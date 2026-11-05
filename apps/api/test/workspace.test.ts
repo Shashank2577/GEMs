@@ -1,8 +1,7 @@
 /** Bid workspace API (T063, T067; FR-023, FR-028, US4 acceptance 1–2, US6 activity). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { activityLog, analyses, notifications } from '@tp/db';
-import type { ChecklistItem } from '@tp/db';
+import { activityLog, analyses, notifications, type ChecklistItem } from '@tp/db';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
@@ -22,7 +21,7 @@ describe('POST /tenders/:id/workspace', () => {
     expect(r.status).toBe(403);
   });
 
-  it('creates the workspace in "go" with auto-mapped vault documents (US4 #1)', async () => {
+  it('creates the workspace in "go" and stores an empty (all-automatic) mapping (US1 #1)', async () => {
     const r = await request(ctx.app, 'POST', `/tenders/${s.tender.id}/workspace`, { cookie: s.org.analyst.cookie });
     expect(r.status).toBe(201);
     expect(r.body.created).toBe(true);
@@ -31,6 +30,8 @@ describe('POST /tenders/:id/workspace', () => {
     expect(r.body.dueAt).toBe('2026-11-20T09:30:00.000Z');
     // Nothing is stored: every item stays "automatic" (absent key, FR-014) and is resolved at read time.
     expect(r.body.mapping).toEqual({});
+    const [created] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.action, 'workspace.created'), eq(activityLog.entityId, r.body.id)));
+    expect(created.meta).toMatchObject({ autoMatched: 4, stage: 'go' });
     wsId = r.body.id;
   });
 

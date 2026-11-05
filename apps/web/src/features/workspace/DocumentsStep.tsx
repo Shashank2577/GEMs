@@ -87,7 +87,7 @@ export function DocumentsStep({ data, onNext, onOpenAnnexure }: { data: Workspac
         </div>
       </div>
 
-      <div role="tabpanel" id={panelId} aria-labelledby={tabId(filter)}>
+      <div role="tabpanel" id={panelId} aria-labelledby={tabId(filter)} tabIndex={0} className="focus-ring rounded-lg">
         <ul className="grid grid-cols-1 gap-2.5">
           {shown.map((it) => (
             <ChecklistRow key={it.item.id} wsId={data.workspace.id} it={it} doc={it.docId ? docs.get(it.docId) ?? null : null} allDocs={data.vaultDocs} onOpenAnnexure={onOpenAnnexure} />
