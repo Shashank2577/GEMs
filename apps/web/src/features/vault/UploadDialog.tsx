@@ -8,6 +8,7 @@ import {
 } from '@/components/ui';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useUploadVault } from './api';
+import { checkVaultFile } from './file-check';
 import { DocumentForm, emptyDraft, validateDraft, type DocDraft } from './DocumentForm';
 
 const titleFrom = (name: string) => name.replace(/\.[A-Za-z0-9]{1,5}$/, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').replace(/(?<!\d)(20\d{2}) (\d{2})(?!\d)/, '$1-$2').trim();
@@ -33,11 +34,13 @@ export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUp
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    if (initialFile) { setFile(initialFile); setDraft(draftForFile(initialFile, presetType)); }
+    if (initialFile && !checkVaultFile(initialFile)) { setFile(initialFile); setDraft(draftForFile(initialFile, presetType)); }
     else { setFile(null); setDraft(emptyDraft(presetType ?? 'other')); }
   }, [open, initialFile, presetType]);
 
   const pick = (f: File) => {
+    const problem = checkVaultFile(f);
+    if (problem) { setErrors({ file: problem }); return; }
     setFile(f);
     // Keep anything the user already typed; fill the rest from the file name.
     setDraft((d) => {

@@ -9,13 +9,13 @@
  *   GET    /vault/:id             → VaultDocumentDto                                     viewer+
  *   PATCH  /vault/:id             metadata → VaultDocumentDto                            analyst+
  *   PUT    /vault/:id/file        multipart file — replace the file, keep metadata       analyst+
- *   DELETE /vault/:id             removes the row and the blob                           analyst+
+ *   DELETE /vault/:id             removes the row and the blob, unlinks CRAC + OEM refs   analyst+
  *   GET    /vault/:id/download    streams the file (?inline=1 for preview)               viewer+
  */
 import { and, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { PDFDocument } from 'pdf-lib';
-import { pastContracts, users, vaultDocuments } from '@tp/db';
+import { companyProfiles, pastContracts, users, vaultDocuments } from '@tp/db';
 import { uuidSchema } from '@tp/core/contracts/common';
 import {
   VAULT_MAX_BYTES, vaultQuerySchema, vaultUpdateSchema, vaultUploadFieldsSchema, type VaultDocumentDto, type VaultSummary,
@@ -46,7 +46,8 @@ export function sniffMime(bytes: Uint8Array): 'application/pdf' | 'image/png' | 
 
 export function safeFileName(name: string, mime: string): string {
   const ext = mime === 'application/pdf' ? 'pdf' : mime === 'image/png' ? 'png' : 'jpg';
-  let base = (name.split(/[\\/]/).pop() ?? '').replace(/[^\w.\- ()&]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 120);
+  // Keep letters/digits of any script (e.g. Devanagari "प्रमाणपत्र.pdf") so downloads keep the original name (FR-030).
+  let base = (name.split(/[\\/]/).pop() ?? '').normalize('NFC').replace(/[^\p{L}\p{M}\p{N}_.\- ()&]+/gu, '_').replace(/\s+/g, ' ').trim().slice(0, 120);
   base = base.replace(/\.[A-Za-z0-9]{1,5}$/, '');
   return `${base || 'document'}.${ext}`;
 }
@@ -244,6 +245,11 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
   const org = orgId(c);
   const existing = await getDoc(deps, org, c.req.param('id'));
   await deps.db.update(pastContracts).set({ cracDocumentId: null }).where(and(eq(pastContracts.orgId, org), eq(pastContracts.cracDocumentId, existing.id)));
+  // FR-041: unlink profile OEM authorisations pointing at this document (one statement, order preserved).
+  await deps.db.update(companyProfiles).set({
+    oemAuthorizations: sql`(select coalesce(jsonb_agg(case when e->>'documentId' = ${existing.id} then jsonb_set(e, '{documentId}', 'null'::jsonb) else e end order by i), '[]'::jsonb)
+      from jsonb_array_elements(${companyProfiles.oemAuthorizations}) with ordinality as t(e, i))`,
+  }).where(and(eq(companyProfiles.orgId, org), sql`${companyProfiles.oemAuthorizations} @> ${JSON.stringify([{ documentId: existing.id }])}::jsonb`));
   await deps.db.delete(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id)));
   await deps.blobs.delete(existing.blobKey).catch((e) => deps.logger.warn('vault blob delete failed', { key: existing.blobKey, error: String(e) }));
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.deleted', entityType: 'vault_document', entityId: existing.id, meta: { type: existing.type, title: existing.title } });

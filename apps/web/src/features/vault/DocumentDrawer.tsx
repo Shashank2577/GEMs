@@ -11,6 +11,7 @@ import { apiUrl, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { useDeleteVault, useReplaceVaultFile, useUpdateVault } from './api';
+import { checkVaultFile } from './file-check';
 import { DocTypeIcon, ExpiryBadge } from './doc-ui';
 import { DocumentForm, validateDraft, type DocDraft } from './DocumentForm';
 import { serverFieldErrors } from './UploadDialog';
@@ -81,6 +82,8 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
 
   const onReplace = (f: File | undefined) => {
     if (!f) return;
+    const problem = checkVaultFile(f);
+    if (problem) { toast.error(problem); return; }
     replace.mutate({ id: doc.id, file: f }, {
       onSuccess: () => toast.success('File replaced', { description: 'Metadata kept. Update the expiry date if this is a renewed copy.' }),
       onError: (err) => toast.error(errorMessage(err)),

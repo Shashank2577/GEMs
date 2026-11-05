@@ -12,8 +12,9 @@ import {
 import type { VaultDocumentDto } from '@tp/core/contracts/vault';
 import { DOC_CATEGORIES, DOC_TYPES, docTypeInfo, type DocCategory, type DocStatus, type DocType } from '@tp/core/vault/status';
 import {
-  Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, ResponsiveTable, Segmented, Select, Skeleton, StatTile, type Column,
+  Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, ResponsiveTable, Segmented, Select, Skeleton, StatTile, toast, type Column,
 } from '@/components/ui';
+import { ApiError } from '@/lib/api';
 import { RoleGate, useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { useLocalStorage } from '@/lib/hooks';
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { useVault, useVaultDoc, useVaultSummary, type VaultFilters } from './api';
 import { DocTypeIcon, ExpiryBadge, STATUS_LABEL } from './doc-ui';
 import { DocumentDrawer } from './DocumentDrawer';
+import { checkVaultFile } from './file-check';
 import { ExpiryTimeline } from './ExpiryTimeline';
 import { UploadDialog } from './UploadDialog';
 
@@ -152,11 +154,24 @@ export default function VaultPage() {
   const single = useVaultDoc(docId && !inList ? docId : null);
   const openDoc = inList ?? single.data ?? null;
   const setDoc = (id: string | null) => setParam('doc', id);
+  // FR-040: a stale `?doc=<id>` (deleted document, old reminder link) gets a visible message and is dropped from the URL.
+  useEffect(() => {
+    if (docId && !inList && single.error instanceof ApiError && single.error.status === 404) {
+      toast.error('That document could not be found. It may have been deleted.', { id: 'vault-doc-not-found' });
+      setParam('doc', null);
+    }
+  }, [docId, inList, single.error, setParam]);
 
   // Page-level drag & drop
   const [dragging, setDragging] = useState(false);
   const onDragOver = (e: DragEvent) => { if (can('analyst') && e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } };
-  const onDrop = (e: DragEvent) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files?.[0]; if (f && can('analyst')) openUpload(f); };
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (!f || !can('analyst')) return;
+    const problem = checkVaultFile(f);
+    if (problem) toast.error(problem); else openUpload(f);
+  };
 
   const s = summary.data;
   const hasFilters = !!(status || category || type || dq.trim());
@@ -301,9 +316,6 @@ export default function VaultPage() {
 
       <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} initialFile={uploadFile} presetType={presetType} onUploaded={(id) => setDoc(id)} />
       <DocumentDrawer doc={openDoc} open={!!docId && !!openDoc} onOpenChange={(o) => { if (!o) setDoc(null); }} />
-      {docId && single.isError && !inList && (
-        <p role="status" className="sr-only">That document could not be found.</p>
-      )}
     </div>
   );
 }
