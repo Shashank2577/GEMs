@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useBlocker } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Download, Eye, FileSignature, PencilLine, RotateCcw, ExternalLink } from 'lucide-react';
 import type { WorkspaceAnnexure, WorkspaceDetail } from '@tp/core/contracts/apply';
 import {
@@ -99,6 +99,9 @@ function PdfFrame({ src, title }: { src: string; title: string }) {
   );
 }
 
+/** Palette entries grouped by `group`, in catalogue order. */
+const PALETTE_GROUPS = [...INSERTABLE_PLACEHOLDERS.reduce((m, p) => m.set(p.group, [...(m.get(p.group) ?? []), p]), new Map<string, (typeof INSERTABLE_PLACEHOLDERS)[number][]>())];
+
 function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; annexure: WorkspaceAnnexure; onClose: () => void; onSaved: () => void }) {
   const templates = useTemplates();
   const tpl = useMemo(() => templates.data?.items.find((t) => t.key === annexure.key), [templates.data, annexure.key]);
@@ -113,13 +116,26 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
   /** Message from an `unknown_placeholder` refusal (FR-041); cleared when the body changes. */
   const [serverUnknown, setServerUnknown] = useState<string | null>(null);
 
-  useEffect(() => { if (tpl) { setTitle(tpl.title); setBody(tpl.body); } }, [tpl]);
+  /** Text the editor was seeded with (or last saved/restored); edits are compared against it. */
+  const [baseline, setBaseline] = useState<{ title: string; body: string } | null>(null);
+  // Seed once per opened template: a background refetch of the templates list must not wipe edits.
+  useEffect(() => {
+    if (tpl && !baseline) { setTitle(tpl.title); setBody(tpl.body); setBaseline({ title: tpl.title, body: tpl.body }); }
+  }, [tpl, baseline]);
   useEffect(() => { setServerUnknown(null); }, [body]);
 
   const unknown = useMemo(() => unknownPlaceholders(body), [body]);
   const bodyError = unknown.length ? unknownPlaceholderMessage(unknown) : serverUnknown;
   // FR-092: unsaved edits prompt before closing the editor or leaving the page.
-  const dirty = !!tpl && (title !== tpl.title || body !== tpl.body);
+  const dirty = !!baseline && (title !== baseline.title || body !== baseline.body);
+  // In-app navigation (links, Back/Forward, ?step= changes). The blocker only exists while this editor is
+  // mounted and only blocks while dirty, so it never competes with another page's blocker.
+  const blocker = useBlocker(useCallback(
+    ({ currentLocation, nextLocation }: { currentLocation: { pathname: string; search: string }; nextLocation: { pathname: string; search: string } }) =>
+      dirty && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search),
+    [dirty],
+  ));
+  useEffect(() => { if (blocker.state === 'blocked' && !dirty) blocker.reset(); }, [blocker, dirty]);
   useEffect(() => {
     if (!dirty) return;
     const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
@@ -152,7 +168,7 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
     onError: handleError,
   });
   const doReset = () => reset.mutate(annexure.key, {
-    onSuccess: (t) => { setTitle(t.title); setBody(t.body); onSaved(); toast.success('Restored the TenderPilot template'); },
+    onSuccess: (t) => { setTitle(t.title); setBody(t.body); setBaseline({ title: t.title, body: t.body }); onSaved(); toast.success('Restored the TenderPilot template'); },
     onError: (e) => toast.error(errorMessage(e)),
   });
 
@@ -173,9 +189,14 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
               </Field>
               <div>
                 <div className="mb-1.5 text-xs font-medium text-muted-foreground">Insert placeholder</div>
-                <div className="flex flex-wrap gap-1">
-                  {INSERTABLE_PLACEHOLDERS.map((p) => (
-                    <button key={p.path} type="button" onClick={() => insert(p.path)} className="rounded-md border bg-card px-1.5 py-0.5 font-mono text-2xs hover:border-primary/40 hover:text-primary focus-ring" title={p.label} aria-label={`Insert ${p.label} ({{${p.path}}})`}>{p.path}</button>
+                <div className="grid gap-1.5">
+                  {PALETTE_GROUPS.map(([group, items]) => (
+                    <div key={group} role="group" aria-label={group} className="flex flex-wrap items-center gap-1">
+                      <span className="mr-1 text-2xs font-medium uppercase tracking-wide text-muted-foreground">{group}</span>
+                      {items.map((p) => (
+                        <button key={p.path} type="button" onClick={() => insert(p.path)} className="rounded-md border bg-card px-1.5 py-0.5 font-mono text-2xs hover:border-primary/40 hover:text-primary focus-ring" title={placeholderLabel(p.path)} aria-label={`Insert ${placeholderLabel(p.path)} ({{${p.path}}})`}>{p.path}</button>
+                      ))}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -201,18 +222,19 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
         <DialogFooter className="flex-wrap gap-2">
           {tpl?.custom && <Button variant="ghost" onClick={doReset} loading={reset.isPending} className="mr-auto"><RotateCcw /> Restore default</Button>}
           <Button variant="secondary" onClick={preview} loading={previewing} disabled={!tpl || body.trim().length < 20 || unknown.length > 0}><Eye /> Preview</Button>
+          {/* Save stays enabled with unknown placeholders on purpose: the server refuses with 400 unknown_placeholder (FR-041), shown inline. */}
           <Button onClick={doSave} loading={save.isPending} disabled={!tpl || title.trim().length < 3 || body.trim().length < 20}>Save template</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
     <ConfirmDialog
-      open={confirmClose}
-      onOpenChange={setConfirmClose}
+      open={confirmClose || blocker.state === 'blocked'}
+      onOpenChange={(o) => { if (!o) { setConfirmClose(false); if (blocker.state === 'blocked') blocker.reset(); } }}
       title="Discard unsaved changes?"
       description="Your edits to this template have not been saved."
       cancelLabel="Keep editing"
       confirmLabel="Discard changes"
-      onConfirm={() => { setConfirmClose(false); onClose(); }}
+      onConfirm={() => { setConfirmClose(false); if (blocker.state === 'blocked') blocker.proceed(); onClose(); }}
     />
     </>
   );
