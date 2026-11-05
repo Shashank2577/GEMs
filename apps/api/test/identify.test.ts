@@ -2,7 +2,7 @@
  * T038 — Identify routes: tender feed filters/facets/sort/pagination, detail, seen/dismiss, watchlists CRUD +
  * preview + roles, ingestion run/runs roles, notifications, and org isolation.
  */
-import { eq, like, sql } from 'drizzle-orm';
+import { eq, inArray, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { analyses, bidWorkspaces, ingestionRuns, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
 import type { NormalizedTender } from '@tp/core/gem/parse';
@@ -136,6 +136,38 @@ describe('GET /tenders', () => {
     expect((await get('/tenders?bidType=service')).body.total).toBeGreaterThanOrEqual(10);
     expect((await get('/tenders?status=closed')).body.total).toBe(0);
     expect((await get('/tenders?status=all')).body.total).toBe(36);
+  });
+
+  it('008/FR-073 full-text search: multi-word, quoted phrase, -exclusion, or, prefix words, item names, bid-number prefix and digits', async () => {
+    const mk = (bidNumber: string, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber, title, status: 'open' as const, endAt: new Date(REF.getTime() + 10 * 86_400_000), sourceUrl: `https://bidplus.gem.gov.in/${bidNumber}`, contentHash: bidNumber, ...extra,
+    });
+    await ctx.db.insert(tenders).values([
+      mk('GEM/2026/B/7770001', 'Solar Street Light poles with LED', { state: 'Kerala' }),
+      mk('GEM/2026/B/7770002', 'Street light maintenance (sodium vapour)'),
+      mk('GEM/2026/B/7780003', 'Supply of solar water heater', { items: [{ name: 'Light fittings' }] }),
+    ]);
+    const bids = async (q: string) => ((await get(`/tenders?q=${encodeURIComponent(q)}&pageSize=100`)).body.items as { bidNumber: string }[])
+      .map((t) => t.bidNumber).filter((b) => /^GEM\/2026\/B\/77[78]/.test(b)).sort();
+    try {
+      expect(await bids('solar street light')).toEqual(['GEM/2026/B/7770001']); // every word, any field
+      expect(await bids('"street light" -solar')).toEqual(['GEM/2026/B/7770002']); // phrase + exclusion
+      expect(await bids('solar or sodium')).toEqual(['GEM/2026/B/7770001', 'GEM/2026/B/7770002', 'GEM/2026/B/7780003']);
+      expect(await bids('pole')).toEqual(['GEM/2026/B/7770001']); // prefix: "pole" finds "poles"
+      expect(await bids('fittings')).toEqual(['GEM/2026/B/7780003']); // item names
+      expect(await bids('kerala SOLAR')).toEqual(['GEM/2026/B/7770001']); // state, case-insensitive
+      expect(await bids('GEM/2026/B/777')).toEqual(['GEM/2026/B/7770001', 'GEM/2026/B/7770002']); // bid-number prefix
+      expect(await bids('gem/2026/b/7780003')).toEqual(['GEM/2026/B/7780003']);
+      expect(await bids('7780003')).toEqual(['GEM/2026/B/7780003']); // the bid number's digits alone
+      expect(await bids('%')).toEqual([]);
+      expect((await get(`/tenders?q=${encodeURIComponent('"')}`)).status).toBe(200); // malformed websearch input never errors
+      // The feed DTO never carries the tsvector.
+      const one = await get('/tenders?q=7770001');
+      expect(one.body.items[0]).not.toHaveProperty('search');
+      expect((await get(`/tenders/${one.body.items[0].id}`)).body).not.toHaveProperty('search');
+    } finally {
+      await ctx.db.delete(tenders).where(inArray(tenders.bidNumber, ['GEM/2026/B/7770001', 'GEM/2026/B/7770002', 'GEM/2026/B/7780003']));
+    }
   });
 
   it('status selector: closed / awarded / cancelled / all (FR-036)', async () => {
@@ -634,6 +666,40 @@ describe('watchlist SQL helpers and batched matching', () => {
     } finally {
       await ctx.db.delete(tenders).where(eq(tenders.bidNumber, bid));
       await ctx.db.delete(notifications).where(eq(notifications.orgId, org.me.org.id));
+    }
+  });
+
+  it('008/FR-073: the full-text keyword pre-filter keeps every tender the matcher would match (plurals, separators, items, buyer, punctuation)', async () => {
+    const prefix = 'GEM/2099/B/7900';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7900${n}`, contentHash: `fts-${n}`, ...extra,
+    });
+    const preview = async (keywords: string[]) => {
+      const r = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { keywords } } });
+      expect(r.status).toBe(200);
+      return r.body.count as number;
+    };
+    try {
+      await ctx.db.insert(tenders).values([
+        row(1, 'Zorbing balls for parks'), // plural of the keyword
+        row(2, 'Supply of zorb/trampoline sets'), // slash-joined in the text
+        row(3, 'Misc sports goods', { items: [{ name: 'Zorbing harness' }] }), // item names only
+        row(4, 'Annual rate contract', { organisation: 'Zorbtech Board' }), // buyer field
+        row(5, 'Wombat-proof fencing'), // hyphenated
+        row(6, 'R&D quokkatron unit'), // ampersand
+      ]);
+      expect(await preview(['zorbing'])).toBe(2); // rows 1 and 3 — the matcher still applies word boundaries
+      expect(await preview(['zorb'])).toBe(1 + 0); // "zorb/trampoline" (row 2); "Zorbing"/"Zorbtech" are other words
+      expect(await preview(['trampoline'])).toBe(1);
+      expect(await preview(['zorbtech board'])).toBe(1);
+      expect(await preview(['wombat-proof'])).toBe(1);
+      expect(await preview(['wombat proof'])).toBe(1);
+      expect(await preview(['R&D quokkatron'])).toBe(1);
+      expect(await preview(['&'])).toBeGreaterThanOrEqual(1); // no lexemes → the matcher decides on every open tender
+      expect(await preview(['no-such-zorbword'])).toBe(0);
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
     }
   });
 

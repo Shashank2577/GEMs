@@ -16,6 +16,7 @@ import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, notFound, validationError } from '../lib/errors';
 import { visibleTenderSource } from '../lib/tender-scope';
+import { anyKeywordCondition } from '../lib/tender-search';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
@@ -80,14 +81,10 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
   if (criteria.minValue != null) conds.push(or(isNull(tenders.estimatedValue), gte(tenders.estimatedValue, criteria.minValue))!);
   if (criteria.maxValue != null) conds.push(or(isNull(tenders.estimatedValue), sql`${tenders.estimatedValue} <= ${criteria.maxValue}`)!);
   if (criteria.bidTypes.length) conds.push(inArray(tenders.bidType, criteria.bidTypes));
-  // Each dimension: title first (cheapest, most hits), then the other text columns, then item names.
+  // Keywords: GIN-backed full-text pre-filter (008/FR-073) over title, category, buyer fields and item names; the
+  // matcher below applies the exact word-boundary rules.
   const keywords = clean(criteria.keywords);
-  if (keywords.length) {
-    const likes = keywords.map(phraseLike);
-    conds.push(or(ilikeAny(sql`${tenders.title}`, likes),
-      ilikeAny(joined(tenders.category, tenders.department, tenders.ministry, tenders.organisation, tenders.buyerOffice), likes),
-      itemsLikeAny(likes))!);
-  }
+  if (keywords.length) conds.push(anyKeywordCondition(keywords));
   // Categories substring-match category, item names and title.
   const categories = clean(criteria.categories);
   if (categories.length) {
