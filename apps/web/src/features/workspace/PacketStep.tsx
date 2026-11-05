@@ -10,6 +10,7 @@ import {
 import type { PacketDto, PacketItemInput, WorkspaceDetail } from '@tp/core/contracts/apply';
 import { Badge, Button, Card, EmptyState, Progress, Tooltip, toast } from '@/components/ui';
 import { useCan } from '@/lib/auth';
+import { packetReorderAnnouncements } from './a11y';
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, pluralize, relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -107,6 +108,7 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
     const from = included.indexOf(String(e.active.id)), to = included.indexOf(String(e.over.id));
     setOrder(arrayMove(included, from, to));
   };
+  const announcements = useMemo(() => packetReorderAnnouncements(included, (id) => byUid.get(id)?.title ?? 'document'), [included, byUid]);
   const move = (uid: string, dir: -1 | 1) => {
     const i = included.indexOf(uid), j = i + dir;
     if (j < 0 || j >= included.length) return;
@@ -146,7 +148,7 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
             {canWrite && !isComputed && <Button size="xs" variant="ghost" onClick={resetOrder}><RotateCcw /> Default order</Button>}
           </div>
           {items.length ? (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={{ announcements, screenReaderInstructions: { draggable: 'To pick up a document, press space or enter. Use the up and down arrow keys to move it, space or enter to drop it, escape to cancel.' } }}>
               <SortableContext items={included} strategy={verticalListSortingStrategy}>
                 <ol className="divide-y" aria-label="Documents in the packet, in order">
                   {items.map((r, i) => (

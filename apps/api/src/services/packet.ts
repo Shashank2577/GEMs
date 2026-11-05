@@ -393,6 +393,7 @@ export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdVal
   if (bad.length) throw new HttpError(400, 'validation_error', `Unknown packet item(s): ${bad.join(', ')}`, { items: bad });
 
   // 006/FR-056, NFR-003: refuse oversized inputs from stored sizes, before any file is loaded or a row is created.
+  // (Budget-guard shape adapted from erenmyeager15/india-government-tenders-scraper src/run-budget.ts, Apache-2.0; see NOTICE.)
   const sized = items.map((i) => ({
     title: i.title,
     sizeBytes: i.kind === 'vault' ? vaultById.get(i.refId!)?.sizeBytes ?? 0

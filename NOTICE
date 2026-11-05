@@ -31,6 +31,9 @@ listed here with its licence.
    Spec 006 Apply (ported at commit 46925c6, 2026-11-05):
    - apps/api/src/services/packet.ts buildWorkspacePacket loadBytes — the "independent Uint8Array copy before
      PDF load" hardening (Uint8Array.from(bytes) before parsing) adapted from src/pdf.ts parseGemPdfText.
+   - apps/api/src/services/packet.ts buildWorkspacePacket input-size pre-check (413 packet_too_large, 006/FR-056) —
+     the "fail fast against an explicit byte budget before doing any work" shape adapted from src/run-budget.ts
+     (the idea only; no code copied).
    Licence text: https://www.apache.org/licenses/LICENSE-2.0
 
 2. gem-search — https://github.com/arush15june/gem-search

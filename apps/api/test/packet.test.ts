@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { desc, eq } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
-import { analyses, packets, vaultDocuments } from '@tp/db';
+import { analyses, annexureTemplates, packets, vaultDocuments } from '@tp/db';
 import { loadConfig } from '../src/env';
 import { contentDisposition } from '../src/lib/http';
 import { extractPages } from '@tp/core/analyse/pdf-text';
@@ -51,6 +51,19 @@ describe('annexure templates', () => {
     const reset = await request(ctx.app, 'DELETE', '/annexure-templates/non_blacklisting', { cookie: s.org.bidManager.cookie });
     expect(reset.body.custom).toBe(false);
     expect((await request(ctx.app, 'PUT', '/annexure-templates/unknown_key', { cookie: s.org.bidManager.cookie, json: body })).status).toBe(404);
+  });
+
+  it('concurrent saves of the same template key upsert one row (unique index, no 500)', async () => {
+    const mk = (n: number) => request(ctx.app, 'PUT', '/annexure-templates/authority_letter', {
+      cookie: s.org.bidManager.cookie, json: { title: `Authority v${n}`, body: `Authorised signatory letter version ${n} for {{tender.bidNumber}}.` },
+    });
+    const rs = await Promise.all([mk(1), mk(2), mk(3), mk(4)]);
+    expect(rs.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+    const rows = await ctx.db.select().from(annexureTemplates).where(eq(annexureTemplates.key, 'authority_letter'));
+    expect(rows.filter((r) => r.orgId === s.org.orgId)).toHaveLength(1);
+    // the database itself refuses a duplicate (org_id, key)
+    await expect(ctx.db.insert(annexureTemplates).values({ orgId: s.org.orgId, key: 'authority_letter', title: 'dup', body: 'dup body' })).rejects.toThrow();
+    await request(ctx.app, 'DELETE', '/annexure-templates/authority_letter', { cookie: s.org.bidManager.cookie });
   });
 
   it('renders annexure PDFs filled with company & tender data (alias keys accepted)', async () => {

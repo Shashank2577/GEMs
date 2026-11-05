@@ -126,18 +126,39 @@ DTOs (`packages/core/src/contracts/vault.ts`):
 | POST (W) | /tenders/:id/workspace | create-or-get workspace (stage `identified`, or `go/no_go` hint from analysis) |
 | GET | /workspaces | `stage?` → cards for Kanban: tender summary, score, owner, due, readiness % |
 | GET | /workspaces/:id | workspace + tender + analysis + `readiness` + packets + comments |
-| PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?}`; moving to `ready` blocked (409) if mandatory items missing/expired and not overridden |
+| PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?: {result:'won'\|'lost', l1Price?, ourPrice?, notes?}\|null}`; moving to `ready` is blocked (409 `not_ready`, or `conflict` with `reason:'not_analysed'`) if mandatory items are missing/expired and not overridden; reaching `won`/`lost` (by `stage` or by `outcome`) from any stage other than `submitted`/`won`/`lost` is 409 `invalid_transition` (`details:{from,to}`). A position move renumbers the column in one transaction under a per-(org, stage) advisory lock |
 | PUT (W) | /workspaces/:id/mapping | `{[itemId]: vaultDocId|null}` |
-| POST (M) | /workspaces/:id/overrides | `{itemId, reason}` |
-| GET/POST (W) | /workspaces/:id/comments | POST is Analyst+ (002/FR-022) |
+| POST (M) | /workspaces/:id/overrides | `{itemId, reason}` → 201 `{workspace, readiness}`; only a missing or expired item can be overridden, otherwise 409 `nothing_to_override` (`details:{itemId,state}`); an item not in the checklist is 400 `validation_error` |
+| DELETE (M) | /workspaces/:id/overrides/:itemId | removes an override → `{workspace, readiness}`; 404 when there is none |
+| GET/POST (W) | /workspaces/:id/comments | POST `{body}` is Analyst+ (002/FR-022), 201 `{id, body, user, createdAt}`; `@mentions` notify the mentioned members |
+| DELETE | /workspaces/:id/comments/:commentId | 204; the comment's author or a Bid Manager+ (anyone else 403 `forbidden`); unknown id or another workspace/org's comment is 404 |
 | GET | /annexure-templates | system + org templates |
-| PUT (M) | /annexure-templates/:key | `{title, body}` org override |
+| PUT (M) | /annexure-templates/:key | `{title, body}` org override (atomic upsert on the unique `(org_id, key)` index); a body with a `{{placeholder}}` outside the supported context paths is 400 `unknown_placeholder` (`details:{unknown:[…]}`, message "Unknown placeholder {{x}} — use one from the list."); an unknown key is 404 |
+| DELETE (M) | /annexure-templates/:key | resets the org override to the system template |
+| POST (W) | /workspaces/:id/annexures/:key/preview | `{title, body}` → rendered PDF of an unsaved draft (same `unknown_placeholder` check) |
 | GET | /workspaces/:id/annexures/:key.pdf | rendered annexure PDF |
-| POST (W) | /workspaces/:id/packets | `{items: PacketItem[]}` (optional, default order) → `Packet` (merged PDF built) |
+| GET | /workspaces/:id/packets | newest first (max 50) |
+| POST (W) | /workspaces/:id/packets | `{items: PacketItem[]}` (optional, default order) → 201 `Packet` (merged PDF built). If the stored sizes of the selected documents exceed `PACKET_MAX_INPUT_BYTES` nothing is loaded or created: 413 `packet_too_large` (`details:{totalBytes,limitBytes,items:[{title,sizeBytes}]}` — the 10 largest). A failed build is 500 `packet_build_failed` (`details.packet`). Rate limited (`rate_limited`, per org) |
 | GET | /packets/:id/download | merged PDF |
 | GET | /assist/:workspaceId | session or Bearer token → `{tender:{bidNumber,title}, fields:[{key,label,value,selectorHints[]}], documents:[{title, fileName, url}], humanSteps:[...]}` — never includes price |
-| PUT (W) | /workspaces/:id/assist-values | `{[key]: value}` (price-like keys rejected) |
-| POST (W) | /workspaces/:id/submitted | marks stage `submitted`, records time |
+| PUT (W) | /workspaces/:id/assist-values | `{[key]: value}` (an empty value removes the key) → `{assistValues}`; price-like keys are 400 `forbidden_field` (`details:{fields,forbidden}`), other invalid values 400 `validation_error` |
+| POST (W) | /workspaces/:id/submitted | `{submittedAt?: ISO datetime, note?}` → the workspace in stage `submitted` with `submittedAt` (default now). Informational only: open checklist blockers are logged (`openBlockers`), not refused. 409 `conflict` when the bid already has an outcome (`won`/`lost`) or was `dropped` |
+| GET (W) | /tenders/:id/result-hint | optional L1 price hint from GeM's public result page → `BidResultHint` (`{available:false, reason}` when GeM has none, e.g. `no_gem_id`). Requires a workspace for the tender (404 otherwise); cached 15 min per GeM bid, 20 lookups/org/hour then 429 `rate_limited`. Refused for read-only tokens (`read_only_token`) because it has side effects |
+
+Apply error codes (all use the standard error envelope):
+
+| Code | Status | When |
+|---|---|---|
+| `invalid_transition` | 409 | PATCH `/workspaces/:id` to `won`/`lost` (stage or outcome) before the bid was submitted. "Record the submission on GeM first — a bid can only be won or lost after it was submitted." (006/FR-008) |
+| `not_ready` | 409 | Moving to `ready` while mandatory checklist items are missing/expired and not overridden; `details.blockers` lists them (006/FR-005) |
+| `nothing_to_override` | 409 | Override of an item that is present and valid (006/FR-027) |
+| `unknown_placeholder` | 400 | Annexure template or preview body contains a `{{placeholder}}` that is not supported (006/FR-041) |
+| `forbidden_field` | 400 | Assist values containing a price-like key (never entered on GeM) |
+| `packet_too_large` | 413 | Selected packet documents exceed the input budget (006/FR-056) |
+| `packet_build_failed` | 500 | The merged PDF could not be built |
+| `read_only_token` | 403 | A non-GET/HEAD request, or a GET with side effects, with a `scope:"read"` API token; message "This API token is read-only" (006/FR-074) |
+
+Token scope (006/FR-074): `POST /me/api-tokens` accepts `scope: "full" | "read"` (default `full`; fixed at creation, session-only so a token can never mint a broader one). `GET`/`HEAD` work with either scope; every other method needs `full`. An unknown or missing stored scope is treated as read-only (fails closed). Cookie sessions are never affected.
 
 ## Dashboard & demo — owner: Experience module (`routes/dashboard.ts`, `routes/demo.ts`)
 

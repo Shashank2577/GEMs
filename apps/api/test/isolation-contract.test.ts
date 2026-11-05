@@ -122,6 +122,10 @@ const FOREIGN: Record<string, () => Call> = {
   'POST /workspaces/:id/overrides': () => asB('POST', `/workspaces/${ids.workspace}/overrides`, { itemId: 'gst', reason: 'Hijack attempt' }),
   'GET /workspaces/:id/comments': () => asB('GET', `/workspaces/${ids.workspace}/comments`),
   'POST /workspaces/:id/comments': () => asB('POST', `/workspaces/${ids.workspace}/comments`, { body: 'Hijack' }),
+  'GET /workspaces/:id/packets': () => asB('GET', `/workspaces/${ids.workspace}/packets`),
+  'DELETE /workspaces/:id/overrides/:itemId': () => asB('DELETE', `/workspaces/${ids.workspace}/overrides/oem_authorization`),
+  'POST /workspaces/:id/annexures/:key/preview': () =>
+    asB('POST', `/workspaces/${ids.workspace}/annexures/authority_letter/preview`, { title: 'Authority', body: 'Draft body for {{tender.bidNumber}}.' }),
   'DELETE /workspaces/:id/comments/:commentId': () => asB('DELETE', `/workspaces/${ids.workspace}/comments/${ids.comment}`),
   'GET /workspaces/:id/annexures/:key.pdf': () => asB('GET', `/workspaces/${ids.workspace}/annexures/non_blacklisting.pdf`),
   'POST /workspaces/:id/packets': () => asB('POST', `/workspaces/${ids.workspace}/packets`, {}),
@@ -139,10 +143,6 @@ const FOREIGN: Record<string, () => Call> = {
 
 /** Implemented routes not (yet) in the contract, swept the same way. */
 const FOREIGN_EXTRA: Record<string, () => Call> = {
-  'GET /workspaces/:id/packets': () => asB('GET', `/workspaces/${ids.workspace}/packets`),
-  'DELETE /workspaces/:id/overrides/:itemId': () => asB('DELETE', `/workspaces/${ids.workspace}/overrides/oem_authorization`),
-  'POST /workspaces/:id/annexures/:key/preview': () =>
-    asB('POST', `/workspaces/${ids.workspace}/annexures/authority_letter/preview`, { title: 'Authority', body: 'Draft body for {{tender.bidNumber}}.' }),
 };
 
 /** Parameter is public/global data; the call may succeed but must only affect org B. Run after the foreign sweep. */
