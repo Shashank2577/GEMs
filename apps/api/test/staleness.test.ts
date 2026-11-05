@@ -9,7 +9,7 @@ import { PDFDocument } from 'pdf-lib';
 import { analyses, tenderDocuments, tenders } from '@tp/db';
 import type { LlmClient } from '../src/deps';
 import { keepStaleOnCompletion, markStale } from '../src/services/staleness';
-import { analyseTender, toAnalysisDto } from '../src/services/analyse';
+import { analyseTender, rescoreAnalysis, toAnalysisDto } from '../src/services/analyse';
 import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
 
 let ctx: TestContext;
@@ -177,6 +177,32 @@ describe('run completion keeps a flag set while it ran (FR-045, T074)', () => {
     }).returning();
     await ctx.db.update(analyses).set({ status: 'done', ...keepStaleOnCompletion() }).where(eq(analyses.id, a.id));
     expect(await row(a.id)).toMatchObject({ status: 'done', stale: false, staleReason: null, staleAt: null });
+  });
+});
+
+// Review S1: Re-score locks its row together with the timed-out running rows it expires, in id order, like markStale.
+describe('Re-score and markStale lock in the same order (S1)', () => {
+  it('concurrent Re-scores (expiring a timed-out run) and corrigenda never deadlock', async () => {
+    for (let i = 0; i < 8; i++) {
+      await ctx.db.delete(analyses);
+      const long = new Date(ctx.clock.now().getTime() - 10 * 60_000);
+      // Both orders of ids between the done row and the timed-out running row occur across iterations.
+      const [x, y] = await ctx.db.insert(analyses).values([
+        { orgId: orgA, tenderId: openT, status: 'done', createdAt: long, updatedAt: long },
+        { orgId: orgA, tenderId: openT, status: 'running', createdAt: long, updatedAt: long },
+      ]).returning();
+      const done = x.status === 'done' ? x : y;
+      await markStale(ctx.db, { orgId: orgA, tenderIds: [openT] }, 'profile_changed', ctx.clock.now());
+      const results = await Promise.allSettled([
+        rescoreAnalysis(ctx.deps, { orgId: orgA, userId: userA, analysisId: done.id, viewer: {} }),
+        markStale(ctx.db, { tenderIds: [openT] }, 'corrigendum', ctx.clock.now()),
+        markStale(ctx.db, { orgId: orgA, openOnly: true }, 'vault_changed', ctx.clock.now()),
+      ]);
+      for (const r of results) {
+        // Re-score may lose the race to the corrigendum (409 reanalysis_required); a deadlock (40P01) is never acceptable.
+        if (r.status === 'rejected') expect((r.reason as { code?: string }).code).toBe('reanalysis_required');
+      }
+    }
   });
 });
 

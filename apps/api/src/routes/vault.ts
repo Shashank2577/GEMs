@@ -310,18 +310,22 @@ vaultRoutes.post('/vault', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_LARGE), r
   await deps.blobs.put(blobKey, file.bytes, { contentType: file.mime });
   let row: VaultRow;
   try {
-    [row] = (await deps.db.insert(vaultDocuments).values({
-      id, orgId: org, type: meta.type as DocType, title: meta.title ?? titleFromFileName(file.name), number: meta.number ?? null,
-      issuer: meta.issuer ?? null, issueDate: meta.issueDate ?? null, expiryDate: meta.expiryDate ?? null,
-      financialYear: meta.financialYear ?? null, tags: meta.tags ?? [], blobKey, fileName, mimeType: file.mime,
-      sizeBytes: file.bytes.length, pageCount, uploadedBy: userId(c), contentSha256,
-    }).returning()) as [VaultRow];
+    row = await deps.db.transaction(async (tx) => {
+      const [inserted] = (await tx.insert(vaultDocuments).values({
+        id, orgId: org, type: meta.type as DocType, title: meta.title ?? titleFromFileName(file.name), number: meta.number ?? null,
+        issuer: meta.issuer ?? null, issueDate: meta.issueDate ?? null, expiryDate: meta.expiryDate ?? null,
+        financialYear: meta.financialYear ?? null, tags: meta.tags ?? [], blobKey, fileName, mimeType: file.mime,
+        sizeBytes: file.bytes.length, pageCount, uploadedBy: userId(c), contentSha256,
+      }).returning()) as [VaultRow];
+      // The vault feeds scoring (FR-044); flagged with the write so it commits with it or not at all (S2).
+      await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
+      return inserted;
+    });
   } catch (e) {
     await deps.blobs.delete(blobKey).catch(() => {});
     throw e;
   }
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.uploaded', entityType: 'vault_document', entityId: id, meta: { type: row.type, title: row.title, fileName } });
-  await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json(await dto(deps, row), 201);
 });
 
@@ -340,10 +344,14 @@ vaultRoutes.patch('/vault/:id', requireRole('analyst'), async (c) => {
   if (issue && expiry && expiry < issue) throw validationError('expiryDate: Expiry date is before the issue date', { fields: { expiryDate: 'Expiry date is before the issue date' } });
   // A renewed expiry date restarts the 30/7/1 reminder cycle.
   if (patch.expiryDate !== undefined && patch.expiryDate !== existing.expiryDate) patch.lastReminderDays = null;
-  const [row] = await deps.db.update(vaultDocuments).set({ ...patch, updatedAt: deps.clock.now() })
-    .where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id))).returning();
+  const [row] = await deps.db.transaction(async (tx) => {
+    const rows = await tx.update(vaultDocuments).set({ ...patch, updatedAt: deps.clock.now() })
+      .where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id))).returning();
+    if (rows.length && Object.keys(patch).length) await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now()); // with the write (S2)
+    return rows;
+  });
+  if (!row) throw notFound('Document');
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.updated', entityType: 'vault_document', entityId: existing.id, meta: { fields: Object.keys(input) } });
-  if (Object.keys(patch).length) await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json(await dto(deps, row!));
 });
 
@@ -396,6 +404,7 @@ vaultRoutes.put('/vault/:id/file', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_L
       if (drop.length) {
         await tx.delete(vaultDocumentVersions).where(and(eq(vaultDocumentVersions.orgId, org), inArray(vaultDocumentVersions.id, drop.map((v) => v.id))));
       }
+      await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now()); // with the write (S2)
       return { row: updated, pruned: drop.map((v) => v.blobKey) };
     }));
   } catch (e) {
@@ -409,7 +418,6 @@ vaultRoutes.put('/vault/:id/file', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_L
   if (expiryChanged) {
     await logActivity(deps.db, { orgId: org, userId: uid, action: 'vault.renewed', entityType: 'vault_document', entityId: existing.id, meta: { fromExpiry: existing.expiryDate, toExpiry: row.expiryDate } });
   }
-  await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json(await dto(deps, row));
 });
 
@@ -432,6 +440,7 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
     const [gone] = await tx.delete(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id)))
       .returning({ blobKey: vaultDocuments.blobKey });
     if (!gone) throw notFound('Document');
+    await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now()); // with the write (S2)
     return [gone.blobKey, ...versions.map((v) => v.blobKey)];
   });
   // After commit: the blobs (current file + versions) and the activity entry.
@@ -439,7 +448,6 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
     await deps.blobs.delete(key).catch((e) => deps.logger.warn('vault blob delete failed', { key, error: String(e) }));
   }
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.deleted', entityType: 'vault_document', entityId: existing.id, meta: { type: existing.type, title: existing.title } });
-  await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json({ ok: true as const });
 });
 

@@ -118,6 +118,7 @@ export default function TenderPage() {
   const docCount = docs.data?.total ?? t.documents.length;
   const hasGemLink = !!(t.gemBidId || t.documentUrl);
   const stale = !!analysis?.stale || (!!t.analysis?.stale && analysis?.id === t.analysis.id);
+  const staleSince = staleSinceCopy(analysis?.staleAt);
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-6">
@@ -148,7 +149,7 @@ export default function TenderPage() {
               <div className="min-w-0 flex-1 text-sm">
                 <div className="font-semibold">
                   Re-analysis needed
-                  {staleSinceCopy(analysis?.staleAt) && <span className="ml-2 text-xs font-normal text-muted-foreground">{staleSinceCopy(analysis?.staleAt)}</span>}
+                  {staleSince && <span className="text-xs font-normal text-muted-foreground"> · {staleSince}</span>}
                 </div>
                 <div className="text-muted-foreground">{staleReasonCopy(analysis?.staleReason)}</div>
               </div>

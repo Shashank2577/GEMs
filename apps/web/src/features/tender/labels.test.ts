@@ -26,7 +26,8 @@ describe('stale banner copy per reason (FR-043)', () => {
   it('says when it became stale, relative to now', () => {
     const now = new Date('2026-11-05T12:00:00Z');
     expect(staleSinceCopy('2026-11-05T10:00:00Z', now)).toBe('since 2 hours ago');
-    expect(staleSinceCopy('2026-11-05T11:59:50Z', now)).toBe('just now');
+    expect(staleSinceCopy('2026-11-05T11:59:50Z', now)).toBe('since just now');
+    expect(staleSinceCopy('2026-11-05T12:05:00Z', now)).toBe('since just now'); // clock skew: never "since in 5 minutes"
     expect(staleSinceCopy(null, now)).toBeNull();
     expect(staleSinceCopy('garbage', now)).toBeNull();
   });

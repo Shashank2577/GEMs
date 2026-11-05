@@ -682,18 +682,24 @@ describe('vault — headers, replace, isolation and rollback (T033)', () => {
   it('a failed DB insert removes the blob it just wrote (FR-023)', async () => {
     const written: string[] = [];
     const blobs: AppDeps['blobs'] = { ...ctx.deps.blobs, put: async (key, body, o) => { written.push(key); return ctx.deps.blobs.put(key, body, o); } };
-    const db = new Proxy(ctx.db, {
+    // The insert now runs inside a transaction with its stale flag (004 review S2): fail it on the db and on any tx.
+    const failVaultInserts = <T extends object>(inner: T): T => new Proxy(inner, {
       get(target, prop, recv) {
         if (prop === 'insert') {
           return (table: unknown) => {
             if (table === vaultDocuments) throw new Error('simulated insert failure');
-            return target.insert(table as typeof vaultDocuments);
+            return (target as typeof ctx.db).insert(table as typeof vaultDocuments);
           };
+        }
+        if (prop === 'transaction') {
+          return (fn: (tx: unknown) => Promise<unknown>, ...rest: unknown[]) =>
+            (target as typeof ctx.db).transaction((tx) => fn(failVaultInserts(tx)) as Promise<never>, ...(rest as []));
         }
         const v = Reflect.get(target, prop, recv);
         return typeof v === 'function' ? v.bind(target) : v;
       },
     });
+    const db = failVaultInserts(ctx.db);
     const app = createApp({ ...ctx.deps, db, blobs });
     const r = await request(app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(), 'doomed.pdf'), title: 'Doomed' } });
     expect(r.status).toBe(500);
