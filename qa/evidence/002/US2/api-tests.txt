@@ -1,23 +1,21 @@
-TEST_DATABASE_URL=... pnpm --filter @tp/api exec vitest run
- ✓ test/auth.test.ts (25 tests) 2508ms
- ✓ test/vault.test.ts (33 tests) 1617ms
- ✓ test/analyse.test.ts (16 tests) 1178ms
- ✓ test/workspace.test.ts (25 tests) 936ms
- ✓ test/identify.test.ts (17 tests) 1335ms
- ✓ test/ingest.test.ts (9 tests) 962ms
- ✓ test/rate-limit.test.ts (16 tests) 3027ms
-   ✓ accept-invite (existing user) and change-password share the limits > existing-user accept-invite: 11th attempt is 429; success resets the counter 346ms
- ✓ test/demo.test.ts (9 tests) 1063ms
- ✓ test/password-reset.test.ts (10 tests) 1335ms
- ✓ test/packet.test.ts (10 tests) 907ms
- ✓ test/sessions.test.ts (8 tests) 743ms
- ✓ test/dashboard.test.ts (7 tests) 616ms
- ✓ test/foundation.test.ts (10 tests) 106ms
- ✓ test/assist.test.ts (6 tests) 690ms
+TEST_DATABASE_URL=... pnpm --filter @tp/api exec vitest run  (commit 7f7c16f, re-review round 2)
+ ✓ test/auth.test.ts (26 tests) 2290ms
+ ✓ test/vault.test.ts (33 tests) 1254ms
+ ✓ test/analyse.test.ts (16 tests) 905ms
+ ✓ test/workspace.test.ts (25 tests) 880ms
+ ✓ test/identify.test.ts (17 tests) 1069ms
+ ✓ test/ingest.test.ts (9 tests) 816ms
+ ✓ test/rate-limit.test.ts (16 tests) 2395ms
+ ✓ test/demo.test.ts (9 tests) 747ms
+ ✓ test/password-reset.test.ts (10 tests) 1017ms
+ ✓ test/packet.test.ts (10 tests) 732ms
+ ✓ test/sessions.test.ts (8 tests) 794ms
+ ✓ test/dashboard.test.ts (7 tests) 533ms
+ ✓ test/foundation.test.ts (10 tests) 92ms
+ ✓ test/assist.test.ts (6 tests) 618ms
  Test Files  14 passed (14)
-      Tests  201 passed (201)
-   Duration  28.88s (transform 1.05s, setup 0ms, collect 9.12s, tests 17.02s, environment 2ms, prepare 752ms)
-
+      Tests  202 passed (202)
+   Duration  24.40s (transform 942ms, setup 0ms, collect 7.83s, tests 14.14s, environment 2ms, prepare 714ms)
 --- auth.test.ts verbose ---
  ✓ test/auth.test.ts > platform basics > GET /api/health reports db status without auth
  ✓ test/auth.test.ts > platform basics > unknown API routes return a JSON 404 in the standard error format
@@ -33,7 +31,8 @@ TEST_DATABASE_URL=... pnpm --filter @tp/api exec vitest run
  ✓ test/auth.test.ts > API tokens (browser extension) > create → Bearer auth → list without secret → revoke
  ✓ test/auth.test.ts > API tokens (browser extension) > cannot revoke another user's token
  ✓ test/auth.test.ts > invitations & roles > owner invites; invitee previews, creates an account and joins with the invited role
- ✓ test/auth.test.ts > invitations & roles > existing user accepts with password, then switches between orgs 334ms
+ ✓ test/auth.test.ts > invitations & roles > existing user accepts with password, then switches between orgs
+ ✓ test/auth.test.ts > invitations & roles > 002/FR-021: sign-in resumes the last-used org across sign-outs, else the oldest membership
  ✓ test/auth.test.ts > invitations & roles > a signed-in user accepting an invite for their email joins with their current account
  ✓ test/auth.test.ts > invitations & roles > 002/FR-018: a signed-in user with a different email cannot redeem the invitation
  ✓ test/auth.test.ts > invitations & roles > expired and invalid invitations are rejected
@@ -44,4 +43,4 @@ TEST_DATABASE_URL=... pnpm --filter @tp/api exec vitest run
  ✓ test/auth.test.ts > invitations & roles > bid managers can revoke pending invitations
  ✓ test/auth.test.ts > organization isolation (Constitution IV) > two orgs cannot see or touch each other's members, invitations or activity
  ✓ test/auth.test.ts > organization isolation (Constitution IV) > activity supports filters and pagination
-      Tests  25 passed (25)
+      Tests  26 passed (26)

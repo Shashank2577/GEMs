@@ -142,10 +142,11 @@ test.describe('sc1-sc6 inviting', () => {
     expect(j.error.message).toBe(`${asha.email} is already a member of this organization`);
     // UI shows the message under the email field
     const msg = `${asha.email} is already a member of this organization`;
-    await expect(page.getByRole('dialog').getByText('Already a member').or(page.getByRole('dialog').getByText(msg)).first()).toBeVisible();
+    // exact spec copy, under the email field (inside the Work email field group, not a toast)
+    await expect(page.getByRole('dialog').getByText(msg, { exact: true })).toBeVisible();
+    expect(j.error.details.fields.email).toBe(msg);
+    await page.waitForTimeout(500);
     await ev(page, 'sc3-already-member');
-    // Spec requires the full server message under the field (QA finding if only the short field hint appears).
-    await expect(page.getByRole('dialog').getByText(msg)).toBeVisible({ timeout: 2000 });
   });
 
   test('sc4 re-inviting a pending address deletes the old invite (404 invite_invalid) and leaves one pending row', async ({ page, request }) => {
@@ -375,6 +376,7 @@ test.describe('sc7-sc12 joining', () => {
       await p.goto(inv.inviteUrl);
       await expect(p.getByRole('alert')).toBeVisible();
       await expect(p.getByText('Ask your admin for a new invitation')).toBeVisible();
+      await expect(p.getByText(INVALID_MSG, { exact: false })).toBeVisible();
       await expect(p.getByRole('button', { name: /Join team|Sign in & join|Accept & join team/ })).toHaveCount(0);
       await expect(p.locator('input[type="password"]')).toHaveCount(0);
       await ev(p, `sc10-${label}`);
@@ -542,6 +544,10 @@ test.describe('sc13-sc15 orgs and resend', () => {
     const d3 = await newCtx(browser, baseURL!);
     login = await d3.request.post('/api/auth/login', { data: { email: me.email, password: me.password } });
     expect((await login.json()).org.name).toBe(me.orgName);
+    // switching org in an OLDER session also counts as 'last used'
+    expect((await page.request.post('/api/auth/switch-org', { data: { orgId: boss.org.id } })).status()).toBe(200);
+    const dOld = await newCtx(browser, baseURL!);
+    expect((await (await dOld.request.post('/api/auth/login', { data: { email: me.email, password: me.password } })).json()).org.name).toBe(ownerU.orgName);
     // switch back to inviter org, then get removed from it: next login falls back to the oldest membership
     expect((await d3.request.post('/api/auth/switch-org', { data: { orgId: boss.org.id } })).status()).toBe(200);
     const myId = (await meOf(page.context())).body.user.id;
@@ -561,7 +567,7 @@ test.describe('sc13-sc15 orgs and resend', () => {
     void request;
   });
 
-  test('sc14b after an explicit sign-out the next sign-in (observation: which org is chosen)', async ({ page, browser, baseURL }) => {
+  test('sc14b after an explicit sign-out the next sign-in resumes the last-used org', async ({ page, browser, baseURL }) => {
     const { me, ownerU } = await twoOrgUser(page, browser, baseURL!);
     expect((await meOf(page.context())).body.org.name).toBe(ownerU.orgName);
     await page.request.post('/api/auth/logout');
@@ -570,7 +576,7 @@ test.describe('sc13-sc15 orgs and resend', () => {
     const org = (await login.json()).org.name;
     test.info().annotations.push({ type: 'observation', description: `after logout, next login active org = ${org} (last used was ${ownerU.orgName}; oldest is ${me.orgName})` });
     console.log(`SC14B_OBSERVED_ORG=${org} last_used=${ownerU.orgName} oldest=${me.orgName}`);
-    // Recorded, not asserted: the verdict decides whether "most recent session" includes signed-out sessions.
+    expect(org).toBe(ownerU.orgName); // last-used org survives sign-out (users.last_org_id)
   });
 
   test('sc15 Resend: fresh link + new 7-day expiry, old link dead, toast "Invitation resent to <email>"', async ({ page, request }) => {

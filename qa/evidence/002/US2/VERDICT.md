@@ -1,9 +1,9 @@
-## QA verdict — REJECTED
+## QA verdict — APPROVED (re-review round 2, commit 7f7c16f; supersedes round 1 REJECTED)
 
 **Work item:** #4 · **PR:** #487 · **Reviewer:** qa (claude-code/Sonnet 5.5) · **Session:** https://claude.ai/code/session_01BUi6mFdfjz9y1F3zKYmWQB
 
-Tests: `e2e/002/US2-invitations.e2e.ts` (desktop + mobile `@mobile` accept flow): **16 passed, 1 failed** (sc3 UI, a genuine product defect).
-API suite: 201/201 passed, see [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/api-tests.txt).
+Tests: `e2e/002/US2-invitations.e2e.ts` (desktop + mobile `@mobile` accept flow): **17 passed, 0 failed**. Round 1 had 16 passed / 1 failed (sc3 UI defect); sc3 now asserts the exact spec copy, sc14b now asserts last-used org survives sign-out, sc14 also covers a switch made in an older session, sc10 asserts the full invalid-link copy on the page.
+API suite: 202/202 passed (new test: FR-021 sign-in resumes the last-used org across sign-outs), see [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/api-tests.txt).
 
 ### Acceptance criteria
 
@@ -14,7 +14,7 @@ API suite: 201/201 passed, see [api-tests.txt](https://github.com/Shashank2577/G
 | 1c | sc1: email with subject "<Inviter> invited you to <Org> on TenderPilot" sent/logged | met (API suite) | Not capturable from Playwright (log mailer writes to API stdout). `apps/api/test/auth.test.ts` "owner invites; invitee previews..." asserts `mailer.sent` subject contains the org name; passed, see [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/api-tests.txt). Exact subject format confirmed by reading `org.ts` `sendInviteEmail`. |
 | 2 | sc2: "asha@" -> inline "Enter a valid email address", no request sent | met | [sc2-invalid-email.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc2-invalid-email.png) (request counter = 0) |
 | 3a | sc3: already a member -> 409 `conflict` "asha@sharma.in is already a member of this organization" | met (API) | e2e response assertion in sc3 test |
-| 3b | sc3: that message is "shown under the email field" | **not met** | UI shows only "Already a member" (the `details.fields.email` hint), not the full message. [sc3-already-member.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc3-already-member.png) |
+| 3b | sc3: that message is "shown under the email field" | met | UI now shows "<email> is already a member of this organization" under the field (exact-text assertion). [sc3-already-member.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc3-already-member.png) |
 | 4a | sc4: re-invite deletes old invitation, old link 404 `invite_invalid` | met | sc4 test; [sc4-one-pending-row.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc4-one-pending-row.png) |
 | 4b | sc4: new one created; Team page shows exactly one pending row | met | [sc4-one-pending-row.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc4-one-pending-row.png) |
 | 5a | sc5: Bid Manager's Role select does not offer "Owner" | met | [sc5-role-options-bid-manager.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc5-role-options-bid-manager.png) (control: Owner sees it, [sc5-role-options-owner-control.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc5-role-options-owner-control.png)) |
@@ -38,25 +38,18 @@ API suite: 201/201 passed, see [api-tests.txt](https://github.com/Shashank2577/G
 | 13a | sc13: switch-org returns `Me`, toast "Switched to <Org>", on /dashboard | met | [sc13-switcher-open.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc13-switcher-open.png), [sc13-switched-dashboard.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc13-switched-dashboard.png) |
 | 13b | sc13: cached queries cleared, new org's data shown | met | [sc13-new-org-team.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc13-new-org-team.png) (previous org's member no longer shown) |
 | 13c | sc13: switching to a non-member org -> 404 | met | sc13 test |
-| 14a | sc14: sign-in resumes the active org of the most recent session (if still a member) | met while that session still exists | sc14 test: second-device login resumes last-used org; [sc14-ui-login-org.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc14-ui-login-org.png) |
+| 14a | sc14: sign-in resumes the active org of the most recent session (if still a member) | met | sc14 test: second-device login resumes last-used org; [sc14-ui-login-org.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc14-ui-login-org.png) |
 | 14b | sc14: otherwise oldest membership | met | sc14 test (removed from last org -> own/oldest org) |
-| 14c | sc14: "signs in again later" after explicit sign-out | **not met** | see finding 2: logout deletes the session row, so the last org is lost and login picks the oldest membership |
+| 14c | sc14: "signs in again later" after explicit sign-out | met | `sc14b` test: after logout, login resumes the last-used org (`users.last_org_id`); a switch made in an older session also counts; API test FR-021 |
 | 15 | sc15: Resend creates fresh link + new 7-day expiry (old link dead), emailed, toast "Invitation resent to <email>" | met (email via API suite) | [sc15-before-resend.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc15-before-resend.png), [sc15-after-resend.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc15-after-resend.png); email: `apps/api/test/auth.test.ts` FR-020 resend test (mailer) passed |
 
 Videos (6, each < 1 MB): sc3, sc4, sc7 desktop/mobile, sc13, sc15 `*.webm` in this folder. Full list of screenshots is in this folder.
 
 ### Findings
 
-1. **blocking** — sc3: the duplicate-member error is not the specified message under the email field.
-   - Observed: invite an existing member -> API 409 `conflict` with message "<email> is already a member of this organization" and `details.fields.email: "Already a member"`; the dialog shows only "Already a member" ([sc3-already-member.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-4-invitations/qa/evidence/002/US2/sc3-already-member.png)).
-   - Expected: "asha@sharma.in is already a member of this organization" shown under the email field.
-   - Where: `apps/web/src/features/settings/sections/TeamSection.tsx` InviteDialog `onError`: `fieldErrors(e2).email ?? errorMessage(e2)` prefers the short field hint. Test: `e2e/002/US2-invitations.e2e.ts` sc3 (fails at the final assertion).
-2. **major** — sc14: the last-used org is not restored after an explicit sign-out.
-   - Observed: user in orgs A (oldest) and B, active B; `POST /api/auth/logout`, then login -> A (test `sc14b`, output `SC14B_OBSERVED_ORG=<A> last_used=<B> oldest=<A>`). `pickSignInOrg` reads the newest `sessions` row, and logout deletes it.
-   - Expected: "Given a user signs in again later ... the active org is the one used in their most recent session". If criteria intend only live sessions this is acceptable, but then the spec should say so.
-   - Where: `apps/api/src/routes/auth.ts` `pickSignInOrg` / `/auth/logout`.
-3. **observation** — "most recent session" is the most recently *created* session, not most recently used: switching org in an older session does not change what the next login picks.
-4. **observation** — sc10 page copy omits the sentence "Ask your admin for a new one." in the body (title says "Ask your admin for a new invitation"); the exact API message is correct. Not blocking (sc11 allows this wording).
+Round 1 findings 1 (sc3 copy) and 2 (last org lost after sign-out) are fixed and verified above. Round 1 observation 4 (invalid-link page body) is also fixed: the page now shows the full API copy (asserted in sc10).
+
+1. **observation** — The rework added migration 0002 (`users.last_org_id`); applied automatically by the e2e server and API tests without error. Not separately reviewed for data backfill on existing users.
 
 ### Not checked
 
@@ -72,4 +65,4 @@ An approval covers what is in the table above. It is not a statement that the ch
 
 ### Verdict
 
-`qa:rejected` — criteria 3b (and 14c) not met. Rejection 1 of 3 on this item.
+`qa:approved` — every criterion met, evidence above. Re-review round 2; replaces the earlier `qa:rejected` (round 1).
