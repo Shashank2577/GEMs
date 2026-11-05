@@ -10,7 +10,8 @@ export interface ActivityInput {
   meta?: Record<string, unknown>;
 }
 
-export async function logActivity(db: Db, a: ActivityInput): Promise<void> {
+/** `db` may be a transaction, so the entry commits (or rolls back) with the change it describes. */
+export async function logActivity(db: Pick<Db, 'insert'>, a: ActivityInput): Promise<void> {
   await db.insert(activityLog).values({
     orgId: a.orgId,
     userId: a.userId ?? null,

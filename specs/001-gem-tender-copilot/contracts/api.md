@@ -55,7 +55,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | GET | /tenders/:id/documents/:docId/download | streams file |
 | POST (W) | /tenders/:id/analyse | runs rules (+LLM if key) → `Analysis` |
 | GET | /tenders/:id/analysis | latest `Analysis` or 404 |
-| POST (W) | /analyses/:id/override | `{factorKey,status,reason}` → re-scored `Analysis` |
+| POST (M) | /analyses/:id/override | `{factorKey,status,reason}` → re-scored `Analysis` |
 | GET/PUT (M) | /scoring-weights | `Record<factorKey, number>` |
 
 ## Profile & Vault — owner: Vault module (`routes/profile.ts`, `routes/vault.ts`)
@@ -81,7 +81,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?}`; moving to `ready` blocked (409) if mandatory items missing/expired and not overridden |
 | PUT (W) | /workspaces/:id/mapping | `{[itemId]: vaultDocId|null}` |
 | POST (M) | /workspaces/:id/overrides | `{itemId, reason}` |
-| GET/POST | /workspaces/:id/comments | – |
+| GET/POST (W) | /workspaces/:id/comments | POST is Analyst+ (002/FR-022) |
 | GET | /annexure-templates | system + org templates |
 | PUT (M) | /annexure-templates/:key | `{title, body}` org override |
 | GET | /workspaces/:id/annexures/:key.pdf | rendered annexure PDF |
