@@ -6,7 +6,8 @@ import { and, eq, gt, ne, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { sessions } from '@tp/db';
 import { summarizeUserAgent, type RevokeOtherSessionsResponse, type SessionsResponse } from '@tp/core/contracts/auth';
-import { requireSession, userId } from '../middleware/auth';
+import { orgId, requireSession, userId } from '../middleware/auth';
+import { logActivity } from '../lib/activity';
 import { notFound } from '../lib/errors';
 import { clearSessionCookie } from '../lib/session';
 import type { AppEnv } from '../types';
@@ -34,8 +35,12 @@ sessionsRoutes.get('/me/sessions', requireSession, async (c) => {
 });
 
 sessionsRoutes.post('/me/sessions/revoke-others', requireSession, async (c) => {
-  const deleted = await c.var.deps.db.delete(sessions)
-    .where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!))).returning({ id: sessions.id });
+  const deleted = await c.var.deps.db.transaction(async (tx) => {
+    const rows = await tx.delete(sessions)
+      .where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!))).returning({ id: sessions.id });
+    if (rows.length) await logActivity(tx, { orgId: orgId(c), userId: userId(c), action: 'auth.sessions_revoked', entityType: 'user', entityId: userId(c), meta: { scope: 'others', count: rows.length } });
+    return rows;
+  });
   const out: RevokeOtherSessionsResponse = { revoked: deleted.length };
   return c.json(out);
 });
@@ -44,9 +49,14 @@ sessionsRoutes.post('/me/sessions/revoke-others', requireSession, async (c) => {
 sessionsRoutes.delete('/me/sessions/:id', requireSession, async (c) => {
   const id = c.req.param('id');
   if (!UUID_RE.test(id)) throw notFound('Session');
-  const deleted = await c.var.deps.db.delete(sessions)
-    .where(and(eq(sessions.id, id), eq(sessions.userId, userId(c)))).returning({ id: sessions.id });
-  if (!deleted.length) throw notFound('Session');
-  if (id === c.var.sessionId) clearSessionCookie(c);
+  const { db } = c.var.deps;
+  const self = id === c.var.sessionId;
+  await db.transaction(async (tx) => {
+    const deleted = await tx.delete(sessions)
+      .where(and(eq(sessions.id, id), eq(sessions.userId, userId(c)))).returning({ id: sessions.id });
+    if (!deleted.length) throw notFound('Session');
+    await logActivity(tx, { orgId: orgId(c), userId: userId(c), action: 'auth.sessions_revoked', entityType: 'user', entityId: userId(c), meta: { scope: self ? 'current' : 'one', count: 1 } });
+  });
+  if (self) clearSessionCookie(c);
   return c.json({ ok: true as const });
 });

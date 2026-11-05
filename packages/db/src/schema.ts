@@ -537,4 +537,7 @@ export const activityLog = pgTable('activity_log', {
   entityId: text('entity_id'),
   meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: createdAt(),
-}, (t) => ({ orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt) }));
+}, (t) => ({
+  orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt),
+  orgTypeIdx: index('activity_org_type_idx').on(t.orgId, t.entityType, t.createdAt),
+}));
