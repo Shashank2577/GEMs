@@ -61,7 +61,7 @@ export function gstinCheckChar(first14: string): string {
 
 export function validateGstin(raw: string): string | null {
   const v = normalizeId(raw);
-  if (v.length !== 15) return 'GSTIN has 15 characters, e.g. 27AAPCS1234K1Z5';
+  if (v.length !== 15) return 'GSTIN has 15 characters, e.g. 27AAPCS1234K1Z2';
   if (!/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v)) {
     return 'GSTIN format: 2-digit state code, 10-character PAN, entity number, "Z", check character';
   }
@@ -80,19 +80,38 @@ export const gstinPan = (raw: string): string => normalizeId(raw).slice(2, 12);
 
 // ───────────── Udyam, CIN, IFSC, pincode ─────────────
 
+/**
+ * State / UT codes used in Udyam registration numbers (UDYAM-<code>-<district>-<serial>), FR-015:
+ * 28 states + 8 union territories.
+ */
+export const UDYAM_STATE_CODES: Record<string, string> = {
+  AP: 'Andhra Pradesh', AR: 'Arunachal Pradesh', AS: 'Assam', BR: 'Bihar', CG: 'Chhattisgarh', GA: 'Goa', GJ: 'Gujarat',
+  HR: 'Haryana', HP: 'Himachal Pradesh', JH: 'Jharkhand', KA: 'Karnataka', KL: 'Kerala', MP: 'Madhya Pradesh',
+  MH: 'Maharashtra', MN: 'Manipur', ML: 'Meghalaya', MZ: 'Mizoram', NL: 'Nagaland', OD: 'Odisha', PB: 'Punjab',
+  RJ: 'Rajasthan', SK: 'Sikkim', TN: 'Tamil Nadu', TS: 'Telangana', TR: 'Tripura', UP: 'Uttar Pradesh', UK: 'Uttarakhand',
+  WB: 'West Bengal',
+  AN: 'Andaman and Nicobar Islands', CH: 'Chandigarh', DN: 'Dadra and Nagar Haveli and Daman and Diu', DL: 'Delhi',
+  JK: 'Jammu and Kashmir', LA: 'Ladakh', LD: 'Lakshadweep', PY: 'Puducherry',
+};
+
 export function validateUdyam(raw: string): string | null {
   const v = normalizeId(raw);
   if (!/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(v)) return 'Udyam number format is UDYAM-XX-00-0000000 (e.g. UDYAM-MH-26-0123456)';
+  const state = v.slice(6, 8);
+  if (!UDYAM_STATE_CODES[state]) return `"${state}" is not a valid state code in a Udyam number`;
   return null;
 }
 
-/** Company Identification Number: L/U + 5-digit industry + state + year + type + 6-digit number. */
-export function validateCin(raw: string): string | null {
+/**
+ * Company Identification Number: L/U + 5-digit industry + state + year + type + 6-digit number.
+ * `now` bounds the incorporation year (≤ next year) and is injectable for deterministic tests (FR-015).
+ */
+export function validateCin(raw: string, now: Date = new Date()): string | null {
   const v = normalizeId(raw);
   if (v.length !== 21) return 'CIN has 21 characters, e.g. U72200MH2015PTC123456';
   if (!/^[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}$/.test(v)) return 'CIN format: L/U, 5-digit industry code, state, year, company type, 6-digit number';
   const year = Number(v.slice(8, 12));
-  if (year < 1850 || year > new Date().getUTCFullYear() + 1) return `Incorporation year ${year} in the CIN looks wrong`;
+  if (year < 1850 || year > now.getUTCFullYear() + 1) return `Incorporation year ${year} in the CIN looks wrong`;
   return null;
 }
 

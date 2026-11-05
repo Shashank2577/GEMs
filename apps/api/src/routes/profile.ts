@@ -3,6 +3,7 @@
  *
  *   GET    /profile                → { profile, completeness, issues, averageTurnover }   viewer+
  *   PUT    /profile                partial upsert (omitted fields keep their value)       analyst+
+ *                                   optional expectedUpdatedAt → 409 conflict on mismatch (FR-014)
  *   GET    /past-contracts         → { items, total }                                     viewer+
  *   POST   /past-contracts         → PastContractDto (201)                                analyst+
  *   PATCH  /past-contracts/:id     → PastContractDto                                      analyst+
@@ -18,9 +19,10 @@ import {
 import { uuidSchema } from '@tp/core/contracts/common';
 import { profileCompleteness } from '@tp/core/vault/completeness';
 import { averageTurnoverLastN } from '@tp/core/vault/validators';
+import { dateTimeIST } from '@tp/core/packet/pdf-utils';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
-import { notFound, validationError } from '../lib/errors';
+import { conflict, notFound, validationError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
@@ -67,8 +69,19 @@ profileRoutes.get('/profile', requireAuth, async (c) => c.json(await buildProfil
 profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
   const { db } = c.var.deps;
   const org = orgId(c);
-  const input = await parseJson(c, profileInputSchema);
+  const { expectedUpdatedAt, ...input } = await parseJson(c, profileInputSchema);
   const [existing] = await db.select().from(companyProfiles).where(eq(companyProfiles.orgId, org));
+  // Optimistic concurrency (FR-014): when the client says which version it edited, refuse to overwrite a newer one.
+  // null means "I saw no saved profile yet", so it conflicts with any existing row.
+  if (expectedUpdatedAt !== undefined) {
+    const stored = existing?.updatedAt ?? null;
+    const expected = expectedUpdatedAt === null ? null : Date.parse(expectedUpdatedAt);
+    if ((stored?.getTime() ?? null) !== expected) {
+      throw conflict(`Someone else saved the profile at ${stored ? dateTimeIST(stored) : 'an earlier time'}. Reload to see their changes.`, {
+        updatedAt: stored?.toISOString() ?? null,
+      });
+    }
+  }
   // Merge: keys absent from the body keep their stored value.
   const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) as Partial<ProfileRow>;
   const merged = { ...EMPTY_PROFILE, ...(existing ?? {}), ...patch };

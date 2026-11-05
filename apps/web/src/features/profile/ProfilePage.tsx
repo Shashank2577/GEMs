@@ -3,12 +3,14 @@
  * Sectioned form with sticky section nav, live inline validation (the same zod schema the API uses),
  * a live completeness meter, and a save bar that appears when there are unsaved changes.
  * Past contracts save immediately through their own endpoints.
+ * Leaving with unsaved edits is guarded both for tab close (beforeunload) and in-app navigation (useBlocker, FR-013);
+ * saves carry `expectedUpdatedAt` so a newer save by someone else returns 409 instead of being overwritten (FR-014).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import {
-  BadgeCheck, Briefcase, Building2, Eye, Flag, Handshake, HelpCircle, IndianRupee, Info, Layers, Rocket, RotateCcw, Save, UserRoundPen, Wand2,
+  AlertTriangle, BadgeCheck, Briefcase, Building2, Eye, Flag, Handshake, HelpCircle, IndianRupee, Info, Layers, RefreshCw, Rocket, RotateCcw, Save, UserRoundPen, Wand2,
 } from 'lucide-react';
 import {
   MII_CLASSES, MII_CLASS_INFO, MSE_CATEGORIES, MSE_SOCIAL_CATEGORIES, profileInputSchema, type CompanyProfileDto, type ProfileInput,
@@ -17,7 +19,7 @@ import { profileCompleteness } from '@tp/core/vault/completeness';
 import { INDIAN_STATES } from '@tp/core/gem/states';
 import { gstinPan, gstinState, panEntityType, validateGstin } from '@tp/core/vault/validators';
 import {
-  Badge, Button, Card, ErrorState, Field, Input, PageHeader, Segmented, Select, Skeleton, Switch, Textarea, Tooltip, toast,
+  Badge, Button, Card, ConfirmDialog, ErrorState, Field, Input, PageHeader, Segmented, Select, Skeleton, Switch, Textarea, Tooltip, toast,
 } from '@/components/ui';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -132,6 +134,9 @@ export default function ProfilePage() {
   const [blurred, setBlurred] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   const [active, setActive] = useState<string>('identity');
+  /** 409 message from a save that lost a race with someone else's save (FR-014). The draft is kept until Reload. */
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [reloading, setReloading] = useState(false);
 
   // Adopt fresh server data unless the user has unsaved edits (e.g. a past-contract change refetches the profile).
   const prevSaved = useRef<Draft | null>(null);
@@ -162,6 +167,11 @@ export default function ProfilePage() {
     window.addEventListener('beforeunload', h);
     return () => window.removeEventListener('beforeunload', h);
   }, [dirty]);
+  // …and before in-app navigation to another page (FR-013). Query-string changes on /profile are not "leaving".
+  const blocker = useBlocker(useCallback(
+    ({ currentLocation, nextLocation }: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }) => dirty && currentLocation.pathname !== nextLocation.pathname,
+    [dirty],
+  ));
 
   // Section scroll-spy
   useEffect(() => {
@@ -201,18 +211,29 @@ export default function ProfilePage() {
       jump(sectionOf(first), first.split('.')[0]);
       return;
     }
-    save.mutate(draft as unknown as ProfileInput, {
+    save.mutate({ ...draft, expectedUpdatedAt: profile.data!.profile.updatedAt } as unknown as ProfileInput, {
       onSuccess: (r) => {
-        setDraft(stripMeta(r.profile)); setSubmitted(false); setBlurred(new Set()); setServerErrors({});
+        setDraft(stripMeta(r.profile)); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null);
         toast.success('Profile saved', { description: `${r.completeness}% complete${r.issues[0] ? ` · next: ${r.issues[0].message}` : ''}` });
       },
       onError: (e) => {
+        if (e instanceof ApiError && e.isConflict) { setConflict(e.message); toast.error(e.message); return; }
         if (e instanceof ApiError && e.details && typeof e.details === 'object' && 'fields' in e.details) setServerErrors((e.details as { fields: Record<string, string> }).fields);
         toast.error(errorMessage(e));
       },
     });
   };
   const discard = () => { setDraft(saved); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); };
+  // Replace the (stale) draft with the latest saved profile only when the user asks to (FR-014).
+  const reload = async () => {
+    setReloading(true);
+    const r = await profile.refetch();
+    setReloading(false);
+    if (!r.data) { toast.error(errorMessage(r.error)); return; }
+    const fresh = stripMeta(r.data.profile);
+    prevSaved.current = fresh;
+    setDraft(fresh); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null);
+  };
 
   // Smart helpers from GSTIN
   const gstOk = !!draft.gstin && !validateGstin(draft.gstin);
@@ -236,6 +257,14 @@ export default function ProfilePage() {
           </div>
         }
       />
+
+      {conflict && !readOnly && (
+        <div role="alert" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-danger/40 bg-danger-soft/60 px-4 py-3 text-sm">
+          <AlertTriangle className="size-4 shrink-0 text-danger" aria-hidden />
+          <span className="min-w-0 flex-1">{conflict}</span>
+          <Button size="sm" variant="secondary" onClick={reload} loading={reloading}><RefreshCw />Reload</Button>
+        </div>
+      )}
 
       {readOnly && (
         <div className="mb-6 flex items-center gap-2.5 rounded-xl border bg-info-soft/60 px-4 py-3 text-sm"><Eye className="size-4 shrink-0 text-info" aria-hidden />You have view-only access. Ask an owner or bid manager to make changes.</div>
@@ -296,8 +325,8 @@ export default function ProfilePage() {
               <Field label="Incorporation date" error={errors.incorporationDate}>
                 <Input id="f-incorporationDate" type="date" value={txt('incorporationDate')} onChange={(e) => set('incorporationDate', e.target.value || null)} max={new Date().toISOString().slice(0, 10)} />
               </Field>
-              <Field label="GSTIN" error={errors.gstin} hint={gstOk ? <span className="text-success">✓ Valid · {gstStateName} · PAN {gstPan}</span> : '15 characters, e.g. 27AAPCS1234K1Z5'}>
-                <Input id="f-gstin" value={txt('gstin')} onChange={(e) => set('gstin', e.target.value.toUpperCase())} maxLength={15} className="font-mono uppercase tracking-wider" placeholder="27AAPCS1234K1Z5" autoComplete="off" spellCheck={false} />
+              <Field label="GSTIN" error={errors.gstin} hint={gstOk ? <span className="text-success">✓ Valid · {gstStateName} · PAN {gstPan}</span> : '15 characters, e.g. 27AAPCS1234K1Z2'}>
+                <Input id="f-gstin" value={txt('gstin')} onChange={(e) => set('gstin', e.target.value.toUpperCase())} maxLength={15} className="font-mono uppercase tracking-wider" placeholder="27AAPCS1234K1Z2" autoComplete="off" spellCheck={false} />
               </Field>
               <Field label="PAN" error={errors.pan} hint={panType && !errors.pan ? <span className="text-success">✓ {panType}</span> : '10 characters, e.g. AAPCS1234K'}>
                 <Input id="f-pan" value={txt('pan')} onChange={(e) => set('pan', e.target.value.toUpperCase())} maxLength={10} className="font-mono uppercase tracking-wider" placeholder="AAPCS1234K" autoComplete="off" spellCheck={false} />
@@ -473,6 +502,16 @@ export default function ProfilePage() {
         </div>,
         document.body,
       )}
+
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(o) => { if (!o && blocker.state === 'blocked') blocker.reset(); }}
+        title="Discard unsaved changes?"
+        description="Your edits to the company profile have not been saved."
+        cancelLabel="Stay"
+        confirmLabel="Discard and leave"
+        onConfirm={() => { if (blocker.state === 'blocked') blocker.proceed(); }}
+      />
     </div>
   );
 }

@@ -110,10 +110,10 @@ export const SheetDescription = DialogDescription;
 
 /** Simple confirm dialog for destructive actions. */
 export function ConfirmDialog({
-  open, onOpenChange, title, description, confirmLabel = 'Confirm', tone = 'danger', loading, onConfirm, children,
+  open, onOpenChange, title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger', loading, onConfirm, children,
 }: {
   open: boolean; onOpenChange: (o: boolean) => void; title: ReactNode; description?: ReactNode;
-  confirmLabel?: string; tone?: 'danger' | 'primary'; loading?: boolean; onConfirm: () => void; children?: ReactNode;
+  confirmLabel?: string; cancelLabel?: string; tone?: 'danger' | 'primary'; loading?: boolean; onConfirm: () => void; children?: ReactNode;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,7 +125,7 @@ export function ConfirmDialog({
         {children}
         <DialogFooter>
           <DialogClose asChild>
-            <button className="inline-flex h-9 items-center justify-center rounded-lg border bg-card px-4 text-sm font-medium hover:bg-muted focus-ring">Cancel</button>
+            <button className="inline-flex h-9 items-center justify-center rounded-lg border bg-card px-4 text-sm font-medium hover:bg-muted focus-ring">{cancelLabel}</button>
           </DialogClose>
           <button
             onClick={onConfirm}

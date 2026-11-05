@@ -1,6 +1,6 @@
 /** Profile & Vault API (T055; FR-020–FR-022, US3 acceptance 1–4). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
 import { activityLog, notifications, vaultDocuments } from '@tp/db';
 import { runExpiryReminders } from '../src/services/reminders';
@@ -72,6 +72,85 @@ describe('profile', () => {
     const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { pan: 'AAACI1681G' } });
     expect(r.status).toBe(400);
     expect(r.body.error.details.fields.pan).toMatch(/AAPFU0939F/);
+  });
+
+  // T013 — remaining profile rules (FR-003, FR-006, FR-007, FR-008)
+  it.each(['+91 98123-45678', '09812345678', '919812345678'])('normalises phone %s to E.164 (FR-006)', async (phone) => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { contactPhone: phone } });
+    expect(r.status).toBe(200);
+    expect(r.body.profile.contactPhone).toBe('+919812345678');
+  });
+
+  it('rejects a 3-digit HSN code (FR-008)', async () => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { hsnCodes: ['847'] } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe('validation_error');
+    expect(r.body.error.details.fields['hsnCodes.0']).toBe('HSN/SAC codes have 4, 6 or 8 digits');
+  });
+
+  it('rejects Class-II with 55% local content (FR-007)', async () => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { miiClass: 'class_2', localContentPct: 55 } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields.localContentPct).toBe('Class-II means 20% to under 50% local content');
+    expect((await request(ctx.app, 'GET', '/profile', { cookie: org.viewer.cookie })).body.profile.miiClass).toBe('class_1');
+  });
+
+  it('rejects an invalid contact email (FR-006)', async () => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { contactEmail: 'bids@' } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields.contactEmail).toBe('Enter a valid email address');
+  });
+
+  it('requires sign-in to read the profile', async () => {
+    const r = await request(ctx.app, 'GET', '/profile');
+    expect(r.status).toBe(401);
+    expect(r.body.error.code).toBe('unauthorized');
+  });
+
+  it('logs profile.updated with only the keys that were sent (FR-003)', async () => {
+    const where = and(eq(activityLog.orgId, org.orgId), eq(activityLog.action, 'profile.updated'));
+    const before = new Set((await ctx.db.select({ id: activityLog.id }).from(activityLog).where(where)).map((a) => a.id));
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Sharma IT', contactEmail: 'Bids@Sharma.in' } });
+    expect(r.status).toBe(200);
+    expect(r.body.profile.contactEmail).toBe('bids@sharma.in');
+    expect(r.body.profile.legalName).toBe('Sharma Infotech Pvt Ltd');
+    const added = (await ctx.db.select().from(activityLog).where(where)).filter((a) => !before.has(a.id));
+    expect(added).toHaveLength(1);
+    expect(((added[0]!.meta as { fields: string[] }).fields).sort()).toEqual(['contactEmail', 'tradeName']);
+  });
+
+  // T020 — optimistic concurrency (FR-014)
+  it('saves when expectedUpdatedAt matches and answers 409 when someone else saved in between', async () => {
+    try {
+      const loaded = (await request(ctx.app, 'GET', '/profile', { cookie: org.analyst.cookie })).body.profile.updatedAt as string;
+      expect(loaded).toBeTruthy();
+      // A saves on top of the version both loaded → 200, and the activity log does not record expectedUpdatedAt as a field.
+      ctx.clock.set('2026-11-04T09:15:00Z'); // 2:45 PM IST
+      const a = await request(ctx.app, 'PUT', '/profile', { cookie: org.owner.cookie, json: { tradeName: 'Sharma IT Solutions', expectedUpdatedAt: loaded } });
+      expect(a.status).toBe(200);
+      expect(a.body.profile.updatedAt).toBe('2026-11-04T09:15:00.000Z');
+      const [lastLog] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, org.orgId), eq(activityLog.action, 'profile.updated'))).orderBy(desc(activityLog.createdAt)).limit(1);
+      expect((lastLog!.meta as { fields: string[] }).fields).toEqual(['tradeName']);
+      // B still holds the older copy → 409, nothing of B's is stored.
+      ctx.clock.set('2026-11-04T09:20:00Z');
+      const b = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Stale edit', expectedUpdatedAt: loaded } });
+      expect(b.status).toBe(409);
+      expect(b.body.error.code).toBe('conflict');
+      expect(b.body.error.message).toBe('Someone else saved the profile at 4 Nov 2026, 2:45 PM IST. Reload to see their changes.');
+      const after = (await request(ctx.app, 'GET', '/profile', { cookie: org.viewer.cookie })).body.profile;
+      expect(after.tradeName).toBe('Sharma IT Solutions');
+      expect(after.updatedAt).toBe('2026-11-04T09:15:00.000Z');
+      // null means "no profile saved yet" and therefore also conflicts with an existing row.
+      expect((await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'X', expectedUpdatedAt: null } })).status).toBe(409);
+      // After reloading, B can save; omitting expectedUpdatedAt keeps last-write-wins for older clients.
+      const b2 = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Sharma IT', expectedUpdatedAt: after.updatedAt } });
+      expect(b2.status).toBe(200);
+      expect((await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Sharma IT' } })).status).toBe(200);
+      const bad = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { expectedUpdatedAt: 'yesterday' } });
+      expect(bad.status).toBe(400);
+    } finally {
+      ctx.clock.set(NOW);
+    }
   });
 
   it('viewer cannot edit the profile', async () => {
