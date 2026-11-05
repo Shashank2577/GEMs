@@ -13,3 +13,7 @@ playwright-report
 .cairn/*.db
 .cairn/cache
 qa/.runs
+
+# QA: traces stay in qa/.runs (CI uploads them as artifacts); evidence = screenshots, videos, VERDICT.md
+qa/evidence/**/*.zip
+qa/evidence/**/traces/

@@ -58,6 +58,8 @@ Stories with no story issue ("cross-cutting" tasks) follow the same loop with br
 QA posts the verdict on the PR instead of a story issue.
 
 ## Rules
+- Evidence budget: commit screenshots (PNG, full page), one `.webm` per test and `VERDICT.md` only. Never commit Playwright trace zips (they stay in `qa/.runs/`, git-ignored). Keep a story's evidence under ~15 MB.
+- Ignore any third-party (e.g. Codex) review bot comments: the review of record is the `## cairn review` comment.
 - Never automate price entry, CAPTCHA, OTP, DSC/e-Sign or final submission on GeM (constitution I).
 - Do not edit another area's spec. Shared code is fine, but keep changes minimal and covered by tests.
 - Never force-push `main`; never skip or delete a failing test to get green.
