@@ -60,3 +60,18 @@ Paying customers will also ask what happens to their data on cancellation.
 - API test with a fixed clock: seeded rows beyond each threshold are removed, rows inside are untouched, and the
   blob store no longer contains the pruned packets.
 - `RETENTION` is referenced from `docs/runbook.md` and the Terms draft.
+
+## Implementation notes (008/US7)
+
+- `RETENTION` in `apps/api/src/services/housekeeping.ts` is the source of truth (runbook § Data retention); batches of
+  1,000 rows, ≤ 50 batches per rule per run; daily claim in `job_runs (job, day)`, an unfinished claim older than one
+  hour is taken over by the next tick.
+- Some batches are not index-backed: the packet candidates come from a `row_number() over (partition by workspace_id …)`
+  window over the whole `packets` table, and `tender_events` / `tenders.raw` batches filter on unindexed
+  `created_at` / `coalesce(end_at, updated_at)`. That is a sequential scan per batch, acceptable at today's sizes
+  (packets ≤ a few per workspace, one run a day off-peak). Revisit (partial index on `packets (workspace_id,
+  created_at desc)`, or on `tenders (coalesce(end_at, updated_at)) where raw is not null`) if a run exceeds ~30 s.
+- Packet R2 objects: multi-key `delete(keys[])` (≤ 1,000 per call), ≤ 1,000 objects per run.
+- `tenders.raw` is nulled on real tenders only (`REAL_ONLY`): the `raw->>'demo'` marker scopes demo tenders.
+- The R2 lifecycle backstop (2) is **not configured**: R2 lifecycle rules match a literal prefix, and `org/*/packets/`
+  is not one. Decision pending in #552 (recommended: new packets under `packets/<orgId>/…` with one `packets/` rule).

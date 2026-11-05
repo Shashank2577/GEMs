@@ -1,0 +1,23 @@
+# Review round 2 rework gate (after merging origin/main 3f3da71, US5 #540)
+$ pnpm -r typecheck
+packages/core typecheck: Done
+tools/mock-gem typecheck: Done
+apps/extension typecheck: Done
+packages/db typecheck: Done
+apps/web typecheck: Done
+apps/api typecheck: Done
+
+$ pnpm --filter @tp/core exec vitest run
+ Test Files  28 passed (28)
+      Tests  541 passed (541)
+
+$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run
+ Test Files  46 passed | 2 skipped (48)
+      Tests  899 passed | 2 skipped (901)
+
+$ pnpm --filter @tp/web exec vitest run
+ Test Files  45 passed (45)
+      Tests  316 passed (316)
+
+$ cd packages/db && pnpm exec drizzle-kit check
+Everything's fine 🐶🔥

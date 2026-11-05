@@ -134,7 +134,7 @@ describe('provider adapters', () => {
   it('scheduled pipeline runs every step', async () => {
     const deps = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     const report = await runScheduledJobs(deps);
-    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup', 'rate-limit-cleanup']);
+    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup', 'rate-limit-cleanup', 'housekeeping']);
   });
 });
 

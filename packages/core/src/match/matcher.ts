@@ -72,7 +72,11 @@ function buildKeywordRegex(keyword: string): RegExp {
   const parts = keyword.trim().split(/\s+/).map(escapeRe);
   // Allow simple plurals on the last word ("laptop" matches "Laptops").
   const body = parts.join('[\\s\\-_/]+');
-  return new RegExp(`(?<![\\p{L}\\p{N}])${body}(?:e?s)?(?![\\p{L}\\p{N}])`, 'iu');
+  // A word boundary is anything but a letter, digit or combining mark (\p{M}: Devanagari matras/virama, decomposed Latin
+  // accents) — a mark belongs to the word it follows, as it does for Postgres' parser, so the full-text pre-filter stays
+  // a superset of these matches (review R2-S1). Known non-superset edge, by design: case folding of Greek final sigma
+  // (σ/ς) and micro sign vs mu (µ/μ) differs between JS `iu` and Postgres `lower()`.
+  return new RegExp(`(?<![\\p{L}\\p{N}\\p{M}])${body}(?:e?s)?(?![\\p{L}\\p{N}\\p{M}])`, 'iu');
 }
 
 function haystacks(t: MatchableTender) {
@@ -103,10 +107,51 @@ export function hasPositiveCriteria(c: MatchCriteria): boolean {
 const shortINR = (n: number) =>
   n >= 1e7 ? `₹${+(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${+(n / 1e5).toFixed(2)} L` : `₹${n.toLocaleString('en-IN')}`;
 
-export function matchTender(tender: MatchableTender, criteria: MatchCriteria, opts: { now?: Date } = {}): MatchResult {
+/**
+ * A watchlist's criteria with every regex built and every string normalised ONCE (008/FR-074). Matching N tenders
+ * against M watchlists compiles M times, not N × M: callers compile per run (`compileCriteria`) and reuse the result.
+ */
+export interface CompiledCriteria {
+  readonly compiled: true;
+  positive: boolean;
+  keywords: { keyword: string; re: RegExp }[];
+  exclude: RegExp[];
+  categories: { value: string; lower: string }[];
+  hsn: string[];
+  states: string[];
+  ministries: { value: string; lower: string }[];
+  minValue: number | null;
+  maxValue: number | null;
+  minDaysToClose: number | null;
+  bidTypes: string[];
+}
+
+export function compileCriteria(c: MatchCriteria): CompiledCriteria {
+  const lowered = (xs: string[] | undefined) => clean(xs).map((value) => ({ value, lower: value.toLowerCase() }));
+  return {
+    compiled: true,
+    positive: hasPositiveCriteria(c),
+    keywords: clean(c.keywords).map((keyword) => ({ keyword, re: buildKeywordRegex(keyword) })),
+    exclude: clean(c.excludeKeywords).map(buildKeywordRegex),
+    categories: lowered(c.categories),
+    hsn: clean(c.hsnCodes).map((x) => x.replace(/\D/g, '')).filter(Boolean),
+    states: clean(c.states).map((x) => x.toLowerCase()),
+    ministries: lowered(c.ministries),
+    minValue: c.minValue ?? null,
+    maxValue: c.maxValue ?? null,
+    minDaysToClose: c.minDaysToClose ?? null,
+    bidTypes: (c.bidTypes ?? []).filter(Boolean),
+  };
+}
+
+const isCompiled = (c: MatchCriteria | CompiledCriteria): c is CompiledCriteria => (c as CompiledCriteria).compiled === true;
+
+/** Match one tender. Pass `compileCriteria(criteria)` when matching many tenders against the same watchlist. */
+export function matchTender(tender: MatchableTender, criteria: MatchCriteria | CompiledCriteria, opts: { now?: Date } = {}): MatchResult {
+  const c = isCompiled(criteria) ? criteria : compileCriteria(criteria);
   const now = opts.now ?? new Date();
   const no: MatchResult = { matched: false, reasons: [], relevance: 0 };
-  if (!hasPositiveCriteria(criteria)) return no;
+  if (!c.positive) return no;
   const reasons: string[] = [];
   let score = 0;
   let dims = 0;
@@ -114,66 +159,60 @@ export function matchTender(tender: MatchableTender, criteria: MatchCriteria, op
   const all = `${h.title} · ${h.other} · ${h.buyer}`;
 
   // Exclusions first (cheap reject).
-  for (const kw of clean(criteria.excludeKeywords)) if (keywordRegex(kw).test(all)) return no;
+  for (const re of c.exclude) if (re.test(all)) return no;
 
-  const keywords = clean(criteria.keywords);
-  if (keywords.length) {
+  if (c.keywords.length) {
     dims++;
     const hits: string[] = [];
     let titleHits = 0;
-    for (const kw of keywords) {
-      const re = keywordRegex(kw);
-      if (re.test(h.title)) { hits.push(kw); titleHits++; } else if (re.test(h.other) || re.test(h.buyer)) hits.push(kw);
+    for (const { keyword, re } of c.keywords) {
+      if (re.test(h.title)) { hits.push(keyword); titleHits++; } else if (re.test(h.other) || re.test(h.buyer)) hits.push(keyword);
     }
     if (!hits.length) return no;
     reasons.push(...hits.map((k) => `Keyword “${k}”`));
-    score += 0.45 * Math.min(1, hits.length / Math.min(keywords.length, 3)) + (titleHits ? 0.15 : 0);
+    score += 0.45 * Math.min(1, hits.length / Math.min(c.keywords.length, 3)) + (titleHits ? 0.15 : 0);
   }
 
-  const cats = clean(criteria.categories);
-  if (cats.length) {
+  if (c.categories.length) {
     dims++;
     const text = `${tender.category ?? ''} · ${h.other} · ${h.title}`.toLowerCase();
-    const hit = cats.find((c) => text.includes(c.toLowerCase()));
+    const hit = c.categories.find((x) => text.includes(x.lower));
     if (!hit) return no;
-    reasons.push(`Category: ${hit}`);
+    reasons.push(`Category: ${hit.value}`);
     score += 0.15;
   }
 
-  const hsn = clean(criteria.hsnCodes).map((x) => x.replace(/\D/g, '')).filter(Boolean);
-  if (hsn.length) {
+  if (c.hsn.length) {
     dims++;
     const codes = tender.hsnCodes ?? [];
-    const hit = hsn.find((w) => codes.some((c) => c.startsWith(w) || w.startsWith(c)));
+    const hit = c.hsn.find((w) => codes.some((x) => x.startsWith(w) || w.startsWith(x)));
     if (!hit) return no;
     reasons.push(`HSN ${hit}`);
     score += 0.15;
   }
 
-  const states = clean(criteria.states).map((s) => s.toLowerCase());
-  if (states.length) {
+  if (c.states.length) {
     dims++;
-    if (!tender.state || !states.includes(tender.state.toLowerCase())) return no;
+    if (!tender.state || !c.states.includes(tender.state.toLowerCase())) return no;
     reasons.push(`State: ${tender.state}`);
     score += 0.1;
   }
 
-  const mins = clean(criteria.ministries);
-  if (mins.length) {
+  if (c.ministries.length) {
     dims++;
     const buyer = h.buyer.toLowerCase();
-    const hit = mins.find((m) => buyer.includes(m.toLowerCase()));
+    const hit = c.ministries.find((m) => buyer.includes(m.lower));
     if (!hit) return no;
-    reasons.push(`Buyer: ${hit}`);
+    reasons.push(`Buyer: ${hit.value}`);
     score += 0.1;
   }
 
-  if (criteria.minValue != null || criteria.maxValue != null) {
+  if (c.minValue != null || c.maxValue != null) {
     dims++;
     const v = tender.estimatedValue;
     if (v != null) {
-      if (criteria.minValue != null && v < criteria.minValue) return no;
-      if (criteria.maxValue != null && v > criteria.maxValue) return no;
+      if (c.minValue != null && v < c.minValue) return no;
+      if (c.maxValue != null && v > c.maxValue) return no;
       reasons.push(`Value ${shortINR(v)}`);
       score += 0.05;
     } else {
@@ -182,15 +221,14 @@ export function matchTender(tender: MatchableTender, criteria: MatchCriteria, op
     }
   }
 
-  if (criteria.minDaysToClose != null && criteria.minDaysToClose > 0) {
+  if (c.minDaysToClose != null && c.minDaysToClose > 0) {
     const d = daysToClose(tender.endAt, now);
-    if (d === null || d < criteria.minDaysToClose) return no;
+    if (d === null || d < c.minDaysToClose) return no;
   }
 
-  const types = (criteria.bidTypes ?? []).filter(Boolean);
-  if (types.length) {
+  if (c.bidTypes.length) {
     dims++;
-    if (!tender.bidType || !types.includes(tender.bidType)) return no;
+    if (!tender.bidType || !c.bidTypes.includes(tender.bidType)) return no;
     score += 0.02;
   }
 
@@ -210,7 +248,7 @@ export function matchWatchlists<W extends { id: string; criteria: MatchCriteria 
 ): { watchlist: W; result: MatchResult }[] {
   const out: { watchlist: W; result: MatchResult }[] = [];
   for (const w of watchlists) {
-    const result = matchTender(tender, w.criteria, opts);
+    const result = matchTender(tender, compileCriteria(w.criteria), opts);
     if (result.matched) out.push({ watchlist: w, result });
   }
   return out;

@@ -1,0 +1,27 @@
+# sc6-email-batch — project desktop — 2026-11-05T10:31:00.438Z
+$ TEST_DATABASE_URL=… pnpm --filter @tp/api exec vitest run test/email-batch.test.ts
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > limits are 100 per call
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > 120 queued emails → exactly 2 calls to /emails/batch (100 + 20); every row sent
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > a failed batch call affects only its rows (permanent 4xx → failed, 429 → retried later); the next batch is still sent
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > review S2: one invalid message (422 for the whole batch) → that chunk is re-sent one per call; only the bad row fails
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > review S2: batch calls carry an idempotency key that is stable across a retry of the same rows; 409 (already accepted) → sent
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > review R2-N1: 409 invalid_idempotent_request (key already settled) → sent; 409 concurrent_idempotent_requests (still in flight) → retried, then sent
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > review R2-N1: a retried email is rendered as of its row (not the dispatch time) → the same payload under the same key
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > 003/US5 × US7 (review R2-B1): an instant corrigendum email goes out in the batch with its own heading and intro
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > 003/US5 × US7 (review R2-B1): with a daily preference a corrigendum joins the digest, not the instant batch
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > sendMany maps the provider ids back in order
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+
+--- apps/api/test/email-batch.test.ts (the 120-email test) ---
+it('120 queued emails → exactly 2 calls to /emails/batch (100 + 20); every row sent', async () => {
+    await queueEmails(120);
+    const report = await dispatchNotifications(deps());
+    expect(calls.map((c) => c.url)).toEqual(['https://api.resend.com/emails/batch', 'https://api.resend.com/emails/batch']);
+    expect(calls.map((c) => (c.body as unknown[]).length)).toEqual([100, 20]);
+    expect((calls[0]!.body as { to: string[]; subject: string; from: string }[])[0]).toMatchObject({ to: [owner.me.user.email], subject: 'Batch email 0', from: 'TenderPilot <alerts@tenderpilot.in>' });
+    expect(report).toMatchObject({ sent: 120, failed: 0, skipped: 0 });
+    const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(notifications)
+      .where(sql`${notifications.orgId} = ${owner.me.org.id} and ${notifications.status} = 'sent' and ${notifications.sentAt} is not null`);
+    expect(n).toBe(120);
+  });
