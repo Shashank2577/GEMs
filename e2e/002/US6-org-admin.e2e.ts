@@ -298,7 +298,7 @@ test('sc4 Scoring weights: change Turnover -> shares update, PUT persists, "Cust
   expect(put.status()).toBe(200);
   expect(JSON.parse(put.request().postData()!)).toMatchObject({ turnover: newV });
   await expect(toast(page, 'Scoring weights saved')).toBeVisible();
-  await expect(toast(page, 'New analyses use them; re-run an analysis to rescore it.')).toBeVisible();
+  await expect(toast(page, 'New analyses use them; open a tender and Re-score to update an existing result.') /* wording since 004/US4 */).toBeVisible();
   await expect(page.getByText('Custom weights', { exact: true })).toBeVisible();
   const saved = await (await bm.api.get('/api/scoring-weights')).json();
   expect(saved.custom).toBe(true);

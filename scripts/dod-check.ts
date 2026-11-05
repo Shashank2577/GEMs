@@ -10,7 +10,11 @@
  *   3. label `spec:<NNN>` plus `US<n>` in the title/body.
  * No story → hardening/cross-cutting PR: passes with a note (unless labelled `type:story`, which then fails).
  *
- * Rules (each reported by name): verdict-exists, verdict-approved, criteria-met, evidence-media, commit-trailers.
+ * Rules (each reported by name): verdict-exists, verdict-approved, criteria-met, evidence-media, commit-trailers,
+ * plus for every PR (story or not): pr-body-refs (`Closes #n` or `Part of #n`) and pr-body-checkboxes (no unticked
+ * `- [ ]` box; `- [~]` marks an explicit deferral and is allowed).
+ * commit-trailers skips merge commits and commits that are already on the base branch (main's squash-merge commits
+ * brought in by `git merge origin/main`); every other PR commit must carry the trailers.
  *
  * Inputs (env): PR_TITLE, PR_BODY, PR_LABELS (JSON array or comma list), BASE_SHA, HEAD_SHA (default HEAD).
  * When GH_TOKEN, PR_NUMBER and GITHUB_REPOSITORY are set, title/body/labels and the PR's commits come from the GitHub
@@ -27,7 +31,14 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export interface PrInfo { title: string; body: string; labels: string[] }
-export interface Commit { sha: string; message: string }
+export interface Commit {
+  sha: string;
+  message: string;
+  /** Number of parents; > 1 is a merge commit (exempt from the trailer rule). */
+  parents?: number;
+  /** Already reachable from the base branch (e.g. main's squash-merge commits pulled in by a merge); exempt. */
+  onBase?: boolean;
+}
 export interface StoryRef { spec: string; story: string; source: string }
 export interface RuleResult { rule: string; ok: boolean; message: string }
 export type StoryIndex = Map<number, { spec: string; story: string }>;
@@ -166,9 +177,25 @@ export function checkMedia(dir: string, files: string[], verdict: string): RuleR
     : { rule: 'evidence-media', ok: true, message: `${png.length} screenshot(s), ${webm.length} video(s)` };
 }
 
+/** Pure: the PR body references its work item(s) and leaves no unticked checkbox (`- [~]` = deferral, allowed). */
+export function checkPrBody(body: string): RuleResult[] {
+  const text = body.replace(/<!--[\s\S]*?-->/g, '');
+  const refs = /\b(?:Closes|Part of)\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i.test(text);
+  const unticked = text.split('\n').map((l) => l.trim()).filter((l) => /^(?:[-*+]|\d+\.)\s+\[ \]/.test(l));
+  return [
+    refs
+      ? { rule: 'pr-body-refs', ok: true, message: 'PR body references its work item' }
+      : { rule: 'pr-body-refs', ok: false, message: 'PR body must contain "Closes #<n>" or "Part of #<n>"' },
+    unticked.length
+      ? { rule: 'pr-body-checkboxes', ok: false, message: `PR body has ${unticked.length} unticked box(es); tick them or mark a deferral with "- [~]":\n${unticked.map((l) => `    ${l}`).join('\n')}` }
+      : { rule: 'pr-body-checkboxes', ok: true, message: 'no unticked boxes' },
+  ];
+}
+
 /** Pure: every commit carries the CONVENTIONS.md trailers. */
-export function checkTrailers(commits: Commit[]): RuleResult {
+export function checkTrailers(all: Commit[]): RuleResult {
   const bad: string[] = [];
+  const commits = all.filter((c) => (c.parents ?? 1) < 2 && !c.onBase);
   for (const c of commits) {
     const missing = REQUIRED_TRAILERS.filter((t) => !new RegExp(`^${t}:\\s*\\S`, 'mi').test(c.message));
     if (missing.length) bad.push(`${c.sha.slice(0, 7)} "${c.message.split('\n')[0]}" missing ${missing.join(', ')}`);
@@ -195,11 +222,14 @@ export interface DodOutcome { ok: boolean; story: StoryRef | null; results: Rule
 export function evaluate(input: DodInput): DodOutcome {
   const story = resolveStory(input.pr, input.commits, input.index);
   const isStoryLabelled = input.pr.labels.some((l) => l.trim().toLowerCase() === 'type:story');
+  const body = checkPrBody(input.pr.body);
   if (!story) {
     if (isStoryLabelled) {
-      return { ok: false, story, notes: [], results: [{ rule: 'story-resolved', ok: false, message: 'PR is labelled type:story but no spec/story could be determined (use title "[<NNN>/US<n>] …")' }] };
+      const results = [{ rule: 'story-resolved', ok: false, message: 'PR is labelled type:story but no spec/story could be determined (use title "[<NNN>/US<n>] …")' }, ...body];
+      return { ok: false, story, notes: [], results };
     }
-    return { ok: true, story, results: [], notes: ['No story referenced (hardening / cross-cutting PR): Definition-of-Done check not applicable.'] };
+    const results = [...body, checkTrailers(input.commits)];
+    return { ok: results.every((r) => r.ok), story, results, notes: ['No story referenced (hardening / cross-cutting PR): QA verdict rules not applicable.'] };
   }
   const path = verdictPath(story);
   const dir = path.replace(/\/VERDICT\.md$/, '');
@@ -213,6 +243,7 @@ export function evaluate(input: DodInput): DodOutcome {
     results.push(checkMedia(dir, input.listEvidence(dir), verdict));
   }
   results.push(checkTrailers(input.commits));
+  results.push(...body);
   return { ok: results.every((r) => r.ok), story, results, notes: [] };
 }
 
@@ -276,10 +307,10 @@ async function loadCommits(): Promise<Commit[]> {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const batch = (await res.json()) as { sha: string; commit: { message: string }; parents?: unknown[] }[];
-        commits.push(...batch.filter((c) => (c.parents?.length ?? 1) < 2).map((c) => ({ sha: c.sha, message: c.commit.message.trim() })));
-        if (batch.length < 100) return commits;
+        commits.push(...batch.map((c) => ({ sha: c.sha, message: c.commit.message.trim(), parents: c.parents?.length ?? 1 })));
+        if (batch.length < 100) return markOnBase(commits);
       }
-      return commits;
+      return markOnBase(commits);
     } catch (err) {
       console.warn(`dod-check: could not list PR commits from the GitHub API (${(err as Error).message}); using git`);
     }
@@ -289,7 +320,19 @@ async function loadCommits(): Promise<Commit[]> {
   const base = env.BASE_SHA || 'origin/main';
   const mergeBase = execFileSync('git', ['merge-base', base, head], { encoding: 'utf8' }).trim();
   const out = execFileSync('git', ['log', '--no-merges', '--format=%H%x1f%B%x1e', `${mergeBase}..${head}`], { encoding: 'utf8' });
-  return parseGitLog(out);
+  return markOnBase(parseGitLog(out));
+}
+
+/** Flags commits already reachable from the current base branch (origin/<BASE_REF>, default main). */
+function markOnBase(commits: Commit[]): Commit[] {
+  const ref = `origin/${process.env.BASE_REF || 'main'}`;
+  try { execFileSync('git', ['rev-parse', '--verify', '-q', `${ref}^{commit}`], { stdio: 'ignore' }); } catch { return commits; }
+  return commits.map((c) => {
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', c.sha, ref], { stdio: 'ignore' });
+      return { ...c, onBase: true };
+    } catch { return c; }
+  });
 }
 
 function loadIndex(): StoryIndex {

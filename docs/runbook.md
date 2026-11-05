@@ -200,7 +200,7 @@ Every PR into `main` and every push to `main` runs `.github/workflows/ci.yml`; s
 | `typecheck` | ci | `pnpm typecheck` + `pnpm typecheck:scripts` (scripts/, e2e/); `pnpm audit --prod --audit-level high` (advisory, see below) | 10 min |
 | `unit` | ci | `pnpm -r --filter '!@tp/api' run test` (core, web, extension) + `pnpm test:scripts` | 10 min |
 | `api` | ci | `pnpm --filter @tp/api test` against a `postgres:16` service on `:5433` (`TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test`); runs after `unit` | 15 min |
-| `e2e` | ci | `CI=1 pnpm e2e` (real API + SPA + mock-gem, `E2E_DATABASE_URL=…/tenderpilot_e2e`), job summary from `scripts/e2e-summary.ts`, artifact `e2e-evidence-<run_id>` with `qa/evidence/**` + `qa/.runs/**` (30 days, uploaded even on failure); runs after `api` | 30 min |
+| `e2e` | ci | Runs after `api` as `e2e-shard-1..8` (matrix, 30 min each, not required checks): `scripts/e2e-ci.sh <n> 8` runs every spec file of its shard (`scripts/e2e-shard.ts`, balanced by test count) as its own Playwright invocation on a freshly recreated `E2E_DATABASE_URL=…/tenderpilot_e2e` (specs assume a fresh DB); real API + SPA + mock-gem; extra server env from a spec's `@e2e-env KEY=value` header line. The required `e2e` job (skipped unless `api` passed) merges the shard blob reports into `qa/.runs/8788/results.json` + HTML report, writes the job summary from `scripts/e2e-summary.ts`, uploads artifact `e2e-evidence-<run_id>` with `qa/evidence/**` + `qa/.runs/**` (30 days, also on failure) and fails unless every shard passed | 30 min |
 | `migrations-additive` | ci | `scripts/check-migrations.ts` over migrations added/changed vs the PR base, then `pnpm --filter @tp/db generate` must leave no diff (schema drift) | 10 min |
 | `ci-gate` | ci | Aggregator (`if: always()`, needs every job above plus `changes`): fails if any of them failed or was cancelled, or if the `changes` path filter itself did not succeed | 5 min |
 | `deploy` | ci → deploy.yml | Push to `main` only, after `ci-gate` succeeded: calls the reusable deploy workflow (see below). Not a required check | 5 min |
@@ -232,7 +232,7 @@ Every PR into `main` and every push to `main` runs `.github/workflows/ci.yml`; s
   `workflow_dispatch` (`gh workflow run deploy.yml --ref main`); note that GitHub only lists/dispatches workflows that
   also exist on the default branch.
 - **Run locally**: `pnpm typecheck && pnpm typecheck:scripts`, `pnpm -r --filter '!@tp/api' run test`, `pnpm test:scripts`,
-  `TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test pnpm --filter @tp/api test`, `pnpm e2e`,
+  `TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test pnpm --filter @tp/api test`, `pnpm e2e` (or one CI shard: `CI=1 scripts/e2e-ci.sh 1 8`),
   `pnpm exec tsx scripts/check-migrations.ts --base origin/main`,
   `PR_TITLE='[008/US1] …' BASE_SHA=origin/main pnpm exec tsx scripts/dod-check.ts`.
 

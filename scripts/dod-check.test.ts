@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  buildStoryIndex, checkTrailers, checkVerdict, verdictOf, evaluate, formatOutcome, issueRefs, parseGitLog, parseLabels, resolveStory,
+  buildStoryIndex, checkPrBody, checkTrailers, checkVerdict, verdictOf, evaluate, formatOutcome, issueRefs, parseGitLog, parseLabels, resolveStory,
   type Commit, type DodInput, type PrInfo,
 } from './dod-check';
 
@@ -147,7 +147,7 @@ describe('dod rules (scenario 6)', () => {
   });
 
   it('passes hardening PRs with a note', () => {
-    const o = evaluate(input({ pr: { title: 'Harden headers', body: '', labels: [] }, commits: [{ sha: 'e'.repeat(40), message: 'x' }] }));
+    const o = evaluate(input({ pr: { title: 'Harden headers', body: 'Part of #173', labels: [] }, commits: [{ sha: 'e'.repeat(40), message: `x\n\n${TRAILERS.replace('#356', '#173')}` }] }));
     expect(o.ok).toBe(true);
     expect(o.story).toBeNull();
     expect(formatOutcome(o)).toContain('not applicable');
@@ -224,5 +224,40 @@ describe('review round 2 (N-R1, N-R2)', () => {
     const { criterionRows } = await import('./dod-check');
     const rows = criterionRows('| # | Criterion | Verdict |\n|---|---|---|\n| 1 | a \\| b | met |\n');
     expect(rows).toEqual([{ row: '| 1 | a \\| b | met |', verdict: 'met' }]);
+  });
+});
+
+describe('PR conventions (orchestrator rules)', () => {
+  it('requires "Closes #n" or "Part of #n" in the PR body', () => {
+    expect(checkPrBody('Closes #356')[0].ok).toBe(true);
+    expect(checkPrBody('Part of #173\nmore')[0].ok).toBe(true);
+    expect(checkPrBody('Part of Shashank2577/GEMs#173')[0].ok).toBe(true);
+    expect(checkPrBody('Related: #356')[0]).toMatchObject({ rule: 'pr-body-refs', ok: false });
+    expect(checkPrBody('<!-- Closes #1 -->')[0].ok).toBe(false);
+    const o = evaluate(input({ pr: { title: '[008/US1] Every change is proven by CI', body: 'See #356', labels: ['type:story'] } }));
+    expect(o.results.filter((r) => !r.ok).map((r) => r.rule)).toEqual(['pr-body-refs']);
+  });
+
+  it('fails unticked boxes but allows ticked ones and "- [~]" deferrals', () => {
+    expect(checkPrBody('Closes #1\n- [x] done\n- [X] done\n- [~] deferred to #2')[1].ok).toBe(true);
+    const r = checkPrBody('Closes #1\n- [x] done\n- [ ] review recorded\n  * [ ] nested');
+    expect(r[1]).toMatchObject({ rule: 'pr-body-checkboxes', ok: false });
+    expect(r[1].message).toContain('2 unticked');
+    expect(failed(evaluate(input({ pr: { title: '[008/US1] Every change is proven by CI', body: 'Closes #356\n- [ ] QA verdict', labels: ['type:story'] } })))[0]).toMatch(/unticked/);
+  });
+
+  it('applies to hardening PRs too', () => {
+    const o = evaluate(input({ pr: { title: 'Harden headers', body: '- [ ] x', labels: [] } }));
+    expect(o.ok).toBe(false);
+    expect(o.results.filter((r) => !r.ok).map((r) => r.rule)).toEqual(['pr-body-refs', 'pr-body-checkboxes']);
+  });
+
+  it('commit trailers: merge commits and commits already on main are exempt, PR commits are not', () => {
+    const squashFromMain: Commit = { sha: '1'.repeat(40), message: '[007/US7] Accessibility (#539)', onBase: true };
+    const mergeMain: Commit = { sha: '2'.repeat(40), message: "Merge remote-tracking branch 'origin/main'", parents: 2 };
+    expect(checkTrailers([goodCommit, squashFromMain, mergeMain])).toMatchObject({ ok: true, message: expect.stringContaining('1 commit(s)') });
+    const own: Commit = { sha: '3'.repeat(40), message: '[008/US1] tweak (#475)' };
+    expect(checkTrailers([goodCommit, own]).ok).toBe(false);
+    expect(checkTrailers([mergeMain]).ok).toBe(false); // nothing of the PR's own left to check
   });
 });

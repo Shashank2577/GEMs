@@ -97,7 +97,8 @@ async function freshManager(page: Page) {
 
 // ── page helpers ──
 const cards = (page: Page) => page.getByRole('list', { name: 'Tenders' }).locator('> li');
-const countText = (page: Page) => page.locator('[aria-live="polite"]').first();
+// excludes the app shell's offline live region (007/US7), which comes first in the DOM
+const countText = (page: Page) => page.locator('[aria-live="polite"]:not([data-testid="offline-banner"])').first();
 const rail = (page: Page) => page.getByRole('complementary', { name: 'Filters' });
 const bidNumbers = (page: Page) => cards(page).locator('span.font-mono').allTextContents();
 const tab = (page: Page, name: string) => page.getByRole('tablist', { name: 'Saved views' }).getByRole('tab', { name, exact: true });

@@ -1,5 +1,6 @@
 # Definition-of-Done gate for story PRs (spec 008 US1 FR-004): QA verdict exists and is approved, no criterion
-# "not met", screenshot + video evidence present and linked, commit trailers present. Pattern adapted from ai-sdlc
+# "not met", screenshot + video evidence present and linked, commit trailers present (merge commits and commits already on
+# the base branch exempt), PR body has "Closes #n"/"Part of #n" and no unticked box ("- [~]" = deferral). Pattern adapted from ai-sdlc
 # dod-check.yml (MIT, NOTICE §3); the check itself is scripts/dod-check.ts (no remote script fetch).
 # Docs-only PRs skip the check; `dod` itself always runs (if: always()) so it fails when `dod-changes` errors instead of
 # being skipped (a skipped job would satisfy the required check).
@@ -79,5 +80,6 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec tsx scripts/dod-check.ts

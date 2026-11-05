@@ -306,7 +306,7 @@ test('S4 Build: progress texts in the live region, 201 ready (11 pages, start pa
   });
   const respP = page.waitForResponse((r) => /\/api\/workspaces\/[^/]+\/packets$/.test(r.url()) && r.request().method() === 'POST', { timeout: 30_000 });
   await page.getByRole('button', { name: 'Build packet' }).click();
-  const live = page.locator('div[role="status"][aria-live="polite"]');
+  const live = page.locator('div[role="status"][aria-live="polite"]:not([data-testid="offline-banner"])'); // not the shell's offline region (007/US7)
   await expect(live).toHaveAttribute('aria-live', 'polite');
   const seen: string[] = [];
   for (const t of ['Rendering annexures…', 'Merging documents…', 'Writing index & bookmarks…', 'Saving the packet…']) {

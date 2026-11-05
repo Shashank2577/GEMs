@@ -112,7 +112,8 @@ test.describe('US1 ingestion', () => {
     const btn = page.getByRole('button', { name: 'Sync now' });
     await expect(btn).toBeDisabled();
     await expect(page.locator('span[title^="Next manual sync at"]')).toHaveCount(1);
-    await expect(page.getByRole('status')).toContainText(/Next manual sync at/);
+    // filtered: the app shell also has an (empty) offline live region since 007/US7
+    await expect(page.getByRole('status').filter({ hasText: 'Next manual sync at' })).toContainText(/Next manual sync at/);
     await shot(page, 'S1-S11-cooldown-popover');
     await page.keyboard.press('Escape');
     await page.goto('/tenders');
