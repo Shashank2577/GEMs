@@ -3,11 +3,11 @@
   "formFactor": "mobile",
   "lighthouseVersion": "13.6.0",
   "runs": 3,
-  "generatedAt": "2026-11-05T06:44:05.579Z",
+  "generatedAt": "2026-11-05T07:03:47.931Z",
   "pass": true,
   "checks": {
     "performance": {
-      "median": 88,
+      "median": 94,
       "min": 85,
       "pass": true
     },
@@ -27,28 +27,39 @@
       "pass": true
     }
   },
+  "metricChecks": {
+    "lcpMs": {
+      "median": 906,
+      "max": 2500,
+      "pass": true
+    },
+    "cls": {
+      "median": 0,
+      "max": 0.1,
+      "pass": true
+    }
+  },
   "perRun": [
     {
       "run": 1,
       "scores": {
-        "performance": 88,
+        "performance": 94,
         "accessibility": 100,
         "best-practices": 96,
         "seo": 100
       },
       "metrics": {
-        "lcpMs": 3608,
-        "tbtMs": 178,
+        "lcpMs": 906,
+        "tbtMs": 275,
         "cls": 0,
-        "fcpMs": 909
+        "fcpMs": 906
       },
       "failedAudits": [
-        "largest-contentful-paint: 0.61",
-        "max-potential-fid: 0.88",
+        "total-blocking-time: 0.81",
+        "max-potential-fid: 0.7",
         "errors-in-console: 0",
-        "mainthread-work-breakdown: 0",
         "unused-css-rules: 0",
-        "unused-javascript: 0",
+        "unused-javascript: 0.5",
         "forced-reflow-insight: 0",
         "network-dependency-tree-insight: 0",
         "render-blocking-insight: 0"
@@ -57,23 +68,23 @@
     {
       "run": 2,
       "scores": {
-        "performance": 88,
+        "performance": 96,
         "accessibility": 100,
         "best-practices": 96,
         "seo": 100
       },
       "metrics": {
-        "lcpMs": 3564,
-        "tbtMs": 191,
+        "lcpMs": 907,
+        "tbtMs": 222,
         "cls": 0,
         "fcpMs": 907
       },
       "failedAudits": [
-        "largest-contentful-paint: 0.62",
-        "max-potential-fid: 0.88",
+        "total-blocking-time: 0.87",
+        "max-potential-fid: 0.82",
         "errors-in-console: 0",
         "unused-css-rules: 0",
-        "unused-javascript: 0",
+        "unused-javascript: 0.5",
         "forced-reflow-insight: 0",
         "network-dependency-tree-insight: 0",
         "render-blocking-insight: 0"
@@ -82,23 +93,24 @@
     {
       "run": 3,
       "scores": {
-        "performance": 88,
+        "performance": 93,
         "accessibility": 100,
         "best-practices": 96,
         "seo": 100
       },
       "metrics": {
-        "lcpMs": 3561,
-        "tbtMs": 171,
+        "lcpMs": 906,
+        "tbtMs": 316,
         "cls": 0,
         "fcpMs": 906
       },
       "failedAudits": [
-        "largest-contentful-paint: 0.62",
+        "total-blocking-time: 0.77",
+        "max-potential-fid: 0.79",
         "errors-in-console: 0",
         "mainthread-work-breakdown: 0",
         "unused-css-rules: 0",
-        "unused-javascript: 0",
+        "unused-javascript: 0.5",
         "forced-reflow-insight: 0",
         "network-dependency-tree-insight: 0",
         "render-blocking-insight: 0"

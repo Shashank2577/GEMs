@@ -5,7 +5,7 @@ import { BellRing, CheckCircle2, FileCheck2, Hand, Lock, ShieldCheck, AlertTrian
 import { Logo } from '@/components/layout/Logo';
 import { ScoreRing, VerdictBadge } from '@/components/ui/verdict';
 import { Badge } from '@/components/ui/badge';
-import { useDocumentTitle } from '@/lib/hooks';
+import { useCanonical, useDocumentTitle } from '@/lib/hooks';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 const TRUST = [
@@ -14,8 +14,9 @@ const TRUST = [
   { icon: ShieldCheck, title: 'Public data only', body: 'We read public BidPlus listings politely — your GeM login is never stored.' },
 ];
 
-export function AuthLayout({ title, subtitle, children, footer, docTitle }: { title: ReactNode; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode; docTitle: string }) {
+export function AuthLayout({ title, subtitle, children, footer, docTitle, canonical }: { title: ReactNode; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode; docTitle: string; canonical?: string }) {
   useDocumentTitle(docTitle);
+  useCanonical(canonical ?? '/');
   return (
     <div className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)]">
       <div className="flex flex-col px-5 py-6 sm:px-10 lg:px-14 xl:px-20">

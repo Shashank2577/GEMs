@@ -50,7 +50,7 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthLayout
+    <AuthLayout canonical="/signup"
       docTitle="Create your account"
       title="Start winning more GeM bids"
       subtitle="Free 14-day trial. No card needed. Set up in under 5 minutes."

@@ -35,6 +35,20 @@ export function useDocumentTitle(title?: string, opts?: { raw?: boolean }) {
   }, [title, raw]);
 }
 
+/**
+ * Points `<link rel="canonical">` at `path` on the same origin as index.html's canonical (007/NFR-004), restoring it on
+ * unmount. index.html's canonical is "/" (the landing page); /login and /signup are indexable pages of their own.
+ */
+export function useCanonical(path: string) {
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!link) return;
+    const prev = link.href;
+    link.href = new URL(path, prev).href;
+    return () => { link.href = prev; };
+  }, [path]);
+}
+
 export function useLocalStorage<T>(key: string, initial: T) {
   const [v, setV] = useState<T>(() => {
     try { const s = localStorage.getItem(key); return s ? (JSON.parse(s) as T) : initial; } catch { return initial; }

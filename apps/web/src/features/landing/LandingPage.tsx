@@ -11,6 +11,7 @@ import {
   Fingerprint, Gauge, Hand, IndianRupee, KeyRound, Layers, Lock, Menu, MessageCircle, Radar, ScanText, ShieldCheck, Smartphone, Sparkles,
   Users, X,
 } from 'lucide-react';
+import { dropLandingShell } from './shell';
 import { Logo } from '@/components/layout/Logo';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Badge, Button, Countdown, Progress, ScoreRing, Tabs, TabsContent, TabsList, TabsTrigger, VerdictBadge } from '@/components/ui';
@@ -20,7 +21,10 @@ import { cn } from '@/lib/utils';
 
 export const LANDING_TITLE = 'TenderPilot — GeM tender co-pilot for Indian sellers';
 
-const NAV = [
+/** Labels for the sign-in / sign-up buttons in the nav bar and the mobile menu. */
+export const AUTH_LABELS = { signIn: 'Sign in', signUp: 'Start free trial' } as const;
+
+export const NAV = [
   { href: '#how', label: 'How it works' },
   { href: '#control', label: 'Compliance' },
   { href: '#teams', label: 'For teams' },
@@ -50,6 +54,7 @@ function SectionHead({ eyebrow, title, body, center = true }: { eyebrow: string;
 
 export default function LandingPage() {
   useDocumentTitle(LANDING_TITLE, { raw: true });
+  useEffect(dropLandingShell, []);
   return (
     <div className="min-h-dvh overflow-x-hidden bg-background text-foreground">
       <SiteNav />
@@ -90,8 +95,8 @@ function SiteNav() {
         </nav>
         <div className="flex items-center gap-1.5">
           <ThemeToggle />
-          <Button variant="ghost" className="hidden sm:inline-flex" asChild><Link to="/login">Sign in</Link></Button>
-          <Button className="hidden sm:inline-flex" asChild><Link to="/signup">Start free trial</Link></Button>
+          <Button variant="ghost" className="hidden sm:inline-flex" asChild><Link to="/login">{AUTH_LABELS.signIn}</Link></Button>
+          <Button className="hidden sm:inline-flex" asChild><Link to="/signup">{AUTH_LABELS.signUp}</Link></Button>
           <Button variant="ghost" size="icon" className="md:hidden" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X /> : <Menu />}
           </Button>
@@ -103,8 +108,8 @@ function SiteNav() {
             {NAV.map((n) => <li key={n.href}><a href={n.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted focus-ring">{n.label}</a></li>)}
           </ul>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="secondary" asChild><Link to="/login">Sign in</Link></Button>
-            <Button asChild><Link to="/signup">Start free trial</Link></Button>
+            <Button variant="secondary" asChild><Link to="/login">{AUTH_LABELS.signIn}</Link></Button>
+            <Button asChild><Link to="/signup">{AUTH_LABELS.signUp}</Link></Button>
           </div>
         </nav>
       )}
@@ -121,7 +126,7 @@ function Hero() {
       <div className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" aria-hidden />
       <div className="pointer-events-none absolute left-1/2 top-[-10%] h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px]" aria-hidden />
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-24">
-        <Reveal>
+        <div>
           <a href="#control" className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs backdrop-blur hover:text-foreground focus-ring">
             <ShieldCheck className="size-3.5 text-success" /> Account-safe: never auto-submits on GeM <ArrowRight className="size-3" />
           </a>
@@ -141,8 +146,9 @@ function Hero() {
               <li key={t} className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-success" />{t}</li>
             ))}
           </ul>
-        </Reveal>
-        <Reveal delay={0.1}><ProductMock closing={closing} /></Reveal>
+        </div>
+        {/* Above the fold: no opacity-0 entrance animation, so the hero paints (LCP) without waiting on motion/JS (007/NFR-003). */}
+        <div><ProductMock closing={closing} /></div>
       </div>
     </section>
   );
@@ -350,7 +356,7 @@ function Metrics() {
 
 // ───────────── Personas ─────────────
 
-const PERSONAS = [
+export const PERSONAS = [
   {
     key: 'owner', label: 'Owner', icon: Smartphone, title: 'Know what’s worth bidding — from your phone',
     body: 'A morning dashboard with new matches, bids closing this week, EMD at stake and your win rate. WhatsApp nudges for anything urgent.',
@@ -499,7 +505,7 @@ function Pricing() {
 
 // ───────────── FAQ ─────────────
 
-const FAQ = [
+export const FAQ = [
   ['Will TenderPilot submit bids on GeM for me?', 'No — and that’s deliberate. GeM requires a human to enter the price and authenticate with Aadhaar OTP, e-Sign or a DSC. Automated submissions put seller accounts at risk. TenderPilot prepares everything else and hands you a ready packet.'],
   ['Do you need my GeM login?', 'Never. We read publicly listed BidPlus bids and documents. Your GeM credentials stay with you.'],
   ['How accurate is the Go / No-Go score?', 'Every verdict comes from deterministic rules you can see — turnover, experience, EMD, MSE/Startup exemptions, MII class, OEM authorisation and documents — each linked to the clause and page it came from. AI helps read unusual clauses, but never decides silently. You can override any factor with a reason.'],

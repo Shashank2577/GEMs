@@ -4,7 +4,8 @@
  *
  * Runs Lighthouse (mobile emulation, the Lighthouse default) against `/` N times, takes the per-category MEDIAN,
  * writes `summary.json` and the HTML report of the median-performance run to qa/evidence/007/US6/lighthouse/, and
- * exits 1 if any median is below its threshold: Performance >= 85, Accessibility >= 95, Best Practices >= 90, SEO >= 90.
+ * exits 1 if any median is below its threshold (Performance >= 85, Accessibility >= 95, Best Practices >= 90, SEO >= 90)
+ * or if the median LCP is not < 2500 ms or the median CLS is not < 0.1 (NFR-003 / SC-006).
  *
  * Usage:  node scripts/lighthouse-landing.mjs [--url http://localhost:8788/] [--runs 3] [--out <dir>]
  * Needs a running server that serves the built SPA (pnpm --filter @tp/web build, then the Node API server) and the
@@ -17,6 +18,8 @@ import { chromium } from '@playwright/test';
 import lighthouse from 'lighthouse';
 
 export const THRESHOLDS = { performance: 85, accessibility: 95, 'best-practices': 90, seo: 90 };
+/** NFR-003 / SC-006 (mobile simulation, median of runs): LCP < 2.5 s and CLS < 0.1. Upper bounds, exclusive. */
+export const METRIC_LIMITS = { lcpMs: 2500, cls: 0.1 };
 
 const arg = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -57,20 +60,25 @@ async function main() {
 
   const medians = Object.fromEntries(Object.keys(THRESHOLDS).map((k) => [k, median(results.map((r) => r.scores[k]))]));
   const checks = Object.fromEntries(Object.entries(THRESHOLDS).map(([k, min]) => [k, { median: medians[k], min, pass: medians[k] >= min }]));
-  const pass = Object.values(checks).every((c) => c.pass);
+  const metricChecks = {
+    lcpMs: { median: median(results.map((r) => r.metrics.lcpMs)), max: METRIC_LIMITS.lcpMs },
+    cls: { median: Number(median(results.map((r) => r.metrics.cls)).toFixed(3)), max: METRIC_LIMITS.cls },
+  };
+  for (const c of Object.values(metricChecks)) c.pass = c.median < c.max;
+  const pass = Object.values(checks).every((c) => c.pass) && Object.values(metricChecks).every((c) => c.pass);
   const sorted = [...results].sort((a, b) => a.scores.performance - b.scores.performance);
   const medianRun = sorted[sorted.length >> 1];
 
   const summary = {
     url, formFactor: results[0].formFactor, lighthouseVersion: results[0].lighthouseVersion, runs,
-    generatedAt: new Date().toISOString(), pass, checks,
+    generatedAt: new Date().toISOString(), pass, checks, metricChecks,
     perRun: results.map(({ run, scores, metrics, failedAudits }) => ({ run, scores, metrics, failedAudits })),
     htmlReport: 'report.html (the median-performance run)',
   };
   writeFileSync(resolve(out, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
   writeFileSync(resolve(out, 'report.html'), medianRun.report);
-  console.log(JSON.stringify(checks, null, 2));
-  console.log(pass ? 'PASS' : 'FAIL: a median score is below its threshold');
+  console.log(JSON.stringify({ checks, metricChecks }, null, 2));
+  console.log(pass ? 'PASS' : 'FAIL: a median score or metric (LCP / CLS) misses its threshold');
   process.exit(pass ? 0 : 1);
 }
 
