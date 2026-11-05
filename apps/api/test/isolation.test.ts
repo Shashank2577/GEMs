@@ -62,7 +62,7 @@ beforeAll(async () => {
   ids.vault = A.docs.gst.id;
   ids.wsMember = a.analyst.me.user.id;
 
-  const ws = await request(ctx.app, 'POST', `/tenders/${A.tender.id}/workspace`, { cookie: a.analyst.cookie });
+  const ws = await request(ctx.app, 'POST', `/tenders/${A.tender.id}/workspace`, { cookie: a.bidManager.cookie }); // a Bid Manager: the Go verdict starts it in "go" (#527)
   expect(ws.status, json(ws)).toBe(201);
   ids.workspace = ws.body.id;
 
@@ -185,6 +185,13 @@ describe('org B cannot read, update or delete org A’s resources by id (404, ne
       }
     }
     expect(failures).toEqual([]);
+
+    // #527: the Go/No-Go role guard must never answer 403 about ANOTHER org's workspace: for B's Analyst it is 404 first.
+    for (const stage of ['go', 'dropped']) {
+      const r = await request(ctx.app, 'PATCH', `/workspaces/${ids.workspace}`, { cookie: B.analyst.cookie, json: { stage } });
+      expect(r.status, `${stage}: ${json(r)}`).toBe(404);
+      expect(r.body.error.code).toBe('not_found');
+    }
 
     // Tenders are shared, so seen/dismiss on A's matched tender are legitimate calls for B — they must only touch
     // B's own matches (none): seen is a no-op 200, dismiss is 409 "only matched tenders". A's match stays as it was.

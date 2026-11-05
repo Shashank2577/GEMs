@@ -9,7 +9,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { request as pwRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { test, expect, evidence, collectRunArtifacts, checkA11y, mockGem, uniqueUser } from '../support/fixtures';
+import { test, expect, evidence, collectRunArtifacts, checkA11y, mockGem, uniqueUser, resetIngestionData } from '../support/fixtures';
 
 const SPEC = '003', STORY = 'US2';
 const BASE = `http://localhost:${process.env.E2E_PORT || 8788}`;
@@ -91,6 +91,7 @@ const previewCount = (page: Page, n: number) => preview(page).locator('p.text-3x
 const samples = (page: Page) => preview(page).getByRole('list', { name: 'Sample matches' }).locator('li');
 
 test.describe.configure({ mode: 'serial' });
+test.beforeAll(async ({ request }, info) => { if (info.project.name === 'desktop') await resetIngestionData(request); }); // clean state per spec file: whole-directory runs pass
 test.afterEach(async ({ page }) => { await collectRunArtifacts(SPEC, STORY, page); });
 
 test.describe('US2 watchlists', () => {
@@ -349,6 +350,8 @@ test.describe('US2 watchlists', () => {
 
   test('FR-020 / FR-022: API limits on criteria; categories + ministries matching; closed and past-deadline bids never match', async ({ page }) => {
     await login(page, S.analyst!);
+    // Earlier scenarios already spent the analyst's 30 previews/min budget on a fast machine: reset that window (test arrangement only).
+    sql("delete from rate_limits where key like 'watchlist.preview.user:%'");
     const bad = async (data: unknown, label: string) => {
       const r = await page.request.post('/api/watchlists', { data });
       expect(r.status(), `${label}: ${await r.text()}`).toBe(400);

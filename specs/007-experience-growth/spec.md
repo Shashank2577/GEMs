@@ -172,6 +172,9 @@ submit yet" toast listing the missing items.
     Space again, **Then** the card lands two columns to the right, and the live region announced "Picked up …", "Over
     <stage>." and "Dropped in <stage>."; **When** Escape is pressed mid-drag, **Then** "Drag cancelled." is announced and
     the card returns.
+    *Spec amendment (#527):* the scenario runs as a **Bid Manager** (or Owner); an Analyst dropping a card on Go (the
+    Go / No-Go call) is refused with "Only a Bid Manager can make the Go/No-Go call", the card goes back and no request is
+    sent. Analysts keep every other column.
 14. **Given** a phone at 375 px, **When** `/pipeline` opens, **Then** a "Jump to stage" chip row shows every stage with its
     count, columns are 84 vw wide (max 320 px) with snap scrolling, tapping the "Won" chip scrolls the Won column into
     view, and the page itself has no horizontal scroll (only the board container scrolls).
@@ -181,12 +184,16 @@ submit yet" toast listing the missing items.
 16. *(gap)* **Given** an Analyst on any card, **When** they open the card's "Move to…" menu and choose "Go", **Then** the card
     moves exactly as with drag-and-drop (same API call, toast and activity), satisfying WCAG 2.5.7 (dragging movements)
     without a pointer drag.
+    *Spec amendment (#527):* "Go" and "Dropped" are disabled for an Analyst (tooltip "Only a Bid Manager can make the
+    Go/No-Go call"); the scenario runs as a Bid Manager.
 17. *(gap)* **Given** an Analyst drops a card on Won or Lost, **When** the move succeeds, **Then** an "Record the result"
     dialog asks for L1 price (₹), our price (₹) and notes (all optional); "Save" sends `PATCH` with `outcome` and the card
     shows "Won · L1 ₹x L" in the workspace header; "Skip" keeps the stage-only outcome.
 18. *(gap)* **Given** a demo org with one workspace moved to `dropped`, **When** the board renders, **Then** a "Show dropped
     (1)" toggle appears; enabling it adds a ninth "Dropped" column; dropping via "Move to… → Dropped" asks for
     confirmation "Drop this bid? It leaves the active pipeline but keeps its history."
+    *Spec amendment (#527):* dropping is the No-Go call, so the scenario runs as a Bid Manager; for an Analyst the "Dropped"
+    target is disabled and `PATCH {stage:'dropped'}` answers 403.
 19. *(gap)* **Given** the search box, **When** the user types "dell" quickly, **Then** at most one `GET /api/workspaces?q=dell`
     is sent after 300 ms of inactivity and the URL gains `q=dell`, so the filtered view survives reload and can be shared.
 
@@ -560,7 +567,9 @@ page.
 - **FR-022**: Analysts and above MUST be able to reorder and move cards by pointer (activation after 6 px), touch
   (220 ms long-press, 8 px tolerance) and keyboard (dnd-kit sortable keyboard coordinates), with screen-reader
   announcements for pick-up, over, drop and cancel; Viewers MUST get a static board.
-- **FR-023**: `PATCH /api/workspaces/:id` (analyst+; 403 below; 404 cross-org) MUST persist `stage` and `position`
+  *Spec amendment (#527):* Analysts cannot move a card into **Go** or **Dropped** (Bid Manager+ owns the Go / No-Go call); the
+  Go and Dropped columns show a lock and refuse the drop gracefully (card returns, same message as the API).
+- **FR-023**: `PATCH /api/workspaces/:id` (analyst+; 403 below; go/dropped bid_manager+ (#527); 404 cross-org) MUST persist `stage` and `position`
   (fractional; `positionAt()` between neighbours, append at end when only `stage` is sent), set `submittedAt` on first
   move to submitted, set `outcome {result, at}` on move to won/lost without an outcome, and log
   `workspace.stage_changed {from, to, fromLabel, toLabel}`.
@@ -578,6 +587,7 @@ page.
 - **FR-028**: On < 768 px the board MUST show the "Jump to stage" chip row and snap-scrolling columns (US2-14).
 - **FR-029** *(gap)*: Every card MUST offer a "Move to…" menu (keyboard and touch accessible, analyst+) listing all other
   stages including Dropped, using the same API, toasts and error handling as drag-and-drop.
+  *Spec amendment (#527):* "Go" and "Dropped" are disabled (tooltip "Only a Bid Manager can make the Go/No-Go call") for Analysts.
 - **FR-030** *(gap)*: After a successful move to Won or Lost the web MUST open a "Record the result" dialog (L1 price,
   our price in whole rupees, notes ≤ 2000 chars; all optional) that sends `outcome` via `PATCH`; "Skip" leaves the
   stage-only outcome.
@@ -665,9 +675,11 @@ page.
   below the first row; Viewers MUST NOT see it.
 - **FR-072** *(gap)*: The web MUST show "Awaiting your decision" with one-tap "Go" and "Drop" (with confirmation) to
   bid_manager+; read-only to analysts; hidden from viewers.
+  *Spec amendment (#527):* the read-only state for analysts is now also enforced by the API (403 `forbidden` on a move into
+  `go`/`dropped`).
   *As delivered (T080):* the confirmation applies to **Drop only**; "Go" is one tap with no dialog (scenario US5-5 and the
-  landing promise "Approve Go / No-Go in one tap"). Role gating is UI-only: the workspace PATCH is analyst+ at the API
-  (#527 item 5 asks whether Go/No-Go should be bid_manager+ there).
+  landing promise "Approve Go / No-Go in one tap"). *Amended (#527):* Role gating of the Go/No-Go call is no longer UI-only: a move into `go`/`dropped` is
+  bid_manager+ at the API too (403 `forbidden`; see the amendment to FR-023/FR-029); every other stage move stays analyst+.
 - **FR-073** *(gap)*: Role-gated CTAs on the dashboard MUST be hidden for roles that would get 403 ("Create a watchlist"
   for viewers; "Finish setting up" card for analysts and viewers).
 

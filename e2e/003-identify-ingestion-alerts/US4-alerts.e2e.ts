@@ -16,7 +16,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request as pwRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { test, expect, evidence, collectRunArtifacts, checkA11y, mockGem, uniqueUser } from '../support/fixtures';
+import { test, expect, evidence, collectRunArtifacts, checkA11y, mockGem, uniqueUser, resetIngestionData } from '../support/fixtures';
 
 const SPEC = '003', STORY = 'US4';
 const BASE = `http://localhost:${process.env.E2E_PORT || 8788}`;
@@ -106,6 +106,7 @@ test.beforeEach(async () => {
   if (S || test.info().title.startsWith('setup')) return;
   S = JSON.parse(readFileSync(STATE_FILE, 'utf8')) as Saved;
 });
+test.beforeAll(async ({ request }, info) => { if (info.project.name === 'desktop') await resetIngestionData(request); }); // clean state per spec file: whole-directory runs pass
 test.afterEach(async ({ page }) => { await collectRunArtifacts(SPEC, STORY, page); });
 
 test.describe('US4 alerts', () => {
