@@ -72,6 +72,26 @@ describe('annexure templates', () => {
     expect(r.status).toBe(200);
     expect((await extractPages(await bytesOf(r))).join(' ')).toContain('preview only');
   });
+
+  it('refuses unknown placeholders on save and preview, after the length check (FR-041)', async () => {
+    const typo = { title: 'Non-blacklisting', body: 'We, {{company.legalName}} (GSTIN {{company.gstn}}), undertake that we are not blacklisted.' };
+    const put = await request(ctx.app, 'PUT', '/annexure-templates/non_blacklisting', { cookie: s.org.bidManager.cookie, json: typo });
+    expect(put.status).toBe(400);
+    expect(put.body.error).toEqual({ code: 'unknown_placeholder', message: 'Unknown placeholder {{company.gstn}} — use one from the list.', details: { unknown: ['company.gstn'] } });
+    const list = await request(ctx.app, 'GET', '/annexure-templates', { cookie: s.org.bidManager.cookie });
+    expect(list.body.items.find((t: any) => t.key === 'non_blacklisting').body).not.toContain('company.gstn');
+
+    const prev = await request(ctx.app, 'POST', `/workspaces/${wsId}/annexures/non_blacklisting/preview`, {
+      cookie: s.org.analyst.cookie, json: { title: 'Draft', body: 'Draft {{tender.bidNo}} and {{ foo }} and {{tender.bidNumber}} text.' },
+    });
+    expect(prev.status).toBe(400);
+    expect(prev.body.error.code).toBe('unknown_placeholder');
+    expect(prev.body.error.details).toEqual({ unknown: ['tender.bidNo', 'foo'] });
+
+    const short = await request(ctx.app, 'PUT', '/annexure-templates/non_blacklisting', { cookie: s.org.bidManager.cookie, json: { title: 'Short', body: '{{company.gstn}}' } });
+    expect(short.status).toBe(400);
+    expect(short.body.error.message).toContain('The template body is too short');
+  });
 });
 
 describe('packets', () => {

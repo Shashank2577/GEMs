@@ -3,8 +3,8 @@ import { PDFDocument } from 'pdf-lib';
 import { extractPages } from '../../src/analyse/pdf-text';
 import { ANNEXURE_KEYS } from '../../src/analyse/checklist';
 import {
-  BLANK, SYSTEM_TEMPLATES, SYSTEM_TEMPLATE_BY_KEY, TEMPLATE_KEYS, buildTemplateContext, missingPlaceholders, normalizeTemplateKey,
-  placeholdersOf, renderAnnexurePdf, renderTemplate,
+  BLANK, SYSTEM_TEMPLATES, SYSTEM_TEMPLATE_BY_KEY, TEMPLATE_KEYS, TEMPLATE_PLACEHOLDERS, buildTemplateContext, missingPlaceholders, normalizeTemplateKey,
+  placeholdersOf, renderAnnexurePdf, renderTemplate, unknownPlaceholderMessage, unknownPlaceholders, type TemplateContext,
 } from '../../src/packet/templates';
 
 const now = new Date('2026-11-04T06:00:00Z');
@@ -94,5 +94,31 @@ describe('renderAnnexurePdf', () => {
     const body = Array.from({ length: 60 }, (_, i) => `${i + 1}. Clause number ${i + 1} of a very long undertaking that keeps going for a while.`).join('\n');
     const doc = await PDFDocument.load(await renderAnnexurePdf('Long', body, ctx));
     expect(doc.getPageCount()).toBeGreaterThan(1);
+  });
+});
+
+describe('supported placeholders (FR-041)', () => {
+  const leaves = (ctx: TemplateContext, prefix = ''): string[] =>
+    Object.entries(ctx).flatMap(([k, v]) => (typeof v === 'string' ? [prefix + k] : leaves(v, `${prefix}${k}.`)));
+
+  it('lists exactly the context paths buildTemplateContext produces, each with a label', () => {
+    const paths = leaves(buildTemplateContext({ company: null, tender: { bidNumber: 'X', title: 'Y' }, now })).sort();
+    expect(TEMPLATE_PLACEHOLDERS.map((p) => p.path).sort()).toEqual(paths);
+    expect(new Set(TEMPLATE_PLACEHOLDERS.map((p) => p.path)).size).toBe(TEMPLATE_PLACEHOLDERS.length);
+    for (const p of TEMPLATE_PLACEHOLDERS) expect(p.label.trim().length).toBeGreaterThan(1);
+  });
+
+  it('accepts every placeholder used by the system templates', () => {
+    for (const t of SYSTEM_TEMPLATES) expect(unknownPlaceholders(t.body)).toEqual([]);
+  });
+
+  it('flags typos and unsupported paths once each, in order', () => {
+    expect(unknownPlaceholders('GSTIN {{company.gstn}} / {{ company.gstin }} / {{company.gstn}} {{tender}} {{foo.bar}}')).toEqual(['company.gstn', 'tender', 'foo.bar']);
+    expect(unknownPlaceholders('No placeholders at all, just text.')).toEqual([]);
+  });
+
+  it('words the refusal message', () => {
+    expect(unknownPlaceholderMessage(['company.gstn'])).toBe('Unknown placeholder {{company.gstn}} — use one from the list.');
+    expect(unknownPlaceholderMessage(['a.b', 'c'])).toBe('Unknown placeholders {{a.b}}, {{c}} — use ones from the list.');
   });
 });

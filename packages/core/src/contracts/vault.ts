@@ -29,7 +29,9 @@ const optId = (validate: (v: string) => string | null) =>
     }),
   );
 
-export const isoDateSchema = z.string().regex(ISO_DATE, 'Use a date like 2025-03-31').refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), 'Not a real date');
+/** Round-trip check: `Date.parse` rolls 2029-02-30 over to 2 March instead of rejecting it. */
+const isRealDate = (s: string) => { const t = Date.parse(`${s}T00:00:00Z`); return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === s; };
+export const isoDateSchema = z.string().regex(ISO_DATE, 'Use a date like 2025-03-31').refine(isRealDate, 'Not a real date');
 const optDate = z.preprocess(blankToNull, isoDateSchema.nullable().optional());
 
 const listOf = (item: z.ZodTypeAny, max = 200) => z.array(item).max(max).optional();
@@ -248,6 +250,20 @@ export interface VaultDocumentDto {
   /** Relative API path for download (`?inline=1` for preview). */
   downloadUrl: string;
 }
+
+/** A previous file of a vault document, kept on renewal/replace (FR-065, FR-066). Newest first, at most 5. */
+export interface VaultVersionDto {
+  id: string; fileName: string; mimeType: string; sizeBytes: number; pageCount: number | null;
+  /** Expiry date the document had while this file was current. */
+  expiryDate: string | null;
+  replacedBy: { id: string; name: string } | null;
+  replacedAt: string;
+  /** Relative API path for download (`?inline=1` for preview). */
+  downloadUrl: string;
+}
+
+/** Versions kept per document (FR-065). */
+export const VAULT_MAX_VERSIONS = 5;
 
 export interface VaultSummary {
   total: number; valid: number; expiring: number; expired: number;

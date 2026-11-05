@@ -36,6 +36,13 @@
       "when": 1793849459035,
       "tag": "0004_colossal_dragon_lord",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793849793852,
+      "tag": "0005_vault_versions",
+      "breakpoints": true
     }
   ]
 }
