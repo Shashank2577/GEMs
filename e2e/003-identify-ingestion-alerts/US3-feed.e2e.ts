@@ -644,6 +644,8 @@ test.describe('US3 feed', () => {
     await page.getByRole('menuitem', { name: 'Delete' }).click();
     await shot(page, 'S14e-delete-confirm');
     await page.getByRole('dialog').getByRole('button', { name: 'Delete view' }).click();
+    // wait for the server round-trip: while the confirm dialog is open the tabs are aria-hidden, so toHaveCount(0) alone passes before DELETE lands (QA round 2 race fix)
+    await expect(page.getByText('Deleted view “MH very urgent”')).toBeVisible();
     await expect(tab(page, 'MH very urgent')).toHaveCount(0);
     expect((await (await S.mgr!.get('/api/views')).json()).total).toBe(0);
     await shot(page, 'S14f-deleted');
