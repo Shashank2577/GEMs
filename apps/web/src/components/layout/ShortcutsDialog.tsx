@@ -22,8 +22,8 @@ export function ShortcutsDialog() {
         </DialogHeader>
         <div className="grid gap-5 sm:grid-cols-2">
           {shortcutGroups(isMac ? '⌘' : 'Ctrl').map((g) => (
-            <section key={g.title} aria-labelledby={`kbd-${g.title}`}>
-              <h3 id={`kbd-${g.title}`} className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{g.title}</h3>
+            <section key={g.title} aria-labelledby={`kbd-${g.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>
+              <h3 id={`kbd-${g.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{g.title}</h3>
               <ul className="grid gap-1.5">
                 {g.rows.map((r) => (
                   <li key={r.label} className="flex items-center justify-between gap-3 text-sm">

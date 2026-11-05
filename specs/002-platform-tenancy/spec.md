@@ -31,7 +31,7 @@ and `apps/api/test/auth.test.ts` on 2026-11-05. Requirements marked **(gap)** ar
 
 Conventions used in the scenarios: the web app runs at `APP_URL` (E2E: `http://localhost:8788`), the API at `/api`.
 Error responses always have the shape `{ "error": { "code", "message", "details?" } }`; validation errors carry
-`details.fields` (map of field → message). "Toast" means a sonner toast in the bottom corner. "Phone" = 375×812 viewport
+`details.fields` (map of field → message). "Toast" means a sonner toast: bottom-right at >=768px, top-center below the top bar on smaller screens. "Phone" = 375×812 viewport
 (Playwright project `mobile` / Pixel 7), "desktop" = 1440×900.
 
 ### User Story 1 - Sign up, sign in, sign out and stay signed in (Priority: P1) (#3)

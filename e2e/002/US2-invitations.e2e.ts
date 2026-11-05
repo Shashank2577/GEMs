@@ -514,7 +514,7 @@ test.describe('sc13-sc15 orgs and resend', () => {
     expect(body.role).toBe('owner');
     await expect(page.getByText(`Switched to ${me.orgName}`)).toBeVisible();
     await page.waitForURL('**/dashboard');
-    await expect(page.getByRole('button', { name: new RegExp(`Organization: ${me.orgName}`) }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: new RegExp(`Switch organization.*${me.orgName}|${me.orgName}.*Switch organization`) }).first()).toBeVisible();
     await ev(page, 'sc13-switched-dashboard');
     // cached queries cleared: the Team page now shows the new org's data, not the previous org's cached members
     await page.getByRole('link', { name: /Settings/ }).first().click().catch(async () => { await page.goto('/settings/team'); });
