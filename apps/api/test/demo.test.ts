@@ -576,3 +576,28 @@ describe('removeDemo (library; US4 scenario 14)', () => {
     expect(seen.every((s) => s.rowsLeft === 0 && s.key.startsWith(`org/${orgId}/vault/demo-`))).toBe(true);
   });
 });
+
+describe('isDemo on tender DTOs (007/FR-067, US4-13)', () => {
+  it('flags demo tenders in the list and detail, and only those; raw stays hidden', async () => {
+    const owner = await signup(ctx.app, { orgName: 'Sample Badge Org' });
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: owner.cookie })).status).toBe(201);
+    const [real] = await ctx.db.insert(tenders).values({
+      bidNumber: 'GEM/2026/B/9900001', sourceUrl: 'https://bidplus.gem.gov.in/bid/9900001', title: 'Real live bid for isDemo check', items: [], status: 'open',
+      endAt: new Date(NOW.getTime() + 5 * 86_400_000), raw: {}, contentHash: 'isdemo-real-1',
+    }).returning();
+    const list = await request(ctx.app, 'GET', '/tenders?pageSize=100&status=all', { cookie: owner.cookie });
+    expect(list.status).toBe(200);
+    const items = list.body.items as { id: string; bidNumber: string; isDemo: boolean }[];
+    expect(items.length).toBeGreaterThan(30);
+    expect(items.filter((t) => t.isDemo).length).toBeGreaterThanOrEqual(30);
+    expect(items.find((t) => t.id === real!.id)).toMatchObject({ isDemo: false });
+    for (const t of items) expect(t).not.toHaveProperty('raw');
+
+    const demoItem = items.find((t) => t.isDemo)!;
+    const demoDetail = await request(ctx.app, 'GET', `/tenders/${demoItem.id}`, { cookie: owner.cookie });
+    expect(demoDetail.body).toMatchObject({ id: demoItem.id, isDemo: true });
+    expect(demoDetail.body).not.toHaveProperty('raw');
+    const realDetail = await request(ctx.app, 'GET', `/tenders/${real!.id}`, { cookie: owner.cookie });
+    expect(realDetail.body).toMatchObject({ isDemo: false });
+  });
+});
