@@ -34,6 +34,15 @@ export const overrideFactorInputSchema = z.object({
 });
 export type OverrideFactorInput = z.infer<typeof overrideFactorInputSchema>;
 
+/** GET /analysis/capabilities (004/FR-053): which AI tiers are configured; model ids only, never keys. */
+export interface AnalysisCapabilities {
+  /** An LLM key is configured: enrichment (and escalation) can run. */
+  ai: boolean;
+  /** An OCR model is available for scanned PDFs. */
+  ocr: boolean;
+  models: { enrichment?: string; ocr?: string; escalation?: string };
+}
+
 /** PUT /scoring-weights — partial map of factor → weight 0..100. */
 export const scoringWeightsSchema = z
   .object(Object.fromEntries(FACTOR_KEYS.map((k) => [k, z.number().min(0).max(100).optional()])) as Record<FactorKey, z.ZodOptional<z.ZodNumber>>)

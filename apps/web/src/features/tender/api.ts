@@ -1,7 +1,7 @@
 /** Data hooks for the tender detail page (Identify: GET /tenders/:id; Analyse: documents, analysis, override). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TenderDetail } from '@tp/core/contracts/identify';
-import type { AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto, UploadTenderDocumentResponse } from '@tp/core/contracts/analyse';
+import type { AnalysisCapabilities, AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto, UploadTenderDocumentResponse } from '@tp/core/contracts/analyse';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import { api, ApiError } from '@/lib/api';
 import { ANALYSIS_POLL_MS, isAnalysisRunning } from './labels';
@@ -12,6 +12,11 @@ export const tenderKeys = {
   documents: (id: string) => ['tender', id, 'documents'] as const,
   activity: (id: string) => ['tender', id, 'activity'] as const,
 };
+
+/** GET /analysis/capabilities: is AI (and OCR) configured? Drives the "Analysing…" copy and OCR actions (004/FR-053). */
+export function useAnalysisCapabilities() {
+  return useQuery({ queryKey: ['analysis', 'capabilities'] as const, queryFn: () => api.get<AnalysisCapabilities>('/analysis/capabilities'), staleTime: 5 * 60_000 });
+}
 
 export function useTender(id: string) {
   return useQuery({ queryKey: tenderKeys.detail(id), queryFn: () => api.get<TenderDetail>(`/tenders/${id}`) });

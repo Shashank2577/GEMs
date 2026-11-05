@@ -9,7 +9,8 @@ import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { PAGE_SEPARATOR } from '@tp/core/analyse/pdf-text';
 import { analyseTender } from '../src/services/analyse';
 import type { LlmClient } from '../src/deps';
-import { createTestContext, seedOrgWithRoles, type TestContext } from './helpers';
+import { createApp } from '../src/app';
+import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
 
 let ctx: TestContext;
 let roles: Awaited<ReturnType<typeof seedOrgWithRoles>>;
@@ -144,5 +145,29 @@ describe('escalation (T088, FR-050, FR-048)', () => {
     expect(analysis.status).toBe('done');
     expect(analysis.requirements.find((r) => r.key === 'emd')).toMatchObject({ method: 'RULE', numeric: EMD });
     expect((await ctx.db.select().from(analyses).where(eq(analyses.id, analysis.id)))[0]!.status).toBe('done');
+  });
+});
+
+describe('GET /analysis/capabilities (T089, FR-053)', () => {
+  const caps = (deps: Partial<typeof ctx.deps>, cookie = roles.viewer.cookie) => request(createApp({ ...ctx.deps, ...deps }), 'GET', '/analysis/capabilities', { cookie });
+
+  it('requires a session', async () => {
+    expect((await request(ctx.app, 'GET', '/analysis/capabilities')).status).toBe(401);
+  });
+
+  it('no LLM key → nothing is on', async () => {
+    const r = await caps({ llm: null, llmFor: () => null });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ai: false, ocr: false, models: {} });
+  });
+
+  it('reports configured tiers with model ids only (any member, no secrets)', async () => {
+    const llm = fake('claude-sonnet-5-5', () => ({}));
+    const ocr = fake('claude-opus-5-5', () => ({}));
+    const r = await caps({ llm, llmFor: (p) => (p === 'enrichment' ? llm : p === 'ocr' ? ocr : null) });
+    expect(r.body).toEqual({ ai: true, ocr: true, models: { enrichment: 'claude-sonnet-5-5', ocr: 'claude-opus-5-5' } });
+    const all = await caps({ llm, llmFor: () => fake('claude-fable-5-1', () => ({})) }, roles.analyst.cookie);
+    expect(all.body.models).toEqual({ enrichment: 'claude-sonnet-5-5', ocr: 'claude-fable-5-1', escalation: 'claude-fable-5-1' });
+    expect(JSON.stringify(all.body)).not.toMatch(/key|secret|sk-/i);
   });
 });

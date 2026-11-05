@@ -10,6 +10,7 @@
  *   GET  /tenders/:id/analysis                        latest done Analysis (+lastAttempt) or 404  viewer+
  *   POST /analyses/:id/override                       {factorKey,status,reason}      bid_manager+
  *   POST /analyses/:id/rescore                        recompute with current profile/vault/weights; 409 analysis_running / analysis_replaced / reanalysis_required  analyst+
+ *   GET  /analysis/capabilities                       {ai, ocr, models}              viewer+
  *   GET  /scoring-weights                             {weights, defaults, custom}    viewer+
  *   PUT  /scoring-weights                             partial weights ({} = reset)   bid_manager+
  */
@@ -135,6 +136,18 @@ analysisRoutes.post('/analyses/:id/rescore', requireRole('analyst'), async (c) =
   const { id } = parseWith(idParamSchema, { id: c.req.param('id') }, 'path');
   const a = await rescoreAnalysis(c.var.deps, { orgId: orgId(c), userId: userId(c), analysisId: id, viewer: c.var.org });
   return c.json(await analysisView(c, a.tenderId));
+});
+
+/** 004/FR-053: what the AI tiers can do, so the UI picks its copy and shows OCR actions. Model ids only, never keys. */
+analysisRoutes.get('/analysis/capabilities', requireAuth, (c) => {
+  const { llm, llmFor } = c.var.deps;
+  const ocr = llmFor('ocr');
+  const escalation = llmFor('escalation');
+  return c.json({
+    ai: !!llm,
+    ocr: !!ocr,
+    models: { ...(llm ? { enrichment: llm.model } : {}), ...(ocr ? { ocr: ocr.model } : {}), ...(escalation ? { escalation: escalation.model } : {}) },
+  });
 });
 
 analysisRoutes.get('/scoring-weights', requireAuth, (c) => c.json(weightsResponse(c.var.org.scoringWeights)));

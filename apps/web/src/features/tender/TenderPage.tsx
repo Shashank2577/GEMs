@@ -19,7 +19,7 @@ import { DocumentsTab } from './DocumentsTab';
 import { HistoryTab } from './HistoryTab';
 import { RequirementsTab } from './RequirementsTab';
 import { TenderHero } from './TenderHero';
-import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
+import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useAnalysisCapabilities, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
 import { canRescoreFor, isAnalysisRunning, staleReasonCopy, staleSinceCopy } from './labels';
 
 const TABS = ['analysis', 'requirements', 'documents', 'history'] as const;
@@ -36,6 +36,7 @@ export default function TenderPage() {
   const analysisQ = useAnalysis(id);
   const docs = useTenderDocuments(id);
   const analyse = useAnalyse(id);
+  const capabilities = useAnalysisCapabilities();
   const rescore = useRescore(id);
   const startBid = useStartBid(id);
   const dismiss = useDismiss(id);
@@ -162,7 +163,7 @@ export default function TenderPage() {
               </RoleGate>
             </div>
           )}
-          {analyse.isPending ? <AnalysingState /> : analysisQ.isLoading ? <AnalysisSkeleton /> : analysisQ.isError ? (
+          {analyse.isPending ? <AnalysingState withAi={!!capabilities.data?.ai} /> : analysisQ.isLoading ? <AnalysisSkeleton /> : analysisQ.isError ? (
             <ErrorState error={analysisQ.error} onRetry={() => analysisQ.refetch()} />
           ) : analysis ? (
             <AnalysisPanel analysis={analysis} tenderId={id} onReanalyse={runAnalyse} reanalysing={analyse.isPending} canAnalyse={canAnalyse} hasWorkspace={!!t.workspace} analyseDisabled={analyseBlocked} />
