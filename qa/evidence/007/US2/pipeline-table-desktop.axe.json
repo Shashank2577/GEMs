@@ -1,0 +1,1533 @@
+{
+  "url": "http://localhost:8788/pipeline",
+  "timestamp": "2026-11-05T04:20:49.843Z",
+  "violations": [
+    {
+      "id": "aria-progressbar-name",
+      "impact": "serious",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag111",
+        "EN-301-549",
+        "EN-9.1.1.1",
+        "RGAAv4",
+        "RGAA-11.1.1"
+      ],
+      "description": "Ensure every ARIA progressbar node has an accessible name",
+      "help": "ARIA progressbar nodes must have an accessible name",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-progressbar-name?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(1) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(2) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(3) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(4) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(5) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(6) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(7) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"89\" aria-valuetext=\"89%\" role=\"progressbar\" data-state=\"loading\" data-value=\"89\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            "div[aria-valuetext=\"89%\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(9) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(10) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(11) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(12) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(13) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(14) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(15) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        },
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"100\" aria-valuetext=\"100%\" role=\"progressbar\" data-state=\"complete\" data-value=\"100\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-1.5\">",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(16) > td:nth-child(6) > .w-28.gap-2.flex > .h-1\\.5[aria-valuetext=\"100%\"][aria-valuemax=\"100\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#7d8092",
+                "bgColor": "#fafafc",
+                "contrastRatio": 3.74,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<aside class=\"fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out md:block w-[248px]\" aria-label=\"Sidebar\">",
+                  "target": [
+                    "aside"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mb-1.5 mt-6 px-2.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/80\">Organization</p>",
+          "target": [
+            ".mb-1\\.5"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(1) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(1) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(2) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(2) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(3) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(3) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1183d4",
+                "bgColor": "#ebf7ff",
+                "contrastRatio": 3.69,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-info/20 bg-info-soft text-info h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Analysing</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(4) > td:nth-child(2) > .border-info\\/20.bg-info-soft.text-info"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.69 (foreground color: #1183d4, background color: #ebf7ff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-info/20 bg-info-soft text-info h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Analysing</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(4) > td:nth-child(2) > .border-info\\/20.bg-info-soft.text-info"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.69 (foreground color: #1183d4, background color: #ebf7ff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(4) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(4) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1183d4",
+                "bgColor": "#ebf7ff",
+                "contrastRatio": 3.69,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-info/20 bg-info-soft text-info h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Analysing</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(5) > td:nth-child(2) > .border-info\\/20.bg-info-soft.text-info"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.69 (foreground color: #1183d4, background color: #ebf7ff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-info/20 bg-info-soft text-info h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Analysing</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(5) > td:nth-child(2) > .border-info\\/20.bg-info-soft.text-info"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.69 (foreground color: #1183d4, background color: #ebf7ff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#de2141",
+                "bgColor": "#ffedf0",
+                "contrastRatio": 4.23,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs font-semibold\">No-Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(5) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-danger\\/20.bg-danger-soft.text-danger"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs font-semibold\">No-Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(5) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-danger\\/20.bg-danger-soft.text-danger"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(6) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(6) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(6) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(6) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(7) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(7) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(7) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(7) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#de2141",
+                "bgColor": "#ffedf0",
+                "contrastRatio": 4.23,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs font-semibold\">No-Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(8) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-danger\\/20.bg-danger-soft.text-danger"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs font-semibold\">No-Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(8) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-danger\\/20.bg-danger-soft.text-danger"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(9) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(9) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(10) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(10) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(11) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(11) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(12) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(12) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(13) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(13) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Won</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(14) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Won</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(14) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(14) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(14) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Won</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(15) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Won</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(15) > td:nth-child(2) > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(15) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(15) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#de2141",
+                "bgColor": "#ffedf0",
+                "contrastRatio": 4.23,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Lost</span>",
+                  "target": [
+                    "td:nth-child(2) > .border-danger\\/20.bg-danger-soft.text-danger"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Lost</span>",
+          "target": [
+            "td:nth-child(2) > .border-danger\\/20.bg-danger-soft.text-danger"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    ".hover\\:bg-muted\\/50:nth-child(16) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            ".hover\\:bg-muted\\/50:nth-child(16) > td:nth-child(3) > .gap-1\\.5.inline-flex.items-center > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ]
+    },
+    {
+      "id": "label-content-name-mismatch",
+      "impact": "serious",
+      "tags": [
+        "cat.semantics",
+        "wcag21a",
+        "wcag253",
+        "EN-301-549",
+        "EN-9.2.5.3",
+        "RGAAv4",
+        "RGAA-6.1.5"
+      ],
+      "description": "Ensure that elements labelled through their content must have their visible text as part of their accessible name",
+      "help": "Elements must have their visible text as part of their accessible name",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-content-name-mismatch?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "label-content-name-mismatch",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Text inside the element is not included in the accessible name"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: own Traders mw31fhsl40. Switch organization\">",
+          "target": [
+            "#radix-\\:r3\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+        },
+        {
+          "any": [
+            {
+              "id": "label-content-name-mismatch",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Text inside the element is not included in the accessible name"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+          "target": [
+            "#radix-\\:rg\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+        }
+      ]
+    }
+  ],
+  "incomplete": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">OT</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">OT</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        }
+      ]
+    }
+  ],
+  "passes": 27
+}

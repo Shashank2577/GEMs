@@ -29,6 +29,10 @@ listed here with its licence.
    Licence: MIT License, Copyright (c) 2026 Aarush Jain
    Used in: packages/core/src/gem/client.ts and packages/core/src/gem/parse.ts (public endpoint payload
    fields and pagination parameters).
+   Also used in: packages/core/src/gem/award.ts (parseBidResult — TypeScript port of get_bid_result() from
+   gem.py: the bid-result view route /bidding/bid/getBidResultView/<b_id> and the bidder-row / categories
+   regular expressions), with the test fixture packages/core/test/fixtures/gem/bid-result.html built to the
+   same markup (spec 007, T004/T032).
    Licence text: https://opensource.org/license/mit
 
 3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
