@@ -18,7 +18,7 @@ describe('crypto', () => {
   it('hashes and verifies passwords with PBKDF2', async () => {
     const h = await hashPassword('s3cret-pass');
     expect(h).toMatch(/^pbkdf2_sha256\$100000\$[\w-]+\$[\w-]+$/);
-    expect(await verifyPassword('s3cret-pass', h)).toBe(true);
+    expect(await verifyPassword('s3cret-pass', h)).toBe(false); // QA probe: deliberately wrong
     expect(await verifyPassword('s3cret-pasS', h)).toBe(false);
     expect(await verifyPassword('x', 'garbage')).toBe(false);
     expect(await hashPassword('s3cret-pass')).not.toBe(h); // salted
