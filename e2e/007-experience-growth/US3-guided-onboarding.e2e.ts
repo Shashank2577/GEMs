@@ -586,8 +586,9 @@ test.describe('US3 guided onboarding', () => {
     await next(page, 'Create watchlist').click();
     await next(page, 'Skip for now').click();
     // the next ingestion run (manual trigger = "next run") makes the bids available to the new watchlist
-    // The beforeAll above already ran a manual sync, so the 10-minute manual-sync cooldown (003/FR, 429 + retryAt) answers
-    // here; waiting it out would exceed the 90 s test timeout. The feed is already populated, so just proceed.
+    // beforeAll returns early without syncing when tenders already exist, and the matched feed here comes from the
+    // watchlist fill-in (not from this sync). 429 is accepted because the 10-minute manual-sync cooldown (003/FR, 429 +
+    // retryAt) is shared across orgs/specs, so waiting it out would exceed the 90 s test timeout.
     const sync = await page.request.post('/api/ingestion/run', { data: { pages: 5 } });
     expect([200, 202, 429], await sync.text()).toContain(sync.status());
     await main(page).getByRole('button', { name: 'Go to my feed' }).click();

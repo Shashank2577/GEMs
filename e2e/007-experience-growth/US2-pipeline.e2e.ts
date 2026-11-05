@@ -249,8 +249,7 @@ test('US2-5 [video]: dragging the blocked Preparing card (Dell desktops) to Read
   await evidence007(ap, STORY, 'US2-05-open-workspace-navigated');
 });
 
-test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=ready answers 409 conflict / not_analysed', async ({ page, browser }) => {
-  await demoOwner(page);
+test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=ready answers 409 conflict / not_analysed', async ({ browser }) => {
   // A second org starts a bid on a tender it never analysed. Demo tenders are invisible to orgs that never loaded the
   // demo (008/FR-016), so orgB loads the demo itself and picks a demo tender that has neither a workspace nor an
   // analysis for it (plan index 30 — see PIPELINE / EXTRA_ANALYSES in packages/db/src/demo.ts).
@@ -260,7 +259,8 @@ test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=rea
     expect((await orgB.post('/api/auth/signup', { data: ub })).status()).toBe(201);
     await seedDemo(orgB);
     const bidNo = `GEM/2026/B/${6_400_000 + 30 * 7919 + 1_337}`; // demoBidNumber(30)
-    const feed = await (await orgB.get('/api/tenders?pageSize=100')).json();
+    // Bid-number prefix search (008/FR-073) finds it regardless of how old the DB is / where it sorts in the default list.
+    const feed = await (await orgB.get(`/api/tenders?q=${encodeURIComponent(bidNo)}`)).json();
     const tenderId = (feed.items as { id: string; bidNumber: string }[]).find((t) => t.bidNumber === bidNo)?.id;
     expect(tenderId, `demo tender ${bidNo} visible to orgB`).toBeTruthy();
     const created = await orgB.post(`/api/tenders/${tenderId}/workspace`);
@@ -273,6 +273,8 @@ test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=rea
     expect(body.error.code).toBe('conflict');
     expect(body.error.message).toBe('Analyse the tender before marking the bid ready to submit.');
     expect(body.error.details.reason).toBe('not_analysed');
+    // Cross-org analysis scoping (orgB cannot read/override/rescore orgA's analysis) is not asserted here; it is covered by
+    // apps/api/test/isolation-contract.test.ts ('GET /tenders/:id/analysis', 'POST /analyses/:id/override|rescore').
     // Same through the UI: Move to… -> Ready to submit
     const ctx = await browser.newContext({ storageState: await orgB.storageState(), baseURL: test.info().project.use.baseURL, viewport: { width: 1440, height: 900 } });
     const p = await ctx.newPage();
