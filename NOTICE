@@ -20,6 +20,9 @@ listed here with its licence.
    - packages/core/src/gem/client.ts fetchBidDocument byte cap (25 MB, GemError code 'too_large') —
      approach adapted from src/http.ts fetchBoundedResource({maxBytes}) (content-length check, then
      streamed byte count with cancel), with its test idea from src/http.test.ts.
+   Spec 006 Apply (ported at commit 46925c6, 2026-11-05):
+   - apps/api/src/services/packet.ts buildWorkspacePacket loadBytes — the "independent Uint8Array copy before
+     PDF load" hardening (Uint8Array.from(bytes) before parsing) adapted from src/pdf.ts parseGemPdfText.
    Licence text: https://www.apache.org/licenses/LICENSE-2.0
 
 2. gem-search — https://github.com/arush15june/gem-search

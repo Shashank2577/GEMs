@@ -3,7 +3,7 @@
  * builds. Routes in routes/{workspaces,packets,assist}.ts are thin wrappers around these helpers.
  * Every query is scoped by org (Constitution IV); packet files live under org/<orgId>/packets/….
  */
-import { and, asc, desc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import {
   activityLog, analyses, annexureTemplates, bidWorkspaces, comments, companyProfiles, memberships, packets, tenderDocuments, tenders, users,
   vaultDocuments,
@@ -264,6 +264,60 @@ export function defaultPacketItems(r: Readiness, annexures: WorkspaceAnnexure[],
   return items;
 }
 
+const itemUid = (i: { kind: string; refId?: string | null }) => `${i.kind}:${i.refId ?? ''}`;
+
+/**
+ * Proposed packet order (006/FR-055): the last `ready` build's items so the whole team sees the same order —
+ * references that no longer resolve (deleted vault document, unknown annexure key, removed bid document) are
+ * dropped, and items of the computed default that the last build did not have (newly required annexures,
+ * newly mapped documents) are appended. Without a ready build this is the computed default.
+ */
+export function proposedPacketItems(
+  computed: PacketItemInput[], lastReady: PacketRow | null | undefined,
+  valid: { vaultIds: Set<string>; tenderDocIds: Set<string> },
+): PacketItemInput[] {
+  if (!lastReady || !lastReady.items?.length) return computed;
+  const out: PacketItemInput[] = [];
+  const seen = new Set<string>();
+  for (const it of lastReady.items) {
+    const ok = it.kind === 'cover'
+      || (it.kind === 'annexure' && !!it.refId && SYSTEM_TEMPLATE_BY_KEY.has(it.refId))
+      || (it.kind === 'vault' && !!it.refId && valid.vaultIds.has(it.refId))
+      || (it.kind === 'tender_doc' && !!it.refId && valid.tenderDocIds.has(it.refId));
+    const uid = itemUid(it);
+    if (!ok || seen.has(uid)) continue;
+    seen.add(uid);
+    const fresh = computed.find((c) => itemUid(c) === uid);
+    out.push({
+      kind: it.kind, ...(it.refId ? { refId: it.refId } : {}), title: it.title,
+      ...(fresh?.pages != null ? { pages: fresh.pages } : it.pages != null && it.kind !== 'cover' ? { pages: it.pages } : {}),
+    } as PacketItemInput);
+  }
+  // Append what is newly required; a cover the user removed stays removed.
+  for (const c of computed) if (c.kind !== 'cover' && !seen.has(itemUid(c))) { seen.add(itemUid(c)); out.push(c); }
+  return out;
+}
+
+/** 006/FR-057: a `building` row older than this is treated as interrupted. */
+export const PACKET_BUILD_STALE_MS = 10 * 60 * 1000;
+export const PACKET_INTERRUPTED = 'Build interrupted — try again.';
+
+/** Lazily mark this workspace's stuck `building` packets as `failed` (worker killed mid-build). */
+export async function recoverStuckPackets(deps: AppDeps, org: string, workspaceId: string): Promise<number> {
+  const cutoff = new Date(deps.clock.now().getTime() - PACKET_BUILD_STALE_MS);
+  const rows = await deps.db.update(packets).set({ status: 'failed', warnings: [PACKET_INTERRUPTED] })
+    .where(and(eq(packets.orgId, org), eq(packets.workspaceId, workspaceId), eq(packets.status, 'building'), lt(packets.createdAt, cutoff)))
+    .returning({ id: packets.id });
+  if (rows.length) deps.logger.warn('packet build interrupted', { workspaceId, packets: rows.map((r) => r.id) });
+  return rows.length;
+}
+
+/** Stored-size estimate for annexures rendered on the fly (006/FR-056). */
+export const ANNEXURE_SIZE_ESTIMATE = 50 * 1024;
+const MB = 1024 * 1024;
+const fmtMB = (b: number) => `${(b / MB).toFixed(1)} MB`;
+const fmtLimit = (b: number) => (b % MB === 0 ? `${b / MB} MB` : fmtMB(b));
+
 const PACKET_FILE = (bid: string) => `${bid.replace(/[^\w-]+/g, '_').replace(/_+/g, '_')}_technical_packet.pdf`;
 
 export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdValue: string, w: WorkspaceRow, requested?: PacketItemInput[]): Promise<PacketRow> {
@@ -294,6 +348,21 @@ export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdVal
   }
   if (bad.length) throw new HttpError(400, 'validation_error', `Unknown packet item(s): ${bad.join(', ')}`, { items: bad });
 
+  // 006/FR-056, NFR-003: refuse oversized inputs from stored sizes, before any file is loaded or a row is created.
+  const sized = items.map((i) => ({
+    title: i.title,
+    sizeBytes: i.kind === 'vault' ? vaultById.get(i.refId!)?.sizeBytes ?? 0
+      : i.kind === 'tender_doc' ? tdocById.get(i.refId!)?.sizeBytes ?? 0
+        : i.kind === 'annexure' ? ANNEXURE_SIZE_ESTIMATE : 0,
+  }));
+  const totalBytes = sized.reduce((n, x) => n + x.sizeBytes, 0);
+  const limitBytes = deps.config.packetMaxInputBytes;
+  if (totalBytes > limitBytes) {
+    throw new HttpError(413, 'packet_too_large',
+      `These documents add up to ${fmtMB(totalBytes)} — remove or compress some before building (limit ${fmtLimit(limitBytes)}).`,
+      { totalBytes, limitBytes, items: sized.filter((x) => x.sizeBytes > 0).sort((a, b) => b.sizeBytes - a.sizeBytes).slice(0, 10) });
+  }
+
   const [row] = await deps.db.insert(packets).values({
     orgId: org, workspaceId: w.id, status: 'building', items: items.map((i) => ({ kind: i.kind, refId: i.refId, title: i.title, pages: i.pages })),
     createdBy: userIdValue,
@@ -308,7 +377,12 @@ export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdVal
     const key = it.kind === 'vault' ? vaultById.get(it.refId!)?.blobKey : tdocById.get(it.refId!)?.blobKey;
     if (!key) return null;
     const obj = await deps.blobs.get(key);
-    return obj ? new Uint8Array(await obj.arrayBuffer()) : null;
+    if (!obj) return null;
+    // Hand pdf-lib an independent plain Uint8Array (own ArrayBuffer, offset 0), never a view into a pooled
+    // Buffer or a shared ArrayBuffer: older byte-level PDF code can misread such slices.
+    // Adapted from erenmyeager15/india-government-tenders-scraper src/pdf.ts (`Uint8Array.from(bytes)` before
+    // parsing), Apache-2.0 — see NOTICE (006/FR-047, T063).
+    return Uint8Array.from(new Uint8Array(await obj.arrayBuffer()));
   };
 
   try {
@@ -360,6 +434,7 @@ export async function workspaceActivity(deps: AppDeps, org: string, w: Workspace
 }
 
 export async function workspaceDetail(deps: AppDeps, org: string, w: WorkspaceRow): Promise<WorkspaceDetail> {
+  await recoverStuckPackets(deps, org, w.id);
   const [t, a, docs, profile, templates, packetRows, cmts, activity, members, tdocs] = await Promise.all([
     getTenderRow(deps, w.tenderId), latestAnalysis(deps, org, w.tenderId), vaultRows(deps, org), profileRow(deps, org), templatesFor(deps, org),
     deps.db.select().from(packets).where(and(eq(packets.orgId, org), eq(packets.workspaceId, w.id))).orderBy(desc(packets.createdAt)).limit(20),
@@ -373,6 +448,7 @@ export async function workspaceDetail(deps: AppDeps, org: string, w: WorkspaceRo
   const annexures = workspaceAnnexures(w.id, a, templates, ctx);
   const gaps = new Set<string>();
   for (const an of annexures) if (an.required || an.key === 'bid_cover_letter') for (const m of an.missing) gaps.add(m);
+  const computed = defaultPacketItems(r, annexures, docs);
   return {
     workspace: toWorkspaceDto(w, ppl),
     tender: toWorkspaceTender(t),
@@ -385,7 +461,10 @@ export async function workspaceDetail(deps: AppDeps, org: string, w: WorkspaceRo
     vaultDocs: docs.map((d) => toVaultDoc(d, now)),
     tenderDocs: tdocs.map((d) => ({ id: d.id, kind: d.kind, fileName: d.fileName, pageCount: d.pageCount, sizeBytes: d.sizeBytes, downloadUrl: `/api/tenders/${d.tenderId}/documents/${d.id}/download` })),
     members,
-    defaultPacketItems: defaultPacketItems(r, annexures, docs),
+    defaultPacketItems: proposedPacketItems(computed, packetRows.find((p) => p.status === 'ready'), {
+      vaultIds: new Set(docs.map((d) => d.id)), tenderDocIds: new Set(tdocs.map((d) => d.id)),
+    }),
+    computedPacketItems: computed,
     profileGaps: [...gaps].sort(),
   };
 }

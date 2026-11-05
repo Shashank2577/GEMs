@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core';
@@ -12,7 +12,6 @@ import { Badge, Button, Card, EmptyState, Progress, Tooltip, toast } from '@/com
 import { useCan } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, pluralize, relativeTime } from '@/lib/format';
-import { useLocalStorage } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { formatBytes } from '@/components/ui/dropzone';
 import { useBuildPacket } from './api';
@@ -23,7 +22,7 @@ interface Row extends PacketItemInput { uid: string; sizeBytes: number; group: s
 
 const uidOf = (i: PacketItemInput) => `${i.kind}:${i.refId ?? ''}`;
 
-function allRows(data: WorkspaceDetail): { rows: Row[]; defaults: string[] } {
+function allRows(data: WorkspaceDetail): { rows: Row[]; proposed: string[]; computed: string[] } {
   const vault = new Map(data.vaultDocs.map((d) => [d.id, d]));
   const make = (i: PacketItemInput): Row => {
     const d = i.kind === 'vault' && i.refId ? vault.get(i.refId) : undefined;
@@ -36,22 +35,50 @@ function allRows(data: WorkspaceDetail): { rows: Row[]; defaults: string[] } {
     };
   };
   const out = new Map<string, Row>();
+  // Proposed order (006/FR-055): the last successful build's order, shared by the whole team.
   for (const i of data.defaultPacketItems) out.set(uidOf(i), make(i));
-  const defaults = [...out.keys()];
+  const proposed = [...out.keys()];
+  // Computed default (006/FR-045): what "Default order" resets to.
+  const computedItems = data.computedPacketItems ?? data.defaultPacketItems;
+  for (const i of computedItems) if (!out.has(uidOf(i))) out.set(uidOf(i), make(i));
+  const computed = computedItems.map(uidOf);
   for (const a of data.annexures) if (a.key !== 'oem_auth_request') { const r = make({ kind: 'annexure', refId: a.key, title: a.title, pages: 1 }); if (!out.has(r.uid)) out.set(r.uid, r); }
   for (const d of data.vaultDocs) { const r = make({ kind: 'vault', refId: d.id, title: d.title }); if (!out.has(r.uid)) out.set(r.uid, r); }
   for (const d of data.tenderDocs) { const r = make({ kind: 'tender_doc', refId: d.id, title: d.fileName }); if (!out.has(r.uid)) out.set(r.uid, r); }
-  return { rows: [...out.values()], defaults };
+  return { rows: [...out.values()], proposed, computed };
+}
+
+const sameOrder = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * Per-browser packet order kept only as an unsaved draft (006/FR-055): `null` means "use the server's proposed order".
+ * Stored under `tp:packet-order:<workspaceId>`; removed when cleared (after a successful build or a reset).
+ */
+function usePacketDraft(workspaceId: string) {
+  const key = `tp:packet-order:${workspaceId}`;
+  const read = (): string[] | null => {
+    try { const v = JSON.parse(localStorage.getItem(key) ?? 'null'); return Array.isArray(v) ? v.map(String) : null; } catch { return null; }
+  };
+  const [draft, setDraftState] = useState<string[] | null>(read);
+  useEffect(() => { setDraftState(read()); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setDraft = useCallback((v: string[] | null) => {
+    setDraftState(v);
+    try { if (v) localStorage.setItem(key, JSON.stringify(v)); else localStorage.removeItem(key); } catch { /* storage unavailable */ }
+  }, [key]);
+  return [draft, setDraft] as const;
 }
 
 const KIND_ICON = { cover: BookOpen, annexure: FileSignature, vault: FileText, tender_doc: FileStack } as const;
 
 export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: () => void }) {
   const canWrite = useCan('analyst');
-  const { rows, defaults } = useMemo(() => allRows(data), [data]);
+  const { rows, proposed, computed } = useMemo(() => allRows(data), [data]);
   const byUid = useMemo(() => new Map(rows.map((r) => [r.uid, r])), [rows]);
-  const [order, setOrder] = useLocalStorage<string[] | null>(`tp:packet-order:${data.workspace.id}`, null);
-  const included = (order ?? defaults).filter((u) => byUid.has(u));
+  const [order, setOrder] = usePacketDraft(data.workspace.id);
+  const included = (order ?? proposed).filter((u) => byUid.has(u));
+  const isComputed = sameOrder(included, computed);
+  const fromLastBuild = !order && !sameOrder(proposed, computed);
+  const resetOrder = () => setOrder(sameOrder(proposed, computed) ? null : computed);
   const available = rows.filter((r) => !included.includes(r.uid));
   const build = useBuildPacket(data.workspace.id);
   const [phase, setPhase] = useState(0);
@@ -84,7 +111,11 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
   }, [build.isPending]);
 
   const doBuild = () => build.mutate(items.map(({ kind, refId, title, pages: p }) => ({ kind, refId, title, pages: p })), {
-    onSuccess: (p) => toast.success(`Packet ready — ${p.pageCount} pages`, { description: p.warnings.length ? `${pluralize(p.warnings.length, 'warning')} to review` : 'Download it and check every page before uploading on GeM.' }),
+    onSuccess: (p) => {
+      // The build is now the team's shared order; drop the local draft.
+      if (p.status === 'ready') setOrder(null);
+      toast.success(`Packet ready — ${p.pageCount} pages`, { description: p.warnings.length ? `${pluralize(p.warnings.length, 'warning')} to review` : 'Download it and check every page before uploading on GeM.' });
+    },
     onError: (e) => toast.error(errorMessage(e)),
   });
 
@@ -96,8 +127,10 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-semibold">Packet contents</h3>
               <p className="text-xs text-muted-foreground">Drag to reorder (or use the arrows). The index page lists every document with its page number.</p>
+              {order && !sameOrder(order, proposed) && canWrite && <p className="mt-1 text-2xs text-muted-foreground">Unsaved order on this device — build the packet to share it with your team.</p>}
+              {fromLastBuild && <p className="mt-1 text-2xs text-muted-foreground">Order from the last successful build.</p>}
             </div>
-            {order && <Button size="xs" variant="ghost" onClick={() => setOrder(null)}><RotateCcw /> Default order</Button>}
+            {canWrite && !isComputed && <Button size="xs" variant="ghost" onClick={resetOrder}><RotateCcw /> Default order</Button>}
           </div>
           {items.length ? (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
