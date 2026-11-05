@@ -8,11 +8,10 @@ import {
   activityLog, analyses, bidWorkspaces, invitations, llmUsage, organizations, subscriptions, tenders, vaultDocuments, watchlists,
 } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
-import { PLAN_LIMITS, type PlanKey } from '@tp/core/contracts/plans';
+import { PLAN_LIMITS, WATCHLIST_LIMIT, type PlanKey } from '@tp/core/contracts/plans';
 import { createApp, type App } from '../src/app';
 import type { AppDeps, LlmClient } from '../src/deps';
-import { assertWithinPlan, usageFor, usedOf } from '../src/lib/plan';
-import { WATCHLIST_LIMIT } from '../src/routes/watchlists';
+import { assertWithinPlan, meteredCompleteJson, usageFor, usedOf } from '../src/lib/plan';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
 // 5 Nov 2026 10:00 IST
@@ -73,8 +72,8 @@ async function seedAnalyses(orgId: string, n: number, at = NOW, status = 'done')
 async function seedLlmAnalyses(orgId: string, n: number, at = NOW) {
   await seedAnalyses(orgId, n, at);
   const iso = at.toISOString();
-  await ctx.db.execute(sql`insert into llm_usage (org_id, analysis_id, kind, model, input_tokens, output_tokens, created_at)
-    select org_id, id, 'extract', 'seed', 100, 10, ${iso}::timestamptz from analyses where org_id = ${orgId}::uuid and created_at = ${iso}::timestamptz`);
+  await ctx.db.execute(sql`insert into llm_usage (org_id, analysis_id, analysis_ref, kind, model, input_tokens, output_tokens, created_at)
+    select org_id, id, id, 'extract', 'seed', 100, 10, ${iso}::timestamptz from analyses where org_id = ${orgId}::uuid and created_at = ${iso}::timestamptz`);
 }
 
 async function seedWatchlists(orgId: string, n: number) {
@@ -114,6 +113,14 @@ async function seedPackets(orgId: string, n: number, at = NOW) {
       select ${orgId}::uuid, ${w!.id}::uuid, 'ready', ${iso}::timestamptz from generate_series(1, ${n})`);
   }
   return w!;
+}
+
+/** A demo tender with a demo workspace of this (demo-seeded) org. */
+async function demoTender(orgId: string) {
+  const [t] = await ctx.db.select({ tenderId: bidWorkspaces.tenderId, workspaceId: bidWorkspaces.id }).from(bidWorkspaces)
+    .innerJoin(tenders, eq(tenders.id, bidWorkspaces.tenderId)).where(and(eq(bidWorkspaces.orgId, orgId), eq(tenders.source, 'demo'))).limit(1);
+  expect(t, 'demo seed made a workspace on a demo tender').toBeTruthy();
+  return t!;
 }
 
 const watchlistBody = (name = 'Laptops') => ({
@@ -225,6 +232,29 @@ describe('plan limits per resource (FR-036, scenarios 2–5)', () => {
     expect(r.body.error.details).toEqual({ limit: 'seats', used: 3, max: 3, plan: 'starter' });
   });
 
+  it('seats: resending an EXPIRED invitation takes a seat again; resending a pending one does not (review S3)', async () => {
+    const owner = await signup(ctx.app, { orgName: `Resend Co ${++seq}` });
+    const orgId = owner.me.org.id;
+    await ctx.db.update(organizations).set({ plan: 'starter', trialEndsAt: null }).where(eq(organizations.id, orgId));
+    const a = await request(ctx.app, 'POST', '/org/invitations', { cookie: owner.cookie, json: { email: 'a@example.in', role: 'analyst' } });
+    const b = await request(ctx.app, 'POST', '/org/invitations', { cookie: owner.cookie, json: { email: 'b@example.in', role: 'viewer' } });
+    expect([a.status, b.status]).toEqual([201, 201]);
+    // a@ expires: 1 member + 1 pending = 2 seats, so c@ fits (3 / 3).
+    await ctx.db.update(invitations).set({ expiresAt: new Date(NOW.getTime() - DAY) }).where(eq(invitations.id, a.body.id));
+    const c = await request(ctx.app, 'POST', '/org/invitations', { cookie: owner.cookie, json: { email: 'c@example.in', role: 'viewer' } });
+    expect(c.status, c.text).toBe(201);
+    const revive = await request(ctx.app, 'POST', `/org/invitations/${a.body.id}/resend`, { cookie: owner.cookie, json: {} });
+    expect(revive.status, revive.text).toBe(402);
+    expect(revive.body.error.details).toEqual({ limit: 'seats', used: 3, max: 3, plan: 'starter' });
+    const [still] = await ctx.db.select({ expiresAt: invitations.expiresAt }).from(invitations).where(eq(invitations.id, a.body.id));
+    expect(still!.expiresAt.getTime()).toBeLessThan(NOW.getTime());
+    // Resending a still-pending invitation keeps the seat count → allowed at the limit.
+    expect((await request(ctx.app, 'POST', `/org/invitations/${b.body.id}/resend`, { cookie: owner.cookie, json: {} })).status).toBeLessThan(300);
+    // Free a seat (revoke c@) → reviving a@ works.
+    expect((await request(ctx.app, 'DELETE', `/org/invitations/${c.body.id}`, { cookie: owner.cookie })).status).toBeLessThan(300);
+    expect((await request(ctx.app, 'POST', `/org/invitations/${a.body.id}/resend`, { cookie: owner.cookie, json: {} })).status).toBeLessThan(300);
+  });
+
   it('vault bytes: a Pro org holding 9.99 GB cannot upload 20 MB (POST /vault and PUT /vault/:id/file)', async () => {
     const o = await newOrg('pro');
     const first = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: vaultForm(2048) });
@@ -251,7 +281,7 @@ describe('plan limits per resource (FR-036, scenarios 2–5)', () => {
   it('enterprise is never limited, even at 10× the Pro numbers (scenario 5, FR-043)', async () => {
     const o = await newOrg('enterprise');
     const pro = PLAN_LIMITS.pro;
-    // Pro watchlists are unlimited; 003/FR-027's product cap of 50 per org still applies to every plan.
+    // No plan limit on watchlists; 003/FR-027's product cap of 50 per org still applies to every plan.
     await seedWatchlists(o.orgId, WATCHLIST_LIMIT - 1);
     await seedInvites(o.orgId, pro.seats! * 10);
     await seedVaultBytes(o.orgId, pro.vaultBytes! * 10);
@@ -313,15 +343,31 @@ describe('analyse quota (T084)', () => {
     expect(r.status, r.text).toBe(201);
   });
 
-  it('the demo dataset does not use up the quota (its analyses and packets are on demo tenders, 007/FR-065)', async () => {
+  it('the demo dataset does not use up the quota: only the rows the seeder wrote are left out (007/FR-065)', async () => {
     const o = await newOrg();
     const seeded = await request(ctx.app, 'POST', '/demo/seed', { cookie: o.owner.cookie, json: {} });
     expect(seeded.status, seeded.text).toBeLessThan(300);
-    const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(analyses).where(eq(analyses.orgId, o.orgId));
-    expect(n).toBeGreaterThan(0);
+    const rows = await ctx.db.select({ seeded: analyses.seeded }).from(analyses).where(eq(analyses.orgId, o.orgId));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.seeded)).toBe(true);
     const u = await request(ctx.app, 'GET', '/org/usage', { cookie: o.viewer.cookie });
     expect(u.body.usage.analysesThisMonth).toBe(0);
     expect(u.body.usage.packetsThisMonth).toBe(0);
+  });
+
+  it('what a user runs on a demo tender or demo workspace counts (review S2)', async () => {
+    const o = await newOrg();
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: o.owner.cookie, json: {} })).status).toBeLessThan(300);
+    const t = await demoTender(o.orgId);
+    const up = await request(ctx.app, 'POST', `/tenders/${t.tenderId}/documents`, { cookie: o.analyst.cookie, form: { file: pdfFile('Real bid.pdf'), kind: 'bid' } });
+    expect(up.status, up.text).toBe(201);
+    const a = await request(ctx.app, 'POST', `/tenders/${t.tenderId}/analyse`, { cookie: o.analyst.cookie });
+    expect(a.status, a.text).toBe(201);
+    // A packet built on a demo workspace (e.g. from the org's real vault documents) counts too.
+    await ctx.db.execute(sql`insert into packets (org_id, workspace_id, status, created_at) values (${o.orgId}::uuid, ${t.workspaceId}::uuid, 'ready', ${NOW.toISOString()}::timestamptz)`);
+    const u = await request(ctx.app, 'GET', '/org/usage', { cookie: o.viewer.cookie });
+    expect(u.body.usage.analysesThisMonth).toBe(1);
+    expect(u.body.usage.packetsThisMonth).toBe(1);
   });
 });
 
@@ -354,7 +400,9 @@ describe('LLM metering (T085)', () => {
     const t = await analysableTender(o.analyst.cookie);
     const down: LlmClient = { ...fakeLlm().llm, completeJson: async () => { throw new Error('connect ECONNREFUSED'); } };
     expect((await request(appWith({ llm: down }), 'POST', `/tenders/${t.id}/analyse`, { cookie: o.analyst.cookie })).status).toBe(201);
+    // The AI slot reserved for it is given back: no row, not an AI analysis.
     expect(await ctx.db.select().from(llmUsage).where(eq(llmUsage.orgId, o.orgId))).toHaveLength(0);
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(0);
     const garbled: LlmClient = {
       ...fakeLlm().llm,
       completeJson: async (_req, opts) => { opts?.onUsage?.({ model: 'm', usage: { inputTokens: 900, outputTokens: 3 } }); throw new Error('Model reply was not valid JSON'); },
@@ -364,6 +412,49 @@ describe('LLM metering (T085)', () => {
     const rows = await ctx.db.select().from(llmUsage).where(eq(llmUsage.orgId, o.orgId));
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ inputTokens: 900, outputTokens: 3, analysisId: r.body.id });
+  });
+
+  it('a call that timed out or was aborted in flight is metered with 0 tokens (review N3)', async () => {
+    const o = await newOrg();
+    const ctrl = new AbortController();
+    const slow: LlmClient = { ...fakeLlm().llm, completeJson: async () => { ctrl.abort(new Error('LLM call timed out after 60 s')); throw new Error('LLM call timed out after 60 s'); } };
+    const call = meteredCompleteJson({ ...ctx.deps, llm: slow }, { orgId: o.orgId, analysisId: null, kind: 'assist' });
+    await expect(call({ system: 's', prompt: 'p', signal: ctrl.signal } as never)).rejects.toThrow(/timed out/);
+    const rows = await ctx.db.select().from(llmUsage).where(eq(llmUsage.orgId, o.orgId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'assist', model: 'fake-model', inputTokens: 0, outputTokens: 0 });
+  });
+
+  it('deleting analyses (DELETE /demo) does not give AI analyses back (review B1)', async () => {
+    const o = await newOrg();
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: o.owner.cookie, json: {} })).status).toBeLessThan(300);
+    const t = await demoTender(o.orgId);
+    const up = await request(ctx.app, 'POST', `/tenders/${t.tenderId}/documents`, { cookie: o.analyst.cookie, form: { file: pdfFile('Real bid.pdf'), kind: 'bid' } });
+    expect(up.status, up.text).toBe(201);
+    const { llm } = fakeLlm();
+    const a = await request(appWith({ llm }), 'POST', `/tenders/${t.tenderId}/analyse`, { cookie: o.analyst.cookie });
+    expect(a.status, a.text).toBe(201);
+    expect(a.body.method).toBe('rules+llm');
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(1);
+    const del = await request(ctx.app, 'DELETE', '/demo', { cookie: o.owner.cookie });
+    expect(del.status, del.text).toBeLessThan(300);
+    expect(await ctx.db.select().from(analyses).where(eq(analyses.id, a.body.id))).toHaveLength(0);
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(1);
+  });
+
+  it('concurrent analyses cannot all get AI past the quota: the slot is reserved in the quota transaction (review S1)', async () => {
+    const o = await newOrg('starter');
+    const max = PLAN_LIMITS.starter.llmAnalysesPerMonth!;
+    await seedLlmAnalyses(o.orgId, max - 1);
+    const ts = [];
+    for (let i = 0; i < 3; i++) ts.push(await analysableTender(o.analyst.cookie));
+    const { llm } = fakeLlm();
+    const app = appWith({ llm });
+    const results = await Promise.all(ts.map((t) => request(app, 'POST', `/tenders/${t.id}/analyse`, { cookie: o.analyst.cookie })));
+    expect(results.map((r) => r.status)).toEqual([201, 201, 201]);
+    expect(results.map((r) => r.body.method).sort()).toEqual(['rules', 'rules', 'rules+llm']);
+    expect(results.filter((r) => r.body.warnings.some((w: { code: string }) => w.code === 'llm_quota_reached'))).toHaveLength(2);
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(max);
   });
 
   it('llmAnalysesPerMonth used up → rules-only with warning llm_quota_reached, no LLM call (scenario 11, FR-037)', async () => {
@@ -450,6 +541,7 @@ describe('requireActivePlan (T086, scenario 6)', () => {
     ['POST', '/demo/seed', () => ({ json: {} })],
     ['POST', '/tenders/:tender/workspace', () => ({ json: {} })],
     ['PUT', '/scoring-weights', () => ({ json: {} })],
+    ['POST', '/org/invitations/00000000-0000-4000-8000-000000000001/resend', () => ({ json: {} })],
   ];
   const fill = (p: string) => p.replace(':tender', tenderId).replace(':vault', vaultId).replace(':ws', workspaceId);
 
@@ -495,6 +587,9 @@ describe('requireActivePlan (T086, scenario 6)', () => {
       ['PUT', '/me/notification-prefs', { json: { inApp: true, email: true, whatsapp: false, frequency: 'instant', expiryReminders: true } }],
       ['POST', `/tenders/${tenderId}/seen`, {}],
       ['DELETE', '/demo', {}],
+      // Writes that only reduce usage (review N6).
+      ['DELETE', '/org/invitations/00000000-0000-4000-8000-000000000001', {}],
+      ['DELETE', '/org/members/me', {}],
       ['POST', '/auth/switch-org', { json: { orgId: o.orgId } }],
       ['POST', '/auth/forgot-password', { json: { email: o.owner.email } }],
       ['POST', '/auth/login', { json: { email: o.analyst.email, password: o.analyst.password } }],

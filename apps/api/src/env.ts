@@ -59,7 +59,7 @@ export interface AppConfig {
   trustProxy: TrustProxy;
   /** Max Σ stored input size of a packet build before it is refused with 413 (006/FR-056, NFR-003). */
   packetMaxInputBytes: number;
-  /** Null when ADMIN_TOKEN is unset. */
+  /** Null when ADMIN_TOKEN is unset or shorter than ADMIN_TOKEN_MIN_LENGTH. */
   adminToken: string | null;
   /** Null when SENTRY_DSN is unset. */
   sentryDsn: string | null;
@@ -98,6 +98,21 @@ const positiveInt = (v: string | undefined, d: number) => {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : d;
 };
 
+/** ADMIN_TOKEN shorter than this is treated as unset: the operator endpoint must not hang off a guessable token (review N4). */
+export const ADMIN_TOKEN_MIN_LENGTH = 32;
+
+export function parseAdminToken(v: string | undefined): string | null {
+  return v && v.length >= ADMIN_TOKEN_MIN_LENGTH ? v : null;
+}
+
+/** The startup warning for a set-but-too-short ADMIN_TOKEN (createDeps logs it once per process/isolate). */
+export function adminTokenWarning(env: RuntimeEnv): string | null {
+  const v = env.ADMIN_TOKEN;
+  return v && v.length < ADMIN_TOKEN_MIN_LENGTH
+    ? `ADMIN_TOKEN is shorter than ${ADMIN_TOKEN_MIN_LENGTH} characters and is ignored: POST /api/admin/* stays disabled`
+    : null;
+}
+
 export function loadConfig(env: RuntimeEnv): AppConfig {
   const environment = env.NODE_ENV === 'production' ? 'production' : env.NODE_ENV === 'test' ? 'test' : 'development';
   return {
@@ -109,7 +124,7 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     packetMaxInputBytes: positiveInt(env.PACKET_MAX_INPUT_BYTES, DEFAULT_PACKET_MAX_INPUT_BYTES),
-    adminToken: env.ADMIN_TOKEN || null,
+    adminToken: parseAdminToken(env.ADMIN_TOKEN),
     sentryDsn: env.SENTRY_DSN || null,
     logLevel: parseLogLevel(env.LOG_LEVEL),
     healthIngestionMaxAgeMin: nonNegativeInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),

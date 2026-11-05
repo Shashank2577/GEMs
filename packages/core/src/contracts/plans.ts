@@ -18,7 +18,13 @@ export const TRIAL_DAYS = 14;
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
 
-/** Numeric limits; `null` = unlimited. */
+/**
+ * Every org's hard cap on watchlists (003/FR-027 → 409 `watchlist_limit`), whatever its plan. A plan's
+ * `watchlists: null` means "no plan limit"; this cap still applies (FR-034 note).
+ */
+export const WATCHLIST_LIMIT = 50;
+
+/** Numeric limits; `null` = no plan limit (watchlists stay capped at `WATCHLIST_LIMIT`, see `effectiveLimit`). */
 export interface PlanLimits {
   /** Members + pending invitations. */
   seats: number | null;
@@ -43,6 +49,12 @@ export const PLAN_LIMITS: Readonly<Record<PlanKey, Readonly<PlanLimits>>> = {
   pro: { seats: 10, watchlists: null, analysesPerMonth: 500, llmAnalysesPerMonth: 250, vaultBytes: 10 * GB, packetsPerMonth: 200, whatsapp: true },
   enterprise: { seats: null, watchlists: null, analysesPerMonth: null, llmAnalysesPerMonth: null, vaultBytes: null, packetsPerMonth: null, whatsapp: true },
 };
+
+/** The cap that actually applies to a metered quantity: the plan limit, or the 003/FR-027 cap for watchlists. */
+export function effectiveLimit(key: PlanLimitKey, planMax: number | null): number | null {
+  if (key === 'watchlists') return planMax == null ? WATCHLIST_LIMIT : Math.min(planMax, WATCHLIST_LIMIT);
+  return planMax;
+}
 
 /** Limits of a stored plan string; unknown values are treated as `trial`. */
 export const limitsFor = (plan: string | null | undefined): Readonly<PlanLimits> => PLAN_LIMITS[isPlanKey(plan) ? plan : 'trial'];
@@ -137,7 +149,9 @@ export const USAGE_LABELS: Record<PlanLimitKey, string> = {
 
 /**
  * Writes still allowed while a trial is expired. Paths are relative to `/api` (no prefix).
- * Beyond FR-038: `POST /tenders/:id/seen` (a read receipt, like notifications read) and `/admin/*` (operator token).
+ * Beyond FR-038's original list (all documented in FR-038 and contracts/api.md): `POST /tenders/:id/seen` (a read
+ * receipt, like notifications read), `/admin/*` (operator token, its own auth), and the two writes that only reduce
+ * usage — `DELETE /org/members/me` (leave the org) and `DELETE /org/invitations/:id` (revoke a pending invitation).
  */
 const EXPIRED_ALLOWED: { method: string | '*'; re: RegExp }[] = [
   { method: '*', re: /^\/auth(\/|$)/ },
@@ -151,6 +165,8 @@ const EXPIRED_ALLOWED: { method: string | '*'; re: RegExp }[] = [
   { method: 'DELETE', re: /^\/demo$/ },
   { method: 'POST', re: /^\/tenders\/[^/]+\/seen$/ },
   { method: '*', re: /^\/admin(\/|$)/ },
+  { method: 'DELETE', re: /^\/org\/members\/me$/ },
+  { method: 'DELETE', re: /^\/org\/invitations\/[^/]+$/ },
 ];
 
 /** True when `method path` may run on an expired trial. `path` may include the `/api` prefix and a query string. */
@@ -238,17 +254,21 @@ export interface Plan {
   featured: boolean;
 }
 
+// Monthly caps on the cards come from PLAN_LIMITS, so the published numbers are the enforced ones (review S6).
+const capLine = (k: PlanKey) => `${PLAN_LIMITS[k].analysesPerMonth} analyses a month (${PLAN_LIMITS[k].llmAnalysesPerMonth} AI-assisted)`;
+const packetLine = (k: PlanKey) => `${PLAN_LIMITS[k].packetsPerMonth} bid packets a month`;
+
 export const PLANS: readonly Plan[] = [
   {
     key: 'starter', name: 'Starter', monthlyInr: 2999, featured: false, cta: 'Start free trial',
     blurb: 'For a founder-led MSME bidding a few times a month.',
-    features: ['3 team members', '5 watchlists', 'Email & in-app alerts', 'Go / No-Go scoring', 'Document vault (2 GB)', 'Bid packet builder'],
+    features: ['3 team members', '5 watchlists', capLine('starter'), packetLine('starter'), 'Email & in-app alerts', 'Go / No-Go scoring', 'Document vault (2 GB)', 'Bid packet builder'],
     limits: { members: 3, watchlists: 5, vaultGb: 2 },
   },
   {
     key: 'pro', name: 'Pro', monthlyInr: 7999, featured: true, cta: 'Start free trial',
     blurb: 'For growing teams bidding every week.',
-    features: ['10 team members', 'Unlimited watchlists', 'WhatsApp alerts & daily digest', 'AI-assisted bid reading', 'Annexure templates', 'Chrome co-pilot', 'Pipeline & win-rate analytics'],
+    features: ['10 team members', `Up to ${WATCHLIST_LIMIT} watchlists`, capLine('pro'), packetLine('pro'), 'WhatsApp alerts & daily digest', 'AI-assisted bid reading', 'Annexure templates', 'Chrome co-pilot', 'Pipeline & win-rate analytics'],
     limits: { members: 10, watchlists: null, vaultGb: null },
   },
   {
@@ -261,7 +281,8 @@ export const PLANS: readonly Plan[] = [
 
 export const GST_PERCENT = 18;
 export const SALES_MAILTO = 'mailto:sales@tenderpilot.in?subject=TenderPilot%20Enterprise';
-export const PRICING_NOTE = `Prices exclude ${GST_PERCENT}% GST. Every plan starts with a ${TRIAL_DAYS}-day free trial of Pro.`;
+/** The trial is its own plan (PLAN_LIMITS.trial): name its caps rather than promising "Pro" (review S6). */
+export const PRICING_NOTE = `Prices exclude ${GST_PERCENT}% GST. Every plan starts with a ${TRIAL_DAYS}-day free trial — ${PLAN_LIMITS.trial.analysesPerMonth} analyses and ${PLAN_LIMITS.trial.vaultBytes! / GB} GB of vault included.`;
 
 /** Plans a visitor can start a self-serve trial from (`/signup?plan=<key>`). */
 export const TRIAL_PLAN_KEYS = ['starter', 'pro'] as const satisfies readonly PricedPlanKey[];

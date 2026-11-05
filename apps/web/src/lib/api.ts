@@ -109,6 +109,10 @@ export async function apiFetch<T = unknown>(path: string, opts: RequestOptions =
   if (org && !allowedWhenExpired(method, path) && planExpired(org)) {
     const e = localPlanExpiredError(org);
     showPlanLimit(e);
+    // This write never reaches the server, so nothing else would notice an upgrade made since `/auth/me` was cached
+    // (5-min staleTime): re-check it when the cached copy is older than ME_RECHECK_MS (review S4).
+    const at = queryClient.getQueryState(ME_KEY)?.dataUpdatedAt ?? 0;
+    if (Date.now() - at > ME_RECHECK_MS) void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
     throw new ApiError(e.status, e.code, e.message, e.details);
   }
   let res: Response;
@@ -158,6 +162,8 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong'): s
 
 /** Query key of `GET /auth/me` (re-exported by `lib/auth`). `null` data = signed out. */
 export const ME_KEY = ['auth', 'me'] as const;
+/** A locally blocked write (expired trial) refetches `/auth/me` when the cached copy is older than this. */
+export const ME_RECHECK_MS = 30_000;
 
 export const SESSION_ENDED_MESSAGE = 'Your session ended. Please sign in again.';
 

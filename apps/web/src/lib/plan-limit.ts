@@ -5,7 +5,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import {
-  PLAN_EXPIRED_MESSAGE, PLAN_NAMES, USAGE_LABELS, isPlanKey, isTrialExpired, planDateIST, trialDaysLeft,
+  PLAN_EXPIRED_MESSAGE, PLAN_NAMES, USAGE_LABELS, effectiveLimit, isPlanKey, isTrialExpired, planDateIST, trialDaysLeft,
   type PlanLimitKey,
 } from '@tp/core/contracts/plans';
 
@@ -158,15 +158,17 @@ export interface Meter {
   /** 0–100, capped. */
   pct: number;
   tone: MeterTone;
-  /** "7 / 10", "2 / Unlimited", "12 / 5 — over plan limit". */
+  /** "7 / 10", "2 / Unlimited", "2 / 50" (watchlists without a plan limit), "12 / 5 — over plan limit". */
   text: string;
 }
 
 /** Meter order on the page (FR-041c). */
 export const METER_ORDER: PlanLimitKey[] = ['analysesPerMonth', 'llmAnalysesPerMonth', 'watchlists', 'seats', 'vaultBytes', 'packetsPerMonth'];
 
-export function meter(key: PlanLimitKey, used: number, max: number | null): Meter {
+/** `max` is the plan limit (`null` = none); watchlists are shown against the 003/FR-027 cap of 50 then (review S5). */
+export function meter(key: PlanLimitKey, used: number, planMax: number | null): Meter {
   const label = USAGE_LABELS[key];
+  const max = effectiveLimit(key, planMax);
   if (max == null) return { key, label, used, max, pct: 0, tone: 'unlimited', text: `${formatUsageValue(key, used)} / Unlimited` };
   const ratio = max > 0 ? used / max : used > 0 ? Infinity : 0;
   const tone: MeterTone = ratio >= 1 ? 'danger' : ratio >= 0.8 ? 'warning' : 'ok';

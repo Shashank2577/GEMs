@@ -644,21 +644,31 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   | `enterprise` | null | null | null | null | null | null | true |
 
   `TRIAL_DAYS = 14`. Seats count members + pending invitations. Monthly counters use the IST calendar month.
+  `null` = no plan limit; for watchlists the 003/FR-027 cap of 50 per org (`WATCHLIST_LIMIT`, 409 `watchlist_limit`)
+  still applies, so the cards say "Up to 50 watchlists" and the usage meter shows `N / 50`.
 - **FR-035** *(gap)*: `organizations` MUST gain `trial_ends_at timestamptz` (set to `created_at + 14 days` at sign-up;
   the migration backfills existing `trial` orgs to `greatest(created_at + 14 days, migration time + 7 days)`).
   `GET /api/auth/me` and `GET /api/org` MUST return `org.trialEndsAt`.
 - **FR-036** *(gap)*: `lib/plan.ts#assertWithinPlan(deps, orgId, limit, increment)` MUST be called at watchlist create,
   invitation create, analyse, vault upload (bytes) and packet build, and throw `paymentRequired('plan_limit_reached',
   …)` (402) with `details {limit, used, max, plan, resetsAt?}`. The analyse check and insert MUST be serialised per org
-  (row lock) so concurrent requests cannot exceed the limit.
+  (row lock) so concurrent requests cannot exceed the limit. Failed analyses/packets do not count, nor do the analyses
+  the demo seeder inserts (`analyses.seeded`, 007/FR-065); everything a user runs counts, whatever the tender's source
+  (a real PDF uploaded to a demo tender, a packet on a demo workspace). Seats, vault and packet checks are not
+  serialised (a race overshoots by at most the concurrent requests); resending an expired invitation counts one seat.
 - **FR-037** *(gap)*: When `llmAnalysesPerMonth` is exhausted but `analysesPerMonth` is not, analysis MUST run
   rules-only and carry warning `llm_quota_reached` ("Monthly AI review limit reached — this analysis used rules only.").
+  The AI slot MUST be reserved in the same transaction as the analyses quota (a 0-token `llm_usage` reservation row,
+  given back if no LLM call is metered) and counted on `llm_usage.analysis_ref` (no foreign key), so concurrent
+  analyses cannot overshoot it and deleting analyses (e.g. `DELETE /api/demo`) never gives AI analyses back.
 - **FR-038** *(gap)*: Middleware `requireActivePlan` MUST return 402 `plan_expired` for writes when `plan = 'trial'` and
   `trial_ends_at < now()`. Allowed while expired: all `GET`/`HEAD`; `/api/auth/*` (login, logout, switch-org, accept-invite); `PATCH /api/me`,
   `POST /api/me/password`, `/api/me/sessions*` (002 FR-012), `DELETE /api/me/api-tokens/:id`;
   `POST /api/notifications/:id/read`, `POST /api/notifications/read-all`, `PUT /api/me/notification-prefs`;
-  `DELETE /api/demo` (007 FR-065, when shipped).
-- **FR-039** *(gap)*: Table `llm_usage (id, org_id, analysis_id null, kind 'extract'|'assist', model, input_tokens,
+  `DELETE /api/demo` (007 FR-065, when shipped); `POST /api/tenders/:id/seen` (a read receipt);
+  `DELETE /api/org/members/me` and `DELETE /api/org/invitations/:id` (they only reduce usage); `/api/admin/*`
+  (operator token, FR-042).
+- **FR-039** *(gap)*: Table `llm_usage (id, org_id, analysis_id null, analysis_ref null, kind 'extract'|'assist', model, input_tokens,
   output_tokens, created_at)` MUST be written once per LLM call from `services/analyse.ts` (and any other LLM caller);
   `GET /api/org/usage` (any member) MUST return `{plan, trialEndsAt, period:{start,end}, usage:{seats, watchlists,
   analysesThisMonth, llmAnalysesThisMonth, vaultBytes, packetsThisMonth, llmTokensThisMonth:{input,output}},

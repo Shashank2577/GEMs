@@ -1,6 +1,6 @@
 /**
  * Settings → Plan & usage (`/settings/usage`, spec 008 FR-041c, US5 scenario 9, NFR-011). Read-only for every role.
- * Plan badge, trial line, six meters (`role="progressbar"`; amber ≥ 80 %, red at 100 %, "Unlimited" without a bar),
+ * Plan badge, trial line, six meters (`role="progressbar"`; amber ≥ 80 %, red at 100 %; "Unlimited" is plain text, no bar),
  * the IST reset date and "Talk to sales". One meter per row on phones, 2 columns ≥ 1024 px, 3 ≥ 1280 px.
  */
 import { Crown, Mail, Sparkles } from 'lucide-react';
@@ -35,17 +35,22 @@ function MeterCard({ m }: { m: Meter }) {
         <span id={`${id}-label`} className="text-[13px] font-medium text-muted-foreground">{m.label}</span>
         <span className={cn('text-sm font-semibold tabular-nums', TEXT[m.tone])}>{m.text}</span>
       </div>
-      <div
-        role="progressbar"
-        aria-labelledby={`${id}-label`}
-        aria-valuemin={0}
-        aria-valuenow={m.used}
-        {...(m.max != null ? { 'aria-valuemax': m.max } : {})}
-        aria-valuetext={m.text}
-        className={cn('mt-3 h-2 w-full overflow-hidden rounded-full', m.max == null ? 'bg-transparent' : 'bg-muted')}
-      >
-        {m.max != null && <div className={cn('h-full rounded-full transition-[width] duration-500', BAR[m.tone])} style={{ width: `${m.pct}%` }} />}
-      </div>
+      {m.max == null ? (
+        // No cap: plain text, not a progressbar with a value and no maximum (review N5).
+        <div className="mt-3 h-2 w-full" aria-hidden="true" />
+      ) : (
+        <div
+          role="progressbar"
+          aria-labelledby={`${id}-label`}
+          aria-valuemin={0}
+          aria-valuemax={m.max}
+          aria-valuenow={Math.min(m.used, m.max)}
+          aria-valuetext={m.text}
+          className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted"
+        >
+          <div className={cn('h-full rounded-full transition-[width] duration-500', BAR[m.tone])} style={{ width: `${m.pct}%` }} />
+        </div>
+      )}
     </div>
   );
 }

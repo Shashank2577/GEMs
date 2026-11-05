@@ -40,8 +40,9 @@ describe('Landing pricing renders from PLANS (007/FR-082, FR-086)', () => {
     expect(pricingText).toContain('Custom');
     expect(pricingText).toContain('/month');
     expect(pricingText).toContain('Most popular');
-    expect(pricingText).toContain('Prices exclude 18% GST. Every plan starts with a 14-day free trial of Pro.');
-    expect(PRICING_NOTE).toBe(`Prices exclude ${GST_PERCENT}% GST. Every plan starts with a ${TRIAL_DAYS}-day free trial of Pro.`);
+    // 008 review S6: the note names the enforced trial caps (PLAN_LIMITS.trial), not "a trial of Pro".
+    expect(pricingText).toContain('Prices exclude 18% GST. Every plan starts with a 14-day free trial — 10 analyses and 1 GB of vault included.');
+    expect(PRICING_NOTE).toBe(`Prices exclude ${GST_PERCENT}% GST. Every plan starts with a ${TRIAL_DAYS}-day free trial — 10 analyses and 1 GB of vault included.`);
     for (const p of PLANS) {
       expect(pricingText).toContain(p.name);
       for (const f of p.features) expect(pricingText).toContain(f.replace(/&/g, '&amp;'));

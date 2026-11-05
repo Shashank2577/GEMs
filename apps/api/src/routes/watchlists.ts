@@ -15,6 +15,7 @@ import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { assertWithinPlan } from '../lib/plan';
+import { WATCHLIST_LIMIT } from '@tp/core/contracts/plans';
 import { HttpError, notFound, validationError } from '../lib/errors';
 import { visibleTenderSource } from '../lib/tender-scope';
 import { parseJson } from '../lib/validate';
@@ -29,8 +30,8 @@ export const watchlistsRoutes = new Hono<AppEnv>();
 const CANDIDATE_PAGE = 2000;
 /** Rows per `tender_matches` insert / `in (…)` list. */
 const BATCH = 500;
-/** FR-027: maximum watchlists per organization, paused ones included. */
-export const WATCHLIST_LIMIT = 50;
+/** FR-027: maximum watchlists per organization, paused ones included (shared with the web meter, 008 review S5). */
+export { WATCHLIST_LIMIT };
 
 /** Only the columns the matcher reads (never `raw`), so scanning 50k open tenders stays small (NFR-003). */
 const MATCH_COLUMNS = {

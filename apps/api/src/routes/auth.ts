@@ -72,8 +72,10 @@ authRoutes.post('/auth/signup', rateLimit('auth.signup.ip'), async (c) => {
   try {
     ids = await db.transaction(async (tx) => {
       const [u] = await tx.insert(users).values({ email: body.email, name: body.name, passwordHash }).returning({ id: users.id });
-      // 008/FR-035: the free trial ends 14 days after sign-up.
-      const [o] = await tx.insert(organizations).values({ name: body.orgName, slug, trialEndsAt: trialEndsAtFor(c.var.deps.clock.now()) })
+      // 008/FR-035: the free trial ends 14 days after sign-up. created_at from the same clock, so the trial end, the
+      // onboarding duration (FR-052) and the org's age all agree (a DB default `now()` drifts from an injected clock).
+      const signedUpAt = c.var.deps.clock.now();
+      const [o] = await tx.insert(organizations).values({ name: body.orgName, slug, trialEndsAt: trialEndsAtFor(signedUpAt), createdAt: signedUpAt })
         .returning({ id: organizations.id });
       await tx.insert(memberships).values({ orgId: o.id, userId: u.id, role: 'owner' });
       await tx.insert(notificationPrefs).values({ orgId: o.id, userId: u.id, ...DEFAULT_PREFS });

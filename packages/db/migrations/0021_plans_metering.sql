@@ -1,8 +1,10 @@
--- 008/US5: plans and metering — subscriptions (FR-042), llm_usage (FR-039), organizations.trial_ends_at (FR-035).
+-- 008/US5: plans and metering — subscriptions (FR-042), llm_usage (FR-039), organizations.trial_ends_at (FR-035),
+-- analyses.seeded (FR-036: only demo-seeded analyses are outside the quota), llm_usage.analysis_ref (FR-037: survives deletes).
 CREATE TABLE IF NOT EXISTS "llm_usage" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"analysis_id" uuid,
+	"analysis_ref" uuid,
 	"kind" text NOT NULL,
 	"model" text NOT NULL,
 	"input_tokens" integer DEFAULT 0 NOT NULL,
@@ -22,6 +24,7 @@ CREATE TABLE IF NOT EXISTS "subscriptions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "analyses" ADD COLUMN "seeded" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "organizations" ADD COLUMN "trial_ends_at" timestamp with time zone;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "llm_usage" ADD CONSTRAINT "llm_usage_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;
@@ -48,3 +51,7 @@ CREATE INDEX IF NOT EXISTS "subscriptions_org_idx" ON "subscriptions" USING btre
 UPDATE "organizations"
    SET "trial_ends_at" = greatest("created_at" + interval '14 days', now() + interval '7 days')
  WHERE "plan" = 'trial' AND "trial_ends_at" IS NULL;
+--> statement-breakpoint
+-- 008/FR-036: analyses the demo seeder wrote before this column existed (on demo tenders) stay outside the quota.
+UPDATE "analyses" SET "seeded" = true
+ WHERE "seeded" = false AND "tender_id" IN (SELECT "id" FROM "tenders" WHERE "source" = 'demo');

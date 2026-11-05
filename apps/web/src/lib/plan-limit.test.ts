@@ -90,7 +90,9 @@ describe('meters (scenario 9)', () => {
   it('formats counts, bytes and Unlimited', () => {
     expect(meter('analysesPerMonth', 7, 10)).toMatchObject({ label: 'Analyses this month', text: '7 / 10', pct: 70, tone: 'ok' });
     expect(meter('llmAnalysesPerMonth', 7, 10).label).toBe('AI analyses this month');
-    expect(meter('watchlists', 2, null)).toMatchObject({ text: '2 / Unlimited', tone: 'unlimited', pct: 0 });
+    expect(meter('analysesPerMonth', 2, null)).toMatchObject({ text: '2 / Unlimited', tone: 'unlimited', pct: 0, max: null });
+    // No plan limit on watchlists still means the 003/FR-027 cap of 50 (review S5).
+    expect(meter('watchlists', 2, null)).toMatchObject({ text: '2 / 50', tone: 'ok', pct: 4, max: 50 });
     expect(meter('seats', 1, 10).text).toBe('1 / 10');
     expect(meter('vaultBytes', 120 * MB, GB).text).toBe('120 MB / 1 GB');
     expect(meter('packetsPerMonth', 0, 10).text).toBe('0 / 10');

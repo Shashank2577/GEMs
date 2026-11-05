@@ -598,7 +598,7 @@ async function seedInTx(db: DemoTx, opts: SeedDemoOptions): Promise<SeedDemoResu
     const at = new Date(Math.max(t.startAt.getTime() + DAY, now.getTime() - (t.endAt < now ? 30 : 2) * DAY));
     await db.insert(analyses).values({
       orgId, tenderId: tid(a.idx), status: 'done', method: 'rules', requirements: r.requirements, factors: r.factors,
-      checklist: r.checklist, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: r.summary, stale: false,
+      checklist: r.checklist, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: r.summary, stale: false, seeded: true,
       createdBy: userId, createdAt: at, updatedAt: at,
     });
     analysesCreated++;

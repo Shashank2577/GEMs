@@ -1,5 +1,5 @@
 {
-  "id": "78ac6ea6-708d-44bc-8095-ad1e577cb8c5",
+  "id": "a3cf808f-962d-4265-8bfa-58fc5fea804b",
   "prevId": "e6871fdb-d49a-4cc9-8e15-08c9c826a57a",
   "version": "7",
   "dialect": "postgresql",
@@ -264,6 +264,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'[]'::jsonb"
+        },
+        "seeded": {
+          "name": "seeded",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_by": {
           "name": "created_by",
@@ -1463,6 +1470,12 @@
         },
         "analysis_id": {
           "name": "analysis_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analysis_ref": {
+          "name": "analysis_ref",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false

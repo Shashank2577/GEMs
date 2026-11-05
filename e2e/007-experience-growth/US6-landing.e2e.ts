@@ -19,7 +19,7 @@ const EVID_DIR = join('qa', 'evidence', '007', STORY);
 const H1 = 'Win more GeM bids. Spend minutes, not nights, on each one.';
 const TITLE = 'TenderPilot — GeM tender co-pilot for Indian sellers';
 const MAILTO = 'mailto:sales@tenderpilot.in?subject=TenderPilot%20Enterprise';
-const NOTE = 'Prices exclude 18% GST. Every plan starts with a 14-day free trial of Pro.';
+const NOTE = 'Prices exclude 18% GST. Every plan starts with a 14-day free trial — 10 analyses and 1 GB of vault included.'; // 008 review S6
 const FAQ_Q = 'Will TenderPilot submit bids on GeM for me?';
 
 test.afterEach(async ({ page }) => { await collectRunArtifacts('007', STORY, page); });

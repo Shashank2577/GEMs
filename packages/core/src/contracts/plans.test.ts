@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PLAN_KEYS, PLAN_LIMITS, TRIAL_DAYS, allowedWhenExpired, isTrialExpired, istMonthPeriod, limitsFor, planDateIST,
+  PLAN_KEYS, PLAN_LIMITS, PRICING_NOTE, TRIAL_DAYS, WATCHLIST_LIMIT, effectiveLimit, allowedWhenExpired, isTrialExpired, istMonthPeriod, limitsFor, planDateIST,
   planLimitMessage, PLAN_EXPIRED_MESSAGE, PLANS, trialDaysLeft, trialEndsAtFor,
 } from './plans';
 
@@ -85,13 +85,13 @@ describe('allowedWhenExpired (FR-038)', () => {
     ['POST', '/api/auth/switch-org'], ['POST', '/api/auth/accept-invite'], ['PATCH', '/api/me'], ['POST', '/api/me/password'],
     ['POST', '/api/me/sessions/revoke-others'], ['DELETE', '/api/me/sessions/abc'], ['DELETE', '/api/me/api-tokens/abc'],
     ['POST', '/api/notifications/abc/read'], ['POST', '/api/notifications/read-all'], ['PUT', '/api/me/notification-prefs'],
-    ['DELETE', '/api/demo'], ['POST', '/tenders/abc/seen'],
+    ['DELETE', '/api/demo'], ['POST', '/tenders/abc/seen'], ['DELETE', '/api/org/members/me'], ['DELETE', '/api/org/invitations/abc'],
   ])('allows %s %s', (m, p) => expect(allowedWhenExpired(m, p)).toBe(true));
 
   it.each([
     ['POST', '/api/watchlists'], ['POST', '/api/tenders/abc/analyse'], ['POST', '/api/vault'], ['POST', '/api/me/api-tokens'],
     ['PATCH', '/api/org'], ['POST', '/api/org/invitations'], ['POST', '/api/demo/seed'], ['DELETE', '/api/me'], ['POST', '/api/me'],
-    ['POST', '/api/authx'], ['PUT', '/api/me/password'],
+    ['POST', '/api/authx'], ['PUT', '/api/me/password'], ['POST', '/api/org/invitations/abc/resend'], ['DELETE', '/api/org/members/abc'],
   ])('blocks %s %s', (m, p) => expect(allowedWhenExpired(m, p)).toBe(false));
 });
 
@@ -104,5 +104,32 @@ describe('PLANS cards agree with PLAN_LIMITS (007/FR-086 × 008/FR-034)', () => 
       // The card may leave vault uncapped (null); when it shows a figure it is the enforced one.
       if (p.limits.vaultGb != null) expect(p.limits.vaultGb * GB, p.key).toBe(l.vaultBytes);
     }
+  });
+});
+
+describe('published caps match the enforced ones (review S5/S6)', () => {
+  it('watchlists: no plan limit still means the 003/FR-027 cap of 50', () => {
+    expect(WATCHLIST_LIMIT).toBe(50);
+    expect(effectiveLimit('watchlists', null)).toBe(50);
+    expect(effectiveLimit('watchlists', 5)).toBe(5);
+    expect(effectiveLimit('analysesPerMonth', null)).toBeNull();
+    expect(effectiveLimit('seats', 3)).toBe(3);
+    const pro = PLANS.find((p) => p.key === 'pro')!;
+    expect(pro.features).toContain('Up to 50 watchlists');
+    expect(pro.features.join(' ')).not.toMatch(/unlimited watchlists/i);
+  });
+
+  it('Starter and Pro cards show the monthly analysis and packet caps from PLAN_LIMITS', () => {
+    for (const key of ['starter', 'pro'] as const) {
+      const card = PLANS.find((p) => p.key === key)!;
+      const l = PLAN_LIMITS[key];
+      expect(card.features).toContain(`${l.analysesPerMonth} analyses a month (${l.llmAnalysesPerMonth} AI-assisted)`);
+      expect(card.features).toContain(`${l.packetsPerMonth} bid packets a month`);
+    }
+  });
+
+  it('the pricing note describes the trial that is enforced, not Pro', () => {
+    expect(PRICING_NOTE).toBe('Prices exclude 18% GST. Every plan starts with a 14-day free trial — 10 analyses and 1 GB of vault included.');
+    expect(PRICING_NOTE).not.toMatch(/trial of Pro/);
   });
 });

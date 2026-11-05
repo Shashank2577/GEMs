@@ -466,6 +466,11 @@ export const analyses = pgTable('analyses', {
   notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
   /** Machine-readable caveats rendered by the web (008/FR-031: `llm_budget_exhausted`, `llm_quota_reached`). */
   warnings: jsonb('warnings').$type<AnalysisWarning[]>().notNull().default([]),
+  /**
+   * Inserted by the demo seeder (007/FR-065), not by a user. Only these rows are left out of the monthly analyses
+   * quota (008/FR-036); anything a user runs counts, whatever the tender's source.
+   */
+  seeded: boolean('seeded').notNull().default(false),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -625,6 +630,11 @@ export const llmUsage = pgTable('llm_usage', {
   id: id(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   analysisId: uuid('analysis_id').references(() => analyses.id, { onDelete: 'set null' }),
+  /**
+   * The analysis this row was metered for, with no foreign key so it survives the analysis being deleted (e.g. by
+   * `DELETE /demo`). The monthly AI quota (008/FR-037) counts distinct values of this column, never `analysis_id`.
+   */
+  analysisRef: uuid('analysis_ref'),
   kind: text('kind').$type<'extract' | 'assist'>().notNull(),
   model: text('model').notNull(),
   inputTokens: integer('input_tokens').notNull().default(0),
