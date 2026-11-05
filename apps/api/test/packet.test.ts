@@ -8,6 +8,7 @@ import { contentDisposition } from '../src/lib/http';
 import { extractPages } from '@tp/core/analyse/pdf-text';
 import { readOutline } from '@tp/core/packet/build';
 import { createTestContext, request, signup, type TestContext } from './helpers';
+import { assertPacketItemCount } from '../src/services/packet';
 import { NOW, seedApply } from './workspace-fixtures';
 
 let ctx: TestContext;
@@ -286,6 +287,16 @@ describe('packet order, input cap, recovery and download names (US5 gaps)', () =
     expect(loadConfig({ PACKET_MAX_INPUT_BYTES: '-5' }).packetMaxInputBytes).toBe(62_914_560);
   });
 
+  it('the Worker and .dev.vars.example set PACKET_MAX_INPUT_BYTES to 40 MB (008/FR-032: pdf-lib 2–3× peak under 128 MB)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const root = new URL('../../../', import.meta.url);
+    const wrangler = await readFile(new URL('wrangler.toml', root), 'utf8');
+    const vars = wrangler.slice(wrangler.indexOf('[vars]'));
+    expect(vars).toMatch(/^PACKET_MAX_INPUT_BYTES = "41943040"$/m);
+    expect(loadConfig({ PACKET_MAX_INPUT_BYTES: vars.match(/^PACKET_MAX_INPUT_BYTES = "(\d+)"$/m)![1] }).packetMaxInputBytes).toBe(40 * 1024 * 1024);
+    expect(await readFile(new URL('.dev.vars.example', root), 'utf8')).toMatch(/^PACKET_MAX_INPUT_BYTES=41943040$/m);
+  });
+
   it('marks builds stuck in "building" for more than 10 minutes as failed when read (FR-057)', async () => {
     // The cutoff is evaluated in database time (now() - 10 minutes), like created_at itself.
     const at = (min: number) => new Date(Date.now() - min * 60_000);
@@ -339,5 +350,57 @@ describe('packet order, input cap, recovery and download names (US5 gaps)', () =
       "inline; filename=\"document.pdf\"; filename*=UTF-8''%E0%A4%AA%E0%A5%8D%E0%A4%B0%E0%A4%AE%E0%A4%BE%E0%A4%A3%E0%A4%AA%E0%A4%A4%E0%A5%8D%E0%A4%B0.pdf",
     );
     expect(contentDisposition('attachment', 'a"b\\c\r\n.pdf')).toBe('attachment; filename="abc  .pdf"; filename*=UTF-8\'\'a%22b%5Cc%20%20.pdf');
+  });
+});
+
+// ───────────── 008/US4 packet pre-flight (T076; FR-032, US4 scenario 10) ─────────────
+
+describe('packet pre-flight (008/FR-032)', () => {
+  const MB = 1024 * 1024;
+  const packetCount = async () => (await ctx.db.select({ id: packets.id }).from(packets)).length;
+  const blobCount = async () => {
+    const { readdir } = await import('node:fs/promises');
+    return (await readdir(ctx.blobDir, { recursive: true })).length;
+  };
+
+  it('45 MB of selected items with a 40 MB cap → 413 packet_too_large before any packets row or blob is written', async () => {
+    // One size check (006/FR-056) enforces the cap; 008/FR-032's 40 MB is PACKET_MAX_INPUT_BYTES=41943040.
+    // Stored sizes drive the pre-flight, so no 45 MB of real files is needed (nor loaded into memory).
+    const [gst] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, s.docs.gst.id));
+    const [pan] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, s.docs.pan.id));
+    await ctx.db.update(vaultDocuments).set({ sizeBytes: 25 * MB }).where(eq(vaultDocuments.id, gst.id));
+    await ctx.db.update(vaultDocuments).set({ sizeBytes: 20 * MB }).where(eq(vaultDocuments.id, pan.id));
+    ctx.deps.config.packetMaxInputBytes = 40 * MB;
+    const [rows, blobs] = [await packetCount(), await blobCount()];
+    try {
+      const items = [{ kind: 'vault', refId: gst.id, title: 'GST' }, { kind: 'vault', refId: pan.id, title: 'PAN' }];
+      const r = await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, { cookie: s.org.analyst.cookie, json: { items } });
+      expect(r.status).toBe(413);
+      expect(r.body.error.code).toBe('packet_too_large');
+      expect(r.body.error.message).toBe('These documents add up to 45.0 MB — remove or compress some before building (limit 40 MB).');
+      expect(r.body.error.details).toMatchObject({ totalBytes: 45 * MB, limitBytes: 40 * MB });
+      expect(await packetCount()).toBe(rows);
+      expect(await blobCount()).toBe(blobs);
+    } finally {
+      ctx.deps.config.packetMaxInputBytes = 60 * MB;
+      await ctx.db.update(vaultDocuments).set({ sizeBytes: gst.sizeBytes }).where(eq(vaultDocuments.id, gst.id));
+      await ctx.db.update(vaultDocuments).set({ sizeBytes: pan.sizeBytes }).where(eq(vaultDocuments.id, pan.id));
+    }
+  });
+
+  it('41 items → 413 packet_too_large "41 items (limit 40)" (not a 400), nothing written', async () => {
+    const rows = await packetCount();
+    const items = Array.from({ length: 41 }, (_, i) => ({ kind: 'cover', title: `Item ${i + 1}` }));
+    const r = await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, { cookie: s.org.analyst.cookie, json: { items } });
+    expect(r.status).toBe(413);
+    expect(r.body.error).toEqual({
+      code: 'packet_too_large', message: 'This packet has 41 items (limit 40). Deselect some items and try again.', details: { items: 41, maxItems: 40 },
+    });
+    expect(await packetCount()).toBe(rows);
+  });
+
+  it('stops exactly above 40 items', () => {
+    expect(() => assertPacketItemCount(40)).not.toThrow();
+    expect(() => assertPacketItemCount(41)).toThrow(/41 items \(limit 40\)/);
   });
 });

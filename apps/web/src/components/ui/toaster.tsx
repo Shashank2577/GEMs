@@ -23,6 +23,7 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast: 'group !rounded-xl !border !border-border !shadow-lg !font-sans',
+          success: '!text-emerald-800 dark:!text-emerald-300',
           title: '!text-sm !font-semibold',
           description: '!text-[13px] !text-muted-foreground',
         },

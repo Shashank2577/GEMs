@@ -14,19 +14,25 @@ import {
   type Requirement, type ScoreFactor,
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
-import { enrichWithLlm } from '@tp/core/analyse/llm';
-import { PdfTextError, extractPdf, isPdf, joinPages, looksScanned, splitPages } from '@tp/core/analyse/pdf-text';
+import { buildLlmPrompt, enrichWithLlm, promptChars } from '@tp/core/analyse/llm';
+import {
+  PdfPageLimitError, PdfTextError, extractPdf, isPdf, isScannedDocument, joinPages, looksScanned, splitPages,
+} from '@tp/core/analyse/pdf-text';
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
-  MAX_EXTRACT_PAGES, MAX_TENDER_DOC_BYTES, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
+  ANALYSIS_BUDGET_MS, GEM_LEASE_MAX_WAIT_MS, LLM_CALL_TIMEOUT_MS, MAX_LLM_CALLS_PER_ANALYSIS, MAX_LLM_INPUT_CHARS, MAX_TENDER_DOC_PAGES,
+  SCANNED_EMPTY_PAGE_RATIO,
+} from '@tp/core/contracts/caps';
+import {
+  MAX_EXTRACT_PAGES, MAX_TENDER_DOC_BYTES, isRescorableReason, type AnalysisDto, type AnalysisWarning, type OverrideFactorInput, type ScoringWeights, type StaleReason, type TenderDocKind, type TenderDocumentDto,
   type TenderDocumentWarning,
 } from '@tp/core/contracts/analyse';
 import { GemClient, GemError } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
-import { HttpError, forbidden, notFound } from '../lib/errors';
+import { HttpError, forbidden, notFound, unprocessable } from '../lib/errors';
 import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
 import { markStale } from './staleness';
 
@@ -83,7 +89,7 @@ export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
     id: a.id, orgId: a.orgId, tenderId: a.tenderId, status: a.status, method: a.method,
     requirements: a.requirements, factors: a.factors, checklist: a.checklist,
     score: a.score, confidence: a.confidence, verdict: a.verdict, summary: a.summary, error: a.error, stale: a.stale,
-    staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [],
+    staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [], warnings: a.warnings ?? [],
     createdBy: a.createdBy, createdAt: iso(a.createdAt), updatedAt: iso(a.updatedAt),
     ...(docs ? { documents: docs.map((d) => ({ id: d.id, fileName: d.fileName, kind: d.kind, pageCount: d.pageCount, totalPages: d.totalPages ?? null })) } : {}),
   };
@@ -116,11 +122,20 @@ const safeName = (name: string) => {
   return cleaned || 'document.pdf';
 };
 
-/** Reads at most MAX_EXTRACT_PAGES pages (NFR-005); `totalPages` is the PDF's real page count. */
+/** 008/FR-030 messages (spec 008 US4 scenarios 8–9). */
+export const documentTooLongMessage = (pages: number) =>
+  `This document has ${pages} pages. TenderPilot accepts documents of up to ${MAX_TENDER_DOC_PAGES} pages and reads the first ${MAX_EXTRACT_PAGES} — upload the bid document and ATC separately.`;
+export const SCANNED_DOCUMENT_MESSAGE = 'This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.';
+
+/**
+ * > MAX_TENDER_DOC_PAGES pages → 422 `document_too_long` before any text is read (008/FR-030); otherwise reads at
+ * most MAX_EXTRACT_PAGES pages (NFR-005) and `totalPages` is the PDF's real page count.
+ */
 async function extractOrThrow(bytes: Uint8Array): Promise<{ pages: string[]; totalPages: number }> {
   try {
-    return await extractPdf(bytes, { maxPages: MAX_EXTRACT_PAGES });
+    return await extractPdf(bytes, { maxPages: MAX_EXTRACT_PAGES, rejectAbovePages: MAX_TENDER_DOC_PAGES });
   } catch (e) {
+    if (e instanceof PdfPageLimitError) throw unprocessable('document_too_long', documentTooLongMessage(e.pages), { pages: e.pages, maxPages: e.maxPages });
     if (e instanceof PdfTextError) throw new HttpError(422, 'unreadable_pdf', 'We could not read this PDF. It may be password-protected or damaged.');
     throw e;
   }
@@ -193,12 +208,16 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
     maxRetries: 2, backoffMs: Math.min(1000, Math.max(10, deps.gem.minIntervalMs)), timeoutMs: 45_000,
+    // Streamed with the ported bounded reader (gem/http.ts): aborts at 25 MB instead of buffering it (FR-021).
     maxDocumentBytes: MAX_TENDER_DOC_BYTES,
+    // Cluster-wide ≤ 1 request/s to GeM (008/FR-024): wait ≤ 25 s for a slot, else 503 gem_busy.
+    beforeRequest: () => deps.gemLease.acquire(GEM_LEASE_MAX_WAIT_MS),
   });
   let got: { bytes: Uint8Array; url: string };
   try {
     got = await client.fetchBidDocument(ref);
   } catch (e) {
+    if (e instanceof HttpError) throw e; // 503 gem_busy from the lease
     deps.logger.warn('analyse: GeM document fetch failed', { tenderId: tender.id, error: (e as Error).message });
     const msg = e instanceof GemError && e.code === 'too_large'
       ? 'The GeM document is larger than 25 MB — download it from GeM and upload it here.'
@@ -229,14 +248,13 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
 
 const KIND_ORDER: Record<TenderDocKind, number> = { bid: 0, atc: 1, boq: 2, other: 3, corrigendum: 4 };
 
-async function loadCompany(deps: AppDeps, orgId: string) {
-  const [[profile], pcs, vault, [org]] = await Promise.all([
-    deps.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, orgId)),
-    deps.db.select().from(pastContracts).where(eq(pastContracts.orgId, orgId)),
-    deps.db.select({ id: vaultDocuments.id, type: vaultDocuments.type, title: vaultDocuments.title, expiryDate: vaultDocuments.expiryDate, tags: vaultDocuments.tags })
-      .from(vaultDocuments).where(eq(vaultDocuments.orgId, orgId)),
-    deps.db.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, orgId)),
-  ]);
+async function loadCompany(db: AppDeps['db'] | Tx, orgId: string) {
+  // Sequential: a transaction runs on one connection, so parallel queries would only queue anyway.
+  const [profile] = await db.select().from(companyProfiles).where(eq(companyProfiles.orgId, orgId));
+  const pcs = await db.select().from(pastContracts).where(eq(pastContracts.orgId, orgId));
+  const vault = await db.select({ id: vaultDocuments.id, type: vaultDocuments.type, title: vaultDocuments.title, expiryDate: vaultDocuments.expiryDate, tags: vaultDocuments.tags })
+    .from(vaultDocuments).where(eq(vaultDocuments.orgId, orgId));
+  const [org] = await db.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, orgId));
   return { profile: profile ?? null, pastContracts: pcs, vault, weights: org?.scoringWeights ?? null };
 }
 
@@ -268,32 +286,16 @@ async function latestDoneIn(db: AppDeps['db'] | Tx, tenderId: string, orgId: str
 const lockAnalyses = (tx: Tx, orgId: string, tenderId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${orgId}:${tenderId}`}, 0))`);
 
+/** Under the lifecycle lock: `running` rows of this org+tender older than the timeout become failed "timed out" (FR-028). */
+async function expireTimedOutRuns(tx: Tx, orgId: string, tenderId: string, now: Date) {
+  const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
+  await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
+    .where(and(eq(analyses.orgId, orgId), eq(analyses.tenderId, tenderId), eq(analyses.status, 'running'), lte(analyses.createdAt, cutoff)));
+}
+
 /** A `running` analysis older than this is treated as failed ("timed out") (FR-028). */
 export const ANALYSIS_RUNNING_TIMEOUT_MS = 2 * 60 * 1000;
 export const ANALYSIS_TIMED_OUT = 'timed out';
-
-/**
- * Wall-clock budget for the LLM stage of one run, across all its documents (FR-028). A `running` row
- * counts as timed out ANALYSIS_RUNNING_TIMEOUT_MS after it was created, so a run must not legitimately
- * take that long: capping the LLM stage (the only slow, unbounded stage) at 90 s leaves ~30 s for
- * extraction, scoring and the DB writes. When the budget runs out, the in-flight call is abandoned and
- * the remaining documents use rules only. We chose this budget over heart-beating `updatedAt`: it needs
- * no background timer and keeps "timed out" a pure function of `createdAt`. A run that still overruns
- * (e.g. a stalled DB) cannot clobber anything: the final write only applies while the row is `running`.
- */
-export const ANALYSIS_LLM_BUDGET_MS = 90_000;
-
-class LlmBudgetExceeded extends Error {
-  constructor() { super('LLM time budget exhausted'); }
-}
-
-/** `p`, or a rejection once `ms` has elapsed. The underlying call is not cancelled, only ignored. */
-function withinBudget<T>(p: Promise<T>, ms: number): Promise<T> {
-  if (ms <= 0) return Promise.reject(new LlmBudgetExceeded());
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const expired = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new LlmBudgetExceeded()), ms); });
-  return Promise.race([p, expired]).finally(() => clearTimeout(timer));
-}
 
 /** A late finisher whose row was already marked timed out (and maybe replaced) by a newer request. */
 const supersededError = () => new HttpError(409, 'analysis_superseded', 'This analysis took too long and was replaced. Reload to see the latest result.');
@@ -332,32 +334,75 @@ function overridesOf(a: AnalysisRow | null): Record<string, FactorOverride> {
   return out;
 }
 
+/** LLM limits of one analysis (008/FR-031); tests override them. */
+export interface LlmBudgetLimits { maxCalls: number; maxChars: number; callTimeoutMs: number; budgetMs: number }
+export const DEFAULT_LLM_BUDGET: LlmBudgetLimits = {
+  maxCalls: MAX_LLM_CALLS_PER_ANALYSIS, maxChars: MAX_LLM_INPUT_CHARS, callTimeoutMs: LLM_CALL_TIMEOUT_MS, budgetMs: ANALYSIS_BUDGET_MS,
+};
+/** Time kept free after the last LLM call for scoring and the final write (FR-028, FR-031). */
+export const LLM_FINISH_RESERVE_MS = 30_000;
+/** A document gets an LLM call only when at least this much of its text still fits the character budget. */
+const MIN_LLM_DOC_CHARS = 2_000;
+/** Reserve per page for the "=== Page N ===" header around the page text. */
+const PAGE_HEADER_CHARS = 24;
+
+/**
+ * Run `call` with an AbortSignal that fires after `ms`: the provider request is aborted (review S3), and the race
+ * also rejects at once in case the client ignores the signal.
+ */
+export function withTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
+  const ctrl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`LLM call timed out after ${Math.round(ms / 1000)} s`);
+      ctrl.abort(err);
+      reject(err);
+    }, Math.max(0, ms));
+  });
+  return Promise.race([call(ctrl.signal), expired]).finally(() => clearTimeout(timer));
+}
+
 export async function analyseTender(
-  deps: AppDeps,
-  input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer },
-  opts: { llmBudgetMs?: number } = {},
+  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer },
+  /**
+   * `llmBudgetMs` is shorthand for `llmBudget.budgetMs`. `withTimeout` is a test seam: a fake can advance the
+   * clock by the time it is given instead of waiting it out.
+   */
+  opts: { llmBudget?: Partial<LlmBudgetLimits>; llmBudgetMs?: number; withTimeout?: typeof withTimeout } = {},
 ): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
+  // 008/FR-031's 120 s overall budget is wall-clock from the request, so a slow GeM auto-fetch counts too (review N4).
+  // Measured on deps.clock, the same clock as the row's createdAt that the running timeout is judged by.
+  const elapsedSince = (t: number) => deps.clock.now().getTime() - t;
+  const started = deps.clock.now().getTime();
+  const callWithTimeout = opts.withTimeout ?? withTimeout;
   const tender = await getTender(deps, input.tenderId, input.viewer);
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
     try {
       docs = (await fetchGemDocuments(deps, input)).documents;
     } catch (e) {
+      // GeM busy (503) and over-long documents (422) are actionable for the user; anything else falls through.
+      if (e instanceof HttpError && (e.status === 503 || e.code === 'document_too_long')) throw e;
       deps.logger.warn('analyse: auto-fetch of GeM document failed', { tenderId: tender.id, error: (e as Error).message });
     }
   }
   if (!docs.length) {
     throw new HttpError(422, 'no_documents', 'Add the bid document first — upload the PDF or fetch it from GeM.');
   }
+  // 008/FR-030: scans without a text layer cannot be analysed. Skip them; with nothing readable left → 422.
+  const scanned = docs.filter((d) => isScannedDocument(splitPages(d.text), SCANNED_EMPTY_PAGE_RATIO));
+  const readable = docs.filter((d) => !scanned.includes(d));
+  if (!readable.length) throw unprocessable('scanned_document', SCANNED_DOCUMENT_MESSAGE, { documents: scanned.map((d) => d.fileName) });
+  const notes = scanned.map((d) => `${d.fileName} is a scan without text and was not read — upload the text PDF from GeM or an OCR’d copy.`);
+
   const now = deps.clock.now();
   // One running analysis per org+tender (FR-028). The advisory lock serialises concurrent requests
   // for the same org+tender until commit, so the check and the insert cannot interleave.
   const row = await deps.db.transaction(async (tx) => {
     await lockAnalyses(tx, input.orgId, tender.id);
-    const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
+    await expireTimedOutRuns(tx, input.orgId, tender.id, now);
     const scope = and(eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'));
-    await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
-      .where(and(scope, lte(analyses.createdAt, cutoff)));
     const [running] = await tx.select({ id: analyses.id }).from(analyses).where(scope).limit(1);
     if (running) throw new HttpError(409, 'analysis_running', 'An analysis is already running for this tender');
     const [inserted] = await tx.insert(analyses).values({
@@ -370,35 +415,59 @@ export async function analyseTender(
   const ours = and(eq(analyses.id, row.id), eq(analyses.status, 'running'));
 
   const t0 = performance.now();
-  const llmDeadline = t0 + (opts.llmBudgetMs ?? ANALYSIS_LLM_BUDGET_MS);
   let extractMs = 0;
   let llmMs = 0;
   let pageTotal = 0;
   try {
-    const ordered = [...docs].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
+    const ordered = [...readable].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
     const perDoc: Requirement[][] = [];
     let usedLlm = false;
+    // 008/FR-031: ≤ 2 LLM calls, ≤ 90k characters, 60 s per call, 120 s overall; the rest is rules-only.
+    const limits = { ...DEFAULT_LLM_BUDGET, ...(opts.llmBudgetMs !== undefined ? { budgetMs: opts.llmBudgetMs } : {}), ...opts.llmBudget };
+    // No LLM call starts or runs past this point, so the final write lands a fixed reserve before both the overall
+    // budget and the 2-minute running timeout (FR-028): two worst-case slow calls cannot make the run look timed out.
+    const llmDeadlineMs = Math.min(limits.budgetMs, ANALYSIS_RUNNING_TIMEOUT_MS) - LLM_FINISH_RESERVE_MS;
+    const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
     for (const d of ordered) {
       const tx0 = performance.now();
       const pages = splitPages(d.text);
       if (!pages.length) continue;
       pageTotal += pages.length;
+      llmUse.total++;
       const meta = { documentId: d.id, fileName: d.fileName, estimatedValue: tender.estimatedValue };
       const rules = extractRequirementsRules(pages, meta);
       extractMs += performance.now() - tx0;
-      if (deps.llm && performance.now() < llmDeadline) {
-        const llm = deps.llm;
-        const tl0 = performance.now();
-        const r = await enrichWithLlm(pages, rules, (req) => withinBudget(llm.completeJson(req), llmDeadline - performance.now()), { documentId: d.id, fileName: d.fileName });
-        llmMs += performance.now() - tl0;
-        if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
-        usedLlm ||= r.used;
-        perDoc.push(r.requirements);
-      } else perDoc.push(rules);
+      if (!deps.llm) { perDoc.push(rules); continue; }
+      const llm = deps.llm;
+      const elapsed = elapsedSince(started);
+      const remaining = limits.maxChars - llmUse.chars;
+      const docBudget = remaining - promptChars(buildLlmPrompt([], rules)) - PAGE_HEADER_CHARS * pages.length;
+      const fits = docBudget >= Math.min(MIN_LLM_DOC_CHARS, pages.join('').length)
+        && promptChars(buildLlmPrompt(pages, rules, docBudget)) <= remaining;
+      if (llmUse.calls >= limits.maxCalls || elapsed >= llmDeadlineMs || !fits) {
+        llmUse.skipped++;
+        perDoc.push(rules);
+        continue;
+      }
+      llmUse.calls++;
+      const timeoutMs = Math.min(limits.callTimeoutMs, llmDeadlineMs - elapsed);
+      const tl0 = performance.now();
+      const r = await enrichWithLlm(pages, rules, (req) => callWithTimeout((signal) => llm.completeJson({ ...req, signal }), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
+      llmMs += performance.now() - tl0;
+      llmUse.chars += r.inputChars;
+      if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
+      if (r.used) llmUse.covered++;
+      usedLlm ||= r.used;
+      perDoc.push(r.requirements);
     }
+    // Any document the LLM did not cover — skipped for budget, or a call that failed/timed out — gets the caveat (S4).
+    const warnings: AnalysisWarning[] = deps.llm && llmUse.covered < llmUse.total
+      ? [{ code: 'llm_budget_exhausted', covered: llmUse.covered, total: llmUse.total }]
+      : [];
+    if (deps.llm) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: elapsedSince(started) });
     const ts0 = performance.now();
     const requirements = combineRequirements(perDoc, requirementsFromListing(tender));
-    const company = await loadCompany(deps, input.orgId);
+    const company = await loadCompany(deps.db, input.orgId);
     const checklist = buildChecklist(requirements, company.profile);
     const prefix = documentCheckPrefix(ordered, tender.bidNumber);
     // Overrides are read under the lifecycle lock, right before the write, from the latest DONE
@@ -415,7 +484,7 @@ export async function analyseTender(
       const [done] = await tx.update(analyses).set({
         status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
         score: result.score, confidence: result.confidence, verdict: result.verdict, summary: withPrefix(prefix, result.summary), error: null, stale: false,
-        updatedAt: deps.clock.now(),
+        notes, warnings, updatedAt: deps.clock.now(),
       }).where(ours).returning();
       return done ?? null;
     });
@@ -487,17 +556,94 @@ export async function overrideFactor(
   return updated;
 }
 
+// ───────────── Re-score (FR-037) ─────────────
+
+/**
+ * Recomputes factors and checklist of a completed analysis from its stored requirements against the
+ * CURRENT profile, vault and weights, without re-reading documents. Overrides are kept, the stale flag
+ * is cleared. Same lifecycle lock as a run / an override, so it never interleaves with either.
+ *
+ * Only a company-side change (profile/vault/weights) can be fixed this way: an analysis stale for a
+ * corrigendum or a document change (or with no recorded reason) answers 409 `reanalysis_required`.
+ * The row is read FOR UPDATE: markStale (which does not take the advisory lock) then either committed
+ * before our read, so we see its reason, or waits for our commit and re-flags the row afterwards, so a
+ * change racing with the re-score is never lost (S3).
+ */
+export async function rescoreAnalysis(
+  deps: AppDeps,
+  input: { orgId: string; userId: string; analysisId: string; viewer: TenderViewer },
+): Promise<AnalysisRow> {
+  const [found] = await deps.db.select({ tenderId: analyses.tenderId }).from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId)));
+  if (!found) throw notFound('Analysis');
+  const tender = await getTender(deps, found.tenderId, input.viewer);
+  const now = deps.clock.now();
+  const { a, updated } = await deps.db.transaction(async (tx) => {
+    await lockAnalyses(tx, input.orgId, tender.id);
+    await expireTimedOutRuns(tx, input.orgId, tender.id, now);
+    const [a] = await tx.select().from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId))).for('update');
+    if (!a) throw notFound('Analysis');
+    if (a.status !== 'done') throw new HttpError(409, 'conflict', 'Only a completed analysis can be re-scored');
+    const [running] = await tx.select({ id: analyses.id }).from(analyses).where(and(
+      eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'), gt(analyses.createdAt, a.createdAt),
+    )).limit(1);
+    if (running) throw new HttpError(409, 'analysis_running', 'An analysis is running for this tender. Wait for it to finish.');
+    const [newer] = await tx.select({ id: analyses.id }).from(analyses).where(and(
+      eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'done'), gt(analyses.createdAt, a.createdAt),
+    )).limit(1);
+    if (newer) throw new HttpError(409, 'analysis_replaced', 'A newer analysis has replaced this one. Reload to see it.');
+    if (a.stale && !isRescorableReason(a.staleReason)) throw reanalysisRequired(a.staleReason);
+    const company = await loadCompany(tx, input.orgId);
+    const result = scoreTender({
+      requirements: a.requirements, profile: company.profile, pastContracts: company.pastContracts, vaultDocs: company.vault,
+      tender: { endAt: tender.endAt, state: tender.state, emdAmount: tender.emdAmount, title: tender.title, category: tender.category, items: tender.items },
+      weights: company.weights, now, overrides: overridesOf(a),
+    });
+    const prefix = matchCheckPrefix(a.summary) ?? '';
+    const [updated] = await tx.update(analyses).set({
+      factors: result.factors, checklist: buildChecklist(a.requirements, company.profile), score: result.score, confidence: result.confidence,
+      verdict: result.verdict, summary: withPrefix(prefix, result.summary), stale: false, staleReason: null, staleAt: null, updatedAt: now,
+    }).where(eq(analyses.id, a.id)).returning();
+    return { a, updated };
+  });
+  await logActivity(deps.db, {
+    orgId: input.orgId, userId: input.userId, action: 'analysis.rescored', entityType: 'tender', entityId: a.tenderId,
+    meta: { analysisId: a.id, from: a.score, score: updated.score, verdict: updated.verdict, reason: a.staleReason },
+  });
+  return updated;
+}
+
+const REANALYSIS_COPY: Partial<Record<StaleReason, string>> = {
+  corrigendum: 'A corrigendum changed this bid after it was analysed.',
+  document_added: 'A document was added since this analysis.',
+  document_removed: 'A document was removed since this analysis.',
+};
+
+function reanalysisRequired(reason: StaleReason | null): HttpError {
+  const why = (reason && REANALYSIS_COPY[reason]) ?? 'This analysis is out of date.';
+  return new HttpError(409, 'reanalysis_required', `${why} Re-score cannot pick that up; re-analyse the tender instead.`);
+}
+
 // ───────────── Scoring weights ─────────────
 
 export function weightsResponse(stored: Record<string, number> | null | undefined): ScoringWeights {
   return { weights: resolveWeights(stored), defaults: { ...DEFAULT_WEIGHTS }, custom: !!stored && Object.keys(stored).length > 0 };
 }
 
+function sameWeights(a: Record<string, number>, b: Record<string, number>): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].every((k) => a[k] === b[k]);
+}
+
 export async function saveWeights(deps: AppDeps, input: { orgId: string; userId: string; weights: Record<string, number | undefined> }): Promise<ScoringWeights> {
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(input.weights)) if (typeof v === 'number') clean[k] = v;
   const stored = Object.keys(clean).length ? resolveWeights(clean) : null;
+  const [before] = await deps.db.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, input.orgId));
+  const changed = !sameWeights(resolveWeights(before?.scoringWeights), resolveWeights(stored));
   await deps.db.update(organizations).set({ scoringWeights: stored }).where(eq(organizations.id, input.orgId));
   await logActivity(deps.db, { orgId: input.orgId, userId: input.userId, action: 'org.scoring_weights_updated', entityType: 'organization', entityId: input.orgId, meta: { weights: stored } });
+  // Existing results of open tenders were scored with the old weights (FR-044): flag them so the banner
+  // offers Re-score. Closed tenders keep their historical result; a save that changes nothing flags nothing.
+  if (changed) await markStale(deps.db, { orgId: input.orgId, openOnly: true }, 'weights_changed', deps.clock.now());
   return weightsResponse(stored);
 }

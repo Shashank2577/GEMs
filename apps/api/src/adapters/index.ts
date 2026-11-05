@@ -2,6 +2,7 @@
 import type { Db } from '@tp/db';
 import type { AppDeps, BlobStore, Clock, GemLease, Logger } from '../deps';
 import { loadConfig, loadGemConfig, type RuntimeEnv } from '../env';
+import { createPgGemLease } from '../lib/gem-lease';
 import { createPgRateLimiter } from '../lib/rate-limiter';
 import { systemClock } from './clock';
 import { noopErrorReporter } from './errors';
@@ -21,6 +22,7 @@ export interface CreateDepsInput {
 
 export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetch: f }: CreateDepsInput): AppDeps {
   const config = loadConfig(env);
+  const gem = loadGemConfig(env);
   const doFetch: typeof fetch = f ?? ((input, init) => fetch(input, init));
   return {
     db,
@@ -28,7 +30,7 @@ export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetc
     config,
     logger,
     clock: clock ?? systemClock,
-    gem: loadGemConfig(env),
+    gem,
     fetch: doFetch,
     llm: env.ANTHROPIC_API_KEY
       ? createAnthropicClient({ apiKey: env.ANTHROPIC_API_KEY, model: config.llmModel, baseUrl: env.LLM_BASE_URL, fetch: doFetch })
@@ -41,12 +43,14 @@ export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetc
       : createLogWhatsApp(logger),
     rateLimiter: createPgRateLimiter(db),
     errors: noopErrorReporter,
-    gemLease: noopGemLease,
+    // 008/FR-024: one GeM request per GEM_MIN_INTERVAL_MS across every isolate (0 = unthrottled, local tests only).
+    // Clock bounds are cached per DATABASE_URL at module scope, not per request's pool (review S2).
+    gemLease: gem.minIntervalMs > 0 ? createPgGemLease(db, gem.minIntervalMs, { clockKey: env.DATABASE_URL }) : noopGemLease,
   };
 }
 
-/** GeM lease that never waits (the per-instance GemClient throttle still applies). US4 replaces it with `lib/gem-lease.ts`. */
-export const noopGemLease: GemLease = { async acquire() { /* no cluster-wide lease yet */ } };
+/** GeM lease that never waits (the per-instance GemClient throttle still applies). */
+export const noopGemLease: GemLease = { async acquire() { /* no cluster-wide lease */ } };
 
 // createFsBlobStore: import from './blob-fs' directly (Node only — keeps node:fs out of the Worker bundle).
 export { createR2BlobStore, type R2BucketLike } from './blob-r2';

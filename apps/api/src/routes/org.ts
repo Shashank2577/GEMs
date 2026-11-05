@@ -5,7 +5,7 @@
 import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Hono, type Context } from 'hono';
-import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db, type Role } from '@tp/db';
+import { activityLog, apiTokens, invitations, memberships, organizations, savedViews, sessions, users, type Db, type Role } from '@tp/db';
 import {
   activityQuerySchema, changeRoleInputSchema, inviteInputSchema, updateOrgInputSchema,
   type ActivityItem, type CreatedInvitation, type Member, type MembersResponse, type PendingInvitation,
@@ -228,6 +228,7 @@ orgRoutes.delete('/org/members/me', requireSession, async (c) => {
     await assertNotLastOwner(tx, oid, uid, 'leave');
     await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, uid)));
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, uid)));
     await logActivity(tx, { orgId: oid, userId: uid, action: 'member.left', entityType: 'user', entityId: uid, meta: { name: c.var.user.name, email: c.var.user.email, role: c.var.role } });
     const [next] = await tx.select({ orgId: memberships.orgId }).from(memberships)
       .where(eq(memberships.userId, uid)).orderBy(asc(memberships.createdAt)).limit(1);
@@ -279,6 +280,7 @@ orgRoutes.delete('/org/members/:userId', requireRole('owner'), async (c) => {
     // Already gone (left or removed concurrently): nothing to do, nothing to log.
     if (!removed) throw notFound('Member');
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, target)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, target)));
     await logActivity(tx, { orgId: oid, userId: userId(c), action: 'member.removed', entityType: 'user', entityId: target, meta: { name: m.name, email: m.email, role: removed.role } });
   });
   return c.json({ ok: true as const });

@@ -1,4 +1,4 @@
--- Dedupe any pre-existing duplicate overrides (keep the most recently updated row per (org_id, key)) so the unique index can be built.
+-- Dedupe any pre-existing duplicate overrides (keep the most recently updated row per (org_id, key); tie-break by id) so the unique index can be built. Idempotent.
 DELETE FROM "annexure_templates" a USING "annexure_templates" b
   WHERE a."org_id" IS NOT NULL AND a."org_id" = b."org_id" AND a."key" = b."key"
     AND (a."updated_at", a."id") < (b."updated_at", b."id");--> statement-breakpoint

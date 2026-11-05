@@ -58,4 +58,7 @@ describe('manifest (FR-073)', () => {
     expect(matches.filter((m) => !/^https:\/\/\*\.gem\.gov\.in\//.test(m))).toEqual(['http://localhost/*gem-form*', 'http://127.0.0.1/*gem-form*']);
     expect(matches.some((m) => m.startsWith('*://') || m.includes('<all_urls>'))).toBe(false);
   });
+  it('requests exactly the storage and activeTab permissions (FR-067)', () => {
+    expect([...manifest.permissions].sort()).toEqual(['activeTab', 'storage']);
+  });
 });

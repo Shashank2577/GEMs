@@ -2,12 +2,13 @@
  * Analyse flow (T047, US2): upload → analyse → verdict, override, weights, GeM fetch, isolation.
  * Run: TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_analyse pnpm exec vitest run test/analyse.test.ts
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { activityLog, analyses, companyProfiles, pastContracts, tenderDocuments, tenders, vaultDocuments } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { createApp } from '../src/app';
-import { analyseTender } from '../src/services/analyse';
+import { ANALYSIS_RUNNING_TIMEOUT_MS, ANALYSIS_TIMED_OUT, analyseTender } from '../src/services/analyse';
+import { markStale } from '../src/services/staleness';
 import type { LlmClient } from '../src/deps';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -279,6 +280,172 @@ describe('scoring weights', () => {
   });
 });
 
+describe('re-score (FR-037, FR-043)', () => {
+  let tenderId: string;
+  let analysisId: string;
+  beforeAll(async () => {
+    tenderId = (await insertTender('nogo-experience', { bidNumber: 'GEM/2026/B/8100001', contentHash: 'rs' })).id;
+    await request(ctx.app, 'POST', `/tenders/${tenderId}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('nogo-experience') } });
+    analysisId = (await request(ctx.app, 'POST', `/tenders/${tenderId}/analyse`, { cookie: roles.analyst.cookie })).body.id;
+    await request(ctx.app, 'POST', `/analyses/${analysisId}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'experience', status: 'pass', reason: 'Consortium partner' } });
+  });
+
+  it('a weights change marks the analysis stale; re-score applies them, keeps overrides, clears stale, audits', async () => {
+    expect((await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.bidManager.cookie, json: { certificates: 50 } })).status).toBe(200);
+    const stale = await request(ctx.app, 'GET', `/tenders/${tenderId}/analysis`, { cookie: roles.viewer.cookie });
+    expect(stale.body).toMatchObject({ stale: true, staleReason: 'weights_changed' });
+    expect(stale.body.factors.find((f: any) => f.key === 'certificates').weight).not.toBe(50);
+
+    expect((await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.viewer.cookie })).status).toBe(403);
+    ctx.clock.advance(1000);
+    const r = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ id: analysisId, status: 'done', stale: false, staleReason: null, staleAt: null });
+    expect(r.body.documents).toHaveLength(1);
+    expect(r.body.factors.find((f: any) => f.key === 'certificates').weight).toBe(50);
+    expect(r.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'Consortium partner' });
+    expect(r.body.requirements).toEqual(stale.body.requirements);
+    const log = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, roles.orgId), eq(activityLog.action, 'analysis.rescored')));
+    expect(log).toHaveLength(1);
+    expect(log[0].meta).toMatchObject({ analysisId, score: r.body.score, reason: 'weights_changed' });
+    await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} });
+  });
+
+  it('refuses while a newer run is in progress or after a newer analysis replaced it; 404 for other orgs', async () => {
+    const [base] = await ctx.db.select().from(analyses).where(eq(analyses.id, analysisId));
+    const later = new Date(base.createdAt.getTime() + 1000);
+    const [running] = await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId, status: 'running', method: 'rules', createdAt: later, updatedAt: later }).returning();
+    const busy = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(busy.status).toBe(409);
+    expect(busy.body.error.code).toBe('analysis_running');
+    // Only a done analysis can be re-scored.
+    const notDone = await request(ctx.app, 'POST', `/analyses/${running.id}/rescore`, { cookie: roles.analyst.cookie });
+    expect(notDone.status).toBe(409);
+    await ctx.db.update(analyses).set({ status: 'done' }).where(eq(analyses.id, running.id));
+    const replaced = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(replaced.status).toBe(409);
+    expect(replaced.body.error.code).toBe('analysis_replaced');
+    const other = await signup(ctx.app, { orgName: 'Rescore Other Co' });
+    expect((await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: other.cookie })).status).toBe(404);
+  });
+});
+
+describe('re-score only fixes company-side staleness (FR-037, FR-044)', () => {
+  const GET = (id: string) => request(ctx.app, 'GET', `/tenders/${id}/analysis`, { cookie: roles.viewer.cookie });
+  const RESCORE = (id: string) => request(ctx.app, 'POST', `/analyses/${id}/rescore`, { cookie: roles.analyst.cookie });
+  const SAVE = (json: Record<string, number>) => request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.bidManager.cookie, json });
+  async function analysed(tag: string, over: Partial<typeof tenders.$inferInsert> = {}, file = pdfFile('go-it-services')) {
+    const t = await insertTender('go-it-services', { contentHash: `rs2-${tag}`, source: `rs2-${tag}`, ...over });
+    await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file } });
+    ctx.clock.advance(1000);
+    const a = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(a.body).toMatchObject({ status: 'done', stale: false });
+    ctx.clock.advance(1000);
+    return { tenderId: t.id, analysisId: a.body.id as string };
+  }
+  afterEach(async () => { await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} }); });
+
+  it('A: stale for document_added, then a weights save → still needs re-analysis; re-score answers 409 reanalysis_required', async () => {
+    const { tenderId, analysisId } = await analysed('a');
+    await request(ctx.app, 'POST', `/tenders/${tenderId}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services', 'ATC.pdf'), kind: 'atc' } });
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'document_added' });
+    ctx.clock.advance(1000);
+    expect((await SAVE({ emd: 30 })).status).toBe(200);
+    const after = await GET(tenderId);
+    expect(after.body).toMatchObject({ stale: true, staleReason: 'document_added', staleAt: ctx.clock.now().toISOString() });
+    const r = await RESCORE(analysisId);
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('reanalysis_required');
+    expect(r.body.error.message).toMatch(/document was added.*re-analyse/i);
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'document_added', score: after.body.score });
+    expect(await ctx.db.select().from(activityLog).where(and(eq(activityLog.action, 'analysis.rescored'), eq(activityLog.entityId, tenderId)))).toHaveLength(0);
+  });
+
+  it('B: weights_changed, then a corrigendum → the corrigendum wins and re-score answers 409', async () => {
+    const { tenderId, analysisId } = await analysed('b');
+    await SAVE({ emd: 30 });
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'weights_changed' });
+    await markStale(ctx.db, { tenderIds: [tenderId] }, 'corrigendum', ctx.clock.now());
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'corrigendum' });
+    const r = await RESCORE(analysisId);
+    expect(r.status).toBe(409);
+    expect(r.body.error).toMatchObject({ code: 'reanalysis_required', message: expect.stringMatching(/corrigendum/) });
+    // A later profile change does not downgrade it either.
+    await markStale(ctx.db, { orgId: roles.orgId, tenderIds: [tenderId] }, 'profile_changed', ctx.clock.now());
+    expect((await GET(tenderId)).body.staleReason).toBe('corrigendum');
+  });
+
+  it('stale with no recorded reason (legacy corrigendum) and document_removed also need a re-analysis', async () => {
+    const { tenderId, analysisId } = await analysed('legacy');
+    await ctx.db.update(analyses).set({ stale: true, staleReason: null, staleAt: null }).where(eq(analyses.id, analysisId));
+    await markStale(ctx.db, { orgId: roles.orgId, tenderIds: [tenderId] }, 'vault_changed', ctx.clock.now());
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: null });
+    expect((await RESCORE(analysisId)).body.error.code).toBe('reanalysis_required');
+    await ctx.db.update(analyses).set({ staleReason: 'document_removed' }).where(eq(analyses.id, analysisId));
+    expect((await RESCORE(analysisId)).status).toBe(409);
+    // A re-analysis-needing reason can still be replaced by another one (newest explains the banner).
+    await markStale(ctx.db, { tenderIds: [tenderId] }, 'corrigendum', ctx.clock.now());
+    expect((await GET(tenderId)).body.staleReason).toBe('corrigendum');
+  });
+
+  it('only a CURRENT stale reason counts: after a fresh analysis (or a leftover reason on a non-stale row), a weights save is re-scorable', async () => {
+    const { tenderId } = await analysed('leftover');
+    await markStale(ctx.db, { tenderIds: [tenderId] }, 'corrigendum', ctx.clock.now());
+    ctx.clock.advance(1000);
+    const fresh = await request(ctx.app, 'POST', `/tenders/${tenderId}/analyse`, { cookie: roles.analyst.cookie });
+    ctx.clock.advance(1000);
+    await ctx.db.update(analyses).set({ stale: false, staleReason: 'corrigendum' }).where(eq(analyses.id, fresh.body.id));
+    await SAVE({ emd: 30 });
+    expect((await GET(tenderId)).body).toMatchObject({ id: fresh.body.id, stale: true, staleReason: 'weights_changed' });
+    expect((await RESCORE(fresh.body.id)).status).toBe(200);
+  });
+
+  it('a weights save leaves analyses of closed tenders untouched; a no-op save marks nothing', async () => {
+    const open = await analysed('open');
+    const closed = await analysed('closed');
+    const past = await analysed('past');
+    await ctx.db.update(tenders).set({ status: 'closed' }).where(eq(tenders.id, closed.tenderId));
+    await ctx.db.update(tenders).set({ endAt: new Date(ctx.clock.now().getTime() - 60_000) }).where(eq(tenders.id, past.tenderId));
+    expect((await SAVE({ emd: 30 })).status).toBe(200);
+    expect((await GET(open.tenderId)).body).toMatchObject({ stale: true, staleReason: 'weights_changed' });
+    expect((await GET(closed.tenderId)).body).toMatchObject({ stale: false, staleReason: null });
+    expect((await GET(past.tenderId)).body).toMatchObject({ stale: false, staleReason: null });
+
+    const ok = await RESCORE(open.analysisId);
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ stale: false, staleReason: null });
+    // Same effective weights again (explicitly, then as the default values) → nothing marked stale.
+    expect((await SAVE({ emd: 30 })).status).toBe(200);
+    expect((await GET(open.tenderId)).body.stale).toBe(false);
+    await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} });
+    await RESCORE(open.analysisId);
+    const defaults = (await request(ctx.app, 'GET', '/scoring-weights', { cookie: roles.viewer.cookie })).body.defaults;
+    expect((await SAVE(defaults)).status).toBe(200);
+    expect((await GET(open.tenderId)).body.stale).toBe(false);
+  });
+
+  it('re-score keeps the "Check documents:" prefix', async () => {
+    const { tenderId, analysisId } = await analysed('prefix', { bidNumber: 'GEM/2026/B/6133872' }); // the PDF prints GEM/2026/B/6120451
+    expect((await GET(tenderId)).body.summary).toMatch(/^Check documents: go-it-services\.pdf is for GEM\/2026\/B\/6120451\. /);
+    await SAVE({ emd: 30 });
+    const r = await RESCORE(analysisId);
+    expect(r.status).toBe(200);
+    expect(r.body.summary).toMatch(/^Check documents: go-it-services\.pdf is for GEM\/2026\/B\/6120451\. (Go|Review|No-Go) — \d+\/100/);
+    expect(r.body.summary.match(/Check documents/g)).toHaveLength(1);
+  });
+
+  it('an expired running row does not block a re-score: it is marked failed "timed out" under the lock', async () => {
+    const { tenderId, analysisId } = await analysed('timeout');
+    const [base] = await ctx.db.select().from(analyses).where(eq(analyses.id, analysisId));
+    const later = new Date(base.createdAt.getTime() + 1);
+    const [running] = await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId, status: 'running', method: 'rules', createdAt: later, updatedAt: later }).returning();
+    ctx.clock.advance(ANALYSIS_RUNNING_TIMEOUT_MS + 1000);
+    expect((await RESCORE(analysisId)).status).toBe(200);
+    const [row] = await ctx.db.select().from(analyses).where(eq(analyses.id, running.id));
+    expect(row).toMatchObject({ status: 'failed', error: ANALYSIS_TIMED_OUT });
+  });
+});
+
 describe('LLM enrichment (fake client)', () => {
   it('adds ATC items with method LLM and labels the analysis "rules+llm"; failures fall back to rules', async () => {
     const fake: LlmClient = {
@@ -441,6 +608,198 @@ describe('US1 documents: messages, bid-number check, removal, staleness (FR-002,
     expect(r.status).toBe(403);
     expect(r.body.error).toMatchObject({ code: 'forbidden', message: 'Documents fetched from GeM are shared and cannot be removed' });
     expect((await request(ctx.app, 'GET', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie })).body.total).toBe(1);
+  });
+});
+
+// ───────────── 008/US4 capacity caps (T073, T074; FR-030, FR-031) ─────────────
+
+/** A PDF with `pages` pages of real text (cheap to build, pdf.js can count it without reading the text). */
+async function longPdf(pages: number): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts } = await import('pdf-lib');
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (let i = 0; i < pages; i++) doc.addPage([595, 842]).drawText(`Bid document page ${i + 1} — eligibility criteria and terms.`, { x: 50, y: 780, size: 11, font });
+  return doc.save();
+}
+
+describe('document caps (008/FR-030, US4 scenarios 8–9)', () => {
+  const tooLong = 'This document has 301 pages. TenderPilot accepts documents of up to 300 pages and reads the first 150 — upload the bid document and ATC separately.';
+
+  it('a 301-page upload → 422 document_too_long; no tender_documents row is written', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9300001', contentHash: 'cap-upload' });
+    const file = new File([await longPdf(301) as BlobPart], 'Huge bid.pdf', { type: 'application/pdf' });
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file, kind: 'bid' } });
+    expect(r.status).toBe(422);
+    expect(r.body.error).toEqual({ code: 'document_too_long', message: tooLong, details: { pages: 301, maxPages: 300 } });
+    expect(await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id))).toEqual([]);
+  });
+
+  it('a 301-page GeM document → 422 document_too_long on fetch and on analyse; nothing stored', async () => {
+    pdfs.long = await longPdf(301);
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9300002', contentHash: 'cap-fetch', gemBidId: 'long' });
+    const f = await request(ctx.app, 'POST', `/tenders/${t.id}/fetch-documents`, { cookie: roles.analyst.cookie });
+    expect(f.status).toBe(422);
+    expect(f.body.error.code).toBe('document_too_long');
+    const a = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(a.status).toBe(422);
+    expect(a.body.error).toMatchObject({ code: 'document_too_long', message: tooLong });
+    expect(await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id))).toEqual([]);
+    expect(await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id))).toEqual([]);
+  });
+
+  it('a scanned PDF is accepted on upload but analyse → 422 scanned_document; no analysis row', async () => {
+    const { renderScannedPdf } = await import('../../../tools/mock-gem/src/pdf');
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9300003', contentHash: 'cap-scan' });
+    const scan = new File([await renderScannedPdf(5) as BlobPart], 'scan.pdf', { type: 'application/pdf' });
+    expect((await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file: scan, kind: 'bid' } })).status).toBe(201);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(422);
+    expect(r.body.error).toMatchObject({ code: 'scanned_document', message: 'This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.' });
+    expect(await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id))).toEqual([]);
+
+    // With a readable document next to it, the scan is skipped (noted) and the analysis runs.
+    await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services'), kind: 'atc' } });
+    const ok = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(ok.status).toBe(201);
+    expect(ok.body.notes).toEqual(['scan.pdf is a scan without text and was not read — upload the text PDF from GeM or an OCR’d copy.']);
+    expect(ok.body.documents.map((d: { fileName: string }) => d.fileName)).toEqual(['go-it-services.pdf']);
+  });
+});
+
+describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
+  const calls: number[] = [];
+  const countingLlm = (impl?: () => Promise<unknown>): LlmClient => ({
+    model: 'fake',
+    complete: async () => ({ text: '', model: 'fake', stopReason: null, usage: { inputTokens: 0, outputTokens: 0 } }),
+    completeJson: async <T>(req: { system?: string; prompt: string }) => {
+      calls.push((req.system ?? '').length + req.prompt.length);
+      return (impl ? await impl() : { requirements: [] }) as T;
+    },
+  });
+  let fiveDocs: string;
+
+  beforeAll(async () => {
+    fiveDocs = (await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9400001', contentHash: 'budget' })).id;
+    const kinds = ['bid', 'atc', 'corrigendum', 'boq', 'other'] as const;
+    const keys = ['go-it-services', 'nogo-experience', 'emd-exempt-mse', 'review-hardware-oem', 'go-it-services'];
+    for (let i = 0; i < 5; i++) {
+      const r = await request(ctx.app, 'POST', `/tenders/${fiveDocs}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile(keys[i], `doc-${i + 1}.pdf`), kind: kinds[i] } });
+      expect(r.status).toBe(201);
+    }
+  });
+
+  it('5 documents → ≤ 2 LLM calls, ≤ 90,000 characters, rules for the rest, warning llm_budget_exhausted (2 of 5)', async () => {
+    calls.length = 0;
+    const app = createApp({ ...ctx.deps, llm: countingLlm() });
+    const r = await request(app, 'POST', `/tenders/${fiveDocs}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(201);
+    expect(calls.length).toBe(2);
+    expect(calls.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(90_000);
+    expect(r.body.method).toBe('rules+llm');
+    expect(r.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+    // Persisted: the analysis panel reads it back.
+    const again = await request(ctx.app, 'GET', `/tenders/${fiveDocs}/analysis`, { cookie: roles.viewer.cookie });
+    expect(again.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+  });
+
+  it('caps the total characters across calls (a small budget gives the 2nd call only what is left)', async () => {
+    calls.length = 0;
+    const { analyseTender } = await import('../src/services/analyse');
+    const { analysis } = await analyseTender({ ...ctx.deps, llm: countingLlm() }, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} },
+      { llmBudget: { maxChars: 12_000 } });
+    expect(calls.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(12_000);
+    expect(analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: calls.length, total: 5 }]);
+  });
+
+  it('a slow LLM call times out and falls back to rules; past the overall budget no call starts', async () => {
+    const { analyseTender } = await import('../src/services/analyse');
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} };
+    calls.length = 0;
+    const hang = countingLlm(() => new Promise(() => {}));
+    const t0 = Date.now();
+    const slow = await analyseTender({ ...ctx.deps, llm: hang }, input, { llmBudget: { callTimeoutMs: 50 } });
+    expect(Date.now() - t0).toBeLessThan(5_000);
+    expect(calls.length).toBe(2);
+    expect(slow.analysis).toMatchObject({ status: 'done', method: 'rules', warnings: [{ code: 'llm_budget_exhausted', covered: 0, total: 5 }] });
+
+    calls.length = 0;
+    const over = await analyseTender({ ...ctx.deps, llm: hang }, input, { llmBudget: { budgetMs: 0 } });
+    expect(calls.length).toBe(0);
+    expect(over.analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 0, total: 5 }]);
+  });
+
+  it('worst case: two calls that each take all the time they are given still write done well before the run is 2 minutes old (review S1, scenario 7)', async () => {
+    const { analyseTender, lastAttemptOf, ANALYSIS_RUNNING_TIMEOUT_MS } = await import('../src/services/analyse');
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} };
+    calls.length = 0;
+    const given: number[] = [];
+    // A slow provider on the fake clock: every call uses its whole time limit, then answers.
+    const slowest = <T>(call: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> => {
+      given.push(ms);
+      ctx.clock.advance(ms);
+      return call(new AbortController().signal);
+    };
+    const { analysis } = await analyseTender({ ...ctx.deps, llm: countingLlm() }, input, { withTimeout: slowest });
+    // 60 s for the first call; the second only gets what is left before 120 s − 30 s reserve.
+    expect(given).toEqual([60_000, 30_000]);
+    expect(analysis).toMatchObject({ status: 'done', method: 'rules+llm', warnings: [{ code: 'llm_budget_exhausted', covered: 2, total: 5 }] });
+    const age = analysis.updatedAt.getTime() - analysis.createdAt.getTime();
+    expect(age).toBeLessThan(ANALYSIS_RUNNING_TIMEOUT_MS);
+    expect(age).toBeLessThanOrEqual(90_000);
+    // A GET at the moment it finished does not report it as timed out.
+    expect(lastAttemptOf(analysis, analysis, ctx.clock.now())).toBeUndefined();
+    // Past the deadline no further call starts: a third document would be rules-only.
+    calls.length = 0;
+    given.length = 0;
+    const capped = await analyseTender({ ...ctx.deps, llm: countingLlm() }, input, {
+      withTimeout: <T>(call: (signal: AbortSignal) => Promise<T>, ms: number) => { given.push(ms); ctx.clock.advance(ms); return call(new AbortController().signal); },
+      llmBudget: { maxCalls: 5 },
+    });
+    expect(given).toEqual([60_000, 30_000]);
+    expect(capped.analysis.updatedAt.getTime() - capped.analysis.createdAt.getTime()).toBeLessThanOrEqual(90_000);
+  });
+
+  it('a timed-out call aborts the provider request (AbortSignal through completeJson to fetch; review S3)', async () => {
+    const { analyseTender } = await import('../src/services/analyse');
+    const { createAnthropicClient } = await import('../src/adapters/llm');
+    const signals: AbortSignal[] = [];
+    // The real adapter over a fetch that never answers unless aborted.
+    const llm = createAnthropicClient({
+      apiKey: 'k', model: 'fake',
+      fetch: (async (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        const sig = init!.signal!;
+        signals.push(sig);
+        sig.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      })) as unknown as typeof fetch,
+    });
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} };
+    const r = await analyseTender({ ...ctx.deps, llm }, input, { llmBudget: { callTimeoutMs: 50 } });
+    expect(r.analysis.method).toBe('rules');
+    expect(signals).toHaveLength(2);
+    expect(signals.every((sig) => sig.aborted)).toBe(true);
+  });
+
+  it('a failed LLM call (not a skipped one) still carries the covered-X-of-Y warning (review S4)', async () => {
+    calls.length = 0;
+    const one = (await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9400003', contentHash: 'budget-fail' })).id;
+    await request(ctx.app, 'POST', `/tenders/${one}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services') } });
+    const failing = countingLlm(async () => { throw new Error('provider 529'); });
+    const r = await request(createApp({ ...ctx.deps, llm: failing }), 'POST', `/tenders/${one}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(201);
+    expect(calls.length).toBe(1);
+    expect(r.body.method).toBe('rules');
+    expect(r.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 0, total: 1 }]);
+  });
+
+  it('no warning when every document fits the budget; rules-only (no LLM) never warns', async () => {
+    calls.length = 0;
+    const one = (await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9400002', contentHash: 'budget-1' })).id;
+    await request(ctx.app, 'POST', `/tenders/${one}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services') } });
+    const withLlm = await request(createApp({ ...ctx.deps, llm: countingLlm() }), 'POST', `/tenders/${one}/analyse`, { cookie: roles.analyst.cookie });
+    expect(withLlm.body.warnings).toEqual([]);
+    expect(calls.length).toBe(1);
+    const rules = await request(ctx.app, 'POST', `/tenders/${fiveDocs}/analyse`, { cookie: roles.analyst.cookie });
+    expect(rules.body.warnings).toEqual([]);
   });
 });
 
@@ -696,8 +1055,17 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
       complete: () => new Promise(() => {}),
       completeJson: () => new Promise(() => {}),
     };
-    const r = await analyseTender({ ...ctx.deps, llm: hung }, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: t.id, viewer: {} }, { llmBudgetMs: 50 });
-    expect(r.analysis).toMatchObject({ status: 'done', method: 'rules' });
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: t.id, viewer: {} };
+    // Budget path: a budget already spent (below the finish reserve) starts no call at all.
+    const r = await analyseTender({ ...ctx.deps, llm: hung }, input, { llmBudgetMs: 50 });
+    expect(r.analysis).toMatchObject({ status: 'done', method: 'rules', warnings: [{ code: 'llm_budget_exhausted', covered: 0, total: 1 }] });
+    // Abort path: the call starts, hangs, is aborted at its time limit, and the run falls back to rules.
+    ctx.clock.advance(1000);
+    let started = 0;
+    const counted: LlmClient = { ...hung, completeJson: () => { started++; return new Promise(() => {}); } };
+    const aborted = await analyseTender({ ...ctx.deps, llm: counted }, input, { llmBudget: { callTimeoutMs: 50 } });
+    expect(started).toBe(1);
+    expect(aborted.analysis).toMatchObject({ status: 'done', method: 'rules', warnings: [{ code: 'llm_budget_exhausted', covered: 0, total: 1 }] });
   });
 
   it('B2: an override saved while a re-analysis is running is carried into the new result', async () => {

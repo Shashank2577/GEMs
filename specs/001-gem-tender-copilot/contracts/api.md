@@ -151,7 +151,7 @@ Apply error codes (all use the standard error envelope):
 |---|---|---|
 | `invalid_transition` | 409 | PATCH `/workspaces/:id` to `won`/`lost` (stage or outcome) before the bid was submitted. "Record the submission on GeM first — a bid can only be won or lost after it was submitted." (006/FR-008) |
 | `not_ready` | 409 | Moving to `ready` while mandatory checklist items are missing/expired and not overridden; `details.blockers` lists them (006/FR-005) |
-| `nothing_to_override` | 409 | Override of an item that is present and valid (006/FR-027) |
+| `nothing_to_override` | 409 | Override of an item that is not missing or expired (e.g. present and valid, or any other state) (006/FR-027) |
 | `unknown_placeholder` | 400 | Annexure template or preview body contains a `{{placeholder}}` that is not supported (006/FR-041) |
 | `forbidden_field` | 400 | Assist values containing a price-like key (never entered on GeM) |
 | `packet_too_large` | 413 | Selected packet documents exceed the input budget (006/FR-056) |
@@ -183,7 +183,7 @@ Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/
 | 402 | `plan_expired` | the trial or plan has ended (writes only) | – |
 | 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
 | 413 | `packet_too_large` | packet would exceed 40 MB or 40 items | – |
-| 422 | `document_too_long` | tender document over 300 pages | – |
+| 422 | `document_too_long` | tender document over 300 pages (refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning) | – |
 | 422 | `scanned_document` | tender document has no extractable text | – |
 | 429 | `rate_limited` | a rate-limit rule is over its limit; header `Retry-After: <s>` | `{rule, retryAfter}` |
 | 429 | `sync_cooldown` | manual "Sync now" within the cooldown | `{retryAt}` |

@@ -34,6 +34,7 @@ export function OrgSwitcher({ collapsed, className }: { collapsed?: boolean; cla
           <>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-semibold leading-tight">{me.org.name}</span>
+              {' '}
               <span className="block truncate text-2xs capitalize text-muted-foreground">{me.org.plan} plan · {ROLE_LABEL[me.role]}</span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />

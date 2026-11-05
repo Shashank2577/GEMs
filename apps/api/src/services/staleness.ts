@@ -7,11 +7,17 @@
  *   await markStale(deps.db, { tenderIds: [id] }, 'corrigendum', now);              // every org
  *
  * Only `done` analyses are touched (running/failed rows have no result to invalidate). An analysis that
- * is already stale gets the newest reason and time, so the banner explains the latest change.
+ * is already stale gets the newest time and, usually, the newest reason so the banner explains the latest
+ * change; EXCEPT that a reason needing a full re-analysis (corrigendum, document_*, or stale with no
+ * recorded reason) is never replaced by one a Re-score fixes (profile/vault/weights): otherwise a Re-score
+ * would clear a flag whose cause it cannot address (FR-037).
  */
-import { and, eq, gt, inArray, isNull, or, type SQL } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { analyses, tenders, type Db } from '@tp/db';
-import type { StaleReason } from '@tp/core/contracts/analyse';
+import { RESCORABLE_STALE_REASONS, isRescorableReason, type StaleReason } from '@tp/core/contracts/analyse';
+
+/** SQL for "this row is stale for a reason a Re-score cannot fix". */
+const needsReanalysis = sql`(${analyses.stale} and (${analyses.staleReason} is null or ${analyses.staleReason} not in (${sql.join(RESCORABLE_STALE_REASONS.map((r) => sql`${r}`), sql`, `)})))`;
 
 export interface StaleScope {
   /** Limit to one organization's analyses (omit for every org, e.g. a corrigendum). */
@@ -36,7 +42,10 @@ export async function markStale(db: Db, scope: StaleScope, reason: StaleReason, 
   }
   const rows = await db.update(analyses)
     // updatedAt is left alone: the UI shows it as "Analysed <time>".
-    .set({ stale: true, staleReason: reason, staleAt: now })
+    .set({
+      stale: true, staleAt: now,
+      staleReason: isRescorableReason(reason) ? sql`case when ${needsReanalysis} then ${analyses.staleReason} else ${reason} end` : reason,
+    })
     .where(and(...where))
     .returning({ id: analyses.id });
   return rows.length;

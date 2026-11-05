@@ -201,6 +201,10 @@ export interface IngestionRunsResponse {
   lastRun: IngestionRunDto | null;
   totalTenders: number;
   openTenders: number;
+  /** When a manual "Sync now" is allowed again (008/FR-026), or null when it is allowed now. */
+  nextManualSyncAt: string | null;
+  /** Cooldown length in minutes (server config, default 10). */
+  manualSyncCooldownMin: number;
 }
 
 // ───────────── Notifications ─────────────
@@ -225,3 +229,29 @@ export interface NotificationDto {
 }
 
 export interface NotificationsResponse { items: NotificationDto[]; unreadCount: number; total: number }
+
+// ───────────── Saved feed views (003/FR-035) ─────────────
+
+export const SAVED_VIEW_LIMIT = 20;
+export const SAVED_VIEW_NAME_MAX = 40;
+
+/** Feed URL params as `key -> values` (repeated keys keep several values). */
+export const savedViewParamsSchema = z.record(z.string().min(1).max(40), z.array(z.string().max(200)).max(50)).refine((p) => Object.keys(p).length <= 30, 'Too many parameters')
+  .refine((p) => JSON.stringify(p).length <= 4096, 'Parameters are too large');
+
+const savedViewName = z.string().trim().min(1, 'Give the view a name').max(SAVED_VIEW_NAME_MAX, `Use at most ${SAVED_VIEW_NAME_MAX} characters`);
+
+export const savedViewCreateSchema = z.object({ name: savedViewName, params: savedViewParamsSchema });
+export type SavedViewCreateInput = z.input<typeof savedViewCreateSchema>;
+
+export const savedViewUpdateSchema = z.object({ name: savedViewName.optional(), params: savedViewParamsSchema.optional() });
+export type SavedViewUpdateInput = z.input<typeof savedViewUpdateSchema>;
+
+export interface SavedViewDto {
+  id: string;
+  name: string;
+  params: Record<string, string[]>;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}

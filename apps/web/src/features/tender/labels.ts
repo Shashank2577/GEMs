@@ -4,7 +4,7 @@ import {
   FileBadge, FileCheck2, FileSpreadsheet, FileText, Flag, Handshake, Landmark, ReceiptText, ScrollText, ShieldCheck, Sparkles,
   Timer, Truck, type LucideIcon,
 } from 'lucide-react';
-import type { AnalysisDto, FactorStatus, Requirement, StaleReason, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
+import { RESCORABLE_STALE_REASONS, isRescorableReason, type AnalysisDto, type AnalysisWarning, type FactorStatus, type Requirement, type StaleReason, type TenderDocKind, type TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import { formatDateIST, formatINR, relativeTime } from '@/lib/format';
 
@@ -43,10 +43,17 @@ export const STALE_REASON_COPY: Record<StaleReason, string> = {
   corrigendum: 'A corrigendum changed this bid after it was analysed. The score below may be outdated.',
   document_added: 'A document was added since this analysis. Re-analyse to include it.',
   document_removed: 'A document was removed since this analysis. Re-analyse to update the score.',
-  profile_changed: 'Your company profile changed since this analysis. Re-analyse to update the score.',
-  vault_changed: 'Your document vault changed since this analysis. Re-analyse to update the score.',
-  weights_changed: 'Scoring weights changed since this analysis. Re-analyse to update the score.',
+  profile_changed: 'Your company profile changed since this analysis. Re-score to update the score.',
+  vault_changed: 'Your document vault changed since this analysis. Re-score to update the score.',
+  weights_changed: 'Scoring weights changed since this analysis. Re-score to update the score.',
 };
+
+/**
+ * Reasons a Re-score fixes (profile, vault, weights); a document change or corrigendum needs a full
+ * Re-analyse (FR-037). Shared with the API, which refuses other reasons with 409 `reanalysis_required`.
+ */
+export const RESCORE_REASONS: readonly StaleReason[] = RESCORABLE_STALE_REASONS;
+export const canRescoreFor = (reason: StaleReason | null | undefined) => isRescorableReason(reason);
 
 export const staleReasonCopy = (reason: StaleReason | null | undefined) => STALE_REASON_COPY[reason ?? 'corrigendum'] ?? STALE_REASON_COPY.corrigendum;
 
@@ -178,8 +185,21 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   'tender.document_uploaded': 'uploaded a document',
   'tender.document_fetched': 'fetched the bid document from GeM',
   'analysis.factor_overridden': 'overrode a factor',
+  'analysis.rescored': 're-scored the analysis',
   'tender.dismissed': 'dismissed this tender',
   'workspace.created': 'started a bid workspace',
 };
 
 export { CalendarClock };
+
+/** User-facing text of an analysis warning (spec 008 FR-031, FR-037). */
+export function analysisWarningText(w: AnalysisWarning): string {
+  switch (w.code) {
+    case 'llm_budget_exhausted':
+      return `AI review covered ${w.covered} of ${w.total} document${w.total === 1 ? '' : 's'}; the rest were checked by rules only.`;
+    case 'llm_quota_reached':
+      return 'Monthly AI review limit reached — this analysis used rules only.';
+    default:
+      return 'Part of this analysis used rules only.';
+  }
+}

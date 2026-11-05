@@ -63,7 +63,7 @@ Keep both operations synchronous. Make the bounds explicit, cheap to check, and 
 (sequentially, page by page), and the truncation is made visible rather than silent:
 
 - `tender_documents.total_pages` stores the PDF's real page count next to `page_count` (pages actually read); it is
-  null for rows created before migration 0012. Set for uploads, explicit GeM fetches and the auto-fetch inside analyse.
+  null for rows created before migration 0013 (`0013_tender_doc_total_pages`). Set for uploads, explicit GeM fetches and the auto-fetch inside analyse.
 - The document DTO exposes `totalPages`; the Documents tab shows "Only the first 150 of N pages were read" on the
   document, uploads answer with a `pages_truncated` warning, and the Analysis panel shows a note when any analysed
   document is truncated.
@@ -76,3 +76,11 @@ must stay prominent. The `scanned_pdf` rejection is unchanged.
 
 **Evidence limits.** The memory figures behind 150 were measured for the extraction step only, under local workerd
 (`wrangler dev --local`), not for the full upload + analyse route and not under production Workers limits.
+
+## Amendment 2 (2026-11-05): 300-page reject restored on top of the 150-page read cap
+
+Spec 008 FR-030 (PR #515) adds back `MAX_TENDER_DOC_PAGES = 300` in `packages/core/src/contracts/caps.ts`, on top of
+Amendment 1: a document of more than 300 pages is refused with 422 `document_too_long` ("This document has N pages.
+TenderPilot accepts documents of up to 300 pages and reads the first 150 — upload the bid document and ATC
+separately.") before any text is read, so no blob and no `tender_documents` row is written. Documents of 151–300 pages
+are still accepted and read to page 150 with the `pages_truncated` warning described above.

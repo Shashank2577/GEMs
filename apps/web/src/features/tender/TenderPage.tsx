@@ -19,8 +19,8 @@ import { DocumentsTab } from './DocumentsTab';
 import { HistoryTab } from './HistoryTab';
 import { RequirementsTab } from './RequirementsTab';
 import { TenderHero } from './TenderHero';
-import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useDismiss, useStartBid, useTender, useTenderDocuments } from './api';
-import { isAnalysisRunning, staleReasonCopy } from './labels';
+import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
+import { canRescoreFor, isAnalysisRunning, staleReasonCopy } from './labels';
 
 const TABS = ['analysis', 'requirements', 'documents', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -36,6 +36,7 @@ export default function TenderPage() {
   const analysisQ = useAnalysis(id);
   const docs = useTenderDocuments(id);
   const analyse = useAnalyse(id);
+  const rescore = useRescore(id);
   const startBid = useStartBid(id);
   const dismiss = useDismiss(id);
   const canAnalyse = useCan('analyst');
@@ -79,6 +80,14 @@ export default function TenderPage() {
           toast(e instanceof Error ? e.message : 'An analysis is already running for this tender', { description: 'The result will appear here when it finishes.' });
         } else toast.error(errorMessage(e, 'Analysis failed'));
       },
+    });
+  };
+
+  const runRescore = () => {
+    if (!analysis || analyseBlocked) return;
+    rescore.mutate(analysis.id, {
+      onSuccess: (a) => toast.success(`Re-scored · ${a.score}/100`, { description: 'Updated with your current profile, vault and weights.' }),
+      onError: (e) => toast.error(errorMessage(e, 'Re-score failed')),
     });
   };
 
@@ -140,7 +149,13 @@ export default function TenderPage() {
                 <div className="font-semibold">Re-analysis needed</div>
                 <div className="text-muted-foreground">{staleReasonCopy(analysis?.staleReason)}</div>
               </div>
-              <RoleGate min="analyst"><Button size="sm" variant="secondary" onClick={runAnalyse} disabled={analyseBlocked}><RefreshCw /> Re-analyse now</Button></RoleGate>
+              <RoleGate min="analyst">
+                {canRescoreFor(analysis?.staleReason) && analysis ? (
+                  <Button size="sm" variant="secondary" onClick={runRescore} loading={rescore.isPending} disabled={analyseBlocked}><RefreshCw /> Re-score</Button>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={runAnalyse} disabled={analyseBlocked}><RefreshCw /> Re-analyse now</Button>
+                )}
+              </RoleGate>
             </div>
           )}
           {analyse.isPending ? <AnalysingState /> : analysisQ.isLoading ? <AnalysisSkeleton /> : analysisQ.isError ? (

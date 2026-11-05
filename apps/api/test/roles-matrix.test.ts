@@ -67,6 +67,9 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/watchlists', min: 'analyst' },
   { method: 'PATCH', path: '/api/watchlists/:id', min: 'analyst' },
   { method: 'DELETE', path: '/api/watchlists/:id', min: 'analyst' },
+  { method: 'POST', path: '/api/views', min: 'viewer' }, // personal saved views (own, per user)
+  { method: 'PATCH', path: '/api/views/:id', min: 'viewer' },
+  { method: 'DELETE', path: '/api/views/:id', min: 'viewer' },
   { method: 'POST', path: '/api/ingestion/run', min: 'bid_manager', json: { pages: 'not-a-number' } },
   { method: 'POST', path: '/api/notifications/read-all', min: 'viewer' },
   { method: 'POST', path: '/api/notifications/:id/read', min: 'viewer' },
@@ -76,6 +79,7 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/tenders/:id/fetch-documents', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/analyse', min: 'analyst' },
   { method: 'POST', path: '/api/analyses/:id/override', min: 'bid_manager' },
+  { method: 'POST', path: '/api/analyses/:id/rescore', min: 'analyst' },
   { method: 'PUT', path: '/api/scoring-weights', min: 'bid_manager' },
   // ── profile & vault ──
   { method: 'PUT', path: '/api/profile', min: 'analyst' },

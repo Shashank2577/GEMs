@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Requirement } from '@tp/core/contracts/analyse';
 import type { TenderDocumentDto } from '@tp/core/contracts/analyse';
-import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, friendlyAnalysisError, truncatedDocuments, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
+import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, analysisWarningText, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, friendlyAnalysisError, truncatedDocuments, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
 
 describe('staleReasonCopy (FR-043)', () => {
   it('falls back to the corrigendum copy when the reason is null or missing (legacy stale analyses)', () => {
@@ -12,6 +12,16 @@ describe('staleReasonCopy (FR-043)', () => {
   it('returns reason-specific copy', () => {
     expect(staleReasonCopy('document_added')).toMatch(/document was added/);
     expect(staleReasonCopy('document_removed')).toMatch(/document was removed/);
+  });
+});
+
+describe('analysisWarningText (008/FR-031, FR-037)', () => {
+  it('renders the spec copy', () => {
+    expect(analysisWarningText({ code: 'llm_budget_exhausted', covered: 2, total: 5 }))
+      .toBe('AI review covered 2 of 5 documents; the rest were checked by rules only.');
+    expect(analysisWarningText({ code: 'llm_budget_exhausted', covered: 0, total: 1 }))
+      .toBe('AI review covered 0 of 1 document; the rest were checked by rules only.');
+    expect(analysisWarningText({ code: 'llm_quota_reached' })).toBe('Monthly AI review limit reached — this analysis used rules only.');
   });
 });
 
@@ -102,5 +112,19 @@ describe('run lifecycle copy (FR-028, FR-029)', () => {
       { fileName: 'c.pdf', pageCount: 5, totalPages: null }, { fileName: 'd.pdf', pageCount: 5 },
     ])).toEqual([{ fileName: 'a.pdf', analysed: 150, total: 280 }]);
     expect(truncatedDocuments(undefined)).toEqual([]);
+  });
+});
+
+describe('Re-score vs Re-analyse (004/FR-037)', () => {
+  it('offers Re-score only for profile, vault and weights changes', async () => {
+    const { canRescoreFor, staleReasonCopy } = await import('./labels');
+    expect(['profile_changed', 'vault_changed', 'weights_changed'].map((r) => canRescoreFor(r as never))).toEqual([true, true, true]);
+    expect(['corrigendum', 'document_added', 'document_removed', null, undefined].map((r) => canRescoreFor(r as never))).toEqual([false, false, false, false, false]);
+    expect(staleReasonCopy('weights_changed')).toMatch(/^Scoring weights changed/);
+    // Same set as the API, which answers 409 reanalysis_required for the others.
+    const { isRescorableReason, STALE_REASONS } = await import('@tp/core/contracts/analyse');
+    expect(STALE_REASONS.map((r) => canRescoreFor(r))).toEqual(STALE_REASONS.map((r) => isRescorableReason(r)));
+    expect(staleReasonCopy('profile_changed')).toMatch(/Re-score to update the score\.$/);
+    expect(staleReasonCopy('vault_changed')).toMatch(/Re-score to update the score\.$/);
   });
 });

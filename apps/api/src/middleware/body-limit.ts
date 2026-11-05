@@ -13,6 +13,7 @@
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { MAX_TENDER_DOC_BYTES } from '@tp/core/contracts/analyse';
+import { JSON_BODY_MAX_BYTES } from '@tp/core/contracts/caps';
 import { VAULT_MAX_BYTES } from '@tp/core/contracts/vault';
 import { HttpError, payloadTooLarge } from '../lib/errors';
 import type { AppEnv } from '../types';
@@ -20,7 +21,7 @@ import type { AppEnv } from '../types';
 const MB = 1024 * 1024;
 /** Multipart framing, field values and file name around the file itself. */
 export const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
-export const JSON_BODY_MAX_BYTES = 1 * MB;
+export { JSON_BODY_MAX_BYTES };
 export const VAULT_UPLOAD_MAX_BYTES = VAULT_MAX_BYTES + MULTIPART_OVERHEAD_BYTES;
 export const TENDER_DOC_UPLOAD_MAX_BYTES = MAX_TENDER_DOC_BYTES + MULTIPART_OVERHEAD_BYTES;
 

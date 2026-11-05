@@ -11,13 +11,20 @@ import {
   Fingerprint, Gauge, Hand, IndianRupee, KeyRound, Layers, Lock, Menu, MessageCircle, Radar, ScanText, ShieldCheck, Smartphone, Sparkles,
   Users, X,
 } from 'lucide-react';
+import { dropLandingShell } from './shell';
 import { Logo } from '@/components/layout/Logo';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Badge, Button, Countdown, Progress, ScoreRing, Tabs, TabsContent, TabsList, TabsTrigger, VerdictBadge } from '@/components/ui';
+import { PLANS, PRICING_NOTE, formatPlanPrice, planCtaHref } from '@tp/core/contracts/plans';
 import { useDocumentTitle } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 
-const NAV = [
+export const LANDING_TITLE = 'TenderPilot — GeM tender co-pilot for Indian sellers';
+
+/** Labels for the sign-in / sign-up buttons in the nav bar and the mobile menu. */
+export const AUTH_LABELS = { signIn: 'Sign in', signUp: 'Start free trial' } as const;
+
+export const NAV = [
   { href: '#how', label: 'How it works' },
   { href: '#control', label: 'Compliance' },
   { href: '#teams', label: 'For teams' },
@@ -46,7 +53,8 @@ function SectionHead({ eyebrow, title, body, center = true }: { eyebrow: string;
 }
 
 export default function LandingPage() {
-  useDocumentTitle('TenderPilot — GeM tender co-pilot for Indian sellers');
+  useDocumentTitle(LANDING_TITLE, { raw: true });
+  useEffect(dropLandingShell, []);
   return (
     <div className="min-h-dvh overflow-x-hidden bg-background text-foreground">
       <SiteNav />
@@ -87,8 +95,8 @@ function SiteNav() {
         </nav>
         <div className="flex items-center gap-1.5">
           <ThemeToggle />
-          <Button variant="ghost" className="hidden sm:inline-flex" asChild><Link to="/login">Sign in</Link></Button>
-          <Button className="hidden sm:inline-flex" asChild><Link to="/signup">Start free trial</Link></Button>
+          <Button variant="ghost" className="hidden sm:inline-flex" asChild><Link to="/login">{AUTH_LABELS.signIn}</Link></Button>
+          <Button className="hidden sm:inline-flex" asChild><Link to="/signup">{AUTH_LABELS.signUp}</Link></Button>
           <Button variant="ghost" size="icon" className="md:hidden" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X /> : <Menu />}
           </Button>
@@ -100,8 +108,8 @@ function SiteNav() {
             {NAV.map((n) => <li key={n.href}><a href={n.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted focus-ring">{n.label}</a></li>)}
           </ul>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="secondary" asChild><Link to="/login">Sign in</Link></Button>
-            <Button asChild><Link to="/signup">Start free trial</Link></Button>
+            <Button variant="secondary" asChild><Link to="/login">{AUTH_LABELS.signIn}</Link></Button>
+            <Button asChild><Link to="/signup">{AUTH_LABELS.signUp}</Link></Button>
           </div>
         </nav>
       )}
@@ -118,7 +126,7 @@ function Hero() {
       <div className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" aria-hidden />
       <div className="pointer-events-none absolute left-1/2 top-[-10%] h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px]" aria-hidden />
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-24">
-        <Reveal>
+        <div>
           <a href="#control" className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs backdrop-blur hover:text-foreground focus-ring">
             <ShieldCheck className="size-3.5 text-success" /> Account-safe: never auto-submits on GeM <ArrowRight className="size-3" />
           </a>
@@ -138,8 +146,9 @@ function Hero() {
               <li key={t} className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-success" />{t}</li>
             ))}
           </ul>
-        </Reveal>
-        <Reveal delay={0.1}><ProductMock closing={closing} /></Reveal>
+        </div>
+        {/* Above the fold: no opacity-0 entrance animation, so the hero paints (LCP) without waiting on motion/JS (007/NFR-003). */}
+        <div><ProductMock closing={closing} /></div>
       </div>
     </section>
   );
@@ -347,7 +356,7 @@ function Metrics() {
 
 // ───────────── Personas ─────────────
 
-const PERSONAS = [
+export const PERSONAS = [
   {
     key: 'owner', label: 'Owner', icon: Smartphone, title: 'Know what’s worth bidding — from your phone',
     body: 'A morning dashboard with new matches, bids closing this week, EMD at stake and your win rate. WhatsApp nudges for anything urgent.',
@@ -466,42 +475,24 @@ function PersonaVisual({ k }: { k: string }) {
 
 // ───────────── Pricing ─────────────
 
-const PLANS = [
-  {
-    name: 'Starter', price: '₹2,999', per: '/month', blurb: 'For a founder-led MSME bidding a few times a month.',
-    features: ['3 team members', '5 watchlists', 'Email & in-app alerts', 'Go / No-Go scoring', 'Document vault (2 GB)', 'Bid packet builder'],
-    cta: 'Start free trial',
-  },
-  {
-    name: 'Pro', price: '₹7,999', per: '/month', blurb: 'For growing teams bidding every week.', featured: true,
-    features: ['10 team members', 'Unlimited watchlists', 'WhatsApp alerts & daily digest', 'AI-assisted bid reading', 'Annexure templates', 'Chrome co-pilot', 'Pipeline & win-rate analytics'],
-    cta: 'Start free trial',
-  },
-  {
-    name: 'Enterprise', price: 'Custom', per: '', blurb: 'For OEMs, distributors and consultants with many entities.',
-    features: ['Unlimited members & orgs', 'SSO & audit exports', 'Custom scoring rules', 'Dedicated success manager', 'Priority support (IST)'],
-    cta: 'Talk to sales',
-  },
-];
-
 function Pricing() {
   return (
     <section id="pricing" className="scroll-mt-20 border-t bg-subtle/50 py-20 sm:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <SectionHead eyebrow="Pricing" title="Pays for itself with one extra win" body="Prices exclude 18% GST. Every plan starts with a 14-day free trial of Pro." />
+        <SectionHead eyebrow="Pricing" title="Pays for itself with one extra win" body={PRICING_NOTE} />
         <div className="mt-14 grid gap-5 lg:grid-cols-3">
           {PLANS.map((p, i) => (
-            <Reveal key={p.name} delay={i * 0.06}>
+            <Reveal key={p.key} delay={i * 0.06}>
               <div className={cn('relative flex h-full flex-col rounded-2xl border bg-card p-6 shadow-xs sm:p-8', p.featured && 'border-primary shadow-lg ring-1 ring-primary/30')}>
                 {p.featured && <Badge tone="solid" className="absolute -top-3 left-6"><Sparkles /> Most popular</Badge>}
                 <h3 className="text-lg font-semibold">{p.name}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{p.blurb}</p>
-                <p className="mt-6 flex items-baseline gap-1"><span className="text-4xl font-semibold tracking-tight tabular">{p.price}</span><span className="text-sm text-muted-foreground">{p.per}</span></p>
+                <p className="mt-6 flex items-baseline gap-1"><span className="text-4xl font-semibold tracking-tight tabular">{formatPlanPrice(p)}</span>{p.monthlyInr != null && <span className="text-sm text-muted-foreground">/month</span>}</p>
                 <ul className="mt-6 grid flex-1 content-start gap-2.5 text-sm">
                   {p.features.map((f) => <li key={f} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-success" />{f}</li>)}
                 </ul>
                 <Button className="mt-8" variant={p.featured ? 'primary' : 'secondary'} size="lg" asChild>
-                  {p.name === 'Enterprise' ? <a href="mailto:sales@tenderpilot.in?subject=TenderPilot%20Enterprise">{p.cta}</a> : <Link to="/signup">{p.cta}</Link>}
+                  {p.key === 'enterprise' ? <a href={planCtaHref(p)}>{p.cta}</a> : <Link to={planCtaHref(p)}>{p.cta}</Link>}
                 </Button>
               </div>
             </Reveal>
@@ -514,7 +505,7 @@ function Pricing() {
 
 // ───────────── FAQ ─────────────
 
-const FAQ = [
+export const FAQ = [
   ['Will TenderPilot submit bids on GeM for me?', 'No — and that’s deliberate. GeM requires a human to enter the price and authenticate with Aadhaar OTP, e-Sign or a DSC. Automated submissions put seller accounts at risk. TenderPilot prepares everything else and hands you a ready packet.'],
   ['Do you need my GeM login?', 'Never. We read publicly listed BidPlus bids and documents. Your GeM credentials stay with you.'],
   ['How accurate is the Go / No-Go score?', 'Every verdict comes from deterministic rules you can see — turnover, experience, EMD, MSE/Startup exemptions, MII class, OEM authorisation and documents — each linked to the clause and page it came from. AI helps read unusual clauses, but never decides silently. You can override any factor with a reason.'],
