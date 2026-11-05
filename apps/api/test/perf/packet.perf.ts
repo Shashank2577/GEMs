@@ -84,7 +84,7 @@ describe('packet build performance (NFR-002)', () => {
     // The absolute peak includes the test process's own baseline (vitest, pg pool, seed data: ~33 MB) that a Worker
     // isolate does not carry per request, so the budget is asserted on what the build itself adds. The sampler runs
     // between event-loop turns, so this is a lower bound. Measured 2026-11-05: ~97 MB added for 24.8 MB input
-    // (≈ 3.9× input) — see the T065 report: the 60 MB default cap does NOT keep a build under 128 MB.
+    // (≈ 3.9× input) — see the T065 report: the 60 MB default cap does NOT keep a build under 128 MB (NFR-003 open: #500).
     const addedMB = (peak - baseline) / 1048576;
     console.log(`[perf] build added ${addedMB.toFixed(1)} MB (${((peak - baseline) / inputBytes).toFixed(1)}× input)`);
     expect(addedMB).toBeLessThan(128);

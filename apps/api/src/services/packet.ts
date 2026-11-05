@@ -299,7 +299,9 @@ export function proposedPacketItems(
     const uid = packetItemUid(c);
     if (!snapshot.has(uid) && !seen.has(uid)) { seen.add(uid); out.push(c); }
   }
-  return out;
+  // Every reference of the last build went stale and nothing is newly required: fall back to the computed default
+  // rather than proposing (and building, for POST {}) an empty packet.
+  return out.length ? out : computed;
 }
 
 /** Computed (FR-045) and proposed (FR-055) packet orders — shared by the workspace DTO and `POST … {}` (FR-046). */
