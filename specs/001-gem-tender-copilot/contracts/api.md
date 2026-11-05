@@ -22,7 +22,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | POST | /auth/accept-invite | `{token,name?,password?}` | `Me` |
 | PATCH | /me | `{name?,phone?}` | `Me` |
 | GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` | prefs |
-| GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name}` | list / `{token}` shown once |
+| GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name, expiresInDays?: 30\|90\|365\|null}` (default 90, null = never) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens (002/FR-037) |
 | GET | /org/members | – | `[{userId,name,email,role,joinedAt}]` + pending invites |
 | POST (M) | /org/invitations | `{email,role}` | `{id, inviteUrl}` |
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member |

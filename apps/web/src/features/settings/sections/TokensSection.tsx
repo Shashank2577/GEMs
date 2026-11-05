@@ -2,12 +2,13 @@ import { useState, type FormEvent } from 'react';
 import { AlertTriangle, Check, Chrome, Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 import type { ApiTokenSummary, CreatedApiToken } from '@tp/core/contracts/auth';
 import {
-  Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, ErrorState, Field,
-  Input, Kbd, SkeletonList, toast,
+  Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, ErrorState, Field,
+  Input, Kbd, Select, SkeletonList, toast,
 } from '@/components/ui';
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { copyText, useCreateToken, useRevokeToken, useTokens } from '../api';
+import { TOKEN_EXPIRY_OPTIONS, expiresInDaysFor, tokenExpiry, tokenHintLabel, type TokenExpiryChoice } from '../token-expiry';
 import { Panel } from './Panel';
 
 export default function TokensSection() {
@@ -25,16 +26,23 @@ export default function TokensSection() {
           <EmptyState compact icon={KeyRound} title="No tokens yet" body="Create one to connect the browser extension." />
         ) : (
           <ul className="divide-y">
-            {q.data!.items.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground"><KeyRound className="size-4" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{t.name}</span>
-                  <span className="block text-xs text-muted-foreground">Created {formatDateIST(t.createdAt)} · {t.lastUsedAt ? `last used ${relativeTime(t.lastUsedAt)}` : 'never used'}</span>
-                </span>
-                <Button variant="ghost" size="sm" onClick={() => setRevoking(t)}><Trash2 /> Revoke</Button>
-              </li>
-            ))}
+            {q.data!.items.map((t) => {
+              const exp = tokenExpiry(t.expiresAt);
+              return (
+                <li key={t.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" data-testid="api-token-row">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><KeyRound className="size-4" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="truncate text-sm font-medium">{t.name}</span>
+                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground" title="Last 4 characters of the token">{tokenHintLabel(t.hint)}</code>
+                      <Badge size="sm" tone={exp.tone} title={t.expiresAt ? `Expires ${formatDateIST(t.expiresAt)}` : undefined}>{exp.label}</Badge>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">Created {formatDateIST(t.createdAt)} · {t.lastUsedAt ? `last used ${relativeTime(t.lastUsedAt)}` : 'never used'}</span>
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => setRevoking(t)}><Trash2 /> Revoke</Button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Panel>
@@ -71,16 +79,17 @@ export default function TokensSection() {
 function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const create = useCreateToken();
   const [name, setName] = useState('Chrome extension');
+  const [expiry, setExpiry] = useState<TokenExpiryChoice>('90');
   const [created, setCreated] = useState<CreatedApiToken | null>(null);
   const [copied, setCopied] = useState(false);
   const close = (o: boolean) => {
     onOpenChange(o);
-    if (!o) setTimeout(() => { setCreated(null); setCopied(false); setName('Chrome extension'); create.reset(); }, 200);
+    if (!o) setTimeout(() => { setCreated(null); setCopied(false); setName('Chrome extension'); setExpiry('90'); create.reset(); }, 200);
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    create.mutate(name.trim(), { onSuccess: setCreated, onError: (e2) => toast.error(errorMessage(e2)) });
+    create.mutate({ name: name.trim(), expiresInDays: expiresInDaysFor(expiry) }, { onSuccess: setCreated, onError: (e2) => toast.error(errorMessage(e2)) });
   };
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -90,6 +99,7 @@ function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange
             <DialogHeader>
               <DialogTitle>Copy your new token</DialogTitle>
               <DialogDescription>This is the only time it’s shown. Store it in the extension now.</DialogDescription>
+              <p className="text-xs text-muted-foreground">{created.expiresAt ? `Expires ${formatDateIST(created.expiresAt)}.` : 'Never expires.'}</p>
             </DialogHeader>
             <div className="flex gap-2">
               <Input readOnly value={created.token} aria-label="API token" className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
@@ -108,6 +118,10 @@ function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange
             </DialogHeader>
             <Field label="Token name" required>
               <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />
+            </Field>
+            <Field label="Expires" hint="Expired tokens stop working. You can hold up to 10 active tokens.">
+              <Select value={expiry} onValueChange={(v) => setExpiry(v as TokenExpiryChoice)}
+                options={TOKEN_EXPIRY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} />
             </Field>
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={() => close(false)}>Cancel</Button>
