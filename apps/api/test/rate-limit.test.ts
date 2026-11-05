@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { authAttempts, passwordResets } from '@tp/db';
-import { LOGIN_EMAIL_LIMIT, LOGIN_IP_LIMIT, check, clientIp, hit, pruneAuthState, rateLimited, release, reset } from '../src/lib/rate-limit';
+import { LOGIN_EMAIL_LIMIT, LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, check, clientIp, hit, pruneAuthState, rateLimited, release, reset } from '../src/lib/rate-limit';
 import { createTestContext, request, signup, uniqueEmail, type TestContext } from './helpers';
 
 let ctx: TestContext;
@@ -71,7 +71,8 @@ describe('rate-limit lib', () => {
     const both = { 'cf-connecting-ip': '198.51.100.7', 'x-forwarded-for': ' 198.51.100.8 , 10.0.0.1' };
     expect(await ip('cloudflare', both)).toBe('198.51.100.7');
     expect(await ip('cloudflare', { 'x-forwarded-for': '198.51.100.8' })).toBeNull();
-    expect(await ip('xff', both)).toBe('198.51.100.8');
+    // 008/FR-022: the right-most hop is the one our proxy appended; left hops are client-supplied.
+    expect(await ip('xff', both)).toBe('10.0.0.1');
     expect(await ip('none', both)).toBeNull(); // untrusted: forged headers are ignored
     expect(await ip('xff', {})).toBeNull();
   });
@@ -176,6 +177,48 @@ describe('login rate limiting', () => {
     expect(blocked.headers.get('retry-after')).toBeTruthy();
     const other = await request(ctx.app, 'POST', '/api/auth/login', { headers: { 'x-forwarded-for': freshIp() }, json: { email: victim.email, password: victim.password } });
     expect(other.status).toBe(200);
+  });
+});
+
+describe('limiter ordering: IP first, then email (#482)', () => {
+  it('a blocked IP does not advance a victim\'s email counter', async () => {
+    const victim = await signup(ctx.app);
+    const ip = freshIp();
+    for (let i = 0; i < LOGIN_IP_LIMIT.limit; i++) {
+      await request(ctx.app, 'POST', '/api/auth/login', { headers: { 'x-forwarded-for': ip }, json: { email: uniqueEmail('spray'), password: 'wrong-pass' } });
+    }
+    // The burnt IP now sprays the victim: every attempt is refused at the IP counter…
+    for (let i = 0; i < LOGIN_EMAIL_LIMIT.limit + 5; i++) {
+      const r = await request(ctx.app, 'POST', '/api/auth/login', { headers: { 'x-forwarded-for': ip }, json: { email: victim.email, password: 'wrong-pass' } });
+      expect(r.status).toBe(429);
+    }
+    // …and the victim's email counter never moved, so the victim signs in fine from anywhere else.
+    expect(await check(ctx.db, victim.email, 'login_email', LOGIN_EMAIL_LIMIT, ctx.clock.now())).toBeNull();
+    expect((await request(ctx.app, 'POST', '/api/auth/login', { headers: { 'x-forwarded-for': freshIp() }, json: { email: victim.email, password: victim.password } })).status).toBe(200);
+  });
+
+  it('an attempt refused by the email limit gives its IP reservation back', async () => {
+    const a = await signup(ctx.app);
+    const ip = freshIp();
+    for (let i = 0; i < LOGIN_EMAIL_LIMIT.limit; i++) {
+      await request(ctx.app, 'POST', '/api/auth/login', { headers: { 'x-forwarded-for': ip }, json: { email: a.email, password: 'wrong-pass' } });
+    }
+    expect((await check(ctx.db, ip, 'login_ip', LOGIN_IP_LIMIT, ctx.clock.now()))!.count).toBe(10);
+    for (let i = 0; i < 5; i++) {
+      expect((await request(ctx.app, 'POST', '/api/auth/login', { headers: { 'x-forwarded-for': ip }, json: { email: a.email, password: 'wrong-pass' } })).status).toBe(429);
+    }
+    expect((await check(ctx.db, ip, 'login_ip', LOGIN_IP_LIMIT, ctx.clock.now()))!.count).toBe(10);
+  });
+
+  it('forgot-password: a blocked IP does not use up a victim\'s reset_email budget', async () => {
+    const victim = await signup(ctx.app);
+    const ip = freshIp();
+    for (let i = 0; i < 20; i++) await request(ctx.app, 'POST', '/api/auth/forgot-password', { headers: { 'x-forwarded-for': ip }, json: { email: uniqueEmail('spray') } });
+    for (let i = 0; i < 5; i++) {
+      expect((await request(ctx.app, 'POST', '/api/auth/forgot-password', { headers: { 'x-forwarded-for': ip }, json: { email: victim.email } })).status).toBe(429);
+    }
+    expect(await check(ctx.db, victim.email, 'reset_email', RESET_EMAIL_LIMIT, ctx.clock.now())).toBeNull();
+    expect((await request(ctx.app, 'POST', '/api/auth/forgot-password', { headers: { 'x-forwarded-for': freshIp() }, json: { email: victim.email } })).status).toBe(200);
   });
 });
 

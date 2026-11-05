@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
-import { memberships, users } from '@tp/db';
+import { and, eq, inArray } from 'drizzle-orm';
+import { activityLog, memberships, users } from '@tp/db';
 import { createTestContext, request, seedOrgWithRoles, signup, uniqueEmail, TEST_APP_URL, type TestContext } from './helpers';
 
 let ctx: TestContext;
@@ -537,16 +537,39 @@ describe('DELETE /api/org/members/me — leave organization (002/FR-027)', () =>
     }
   });
 
-  it('two owners demoting / removing each other at the same time keep one Owner', async () => {
+  it('two owners demoting / removing each other at the same time: exactly one wins (200), the other gets 409 last_owner', async () => {
+    for (let round = 0; round < 3; round++) {
+      const a = await seedOrgWithRoles(ctx.app);
+      const [o1, o2] = [a.owner, a.bidManager];
+      await request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'owner' } });
+      const res = await Promise.all([
+        request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'viewer' } }),
+        request(ctx.app, 'DELETE', `/api/org/members/${o1.me.user.id}`, { cookie: o2.cookie }),
+      ]);
+      const detail = res.map((r) => `${r.status} ${r.text}`).join(' | ');
+      expect(res.map((r) => r.status).sort(), detail).toEqual([200, 409]);
+      expect(res.find((r) => r.status === 409)!.body.error.code).toBe('last_owner');
+      const owners = await ctx.db.select().from(memberships).where(and(eq(memberships.orgId, a.orgId), eq(memberships.role, 'owner')));
+      expect(owners, detail).toHaveLength(1);
+      // the loser left no trace in the activity log
+      const acts = await ctx.db.select({ action: activityLog.action }).from(activityLog)
+        .where(and(eq(activityLog.orgId, a.orgId), inArray(activityLog.action, ['member.role_changed', 'member.removed'])));
+      expect(acts.map((x) => x.action).sort(), detail).toEqual(['member.role_changed', res[0].status === 200 ? 'member.role_changed' : 'member.removed'].sort());
+    }
+  });
+
+  it('two owners removing the same member at the same time: one 200, one 404, one activity entry', async () => {
     const a = await seedOrgWithRoles(ctx.app);
-    const [o1, o2] = [a.owner, a.bidManager];
-    await request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'owner' } });
-    const res = await Promise.all([
-      request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'viewer' } }),
-      request(ctx.app, 'DELETE', `/api/org/members/${o1.me.user.id}`, { cookie: o2.cookie }),
-    ]);
-    const owners = await ctx.db.select().from(memberships).where(and(eq(memberships.orgId, a.orgId), eq(memberships.role, 'owner')));
-    expect(owners.length, res.map((r) => `${r.status} ${r.text}`).join(' | ')).toBeGreaterThanOrEqual(1);
+    const o2 = a.bidManager;
+    await request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: a.owner.cookie, json: { role: 'owner' } });
+    const target = a.analyst.me.user.id;
+    const res = await Promise.all([a.owner, o2].map((o) => request(ctx.app, 'DELETE', `/api/org/members/${target}`, { cookie: o.cookie })));
+    expect(res.map((r) => r.status).sort()).toEqual([200, 404]);
+    const removed = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, a.orgId), eq(activityLog.action, 'member.removed')));
+    expect(removed).toHaveLength(1);
+    // and a role change for a member who is gone is a 404, not a phantom success
+    const gone = await request(ctx.app, 'PATCH', `/api/org/members/${target}`, { cookie: a.owner.cookie, json: { role: 'viewer' } });
+    expect(gone.status).toBe(404);
   });
 
   it('sets the remembered org to the next org, so the next sign-in does not resume the org that was left', async () => {

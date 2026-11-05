@@ -94,6 +94,7 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/workspaces/:id/overrides', min: 'bid_manager' },
   { method: 'DELETE', path: '/api/workspaces/:id/overrides/:itemId', min: 'bid_manager' },
   { method: 'POST', path: '/api/workspaces/:id/comments', min: 'analyst' },
+  { method: 'DELETE', path: '/api/workspaces/:id/comments/:commentId', min: 'viewer' }, // author-or-Bid-Manager+ check is in the handler (workspace.test.ts)
   { method: 'PUT', path: '/api/workspaces/:id/assist-values', min: 'analyst' },
   { method: 'POST', path: '/api/workspaces/:id/submitted', min: 'analyst' },
   { method: 'PUT', path: '/api/annexure-templates/:key', min: 'bid_manager' },

@@ -82,7 +82,7 @@ async function addChip(page: Page, placeholder: string | RegExp, value: string) 
   await input.press('Enter');
 }
 async function pickState(page: Page, state: string) {
-  await sheet(page).getByRole('button', { name: 'States', exact: true }).click();
+  await sheet(page).getByRole('button', { name: /^States\b/ }).click();
   await page.getByRole('textbox', { name: 'Search States' }).fill(state);
   await page.getByRole('option', { name: state, exact: true }).locator('label').click();
   await page.keyboard.press('Escape'); // closes the popover only

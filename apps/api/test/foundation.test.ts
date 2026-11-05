@@ -14,6 +14,10 @@ import { slugify } from '../src/lib/slug';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import type { BlobStore } from '../src/deps';
 import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
+import { loadConfig } from '../src/env';
+import {
+  HttpError, payloadTooLarge, paymentRequired, rateLimitMessage, serviceUnavailable, tooManyRequests, unprocessable,
+} from '../src/lib/errors';
 
 describe('crypto', () => {
   it('hashes and verifies passwords with PBKDF2', async () => {
@@ -130,7 +134,64 @@ describe('provider adapters', () => {
   it('scheduled pipeline runs every step', async () => {
     const deps = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     const report = await runScheduledJobs(deps);
-    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup']);
+    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup', 'rate-limit-cleanup']);
+  });
+});
+
+describe('error helpers (008/FR-018, FR-021, FR-040)', () => {
+  it('paymentRequired → 402 with code, message and details', () => {
+    const e = paymentRequired('plan_limit_reached', 'Your Starter plan allows 5 watchlists.', { limit: 'watchlists', used: 5, max: 5 });
+    expect(e).toBeInstanceOf(HttpError);
+    expect(e.status).toBe(402);
+    expect(e.toJSON()).toEqual({ error: { code: 'plan_limit_reached', message: 'Your Starter plan allows 5 watchlists.', details: { limit: 'watchlists', used: 5, max: 5 } } });
+  });
+
+  it('tooManyRequests → 429 rate_limited with {rule, retryAfter} and a Retry-After header', () => {
+    const e = tooManyRequests('watchlist.preview.user', 42);
+    expect(e.status).toBe(429);
+    expect(e.code).toBe('rate_limited');
+    expect(e.details).toEqual({ rule: 'watchlist.preview.user', retryAfter: 42 });
+    expect(e.headers).toEqual({ 'Retry-After': '42' });
+    expect(e.message).toBe('Too many requests. Try again in 42 seconds.');
+    // Fractions round up and never go below 1 s.
+    expect(tooManyRequests('api.ip', 0.2).headers).toEqual({ 'Retry-After': '1' });
+    expect(tooManyRequests('x', 5, 'Custom').message).toBe('Custom');
+  });
+
+  it('rate-limit messages: auth rules in minutes ("attempts"), others in seconds up to 2 min', () => {
+    expect(rateLimitMessage('auth.fail.email', 840)).toBe('Too many attempts. Try again in 14 minutes.');
+    expect(rateLimitMessage('auth.fail.email', 30)).toBe('Too many attempts. Try again in 1 minute.');
+    expect(rateLimitMessage('api.user', 1)).toBe('Too many requests. Try again in 1 second.');
+    expect(rateLimitMessage('api.user', 119)).toBe('Too many requests. Try again in 119 seconds.');
+    expect(rateLimitMessage('upload.org', 3000)).toBe('Too many requests. Try again in 50 minutes.');
+  });
+
+  it('payloadTooLarge 413, unprocessable 422, serviceUnavailable 503', () => {
+    expect(payloadTooLarge('Files can be at most 20 MB.').toJSON()).toEqual({ error: { code: 'payload_too_large', message: 'Files can be at most 20 MB.' } });
+    expect(payloadTooLarge().status).toBe(413);
+    const u = unprocessable('document_too_long', 'This document has 412 pages; the limit is 300.', { pages: 412 });
+    expect([u.status, u.code, u.details]).toEqual([422, 'document_too_long', { pages: 412 }]);
+    const s = serviceUnavailable('gem_busy', 'GeM is busy — we’ll retry shortly');
+    expect([s.status, s.code, s.message]).toEqual([503, 'gem_busy', 'GeM is busy — we’ll retry shortly']);
+    expect(serviceUnavailable().code).toBe('service_unavailable');
+  });
+});
+
+describe('ops config and deps (008/T013)', () => {
+  it('reads the ops env keys with safe defaults', () => {
+    const d = loadConfig({});
+    expect(d).toMatchObject({ adminToken: null, sentryDsn: null, logLevel: 'info', healthIngestionMaxAgeMin: 120, manualSyncCooldownMin: 10, trustProxy: 'none' });
+    const c = loadConfig({ ADMIN_TOKEN: 'adm', SENTRY_DSN: 'https://k@sentry.io/1', LOG_LEVEL: 'DEBUG', HEALTH_INGESTION_MAX_AGE_MIN: '90', MANUAL_SYNC_COOLDOWN_MIN: '0', TRUST_PROXY: '1' });
+    expect(c).toMatchObject({ adminToken: 'adm', sentryDsn: 'https://k@sentry.io/1', logLevel: 'debug', healthIngestionMaxAgeMin: 90, manualSyncCooldownMin: 0, trustProxy: 'xff' });
+    expect(loadConfig({ LOG_LEVEL: 'verbose', MANUAL_SYNC_COOLDOWN_MIN: 'soon' })).toMatchObject({ logLevel: 'info', manualSyncCooldownMin: 10 });
+  });
+
+  it('createDeps wires a rate limiter, a no-op error reporter and a no-op GeM lease', async () => {
+    const deps = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
+    expect(typeof deps.rateLimiter.hit).toBe('function');
+    expect(typeof deps.rateLimiter.reset).toBe('function');
+    expect(() => deps.errors.capture(new Error('boom'), { rid: 'r1' })).not.toThrow();
+    await expect(deps.gemLease.acquire(25_000)).resolves.toBeUndefined();
   });
 });
 

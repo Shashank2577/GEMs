@@ -62,6 +62,12 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
 /** Minutes a password reset link stays valid. */
 export const PASSWORD_RESET_TTL_MINUTES = 60;
 
+/** Human duration of a reset link for emails and UI copy: 60 → "1 hour", 120 → "2 hours", 90 → "90 minutes". */
+export function resetTtlText(minutes: number = PASSWORD_RESET_TTL_MINUTES): string {
+  if (minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
 // ───────────── Sessions (002/FR-012) ─────────────
 
 export interface SessionSummary {
@@ -143,7 +149,15 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = { inApp: true, emai
  * created, so `inApp` is always `sent`.
  */
 export type TestAlertOutcome = 'sent' | 'skipped' | 'failed' | 'off';
-export interface TestAlertResult { inApp: 'sent'; email: TestAlertOutcome; whatsapp: TestAlertOutcome }
+/** Why a channel was `skipped`: the provider is not configured on this server, or the account has no mobile number. */
+export type TestAlertSkipReason = 'not_configured' | 'no_phone';
+export interface TestAlertResult {
+  inApp: 'sent';
+  email: TestAlertOutcome;
+  whatsapp: TestAlertOutcome;
+  /** Present only when a channel was `skipped` (optional, added after the first release: older servers omit it). */
+  skipReasons?: Partial<Record<'email' | 'whatsapp', TestAlertSkipReason>>;
+}
 export const TEST_ALERT_TITLE = 'Test alert from TenderPilot';
 
 // ───────────── API tokens ─────────────

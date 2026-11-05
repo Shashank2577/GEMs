@@ -541,8 +541,8 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   `specs/001-gem-tender-copilot/contracts/api.md` (it parses the contract and fails on an uncovered route), asserting
   404 and no mutation for cross-org ids.
 - **FR-017** *(gap)*: The API MUST provide a Postgres-backed fixed-window rate limiter: table `rate_limits (key text,
-  window_start timestamptz, count int, primary key (key, window_start))`, `lib/rate-limit.ts#hit(db, key, limit,
-  windowSec)` using one `INSERT … ON CONFLICT DO UPDATE SET count = count + 1 RETURNING count`, exposed through
+  window_start timestamptz, count int, primary key (key, window_start))`, `lib/rate-limiter.ts#hit(db, key, limit,
+  windowSec)` (`lib/rate-limit.ts` holds spec 002's auth-attempt counters) using one `INSERT … ON CONFLICT DO UPDATE SET count = count + 1 RETURNING count`, exposed through
   `AppDeps.rateLimiter` (memory implementation for unit tests).
 - **FR-018** *(gap)*: A `rateLimit(rule)` middleware MUST answer over-limit requests with **429**
   `{error:{code:"rate_limited", message:"Too many requests. Try again in N seconds." | "Too many attempts. Try again in
@@ -570,8 +570,10 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   cap (+64 KB multipart overhead) with 413 `payload_too_large` before reading the body; requests without
   `content-length` on upload routes MUST be read with a streaming byte counter that aborts at the cap. Caps: vault
   20 MB, tender documents 25 MB, JSON bodies 1 MB.
-- **FR-022** *(gap)*: The client IP MUST come from `cf-connecting-ip` on Workers, the socket address on Node, and
-  `x-forwarded-for` (first hop) only when `TRUST_PROXY=1`.
+- **FR-022** *(gap)*: The client IP MUST come from `cf-connecting-ip` on Workers (`TRUST_PROXY=cloudflare`, which only
+  the Worker may use; the Node server refuses to start with it), the socket address on Node, and `x-forwarded-for`
+  (right-most hop, i.e. the one our own proxy appended) only when `TRUST_PROXY=1`. A loopback socket address counts as
+  unknown (per-IP rules skipped; logged once in production). IPv6 addresses are bucketed by /64.
 - **FR-023** *(release gate)*: Spec 002 FR-010, FR-011, FR-018, FR-028 (and FR-012, FR-037 for SHOULD) MUST be passing
   their acceptance scenarios before the first paid plan is activated.
 
