@@ -1,0 +1,65 @@
+# 008/US3 developer API examples
+# Node stack on :8790 (apps/api, tenderpilot_e2e_us3), captured 2026-11-05T03:52:58.274Z
+# ">" = request, "<" = status and headers, then the response body (trimmed)
+
+### 429 rate_limited (31st watchlist preview within 60 s, rule watchlist.preview.user)
+> POST /api/watchlists/preview
+> body {"criteria":{"keywords":["laptop"]}} — after 30 previews in the same minute
+< 429
+< retry-after: 3
+< content-type: application/json
+< x-request-id: 59d02047-2b22-4203-a5e1-f37729637f19
+{"error":{"code":"rate_limited","message":"Too many requests. Try again in 3 seconds.","details":{"rule":"watchlist.preview.user","retryAfter":3}}}
+
+### 429 rate_limited (11th login within 15 min, rule auth.fail.email — even with the right password)
+> POST /api/auth/login
+> after 10 wrong passwords for the same email
+< 429
+< retry-after: 900
+< content-type: application/json
+< x-request-id: 1328687d-a394-4925-913d-214edcc4fa86
+{"error":{"code":"rate_limited","message":"Too many attempts. Try again in 15 minutes.","details":{"rule":"auth.fail.email","retryAfter":900}}}
+
+### 413 payload_too_large (declared 30 MB vault upload, answered in 7 ms without reading the body)
+> POST /api/vault
+> content-length: 31457280
+< 413
+< content-type: application/json
+< x-request-id: 1f1d1afd-a9f8-4274-b6a2-374ea7a409ed
+{"error":{"code":"payload_too_large","message":"Files can be at most 20 MB. Compress the scan or split it and try again.","details":{"maxBytes":21037056}}}
+
+### 413 payload_too_large (1.1 MB JSON body)
+> PATCH /api/me
+> body {"name":"xxxx… (1.1 MB)"}
+< 413
+< content-type: application/json
+< x-request-id: 90802f9c-238b-4f1c-8121-7406815e6ce3
+{"error":{"code":"payload_too_large","message":"The request body is too large (at most 1 MB).","details":{"maxBytes":1048576}}}
+
+### 200 org A reads its own workspace (control)
+> GET /api/workspaces/2b6bc45a-0973-4597-a173-6815492552d7
+> cookie: org A
+< 200
+< content-type: application/json
+< x-request-id: 7614cf1f-dcf0-480f-8cfb-9d5e195f3465
+{"workspace":{"id":"2b6bc45a-0973-4597-a173-6815492552d7","tenderId":"c47cefca-09f0-4b16-afe2-4ec44341bb96","stage":"won","owner":{"id":"26b9aa01-0191-474d-9f68 …
+
+### 404 not_found (org B asks for org A’s workspace)
+> GET /api/workspaces/2b6bc45a-0973-4597-a173-6815492552d7
+> cookie: org B
+< 404
+< content-type: application/json
+< x-request-id: 3d357d14-14eb-4bc8-bdf7-8eb17a83e69f
+{"error":{"code":"not_found","message":"Bid workspace not found"}}
+
+### 404 not_found (org B patches org A’s workspace)
+> PATCH /api/workspaces/2b6bc45a-0973-4597-a173-6815492552d7
+> cookie: org B, body {"stage":"preparing"}
+< 404
+< content-type: application/json
+< x-request-id: 4d62c29e-6ccd-4815-9844-f906cb37898e
+{"error":{"code":"not_found","message":"Bid workspace not found"}}
+
+### Demo isolation (GET /api/tenders?status=all&pageSize=100)
+org A (demo seeded): total 41
+org B (no demo):     total 1 → GEM/2026/B/7123456
