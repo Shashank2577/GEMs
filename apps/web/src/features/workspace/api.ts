@@ -12,7 +12,7 @@ export const wsKeys = {
   templates: ['annexure-templates'] as const,
 };
 
-export type AssistResponse = AssistPayload & { stage: string; workspaceUrl: string; readiness: { percent: number; blockers: number } };
+export type AssistResponse = AssistPayload & { stage: string; workspaceUrl: string; readiness: { percent: number; blockers: number; analysed: boolean } };
 
 export function useWorkspace(id: string) {
   return useQuery({ queryKey: wsKeys.detail(id), queryFn: () => api.get<WorkspaceDetail>(`/workspaces/${id}`) });

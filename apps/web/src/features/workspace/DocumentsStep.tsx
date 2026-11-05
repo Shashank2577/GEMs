@@ -24,7 +24,7 @@ export function DocumentsStep({ data, onNext, onOpenAnnexure }: { data: Workspac
   const attention = r.items.filter((i) => i.state === 'missing' || i.state === 'expired' || i.state === 'expiring');
   const shown = filter === 'attention' ? attention : filter === 'ready' ? r.items.filter((i) => !attention.includes(i)) : r.items;
 
-  if (!data.analysis) {
+  if (!data.analysis || !r.analysed) {
     return <EmptyState icon={FileSignature} title="No checklist yet" body="Analyse the tender to get the list of documents this bid needs." action={<Button asChild><Link to={`/tenders/${data.tender.id}`}>Analyse tender <ArrowRight /></Link></Button>} />;
   }
 
