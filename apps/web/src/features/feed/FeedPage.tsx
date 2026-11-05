@@ -6,21 +6,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  BellPlus, FileStack, LayoutGrid, Loader2, Radar, RefreshCw, Rows3, Search, SlidersHorizontal, X,
+  BellPlus, BookmarkPlus, FileStack, LayoutGrid, Loader2, MoreHorizontal, Pencil, Radar, RefreshCw, Rows3, Search, SlidersHorizontal, Trash2, X,
 } from 'lucide-react';
+import { SAVED_VIEW_LIMIT, SAVED_VIEW_NAME_MAX, type SavedViewDto, type TenderListResponse } from '@tp/core/contracts/identify';
 import {
-  Badge, Button, EmptyState, ErrorState, Input, Kbd, PageHeader, Segmented, Select, Sheet, SheetBody, SheetContent,
-  SheetFooter, SheetHeader, SheetTitle, Switch, Label, Tooltip,
+  Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DropdownMenu,
+  DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, ErrorState, Input, Kbd, PageHeader, Segmented, Select, Sheet,
+  SheetBody, SheetContent, SheetFooter, SheetHeader, SheetTitle, Switch, Label, Tooltip, toast,
 } from '@/components/ui';
+import { api } from '@/lib/api';
 import { RoleGate, useAuth } from '@/lib/auth';
 import { formatINR, formatNumberIN, pluralize } from '@/lib/format';
 import { useIsMobile, useLocalStorage } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { useWatchlists } from '@/features/watchlists/api';
-import { useSyncNow, useTenderFeed } from './api';
+import { useCreateView, useDeleteView, useSavedViews, useSyncNow, useTenderFeed, useUpdateView } from './api';
+import { asBidNumber, bidJumpTarget } from './bidJump';
 import { FilterRail } from './FilterRail';
 import {
-  activeFilterCount, DEFAULT_FILTERS, filtersFromParams, filtersToCriteria, filtersToParams, isPristine, SORT_OPTIONS, VIEWS, type FeedFilters,
+  activeFilterCount, DEFAULT_FILTERS, filtersFromParams, filtersToCriteria, filtersToParams, filtersToViewParams, isPristine, sameFilters, SORT_OPTIONS,
+  STATUS_OPTIONS, viewParamsToFilters, VIEWS, type FeedFilters,
 } from './filters';
 import { SyncHealth } from './SyncHealth';
 import { TenderCard, TenderCardSkeleton } from './TenderCard';
@@ -35,6 +40,41 @@ function useDebounced<T>(value: T, ms = 300) {
   return v;
 }
 
+/** Name dialog for "Save view" and "Rename". */
+function ViewNameDialog({ open, onOpenChange, title, description, initial, submitLabel, busy, error, onSubmit }: {
+  open: boolean; onOpenChange: (o: boolean) => void; title: string; description: string; initial: string; submitLabel: string;
+  busy: boolean; error: string | null; onSubmit: (name: string) => void;
+}) {
+  const [name, setName] = useState(initial);
+  useEffect(() => { if (open) setName(initial); }, [open, initial]);
+  const trimmed = name.trim();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="sm">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <form id="view-name-form" onSubmit={(e) => { e.preventDefault(); if (trimmed) onSubmit(trimmed); }} noValidate>
+          <Label htmlFor="view-name">View name</Label>
+          <Input
+            id="view-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={SAVED_VIEW_NAME_MAX} autoFocus
+            placeholder="e.g. Maharashtra laptops closing soon" className="mt-1.5"
+            aria-invalid={!!error} aria-describedby="view-name-hint"
+          />
+          <p id="view-name-hint" className={cn('mt-1.5 text-xs', error ? 'text-danger' : 'text-muted-foreground')} role={error ? 'alert' : undefined}>
+            {error ?? `${name.length}/${SAVED_VIEW_NAME_MAX} characters`}
+          </p>
+        </form>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="submit" form="view-name-form" loading={busy} disabled={!trimmed}>{submitLabel}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ActiveChips({ f, onChange }: { f: FeedFilters; onChange: (p: Partial<FeedFilters>) => void }) {
   const chips: { key: string; label: string; clear: () => void }[] = [];
   f.states.forEach((s) => chips.push({ key: `s-${s}`, label: s, clear: () => onChange({ states: f.states.filter((x) => x !== s) }) }));
@@ -46,6 +86,7 @@ function ActiveChips({ f, onChange }: { f: FeedFilters; onChange: (p: Partial<Fe
   }
   f.verdicts.forEach((v) => chips.push({ key: `v-${v}`, label: v === 'none' ? 'Not analysed' : v === 'no_go' ? 'No-Go' : v === 'go' ? 'Go' : 'Review', clear: () => onChange({ verdicts: f.verdicts.filter((x) => x !== v) }) }));
   f.bidTypes.forEach((v) => chips.push({ key: `b-${v}`, label: v === 'ra' ? 'Reverse auction' : v[0].toUpperCase() + v.slice(1), clear: () => onChange({ bidTypes: f.bidTypes.filter((x) => x !== v) }) }));
+  if (f.status !== 'open') chips.push({ key: 'status', label: `Status: ${STATUS_OPTIONS.find((o) => o.value === f.status)?.label ?? f.status}`, clear: () => onChange({ status: 'open' }) });
   if (f.watchlistId) chips.push({ key: 'wl', label: 'One watchlist', clear: () => onChange({ watchlistId: null }) });
   if (!chips.length) return null;
   return (
@@ -74,6 +115,15 @@ export default function FeedPage() {
   const debouncedQ = useDebounced(q, 350);
   const searchRef = useRef<HTMLInputElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
+
+  const savedViews = useSavedViews();
+  const createView = useCreateView();
+  const updateView = useUpdateView();
+  const deleteView = useDeleteView();
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [renaming, setRenaming] = useState<SavedViewDto | null>(null);
+  const [deleting, setDeleting] = useState<SavedViewDto | null>(null);
+  const [viewError, setViewError] = useState<string | null>(null);
 
   const update = (patch: Partial<FeedFilters>) => setParams(filtersToParams({ ...filters, ...patch }), { replace: true });
 
@@ -105,7 +155,46 @@ export default function FeedPage() {
   const total = first?.total ?? 0;
   const facets = first?.facets;
   const nFilters = activeFilterCount(filters);
-  const activeView = VIEWS.find((v) => v.match(filters))?.key;
+  const myViews = savedViews.data?.items ?? [];
+  const activeMine = myViews.find((v) => sameFilters(viewParamsToFilters(v.params), filters));
+  const activePersonal = activeMine?.id;
+  const activeView = activePersonal ? undefined : VIEWS.find((v) => v.match(filters))?.key;
+  // Keep the active personal tab visible inside the scrolling tab strip.
+  useEffect(() => {
+    if (activePersonal) document.querySelector(`[data-view-tab="${activePersonal}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activePersonal, myViews.length]);
+  const viewLimit = savedViews.data?.limit ?? SAVED_VIEW_LIMIT;
+  const atViewLimit = myViews.length >= viewLimit;
+
+  const viewFailed = (e: unknown) => {
+    const err = e as { code?: string; message?: string };
+    setViewError(err.code === 'view_exists' ? 'You already have a view with that name.' : err.message ?? 'Could not save the view.');
+  };
+  const saveView = (name: string) => createView.mutate({ name, params: filtersToViewParams(filters) }, {
+    onSuccess: () => { setSaveOpen(false); toast.success(`Saved view “${name}”`); },
+    onError: viewFailed,
+  });
+  const renameView = (name: string) => renaming && updateView.mutate({ id: renaming.id, name }, {
+    onSuccess: () => { setRenaming(null); toast.success('View renamed'); },
+    onError: viewFailed,
+  });
+  const removeView = () => deleting && deleteView.mutate(deleting.id, {
+    onSuccess: () => { setDeleting(null); toast.success(`Deleted view “${deleting.name}”`); },
+    onError: (e) => { setDeleting(null); toast.error((e as Error).message); },
+  });
+
+  // Enter on an exact bid number opens that tender when exactly one exists (FR-037).
+  const onSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    const bid = asBidNumber(q);
+    if (!bid) return;
+    e.preventDefault();
+    try {
+      const r = await api.get<TenderListResponse>('/tenders', { q: bid, status: 'all', includeDismissed: 1, pageSize: 5 });
+      const target = bidJumpTarget(q, r.items);
+      if (target) navigate(target);
+    } catch { /* stay on the feed; the normal (debounced) search still runs */ }
+  };
   const hasWatchlists = (watchlists.data?.total ?? 0) > 0;
   const showTable = layout === 'table' && !isMobile;
 
@@ -152,22 +241,62 @@ export default function FeedPage() {
         }
       />
 
-      {/* Saved views */}
-      <div className="-mx-4 mb-4 flex items-center gap-3 overflow-x-auto px-4 pb-1 scrollbar-thin sm:mx-0 sm:px-0" role="tablist" aria-label="Saved views">
-        {VIEWS.map((v) => (
-          <button
-            key={v.key}
-            role="tab"
-            aria-selected={activeView === v.key}
-            onClick={() => setParams(filtersToParams(v.apply(filters)), { replace: true })}
-            className={cn(
-              'h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring',
-              activeView === v.key ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-          >
-            {v.label}
-          </button>
-        ))}
+      {/* Views: built-in, then personal (FR-035) */}
+      <div className="-mx-4 mb-4 flex items-center gap-3 px-4 sm:mx-0 sm:px-0">
+        <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto pb-1 scrollbar-thin" role="tablist" aria-label="Saved views">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              role="tab"
+              aria-selected={activeView === v.key}
+              onClick={() => setParams(filtersToParams(v.apply(filters)), { replace: true })}
+              className={cn(
+                'h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring',
+                activeView === v.key ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+          {myViews.map((v) => {
+            const on = activePersonal === v.id;
+            return (
+              <button
+                key={v.id}
+                role="tab"
+                data-view-tab={v.id}
+                aria-selected={on}
+                onClick={() => setParams(filtersToParams(viewParamsToFilters(v.params)), { replace: true })}
+                className={cn(
+                  'h-8 max-w-[12rem] shrink-0 truncate rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring',
+                  on ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                {v.name}
+              </button>
+            );
+          })}
+        </div>
+        {activeMine && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={`Options for view ${activeMine.name}`}>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => { setViewError(null); setRenaming(activeMine); }}><Pencil />Rename</DropdownMenuItem>
+              <DropdownMenuItem destructive onSelect={() => setDeleting(activeMine)}><Trash2 />Delete</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <Tooltip content={atViewLimit ? `You can save up to ${viewLimit} views — delete one first.` : 'Save the current search and filters as a tab'}>
+          <span className="shrink-0">
+            <Button variant="outline" size="sm" disabled={atViewLimit} onClick={() => { setViewError(null); setSaveOpen(true); }}>
+              <BookmarkPlus />Save view
+            </Button>
+          </span>
+        </Tooltip>
       </div>
 
       <div className="flex gap-8">
@@ -187,6 +316,7 @@ export default function FeedPage() {
                   ref={searchRef}
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={onSearchKeyDown}
                   placeholder="Search item, buyer, bid number, city…"
                   aria-label="Search tenders"
                   leading={<Search />}
@@ -297,6 +427,22 @@ export default function FeedPage() {
           )}
         </div>
       </div>
+
+      <ViewNameDialog
+        open={saveOpen} onOpenChange={setSaveOpen} title="Save view" initial=""
+        description="Saves your current search, filters and sort as a personal tab. Only you can see it."
+        submitLabel="Save view" busy={createView.isPending} error={viewError} onSubmit={saveView}
+      />
+      <ViewNameDialog
+        open={!!renaming} onOpenChange={(o) => !o && setRenaming(null)} title="Rename view" initial={renaming?.name ?? ''}
+        description="Only the name changes; the filters stay as they are."
+        submitLabel="Rename" busy={updateView.isPending} error={viewError} onSubmit={renameView}
+      />
+      <ConfirmDialog
+        open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)} title={`Delete “${deleting?.name ?? ''}”?`}
+        description="The tab disappears for you. Tenders and watchlists are not affected."
+        confirmLabel="Delete view" loading={deleteView.isPending} onConfirm={removeView}
+      />
 
       {/* Mobile / tablet filters */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

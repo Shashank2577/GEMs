@@ -25,7 +25,7 @@ export function Logo({ className, collapsed, size = 'md' }: { className?: string
       <LogoMark className={size === 'lg' ? 'size-9' : 'size-7'} />
       {!collapsed && (
         <span className={cn('font-semibold tracking-tight', size === 'lg' ? 'text-lg' : 'text-[15px]')}>
-          Tender<span className="text-primary">Pilot</span>
+          Tender<span className="text-primary dark:text-indigo-300">Pilot</span>
         </span>
       )}
     </span>

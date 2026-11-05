@@ -1,5 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { IngestionRunDto, IngestionRunsResponse, TenderListResponse } from '@tp/core/contracts/identify';
+import type { IngestionRunDto, IngestionRunsResponse, SavedViewDto, TenderListResponse } from '@tp/core/contracts/identify';
 import { api } from '@/lib/api';
 import { toast } from '@/components/ui';
 import { pluralize } from '@/lib/format';
@@ -78,5 +78,37 @@ export function useDismiss() {
   return useMutation({
     mutationFn: ({ id, undo }: { id: string; undo?: boolean }) => api.post<{ ok: true; dismissed: boolean }>(`/tenders/${id}/dismiss`, { undo: !!undo }),
     onSuccess: () => qc.invalidateQueries({ queryKey: feedKeys.all }),
+  });
+}
+
+// ───────────── Personal saved views (FR-035) ─────────────
+
+export const viewKeys = { all: ['saved-views'] as const };
+
+export function useSavedViews() {
+  return useQuery({ queryKey: viewKeys.all, queryFn: () => api.get<{ items: SavedViewDto[]; total: number; limit: number }>('/views') });
+}
+
+export function useCreateView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { name: string; params: Record<string, string[]> }) => api.post<SavedViewDto>('/views', v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: viewKeys.all }),
+  });
+}
+
+export function useUpdateView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: string; name?: string; params?: Record<string, string[]> }) => api.patch<SavedViewDto>(`/views/${id}`, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: viewKeys.all }),
+  });
+}
+
+export function useDeleteView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<{ ok: true }>(`/views/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: viewKeys.all }),
   });
 }

@@ -9,9 +9,8 @@ import { errorMessage } from '@/lib/api';
 
 function OrgChip({ name, className }: { name: string; className?: string }) {
   return (
-    <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm', className)}>
-      {initials(name, true)}
-    </span>
+    // Initials are drawn by CSS so they are decorative: not part of the button's visible label text (WCAG 2.5.3).
+    <span aria-hidden data-initials={initials(name, true)} className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm before:content-[attr(data-initials)]", className)} />
   );
 }
 
@@ -23,13 +22,14 @@ export function OrgSwitcher({ collapsed, className }: { collapsed?: boolean; cla
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn('group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring', collapsed && 'justify-center', className)}
-        aria-label={`Organization: ${me.org.name}. Switch organization`}
+        aria-label={`Organization: ${me.org.name} ${me.org.plan} plan · ${ROLE_LABEL[me.role]}. Switch organization`}
       >
         <OrgChip name={me.org.name} />
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-semibold leading-tight">{me.org.name}</span>
+              {' '}
               <span className="block truncate text-2xs capitalize text-muted-foreground">{me.org.plan} plan · {ROLE_LABEL[me.role]}</span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />

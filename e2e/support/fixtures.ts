@@ -180,6 +180,18 @@ export async function a11y(page: Page, name: string, opts: { spec?: string; stor
   return results;
 }
 
+/** Lightweight axe check (WCAG 2.1 A/AA): fails the test on any serious or critical violation; no evidence file. */
+export async function checkA11y(page: Page, opts: { include?: string[]; exclude?: string[]; disableRules?: string[] } = {}) {
+  let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
+  for (const sel of opts.include ?? []) builder = builder.include(sel);
+  for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
+  if (opts.disableRules?.length) builder = builder.disableRules(opts.disableRules);
+  const results = await builder.analyze();
+  const blocking = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+  expect(blocking.map((v) => ({ id: v.id, impact: v.impact, help: v.help, targets: v.nodes.slice(0, 5).map((n) => n.target.join(' ')) })), `axe serious/critical violations on ${page.url()}`).toEqual([]);
+  return results;
+}
+
 /** `test` with an auto fixture that disposes every context opened by inviteAs(), even when the test fails. */
 export const test = base.extend<{ _disposeInvited: void }>({
   _disposeInvited: [async ({}, use) => {
