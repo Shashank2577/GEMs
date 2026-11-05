@@ -23,6 +23,8 @@ export const TENDER_DOC_KIND_LABELS: Record<TenderDocKind, string> = {
 
 /** Max upload size for tender documents. */
 export const MAX_TENDER_DOC_BYTES = 25 * 1024 * 1024;
+/** Pages read from one uploaded/fetched PDF (NFR-005): keeps text extraction inside the 128 MB Worker budget. */
+export const MAX_EXTRACT_PAGES = 150;
 
 /** POST /analyses/:id/override */
 export const overrideFactorInputSchema = z.object({
@@ -47,7 +49,9 @@ export const STALE_REASONS = ['corrigendum', 'document_added', 'document_removed
 export type StaleReason = (typeof STALE_REASONS)[number];
 
 /** Non-blocking upload warnings (FR-010). */
-export interface TenderDocumentWarning { code: 'bid_number_mismatch'; found: string }
+export type TenderDocumentWarning =
+  | { code: 'bid_number_mismatch'; found: string }
+  | { code: 'pages_truncated'; analysed: number; total: number };
 
 /** Tender document (GeM-fetched when orgId is null, else uploaded by the org). Text is omitted. */
 export interface TenderDocumentDto {

@@ -33,6 +33,8 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
         toast.success(`${d.fileName} uploaded`, { description: pagesRead, action });
         // FR-010: the document is stored either way; warn separately that it may belong to another bid.
         const mismatch = d.warnings?.find((w) => w.code === 'bid_number_mismatch');
+        const truncated = d.warnings?.find((w) => w.code === 'pages_truncated');
+        if (truncated) toast.warning(`Only the first ${truncated.analysed} of ${truncated.total} pages were read`, { description: 'Long documents are capped so they can be processed. Upload the key sections (eligibility, ATC) as a separate PDF if they are later in the file.' });
         if (mismatch) toast.warning(`This PDF looks like ${mismatch.found}, not ${bidNumber || 'this bid'}`, { description: 'Check that you uploaded the right document.' });
       },
       onError: (e) => toast.error(errorMessage(e)),

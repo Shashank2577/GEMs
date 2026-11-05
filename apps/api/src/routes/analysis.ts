@@ -52,11 +52,11 @@ analysisRoutes.post('/tenders/:id/documents', requireRole('analyst'), async (c) 
   if (!file || typeof file === 'string') throw new HttpError(400, 'validation_error', 'Choose a PDF file to upload', { fields: { file: 'Required' } });
   const kind = parseWith(z.object({ kind: tenderDocKindSchema.default('bid') }), { kind: typeof body.kind === 'string' && body.kind ? body.kind : undefined }, 'form').kind;
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const { doc, tender } = await uploadTenderDocument(c.var.deps, {
+  const { doc, tender, totalPages } = await uploadTenderDocument(c.var.deps, {
     orgId: orgId(c), userId: userId(c), tenderId, kind, file: { name: file.name, type: file.type, bytes },
   });
   const dto = toDocumentDto(doc, tender.bidNumber);
-  return c.json({ ...dto, warnings: uploadWarnings(dto) }, 201);
+  return c.json({ ...dto, warnings: uploadWarnings(dto, totalPages) }, 201);
 });
 
 analysisRoutes.post('/tenders/:id/fetch-documents', requireRole('analyst'), async (c) => {

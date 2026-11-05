@@ -15,12 +15,12 @@ import {
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
 import { enrichWithLlm } from '@tp/core/analyse/llm';
-import { PdfTextError, extractPages, isPdf, joinPages, looksScanned, splitPages } from '@tp/core/analyse/pdf-text';
+import { PdfTextError, extractPdf, isPdf, joinPages, looksScanned, splitPages } from '@tp/core/analyse/pdf-text';
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
-  MAX_TENDER_DOC_BYTES, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
+  MAX_EXTRACT_PAGES, MAX_TENDER_DOC_BYTES, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
   type TenderDocumentWarning,
 } from '@tp/core/contracts/analyse';
 import { GemClient, GemError } from '@tp/core/gem/client';
@@ -70,8 +70,11 @@ export function toDocumentDto(d: DocRow, tenderBidNumber?: string | null): Tende
 }
 
 /** Upload warnings (non-blocking): currently only a bid-number mismatch. */
-export function uploadWarnings(dto: TenderDocumentDto): TenderDocumentWarning[] {
-  return dto.bidNumberFound ? [{ code: 'bid_number_mismatch', found: dto.bidNumberFound }] : [];
+export function uploadWarnings(dto: TenderDocumentDto, totalPages?: number): TenderDocumentWarning[] {
+  return [
+    ...(dto.bidNumberFound ? [{ code: 'bid_number_mismatch' as const, found: dto.bidNumberFound }] : []),
+    ...(totalPages && dto.pageCount != null && totalPages > dto.pageCount ? [{ code: 'pages_truncated' as const, analysed: dto.pageCount, total: totalPages }] : []),
+  ];
 }
 
 export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
@@ -111,9 +114,10 @@ const safeName = (name: string) => {
   return cleaned || 'document.pdf';
 };
 
-async function extractOrThrow(bytes: Uint8Array): Promise<string[]> {
+/** Reads at most MAX_EXTRACT_PAGES pages (NFR-005); `totalPages` is the PDF's real page count. */
+async function extractOrThrow(bytes: Uint8Array): Promise<{ pages: string[]; totalPages: number }> {
   try {
-    return await extractPages(bytes);
+    return await extractPdf(bytes, { maxPages: MAX_EXTRACT_PAGES });
   } catch (e) {
     if (e instanceof PdfTextError) throw new HttpError(422, 'unreadable_pdf', 'We could not read this PDF. It may be password-protected or damaged.');
     throw e;
@@ -127,13 +131,13 @@ export interface UploadInput {
   file: { name: string; type?: string; bytes: Uint8Array };
 }
 
-export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): Promise<{ doc: DocRow; tender: TenderRow }> {
+export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): Promise<{ doc: DocRow; tender: TenderRow; totalPages: number }> {
   const tender = await getTender(deps, input.tenderId);
   const { bytes } = input.file;
   if (bytes.length === 0) throw new HttpError(400, 'bad_request', 'The file is empty');
   if (bytes.length > MAX_TENDER_DOC_BYTES) throw new HttpError(413, 'payload_too_large', 'The file is larger than 25 MB');
   if (!isPdf(bytes)) throw new HttpError(415, 'unsupported_media_type', 'Only PDF files can be analysed. Export the document to PDF and try again.');
-  const pages = await extractOrThrow(bytes);
+  const { pages, totalPages } = await extractOrThrow(bytes);
   const id = crypto.randomUUID();
   const fileName = safeName(input.file.name || 'document.pdf');
   const blobKey = `tenders/${input.tenderId}/${input.orgId}/${id}.pdf`;
@@ -144,10 +148,10 @@ export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): P
   }).returning();
   await logActivity(deps.db, {
     orgId: input.orgId, userId: input.userId, action: 'tender.document_uploaded', entityType: 'tender', entityId: input.tenderId,
-    meta: { documentId: id, fileName, kind: input.kind, pages: pages.length, scanned: looksScanned(pages) },
+    meta: { documentId: id, fileName, kind: input.kind, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), scanned: looksScanned(pages) },
   });
   await markStale(deps.db, { orgId: input.orgId, tenderIds: [input.tenderId] }, 'document_added', deps.clock.now());
-  return { doc, tender };
+  return { doc, tender, totalPages };
 }
 
 // ───────────── Remove (FR-009) ─────────────
@@ -199,7 +203,8 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
         : 'Could not download the bid document from GeM right now. Try again in a few minutes or upload the PDF.';
     throw new HttpError(502, 'gem_unavailable', msg);
   }
-  const pages = await extractOrThrow(got.bytes);
+  const { pages, totalPages } = await extractOrThrow(got.bytes);
+  if (totalPages > pages.length) deps.logger.warn('analyse: GeM document truncated to the page cap', { tenderId: tender.id, pages: pages.length, totalPages });
   const id = crypto.randomUUID();
   const blobKey = `tenders/${tender.id}/gem/${id}.pdf`;
   await deps.blobs.put(blobKey, got.bytes, { contentType: 'application/pdf' });
