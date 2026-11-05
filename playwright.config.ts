@@ -18,7 +18,7 @@ const BLOB_DIR = process.env.E2E_BLOB_DIR;
 export default defineConfig({
   testDir: 'e2e',
   testMatch: /.*\.e2e\.ts/,
-  outputDir: `qa/.runs/${E2E_PORT}/artifacts${RUN_TAG ? `/${RUN_TAG}` : ''}`,
+  outputDir: `qa/.runs/${E2E_PORT}/artifacts` + (RUN_TAG ? `/${RUN_TAG}` : ''),
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

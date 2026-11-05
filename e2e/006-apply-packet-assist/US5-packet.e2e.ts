@@ -259,7 +259,10 @@ test('S2 reorder by drag, Move up arrow and keyboard; Default order appears; ord
   // (e) keyboard on the grip: Space, ArrowUp, Space
   await panGrip.focus();
   await page.keyboard.press('Space');
+  // wait for the keyboard sensor to pick the row up (and, since 006/HARDEN, announce it) before moving it
+  await expect(panGrip).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(300); // let the sortable transition settle so the drop lands on the new slot
   await page.keyboard.press('Space');
   await expect.poll(async () => (await rowTitles(page)).slice(4, 6), { message: 'keyboard reorder' }).toEqual(['PAN card of the firm', 'GST registration certificate']);
   await expect(page.getByRole('button', { name: 'Default order' })).toBeVisible();

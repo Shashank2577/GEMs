@@ -214,9 +214,9 @@ test.describe('sc3 data-fix migration', () => {
     };
     const before = snap('BEFORE migration 0009');
     expect(before).toContain(`${legacyBid} source=gem matches: `);
-    psqlFile('packages/db/migrations/0009_demo_source_datafix.sql');
-    const after = snap('AFTER migration 0009 (psql -f packages/db/migrations/0009_demo_source_datafix.sql)');
-    psqlFile('packages/db/migrations/0009_demo_source_datafix.sql'); // idempotent
+    psqlFile('packages/db/migrations/0010_demo_source_datafix.sql');
+    const after = snap('AFTER migration 0009 (psql -f packages/db/migrations/0010_demo_source_datafix.sql)');
+    psqlFile('packages/db/migrations/0010_demo_source_datafix.sql'); // idempotent
     expect(snap('AFTER second run (idempotent)')).toBe(after);
     expect(after).toContain(`${legacyBid} source=demo matches: A`);        // flipped; org B's match deleted, org A (demo org) kept
     expect(after).toContain(`${realBid} source=gem matches: B`);           // real bid untouched, B's match kept

@@ -13,6 +13,8 @@
  * Server environment this spec needs (set by the runner, not by product code):
  *   PACKET_MAX_INPUT_BYTES=41943040           (the Worker's cap; the Node default is 60 MB)
  *   ANTHROPIC_API_KEY=qa-fake LLM_BASE_URL=http://127.0.0.1:${E2E_LLM_PORT:-4114}   (sc7: this file serves a counting fake Anthropic API)
+ * scripts/e2e-ci.sh (CI) applies them from this line:
+ * @e2e-env PACKET_MAX_INPUT_BYTES=41943040 ANTHROPIC_API_KEY=qa-fake LLM_BASE_URL=http://127.0.0.1:4114
  * Direct DB access (psql) is used only to create states the public API cannot produce: a tender row without a GeM link, a running ingestion row,
  * a manual sync that "finished 4 minutes ago", stored vault sizes.
  */

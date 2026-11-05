@@ -44,5 +44,8 @@ fi
 PGOPTIONS="-c client_min_messages=warning" psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -qc "drop database if exists \"$DB_NAME\" with (force)" -c "create database \"$DB_NAME\"" >/dev/null
 BLOBS=".data/e2e-blobs-$PORT"; rm -rf "$BLOBS"
 [ "${E2E_SKIP_BUILD:-}" = "1" ] || pnpm --filter @tp/web build >/dev/null
+# E2E_API_LOG: also append the API's stdout/stderr (JSON log lines) to this file, for specs that assert on server logs
+# (008/US6). scripts/e2e-ci.sh sets it per spec-file run.
+if [ -n "${E2E_API_LOG:-}" ]; then mkdir -p "$(dirname "$E2E_API_LOG")"; exec > >(tee -a "$E2E_API_LOG") 2>&1; fi
 PORT=$PORT DATABASE_URL=$DB_URL AUTO_MIGRATE=1 BLOB_DIR=$BLOBS GEM_BASE_URL=http://127.0.0.1:$GEM_PORT \
   GEM_MIN_INTERVAL_MS=0 APP_URL=http://localhost:$PORT exec pnpm --filter @tp/api start

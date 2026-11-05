@@ -251,13 +251,18 @@ test('US2-5 [video]: dragging the blocked Preparing card (Dell desktops) to Read
 
 test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=ready answers 409 conflict / not_analysed', async ({ page, browser }) => {
   await demoOwner(page);
-  const demoCards = await listWs(page.request);
-  // A second org starts a bid on a tender it never analysed.
+  // A second org starts a bid on a GeM tender it never analysed. Demo tenders are private to the demo org
+  // (008/US3 NFR-005), so org B ingests real (mock-gem) tenders first.
   const orgB = await pwRequest.newContext({ baseURL: test.info().project.use.baseURL });
   try {
     const ub = uniqueUser('orgb');
     expect((await orgB.post('/api/auth/signup', { data: ub })).status()).toBe(201);
-    const tenderId = demoCards.items[0].tender.id;
+    const sync = await orgB.post('/api/ingestion/run', { data: { pages: 1 } });
+    // 429 sync_cooldown only on a retry of this test: the tenders from the first attempt are already there.
+    expect([200, 429], await sync.text()).toContain(sync.status());
+    const listed = await (await orgB.get('/api/tenders?pageSize=1')).json();
+    expect(listed.items.length, 'org B sees an ingested GeM tender').toBeGreaterThan(0);
+    const tenderId = listed.items[0].id;
     const created = await orgB.post(`/api/tenders/${tenderId}/workspace`);
     expect(created.status(), await created.text()).toBe(201);
     const ws = await created.json();

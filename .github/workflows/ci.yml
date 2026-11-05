@@ -163,6 +163,8 @@ jobs:
     env:
       # start-api.sh drops/recreates this database via psql before every spec file (no scripts/local-pg.sh in CI).
       E2E_DATABASE_URL: postgres://tp:tp@localhost:5433/tenderpilot_e2e
+      # 008/US6 SC9 runs one API-suite test from inside its E2E spec.
+      TEST_DATABASE_URL: postgres://tp:tp@localhost:5433/tenderpilot_test
       E2E_SHARDS: '8'
     steps:
       - uses: actions/checkout@v4
@@ -174,6 +176,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: PDF tools for specs that read generated PDFs (pdftotext/pdfinfo/pdftoppm) and the API test database
+        run: |
+          sudo apt-get install -y --no-install-recommends poppler-utils >/dev/null
+          psql postgres://tp:tp@localhost:5433/postgres -qc "create database tenderpilot_test"
       - name: E2E (Playwright, real API + SPA + mock-gem, one fresh DB per spec file)
         run: CI=1 scripts/e2e-ci.sh ${{ matrix.shard }} "$E2E_SHARDS"
       - name: Upload shard report
@@ -185,6 +191,7 @@ jobs:
           path: |
             qa/evidence/**
             qa/.runs/8788/blob/**
+            qa/.runs/8788/api-*.log
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 1
@@ -210,11 +217,14 @@ jobs:
         with:
           pattern: e2e-shard-${{ github.run_id }}-*
           merge-multiple: true
+          # the shard artifacts are rooted at qa/ (common ancestor of their paths)
+          path: qa
       - name: Merge shard reports (results.json + HTML report with traces and videos)
         run: |
           mkdir -p "$RUNNER_TEMP/blobs"
           for z in qa/.runs/8788/blob/*/*.zip; do [ -e "$z" ] && cp "$z" "$RUNNER_TEMP/blobs/$(basename "$(dirname "$z")").zip"; done
           ls "$RUNNER_TEMP/blobs"
+          if [ -z "$(ls -A "$RUNNER_TEMP/blobs")" ]; then echo "::error::no shard blob reports were downloaded"; exit 1; fi
           rm -rf qa/.runs/8788/blob
           PLAYWRIGHT_JSON_OUTPUT_FILE=qa/.runs/8788/results.json PLAYWRIGHT_HTML_OUTPUT_DIR=qa/.runs/8788/report PLAYWRIGHT_HTML_OPEN=never \
             pnpm exec playwright merge-reports --reporter=json,html "$RUNNER_TEMP/blobs"
