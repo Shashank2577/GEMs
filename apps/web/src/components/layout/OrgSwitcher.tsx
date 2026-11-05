@@ -9,8 +9,9 @@ import { errorMessage } from '@/lib/api';
 
 function OrgChip({ name, className }: { name: string; className?: string }) {
   return (
-    // Initials are drawn by CSS so they are decorative: not part of the button's visible label text (WCAG 2.5.3).
-    <span aria-hidden data-initials={initials(name, true)} className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm before:content-[attr(data-initials)]", className)} />
+    <span aria-hidden className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm', className)}>
+      {initials(name, true)}
+    </span>
   );
 }
 
@@ -19,12 +20,15 @@ export function OrgSwitcher({ collapsed, className }: { collapsed?: boolean; cla
   const navigate = useNavigate();
   if (!me) return null;
   return (
-    <DropdownMenu>
+    // Non-modal: a modal menu aria-hides the whole shell while its links stay focusable (axe aria-hidden-focus).
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         className={cn('group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring', collapsed && 'justify-center', className)}
-        aria-label={`Organization: ${me.org.name} ${me.org.plan} plan · ${ROLE_LABEL[me.role]}. Switch organization`}
       >
+        {/* Name comes from the visible text (WCAG 2.5.3 label-in-name); the chip's initials are decorative. */}
         <OrgChip name={me.org.name} />
+        {collapsed && <span className="sr-only">{me.org.name}</span>}
+        <span className="sr-only">Switch organization</span>
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">

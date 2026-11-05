@@ -18,6 +18,36 @@ export class ApiError extends Error {
   get isForbidden() { return this.status === 403; }
   get isNotFound() { return this.status === 404; }
   get isConflict() { return this.status === 409; }
+  /** 429 `rate_limited` (008/FR-018) or `sync_cooldown`. */
+  get isRateLimited() { return this.status === 429; }
+  /** Seconds to wait, from `details.retryAfter` of a 429 (null when absent). */
+  get retryAfter(): number | null {
+    const v = (this.details as { retryAfter?: unknown } | undefined)?.retryAfter;
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.ceil(v) : null;
+  }
+  /** Rate-limit rule name from `details.rule` (e.g. `auth.fail.email`). */
+  get rateLimitRule(): string | null {
+    const v = (this.details as { rule?: unknown } | undefined)?.rule;
+    return typeof v === 'string' ? v : null;
+  }
+}
+
+/** "45 s" below two minutes, else "14 min" (008/FR-041d). */
+export function formatRetryAfter(seconds: number): string {
+  const s = Math.max(1, Math.ceil(seconds));
+  return s < 120 ? `${s} s` : `${Math.ceil(s / 60)} min`;
+}
+
+/**
+ * Message for a 429 on an auth form (login, sign-up, forgot password): the server's
+ * "Too many attempts. Try again in N minutes." (002/FR-010, 008/FR-018), rebuilt from `retryAfter` if it is missing.
+ * Null when the error is not a 429.
+ */
+export function tooManyAttemptsMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError) || !err.isRateLimited) return null;
+  if (err.message && /try again/i.test(err.message)) return err.message;
+  const minutes = Math.max(1, Math.ceil((err.retryAfter ?? 60) / 60));
+  return `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 }
 
 export const API_BASE = '/api';

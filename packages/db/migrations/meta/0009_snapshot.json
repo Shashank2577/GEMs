@@ -1,5 +1,5 @@
 {
-  "id": "cfa998a8-3b13-4ca9-84db-c8b9222c3498",
+  "id": "818f3a04-879e-4035-911f-8b4fc95a277f",
   "prevId": "93a2f762-09b6-45fb-bf4b-bdc48a2d3dd4",
   "version": "7",
   "dialect": "postgresql",
@@ -2080,121 +2080,57 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.saved_views": {
-      "name": "saved_views",
+    "public.rate_limits": {
+      "name": "rate_limits",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
+        "key": {
+          "name": "key",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "params": {
-          "name": "params",
-          "type": "jsonb",
+        "window_start": {
+          "name": "window_start",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
-        "position": {
-          "name": "position",
+        "count": {
+          "name": "count",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         }
       },
       "indexes": {
-        "saved_views_name_uq": {
-          "name": "saved_views_name_uq",
+        "rate_limits_window_idx": {
+          "name": "rate_limits_window_idx",
           "columns": [
             {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "name",
+              "expression": "window_start",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
-      "foreignKeys": {
-        "saved_views_org_id_organizations_id_fk": {
-          "name": "saved_views_org_id_organizations_id_fk",
-          "tableFrom": "saved_views",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "saved_views_user_id_users_id_fk": {
-          "name": "saved_views_user_id_users_id_fk",
-          "tableFrom": "saved_views",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "rate_limits_key_window_start_pk": {
+          "name": "rate_limits_key_window_start_pk",
+          "columns": [
+            "key",
+            "window_start"
+          ]
         }
       },
-      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

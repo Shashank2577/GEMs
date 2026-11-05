@@ -9,17 +9,18 @@ import {
 } from '@tp/db';
 import {
   API_TOKEN_LIMIT, API_TOKEN_PREFIX, PASSWORD_RESET_TTL_MINUTES, acceptInviteInputSchema, changePasswordInputSchema, createApiTokenInputSchema,
-  forgotPasswordInputSchema, loginInputSchema, notificationPrefsSchema, passwordSchema, resetPasswordInputSchema,
+  forgotPasswordInputSchema, loginInputSchema, notificationPrefsSchema, passwordSchema, resetPasswordInputSchema, resetTtlText,
   signupInputSchema, switchOrgInputSchema, updateMeInputSchema,
   DEFAULT_NOTIFICATION_PREFS, type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
 } from '@tp/core/contracts/auth';
 import { requireAuth, requireSession, orgId, userId } from '../middleware/auth';
+import { rateLimit } from '../middleware/rate-limit';
 import { logActivity } from '../lib/activity';
 import { getDummyHash, hashPassword, randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
 import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/errors';
 import { buildMe } from '../lib/me';
 import { defer } from '../lib/defer';
-import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reset } from '../lib/rate-limit';
+import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, failClosed, hit, rateLimited, reserveIpThenKey, reset } from '../lib/rate-limit';
 import { clearSessionCookie, firstMembership, loadMembership, loadUser, rememberOrg, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
 import { parseJson, parseWith } from '../lib/validate';
@@ -57,7 +58,8 @@ function isUniqueViolation(e: unknown): boolean {
 
 // ───────────── Signup / login / logout ─────────────
 
-authRoutes.post('/auth/signup', async (c) => {
+// 008/FR-019 `auth.signup.ip`: 20 sign-ups per client IP per hour.
+authRoutes.post('/auth/signup', rateLimit('auth.signup.ip'), async (c) => {
   const body = await parseJson(c, signupInputSchema);
   const { db } = c.var.deps;
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, body.email));
@@ -140,10 +142,8 @@ authRoutes.post('/auth/switch-org', requireSession, async (c) => {
 
 const RESET_INVALID = () => new HttpError(400, 'reset_invalid', 'This password reset link is invalid, already used or has expired. Request a new one.');
 
-/** "60" → "1 hour", "90" → "90 minutes" (email copy follows PASSWORD_RESET_TTL_MINUTES). */
-const RESET_TTL_TEXT = PASSWORD_RESET_TTL_MINUTES % 60 === 0
-  ? `${PASSWORD_RESET_TTL_MINUTES / 60} hour${PASSWORD_RESET_TTL_MINUTES === 60 ? '' : 's'}`
-  : `${PASSWORD_RESET_TTL_MINUTES} minutes`;
+/** Email copy follows PASSWORD_RESET_TTL_MINUTES ("1 hour"); the web pages use the same helper. */
+const RESET_TTL_TEXT = resetTtlText();
 
 /**
  * Always 200 `{ok:true}` (no account enumeration). Emails a single-use link to existing users.
@@ -155,13 +155,9 @@ authRoutes.post('/auth/forgot-password', async (c) => {
   const { db, clock, config, mailer } = c.var.deps;
   const now = clock.now();
   // Counted for every email (existing or not) so the 429 reveals nothing about accounts.
+  // IP first: a blocked IP does not advance the email's counter (reserveIpThenKey).
   const ip = clientIp(c, config.trustProxy);
-  const [byEmail, byIp] = await Promise.all([
-    hit(db, email, 'reset_email', RESET_EMAIL_LIMIT, now),
-    ip ? hit(db, ip, 'reset_ip', RESET_IP_LIMIT, now) : Promise.resolve(null),
-  ]);
-  const blocked = [byEmail, byIp].filter((st) => st?.over);
-  if (blocked.length) throw rateLimited(Math.max(...blocked.map((st) => st!.retryAfterSec)));
+  await reserveIpThenKey(db, ip ? { key: ip, kind: 'reset_ip', opts: RESET_IP_LIMIT, rule: 'auth.reset.ip' } : null, { key: email, kind: 'reset_email', opts: RESET_EMAIL_LIMIT, rule: 'auth.reset.email' }, now);
 
   defer(c, 'password reset email', async () => {
     const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
@@ -191,8 +187,8 @@ authRoutes.post('/auth/reset-password', async (c) => {
   const now = clock.now();
   const ip = clientIp(c, config.trustProxy);
   if (ip) {
-    const st = await check(db, ip, 'login_ip', LOGIN_IP_LIMIT, now);
-    if (st?.limited) throw rateLimited(st.retryAfterSec);
+    const st = await failClosed(check(db, ip, 'login_ip', LOGIN_IP_LIMIT, now));
+    if (st?.limited) throw rateLimited(st.retryAfterSec, 'auth.fail.ip');
   }
   const tokenHash = await sha256Hex(body.token);
   const valid = and(eq(passwordResets.tokenHash, tokenHash), isNull(passwordResets.usedAt), gt(passwordResets.expiresAt, now));
@@ -357,7 +353,7 @@ authRoutes.put('/me/notification-prefs', requireAuth, async (c) => {
 
 const tokenSummary = (t: typeof apiTokens.$inferSelect): ApiTokenSummary => ({
   id: t.id, name: t.name, lastUsedAt: t.lastUsedAt?.toISOString() ?? null, createdAt: t.createdAt.toISOString(),
-  expiresAt: t.expiresAt?.toISOString() ?? null, hint: t.tokenHint,
+  expiresAt: t.expiresAt?.toISOString() ?? null, hint: t.tokenHint, scope: t.scope,
 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -368,7 +364,10 @@ authRoutes.get('/me/api-tokens', requireAuth, async (c) => {
   return c.json({ items: rows.map(tokenSummary), total: rows.length });
 });
 
-/** 002/FR-037: optional expiry (default 90 days), 4-char hint, at most API_TOKEN_LIMIT active tokens per user per org. */
+/**
+ * 002/FR-037: optional expiry (default 90 days), 4-char hint, at most API_TOKEN_LIMIT active tokens per user per org.
+ * 006/FR-074: optional `scope` (default `full`). Session-only, so a token holder can never mint a broader token.
+ */
 authRoutes.post('/me/api-tokens', requireSession, async (c) => {
   const body = await parseJson(c, createApiTokenInputSchema);
   const { db, clock } = c.var.deps;
@@ -390,11 +389,11 @@ authRoutes.post('/me/api-tokens', requireSession, async (c) => {
       .where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid), or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, now))));
     if (n >= API_TOKEN_LIMIT) throw new HttpError(409, 'token_limit', `You already have ${API_TOKEN_LIMIT} tokens. Revoke one first.`);
     const [inserted] = await tx.insert(apiTokens).values({
-      orgId: oid, userId: uid, name: body.name, tokenHash: await sha256Hex(token), tokenHint: token.slice(-4), expiresAt,
+      orgId: oid, userId: uid, name: body.name, tokenHash: await sha256Hex(token), tokenHint: token.slice(-4), expiresAt, scope: body.scope,
     }).returning();
     return inserted;
   });
-  await logActivity(db, { orgId: oid, userId: uid, action: 'api_token.created', entityType: 'api_token', entityId: row.id, meta: { name: body.name, expiresInDays: body.expiresInDays } });
+  await logActivity(db, { orgId: oid, userId: uid, action: 'api_token.created', entityType: 'api_token', entityId: row.id, meta: { name: body.name, expiresInDays: body.expiresInDays, scope: body.scope } });
   return c.json({ ...tokenSummary(row), token }, 201);
 });
 

@@ -54,8 +54,8 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 - [x] T011 [P] Web API client (`ApiError`, `api.*`, `queryClient` retry rules) in `apps/web/src/lib/api.ts` FR-049
 - [x] T012 Web `AuthProvider`, `useAuth`, `can`, `useCan`, `RoleGate`, `RequireAuth`, `safeNext`, `ME_KEY` in `apps/web/src/lib/auth.tsx` FR-009 FR-026
 - [x] T013 API test harness (`createTestApp`, truncate, helpers) in `apps/api/test/helpers.ts` NFR-008
-- [ ] T014 [P] Add `@axe-core/playwright` dev dependency and an `a11y(page, spec, story, name)` helper that runs axe (WCAG 2.1 AA tags), writes the JSON report to `qa/evidence/<spec>/<story>/axe-<name>.json` and fails on serious/critical violations in `e2e/support/fixtures.ts`, `package.json` NFR-004 SC-005 (#10)
-- [ ] T015 [P] Add `createOrgWithRoles(request)` helper (owner signup + invite/accept bid_manager, analyst, viewer via API; returns credentials and storage states) in `e2e/support/platform.ts` SC-006 (#11)
+- [x] T014 [P] Add `@axe-core/playwright` dev dependency and an `a11y(page, spec, story, name)` helper that runs axe (WCAG 2.1 AA tags), writes the JSON report to `qa/evidence/<spec>/<story>/axe-<name>.json` and fails on serious/critical violations in `e2e/support/fixtures.ts`, `package.json` NFR-004 SC-005 (#10)
+- [x] T015 [P] Add `createOrgWithRoles(request)` helper (owner signup + invite/accept bid_manager, analyst, viewer via API; returns credentials and storage states) in `e2e/support/platform.ts` SC-006 (#11)
 
 **Checkpoint**: Foundation ready — user story work can proceed in parallel
 
@@ -247,10 +247,10 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T095 [P] [US7] Add a "Settings" group to the palette listing all settings sub-pages (Organization, Your account, Team & roles, Notifications, Scoring weights, API tokens & extension, Sync health, Activity log) with keywords, sourced from a shared `SETTINGS_ITEMS` export in `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/features/settings/items.ts`, `apps/web/src/features/settings/SettingsPage.tsx` FR-046 (#49)
-- [ ] T096 [P] [US7] "?" opens a "Keyboard shortcuts" dialog (⌘K, /, G+D/T/W/P/V/C/S/N, Esc), also reachable from the user menu in `apps/web/src/components/layout/ShortcutsDialog.tsx`, `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/components/layout/UserMenu.tsx` FR-046 NFR-004 (#50)
-- [ ] T097 [US7] Fix every serious/critical axe finding and contrast issue reported by T034/T045/T057/T068/T078/T088/T098 across shell, auth and settings in light and dark at 375/1440 px in `apps/web/src/components/**`, `apps/web/src/features/auth/**`, `apps/web/src/features/settings/**`, `apps/web/src/index.css` NFR-004 NFR-005 SC-005 (#51)
-- [ ] T098 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in qa/evidence/002/US7/ — sidebar collapse persistence, mobile tab bar + drawer `@mobile`, palette open/filter/quick actions per role, G-shortcuts, theme persistence without flash, skip link + focus, 404 page, axe scans light/dark at 375/1440 in `e2e/002-platform/US7-shell.e2e.ts`, `qa/evidence/002/US7/VERDICT.md` FR-045..FR-048 NFR-004 NFR-005 (#52)
+- [x] T095 [P] [US7] Add a "Settings" group to the palette listing all settings sub-pages (Organization, Your account, Team & roles, Notifications, Scoring weights, API tokens & extension, Sync health, Activity log) with keywords, sourced from a shared `SETTINGS_ITEMS` export in `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/features/settings/items.ts`, `apps/web/src/features/settings/SettingsPage.tsx` FR-046 (#49). Note: the "Activity log" palette entry is gated `ready:false` until T085 (US6) flips it, so scenario 10 is verified in US6.
+- [x] T096 [P] [US7] "?" opens a "Keyboard shortcuts" dialog (⌘K, /, G+D/T/W/P/V/C/S/N, Esc), also reachable from the user menu in `apps/web/src/components/layout/ShortcutsDialog.tsx`, `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/components/layout/UserMenu.tsx` FR-046 NFR-004 (#50)
+- [x] T097 [US7] Fix every serious/critical axe finding and contrast issue reported by T034/T045/T057/T068/T078/T088/T098 across shell, auth and settings in light and dark at 375/1440 px in `apps/web/src/components/**`, `apps/web/src/features/auth/**`, `apps/web/src/features/settings/**`, `apps/web/src/index.css` NFR-004 NFR-005 SC-005 (#51)
+- [x] T098 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in qa/evidence/002/US7/ — sidebar collapse persistence, mobile tab bar + drawer `@mobile`, palette open/filter/quick actions per role, G-shortcuts, theme persistence without flash, skip link + focus, 404 page, axe scans light/dark at 375/1440 in `e2e/002-platform/US7-shell.e2e.ts`, `qa/evidence/002/US7/VERDICT.md` FR-045..FR-048 NFR-004 NFR-005 (#52)
 
 **Checkpoint**: All user stories independently functional
 
@@ -260,14 +260,14 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T099 [P] Security headers middleware (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS on https, CSP for SPA responses with the theme-script hash) for Node and Worker static responses, with tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/src/node.ts`, `apps/api/test/security.test.ts` FR-050 (#53)
-- [ ] T100 [P] Secret-leak scanner test: run auth/org/token/invite/reset flows with a capturing logger and assert no password, `tp_` token, invite/reset token or hash appears in logs, list responses or activity `meta` in `apps/api/test/secrets-leak.test.ts` NFR-003 SC-004 (#54)
-- [ ] T101 [P] Query-count/perf test for `GET /api/auth/me` (≤ 4 queries via instrumented Drizzle logger) and p95 timing smoke for login/me in `apps/api/test/perf-auth.test.ts` NFR-001 (#55)
-- [ ] T102 [P] Record in `NOTICE` (or confirm no change) that spec 002 ports no third-party code from `/home/user/refs` FR-048 (#56)
-- [ ] T103 Update `specs/001-gem-tender-copilot/contracts/api.md § Platform` with the new endpoints and error codes (`rate_limited`, `invite_email_mismatch`, `bad_origin`, `reset_invalid`, `token_limit`) FR-010 FR-011 FR-012 FR-018 FR-027 FR-028 FR-037 (#57)
-- [ ] T104 Run `/cairn-taskstoissues` to create GitHub issues for the 7 stories and every open task (labels `spec:002`, `area:platform`, `type`, `priority`, `role`) per `CONVENTIONS.md` (#58)
-- [ ] T105 `cairn-reviewer` review of each 002 PR, findings recorded on the issue, no blocking findings open (review only via cairn; no Codex) per `CONVENTIONS.md` (#59)
-- [ ] T106 Run `/cairn-analyze` on `specs/002-platform-tenancy/` and resolve any spec/plan/tasks inconsistencies (#60)
+- [x] T099 [P] Security headers middleware (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS on https, CSP for SPA responses with the theme-script hash) for Node and Worker static responses, with tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/src/node.ts`, `apps/api/test/security.test.ts` FR-050 (#53)
+- [x] T100 [P] Secret-leak scanner test: run auth/org/token/invite/reset flows with a capturing logger and assert no password, `tp_` token, invite/reset token or hash appears in logs, list responses or activity `meta` in `apps/api/test/secrets-leak.test.ts` NFR-003 SC-004 (#54)
+- [x] T101 [P] Query-count/perf test for `GET /api/auth/me` (≤ 4 queries via instrumented Drizzle logger) and p95 timing smoke for login/me in `apps/api/test/perf-auth.test.ts` NFR-001 (#55)
+- [x] T102 [P] Record in `NOTICE` (or confirm no change) that spec 002 ports no third-party code from `/home/user/refs` FR-048 (#56) — Confirmed: spec 002 ports no third-party code (plan.md "Reference repositories": Giri-Aayush_gem and Giridar33_gem-tender-tracker both "Do not port"); `NOTICE` unchanged.
+- [x] T103 Update `specs/001-gem-tender-copilot/contracts/api.md § Platform` with the new endpoints and error codes (`rate_limited`, `invite_email_mismatch`, `bad_origin`, `reset_invalid`, `token_limit`) FR-010 FR-011 FR-012 FR-018 FR-027 FR-028 FR-037 (#57)
+- [x] T104 Run `/cairn-taskstoissues` to create GitHub issues for the 7 stories and every open task (labels `spec:002`, `area:platform`, `type`, `priority`, `role`) per `CONVENTIONS.md` (#58) — done by the lead in v1: the issues exist (epic #2, stories #3–#9, tasks #11–#60 etc.); no further action in this PR.
+- [x] T105 `cairn-reviewer` review of each 002 PR, findings recorded on the issue, no blocking findings open (review only via cairn; no Codex) per `CONVENTIONS.md` (#59) — done per PR: cairn-reviewer round 1/2 recorded as GitHub PR reviews on #476, #487, #495, #496, #502; HARDEN is reviewed on its own PR. (ticked on merge after cairn review round 2)
+- [x] T106 Run `/cairn-analyze` on `specs/002-platform-tenancy/` and resolve any spec/plan/tasks inconsistencies (#60) (consistency pass done manually by reviewers against code: FR-050, contracts/api.md, plan limiter order; `/cairn-analyze` tool not run)
 
 ---
 

@@ -1,0 +1,20 @@
+# sc2-no-matches — project desktop — 2026-11-05T04:31:34.538Z
+### org B POST /api/watchlists keyword laptop
+> cookie: org B
+< 201
+< ratelimit-remaining: 597
+< content-type: application/json
+{"id":"acf38b4e-06cd-46a1-8119-50c4d4c5a692","name":"Laptops","criteria":{"states":[],"bidTypes":[],"hsnCodes":[],"keywords":["laptop"],"categories":[],"ministries":[],"excludeKeywords":[]},"active":true,"createdBy":{"id":"ce6c1fd3-16d6-40d3-93a1-3ada9b08c40f","name":"QA orgb mw31te0b5"},"createdAt":"2026-11-05T04:31:34.545Z","updatedAt":"2026-11-05T04:31:34.545Z","matchCount":5,"newThisWeek":5,"openCount":5,"lastMatchAt":"2026-11-05T04:31:34.548Z"}
+
+demo tenders that mention "laptop" (so a leak would be observable): 2
+### org B POST /api/ingestion/run (matching pass)
+> cookie: org B
+< 200
+< ratelimit-remaining: 596
+< content-type: application/json
+{"id":"8ec48772-1c7f-4d59-ac99-624954076ded","trigger":"manual","status":"success","pagesFetched":1,"tendersSeen":10,"tendersCreated":0,"tendersUpdated":0,"matchesCreated":0,"error":null,"startedAt":"2026-11-05T04:31:34.617Z","finishedAt":"2026-11-05T04:31:34.693Z","durationMs":76}
+
+SQL org B tender_matches -> demo tenders: 0
+SQL org B notifications -> demo tenders: 0
+SQL org B tender_matches total (real/mock-gem): 5
+SQL control: org A tender_matches -> demo tenders: 28

@@ -9,6 +9,7 @@ import {
 import { formatDateIST, formatINR, formatNumberIN } from '@/lib/format';
 import type { Stage } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { SampleBadge } from './SampleBadge';
 import { useDismiss, useMarkSeen } from './api';
 
 export const BID_TYPE_LABEL: Record<string, string> = { bid: 'Bid', ra: 'Reverse auction', bunch: 'Bunch bid', service: 'Service' };
@@ -81,6 +82,7 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
             )}
             <span className="font-mono text-[12px] tracking-tight text-foreground/70">{t.bidNumber}</span>
             {t.bidType !== 'bid' && <Badge size="sm" tone={t.bidType === 'ra' ? 'info' : 'neutral'}>{BID_TYPE_LABEL[t.bidType] ?? t.bidType}</Badge>}
+            {t.isDemo && <SampleBadge />}
             {t.hasCorrigendum && (
               <Tooltip content="GeM published a corrigendum this week — dates or terms changed.">
                 <Badge size="sm" tone="warning"><FileWarning aria-hidden />Corrigendum</Badge>

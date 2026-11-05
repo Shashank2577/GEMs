@@ -31,7 +31,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.gem.gov.in/*",
+        "https://*.gem.gov.in/*",
         "http://localhost/*gem-form*",
         "http://127.0.0.1/*gem-form*"
       ],

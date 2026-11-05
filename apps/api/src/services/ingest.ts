@@ -25,6 +25,7 @@ import { GemClient } from '@tp/core/gem/client';
 import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
+import { REAL_ONLY } from '../lib/tender-scope';
 
 export interface RunIngestionOptions {
   trigger?: 'cron' | 'manual' | 'seed';
@@ -382,7 +383,9 @@ export async function matchAndNotify(
   if (!lists.length || !tenderIds.length) return { matchesCreated: 0, notificationsCreated: 0 };
   const rows: TenderRow[] = [];
   for (let i = 0; i < tenderIds.length; i += 500) {
-    rows.push(...(await db.select().from(tenders).where(inArray(tenders.id, tenderIds.slice(i, i + 500)))));
+    // Only real tenders are matched here: demo tenders never alert anyone (008/FR-016). A demo org's own watchlist
+    // refresh (routes/watchlists.ts#refreshMatches) matches its demo tenders silently, without this function.
+    rows.push(...(await db.select().from(tenders).where(and(REAL_ONLY, inArray(tenders.id, tenderIds.slice(i, i + 500))))));
   }
 
   const hits: { t: TenderRow; w: (typeof lists)[number]; reasons: string[]; relevance: number }[] = [];

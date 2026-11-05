@@ -2,7 +2,7 @@
  * Organization routes (FR-031..033): /org, /org/members, /org/invitations (+ resend, 002/FR-020), /activity.
  * Mounted at /api.
  */
-import { and, asc, count, desc, eq, gt, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Hono, type Context } from 'hono';
 import { activityLog, apiTokens, invitations, memberships, organizations, savedViews, sessions, users, type Db, type Role } from '@tp/db';
@@ -63,7 +63,9 @@ const LAST_OWNER = {
  * that makes the change; two owners leaving / demoting each other at once can no longer leave the org ownerless.
  */
 async function assertNotLastOwner(tx: Tx, oid: string, uid: string, why: keyof typeof LAST_OWNER): Promise<void> {
-  await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, oid)).for('update');
+  // NO KEY UPDATE (not UPDATE): serialises membership changes in this org without blocking the FOR KEY SHARE locks
+  // that foreign-key checks take on the org row (e.g. activity_log / api_tokens inserts in other requests).
+  await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, oid)).for('no key update');
   const owners = await tx.select({ userId: memberships.userId }).from(memberships)
     .where(and(eq(memberships.orgId, oid), eq(memberships.role, 'owner')));
   if (owners.length <= 1 && owners.some((o) => o.userId === uid)) throw new HttpError(409, 'last_owner', LAST_OWNER[why]);
@@ -83,9 +85,20 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
   const { db } = c.var.deps;
   const patch: Partial<typeof organizations.$inferInsert> = {};
   if (body.name !== undefined) patch.name = body.name;
-  if (body.onboardingState !== undefined) patch.onboardingState = { ...(c.var.org.onboardingState ?? {}), ...body.onboardingState };
+  // Merge in SQL (jsonb ||) so concurrent PATCHes of different keys never overwrite each other with a stale snapshot.
+  const mergeState = (o: Record<string, boolean>) => sql`coalesce(${organizations.onboardingState}, '{}'::jsonb) || ${JSON.stringify(o)}::jsonb`;
+  if (body.onboardingState !== undefined) patch.onboardingState = mergeState(body.onboardingState) as unknown as Record<string, boolean>;
   if (body.scoringWeights !== undefined) patch.scoringWeights = body.scoringWeights;
   if (!Object.keys(patch).length) return c.json(c.var.org);
+  const notCompleted = sql`coalesce((${organizations.onboardingState}->>'completed')::boolean, false) = false`;
+  // FR-052: the completed flip is a conditional UPDATE, so exactly one of N concurrent requests gets a row back
+  // (the others re-check the predicate after the row lock is released) and logs `onboarding.completed`.
+  let completedAt: Date | null = null;
+  if (body.onboardingState?.completed === true) {
+    const [flipped] = await db.update(organizations).set({ onboardingState: mergeState(body.onboardingState) as unknown as Record<string, boolean> })
+      .where(and(eq(organizations.id, orgId(c)), notCompleted)).returning({ createdAt: organizations.createdAt });
+    completedAt = flipped?.createdAt ?? null;
+  }
   const [org] = await db.update(organizations).set(patch).where(eq(organizations.id, orgId(c))).returning({
     id: organizations.id, name: organizations.name, slug: organizations.slug, plan: organizations.plan,
     onboardingState: organizations.onboardingState, scoringWeights: organizations.scoringWeights,
@@ -95,6 +108,13 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
     await logActivity(db, {
       orgId: orgId(c), userId: userId(c), action: 'org.updated', entityType: 'organization', entityId: orgId(c),
       meta: { fields: Object.keys(patch).filter((k) => k !== 'onboardingState') },
+    });
+  }
+  // FR-052 / SC-001: how long sign-up to "finished setting up" took.
+  if (completedAt) {
+    const durationSec = Math.max(0, Math.round((c.var.deps.clock.now().getTime() - completedAt.getTime()) / 1000));
+    await logActivity(db, {
+      orgId: orgId(c), userId: userId(c), action: 'onboarding.completed', entityType: 'organization', entityId: orgId(c), meta: { durationSec },
     });
   }
   return c.json(org);
@@ -157,7 +177,10 @@ orgRoutes.post('/org/invitations', requireRole('bid_manager'), async (c) => {
 
 /**
  * Resend a pending invitation (002/FR-020): a fresh token (the old link stops working) and a new 7-day expiry,
- * emailed again. Also revives an expired, unaccepted invitation. 404 for other orgs' or accepted invitations.
+ * emailed again. Deliberately also revives an expired, unaccepted invitation (expired rows are kept until replaced or
+ * revoked, so "Resend" is how an admin renews one). `invitedBy` becomes the member who resent it: the email and the
+ * invite preview name them, and they are the one vouching for the new link. 404 for other orgs' or accepted
+ * invitations.
  */
 orgRoutes.post('/org/invitations/:id/resend', requireRole('bid_manager'), async (c) => {
   const id = c.req.param('id');
@@ -209,9 +232,11 @@ orgRoutes.delete('/org/members/me', requireSession, async (c) => {
     const [next] = await tx.select({ orgId: memberships.orgId }).from(memberships)
       .where(eq(memberships.userId, uid)).orderBy(asc(memberships.createdAt)).limit(1);
     const nextId = next?.orgId ?? null;
-    await tx.update(sessions).set({ activeOrgId: nextId }).where(eq(sessions.id, c.var.sessionId!));
     // Sign-in resumes in the org the user is moved to, never the one they left (002/FR-021).
+    // Lock order users -> sessions, the same as the reset-password transaction (auth.ts). Sign-in / switch-org touch
+    // sessions then users, but they are not transactions, so they cannot deadlock with this code.
     await tx.update(users).set({ lastOrgId: nextId }).where(eq(users.id, uid));
+    await tx.update(sessions).set({ activeOrgId: nextId }).where(eq(sessions.id, c.var.sessionId!));
     return nextId;
   });
   return c.json({ ok: true as const, nextOrgId });
@@ -225,11 +250,19 @@ orgRoutes.patch('/org/members/:userId', requireRole('owner'), async (c) => {
   const m = await getMember(db, oid, target);
   if (!m) throw notFound('Member');
   if (m.role === role) return c.json(m);
+  const member = and(eq(memberships.orgId, oid), eq(memberships.userId, target));
   await db.transaction(async (tx) => {
     if (role !== 'owner') await assertNotLastOwner(tx, oid, target, 'demote');
-    await tx.update(memberships).set({ role }).where(and(eq(memberships.orgId, oid), eq(memberships.userId, target)));
+    // Re-read under a row lock: the member may have left / been removed (→ 404) or changed role since `getMember`.
+    const [prev] = await tx.select({ role: memberships.role }).from(memberships).where(member).for('update');
+    if (!prev) throw notFound('Member');
+    const [row] = await tx.update(memberships).set({ role }).where(member).returning({ role: memberships.role });
+    if (!row) throw notFound('Member');
+    // Logged in the same transaction, so the entry exists exactly when the change does.
+    if (prev.role !== role) {
+      await logActivity(tx, { orgId: oid, userId: userId(c), action: 'member.role_changed', entityType: 'user', entityId: target, meta: { from: prev.role, to: role, name: m.name } });
+    }
   });
-  await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.role_changed', entityType: 'user', entityId: target, meta: { from: m.role, to: role, name: m.name } });
   return c.json({ ...m, role });
 });
 
@@ -241,11 +274,14 @@ orgRoutes.delete('/org/members/:userId', requireRole('owner'), async (c) => {
   if (!m) throw notFound('Member');
   await db.transaction(async (tx) => {
     await assertNotLastOwner(tx, oid, target, 'remove');
-    await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, target)));
+    const [removed] = await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, target)))
+      .returning({ role: memberships.role });
+    // Already gone (left or removed concurrently): nothing to do, nothing to log.
+    if (!removed) throw notFound('Member');
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, target)));
     await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, target)));
+    await logActivity(tx, { orgId: oid, userId: userId(c), action: 'member.removed', entityType: 'user', entityId: target, meta: { name: m.name, email: m.email, role: removed.role } });
   });
-  await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.removed', entityType: 'user', entityId: target, meta: { name: m.name, email: m.email, role: m.role } });
   return c.json({ ok: true as const });
 });
 

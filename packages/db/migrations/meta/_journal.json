@@ -68,8 +68,36 @@
     {
       "idx": 9,
       "version": "7",
-      "when": 1793853388499,
-      "tag": "0009_neat_gunslinger",
+      "when": 1793853894508,
+      "tag": "0009_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793853900886,
+      "tag": "0010_demo_source_datafix",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793854927787,
+      "tag": "0011_vault_expiry_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793855576186,
+      "tag": "0012_api_token_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793860108329,
+      "tag": "0013_jittery_jack_murdock",
       "breakpoints": true
     }
   ]

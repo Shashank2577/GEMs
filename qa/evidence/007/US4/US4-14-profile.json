@@ -1,0 +1,62 @@
+{
+  "resetCase": {
+    "removed": {
+      "workspaces": 16,
+      "analyses": 20,
+      "matches": 28,
+      "comments": 2,
+      "notifications": 6,
+      "activity": 12,
+      "pastContracts": 5,
+      "vaultDocuments": 15,
+      "watchlists": 3,
+      "profileReset": true
+    },
+    "after": {
+      "legalName": "",
+      "tradeName": null,
+      "gstin": null,
+      "pan": null,
+      "cin": null,
+      "udyamNumber": null,
+      "mseCategory": null,
+      "mseSocialCategory": null,
+      "isStartup": false,
+      "dpiitNumber": null,
+      "miiClass": null,
+      "localContentPct": null,
+      "incorporationDate": null,
+      "address": null,
+      "state": null,
+      "pincode": null,
+      "contactName": null,
+      "contactEmail": null,
+      "contactPhone": null,
+      "signatoryName": null,
+      "signatoryDesignation": null,
+      "financials": [],
+      "categories": [],
+      "hsnCodes": [],
+      "operatingStates": [],
+      "oemAuthorizations": [],
+      "certifications": [],
+      "maxEmdCapacity": null,
+      "updatedAt": null
+    }
+  },
+  "keptCase": {
+    "removed": {
+      "workspaces": 16,
+      "analyses": 20,
+      "matches": 28,
+      "comments": 2,
+      "notifications": 6,
+      "activity": 12,
+      "pastContracts": 5,
+      "vaultDocuments": 15,
+      "watchlists": 3,
+      "profileReset": false
+    },
+    "legalName": "Aarav Technologies Private Limited (edited)"
+  }
+}

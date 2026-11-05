@@ -97,6 +97,7 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/workspaces/:id/overrides', min: 'bid_manager' },
   { method: 'DELETE', path: '/api/workspaces/:id/overrides/:itemId', min: 'bid_manager' },
   { method: 'POST', path: '/api/workspaces/:id/comments', min: 'analyst' },
+  { method: 'DELETE', path: '/api/workspaces/:id/comments/:commentId', min: 'viewer' }, // author-or-Bid-Manager+ check is in the handler (workspace.test.ts)
   { method: 'PUT', path: '/api/workspaces/:id/assist-values', min: 'analyst' },
   { method: 'POST', path: '/api/workspaces/:id/submitted', min: 'analyst' },
   { method: 'PUT', path: '/api/annexure-templates/:key', min: 'bid_manager' },
@@ -105,6 +106,7 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/workspaces/:id/packets', min: 'analyst' },
   // ── experience ──
   { method: 'POST', path: '/api/demo/seed', min: 'bid_manager' },
+  { method: 'DELETE', path: '/api/demo', min: 'bid_manager' },
 ];
 
 const ROLES: Role[] = ['viewer', 'analyst', 'bid_manager', 'owner'];
@@ -174,6 +176,25 @@ describe('role matrix: every mutating route × every role (FR-022)', () => {
     // and an owner's token passes the role gates of non-session routes
     const r = await request(ctx.app, 'PATCH', '/api/org', { bearer: token, json: {} });
     expect(r.status).toBe(200);
+  });
+});
+
+describe('006/FR-074 read-only API tokens: every mutating route', () => {
+  it('an owner\'s read-only token is 403 read_only_token on every MATRIX route (public ones too); nothing changes', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Read Only Matrix');
+    const created = await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: o.owner.cookie, json: { name: 'ro', scope: 'read' } });
+    expect(created.body.scope).toBe('read');
+    const token = created.body.token as string;
+    for (const e of MATRIX) {
+      const r = await request(ctx.app, e.method, concrete(e.path), opts(e, { bearer: token }));
+      expect(r.status, `${key(e)}: ${r.text}`).toBe(403);
+      expect(r.body.error, key(e)).toEqual({ code: 'read_only_token', message: 'This API token is read-only' });
+    }
+    // still a member (DELETE /org/members/me was refused), token still reads, org untouched
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { bearer: token });
+    expect(me.status).toBe(200);
+    expect(me.body.org).toMatchObject({ id: o.orgId, name: 'Read Only Matrix' });
+    expect((await request(ctx.app, 'GET', '/api/org/members', { cookie: o.owner.cookie })).body.items).toHaveLength(4);
   });
 });
 

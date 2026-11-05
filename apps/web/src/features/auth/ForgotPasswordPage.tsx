@@ -1,17 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Mail, MailCheck } from 'lucide-react';
+import { resetTtlText } from '@tp/core/contracts/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/label';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, tooManyAttemptsMessage } from '@/lib/api';
 import { AuthLayout } from './AuthLayout';
 import { FormAlert } from './FormAlert';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Neutral copy: never reveals whether an account exists (002/FR-011). */
-export const RESET_SENT_MESSAGE = 'If an account exists for that email, we’ve sent a reset link. It expires in 1 hour.';
+export const RESET_SENT_MESSAGE = `If an account exists for that email, we’ve sent a reset link. It expires in ${resetTtlText()}.`;
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -32,7 +33,7 @@ export default function ForgotPasswordPage() {
       setSentTo(value);
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) setError('Enter a valid work email');
-      else setFormError(errorMessage(err));
+      else setFormError(tooManyAttemptsMessage(err) ?? errorMessage(err)); // 429 auth.reset.email → inline
     } finally {
       setLoading(false);
     }

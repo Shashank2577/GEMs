@@ -31,7 +31,7 @@ and `apps/api/test/auth.test.ts` on 2026-11-05. Requirements marked **(gap)** ar
 
 Conventions used in the scenarios: the web app runs at `APP_URL` (E2E: `http://localhost:8788`), the API at `/api`.
 Error responses always have the shape `{ "error": { "code", "message", "details?" } }`; validation errors carry
-`details.fields` (map of field → message). "Toast" means a sonner toast in the bottom corner. "Phone" = 375×812 viewport
+`details.fields` (map of field → message). "Toast" means a sonner toast: bottom-right at >=768px, top-center below the top bar on smaller screens. "Phone" = 375×812 viewport
 (Playwright project `mobile` / Pixel 7), "desktop" = 1440×900.
 
 ### User Story 1 - Sign up, sign in, sign out and stay signed in (Priority: P1) (#3)
@@ -325,7 +325,7 @@ palette with Ctrl+K and "G then V", switch to dark theme, reload, and run axe on
 - **FR-047**: Theme MUST support Light, Dark and System, persisted in `localStorage` (`tp-theme`), applied before first paint, and follow OS changes in System mode.
 - **FR-048**: All UI MUST be built from `apps/web/src/components/ui` (documented in its `README.md`): HSL design tokens (no raw hex in features), 8 px spacing grid, `PageHeader` first, `SkeletonList/SkeletonPage` while loading, `ErrorState` with Retry on error, `EmptyState` with a next action when empty, `ResponsiveTable` for lists (stacked cards < 768 px), `toast` for outcomes, `Field` for labelled inputs with errors wired via `aria-describedby`.
 - **FR-049**: The API MUST return all errors as `{error:{code,message,details?}}`, attach an `x-request-id` to every response (honouring a safe incoming one), never cache API responses (`cache-control: no-store`), and map unexpected errors to 500 `internal_error` with `details.requestId`.
-- **FR-050** (gap): The API MUST send security headers on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security` on https, and a Content-Security-Policy for the SPA (`default-src 'self'`; scripts self + the inline theme script hash; images self data: blob:).
+- **FR-050** (gap): The API MUST send security headers on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` (stricter than the first draft's `strict-origin-when-cross-origin`: invite and reset links carry secrets in the URL path and the app needs no referrer, so none is sent), `Strict-Transport-Security` on https, and a Content-Security-Policy for the SPA (`default-src 'self'`; scripts self + the inline theme script hash; images self data: blob:). Implemented exceptions: `X-Frame-Options` is `SAMEORIGIN` (not `DENY`) on `content-disposition: inline` file responses so the SPA can preview them in an `<iframe>`; the CSP allows `style-src 'unsafe-inline'` (Radix UI and sonner inject inline styles) and `frame-src`/`object-src`/`worker-src 'self' blob:` for PDF previews.
 
 ### Non-Functional Requirements
 

@@ -22,6 +22,7 @@ import { buildPacket, type BuildItem } from '@tp/core/packet/build';
 import { docStatus } from '@tp/core/vault/status';
 import type { AppDeps } from '../deps';
 import { HttpError, notFound } from '../lib/errors';
+import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
 import { toAnalysisDto } from './analyse';
 
 export type WorkspaceRow = typeof bidWorkspaces.$inferSelect;
@@ -43,10 +44,14 @@ export async function getWorkspace(deps: AppDeps, org: string, id: string): Prom
   return w;
 }
 
-export async function getTenderRow(deps: AppDeps, id: string): Promise<TenderRow> {
+/**
+ * Load a tender. Pass the caller's org as `viewer` whenever the id comes from the request: demo tenders do not exist
+ * for orgs that never loaded the demo (008/FR-016). Ids read from the org's own workspace rows are already scoped.
+ */
+export async function getTenderRow(deps: AppDeps, id: string, viewer?: TenderViewer): Promise<TenderRow> {
   if (!UUID_RE.test(id)) throw notFound('Tender');
   const [t] = await deps.db.select().from(tenders).where(eq(tenders.id, id));
-  if (!t) throw notFound('Tender');
+  if (!t || (viewer && !canSeeTender(viewer, t))) throw notFound('Tender');
   return t;
 }
 

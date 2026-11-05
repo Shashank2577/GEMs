@@ -46,6 +46,7 @@ export default function NotificationsSection() {
     if (p.whatsapp && !phoneE164) { setPhoneErr('Add a valid 10-digit mobile number to get WhatsApp alerts'); return; }
     if (phone.trim() && !phoneE164) { setPhoneErr('Enter a 10-digit Indian mobile number starting with 6–9'); return; }
     setPhoneErr(null);
+    setTestStatus(null);
     try {
       if ((phoneE164 ?? null) !== (me?.user.phone ?? null)) await updateMe.mutateAsync({ phone: phoneE164 });
       await save.mutateAsync(p);
@@ -78,7 +79,7 @@ export default function NotificationsSection() {
   return (
     <Panel title="Notifications" description="Choose how TenderPilot tells you about new matches, deadlines and expiring documents. These settings are personal."
       footer={<>
-        <p role="status" aria-live="polite" className={cn('basis-full text-xs empty:hidden sm:basis-0 sm:flex-1',
+        <p role="status" aria-live="polite" className={cn('basis-full text-xs empty:sr-only sm:basis-0 sm:flex-1',
           testStatus?.kind === 'error' ? 'text-danger' : testStatus?.kind === 'warning' ? 'text-[hsl(32_90%_32%)] dark:text-warning' : 'text-muted-foreground')}>
           {testStatus && <>Test alert: {testStatus.text}</>}
         </p>

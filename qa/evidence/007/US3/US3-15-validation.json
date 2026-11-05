@@ -1,0 +1,63 @@
+{
+  "hacked": {
+    "status": 400,
+    "body": {
+      "error": {
+        "code": "validation_error",
+        "message": "onboardingState: Unknown onboarding key: hacked",
+        "details": {
+          "fields": {
+            "onboardingState": "Unknown onboarding key: hacked"
+          },
+          "issues": [
+            {
+              "path": [
+                "onboardingState"
+              ],
+              "message": "Unknown onboarding key: hacked",
+              "code": "custom"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "tooMany": {
+    "status": 400,
+    "body": {
+      "error": {
+        "code": "validation_error",
+        "message": "onboardingState: Unknown onboarding key: k0",
+        "details": {
+          "fields": {
+            "onboardingState": "Unknown onboarding key: k0"
+          },
+          "issues": [
+            {
+              "path": [
+                "onboardingState"
+              ],
+              "message": "Unknown onboarding key: k0",
+              "code": "custom"
+            },
+            {
+              "path": [
+                "onboardingState"
+              ],
+              "message": "At most 16 onboarding keys",
+              "code": "custom"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "merged": {
+    "company": true,
+    "categories": true
+  },
+  "activityActions": [
+    "onboarding.completed",
+    "org.created"
+  ]
+}
