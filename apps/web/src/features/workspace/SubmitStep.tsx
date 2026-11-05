@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   BadgeIndianRupee, Check, CheckCircle2, Copy, Download, Fingerprint, Hand, KeyRound, MousePointerClick, PartyPopper, PencilLine, Puzzle, Send, Trophy, Upload, XCircle,
 } from 'lucide-react';
-import type { AssistField, WorkspaceDetail } from '@tp/core/contracts/apply';
+import { canTransition, type AssistField, type WorkspaceDetail } from '@tp/core/contracts/apply';
 import {
   Badge, Button, Card, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ErrorState, Field, Input,
   Segmented, SkeletonList, Textarea, Tooltip, toast,
@@ -12,7 +12,7 @@ import { useCan } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, formatINR } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useAssist, useMarkSubmitted, useRecordOutcome, useSaveAssist } from './api';
+import { useAssist, useMarkSubmitted, useRecordOutcome, useSaveAssist, useUpdateWorkspace } from './api';
 
 const GROUP_LABEL: Record<AssistField['group'], string> = { product: 'Product', offer: 'Offer', compliance: 'Compliance', declaration: 'Declarations' };
 const SOURCE_LABEL: Record<AssistField['source'], string> = { saved: 'Edited', profile: 'From profile', tender: 'From tender', analysis: 'From analysis', empty: 'Not set' };
@@ -190,6 +190,9 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
   const canWrite = useCan('analyst');
   const mark = useMarkSubmitted(w.id);
   const outcome = useRecordOutcome(w.id);
+  const update = useUpdateWorkspace(w.id);
+  // FR-008: the result can be recorded only while the stage is Submitted (the API guard is stage-based, not submittedAt-based).
+  const canRecord = canTransition(w.stage, 'won').ok;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [checks, setChecks] = useState({ price: false, auth: false, submit: false });
   const [note, setNote] = useState('');
@@ -225,7 +228,15 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
         <>
           <div className="flex items-center gap-2.5"><CheckCircle2 className="size-6 text-success" aria-hidden /><div><div className="text-sm font-semibold">Submitted on GeM</div><div className="text-xs text-muted-foreground">{w.submittedAt ? formatDateIST(w.submittedAt, { time: true }) : ''}</div></div></div>
           <p className="mt-3 text-[13px] text-muted-foreground">When GeM publishes the result, record it here — the L1 price helps you price the next bid.</p>
-          {canWrite && <Button block className="mt-3" variant="secondary" onClick={() => setOutcomeOpen(true)}><PartyPopper /> Record result</Button>}
+          {canWrite && (canRecord
+            ? <Button block className="mt-3" variant="secondary" onClick={() => setOutcomeOpen(true)}><PartyPopper /> Record result</Button>
+            : <>
+              <p className="mt-2 text-xs text-muted-foreground">This bid was moved out of Submitted. Move it back to record the result.</p>
+              <Button block className="mt-3" variant="secondary" loading={update.isPending}
+                onClick={() => update.mutate({ stage: 'submitted' }, { onSuccess: () => toast.success('Moved to Submitted'), onError: (e) => toast.error(errorMessage(e)) })}>
+                <Send /> Move back to Submitted
+              </Button>
+            </>)}
         </>
       ) : (
         <>

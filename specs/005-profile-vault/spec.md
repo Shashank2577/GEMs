@@ -39,7 +39,8 @@ organisation answers **404** `not_found` (never 403, never data).
 > `signupViaApi()` (role Owner, empty profile and vault). "Demo org" = a fresh org after `POST /api/demo/seed` (company
 > "Aarav Technologies Pvt Ltd", GSTIN `27AAJCA4721K1ZK`, PAN `AAJCA4721K`, CIN `U72900PN2016PTC165432`, Udyam
 > `UDYAM-MH-26-0012345`, 5 past contracts, 15 vault documents including an ISO 9001 certificate expiring in **10** days, a
-> CA turnover certificate expiring in **25** days and a Dell OEM authorisation that expired **5** days ago). Other roles
+> CA turnover certificate expiring in **25** days and a Dell OEM authorisation that expired **5** days ago; the profile's
+> CP PLUS and Dell Technologies OEM rows are linked to their vault letters, the D-Link India row is not). Other roles
 > are added by inviting users from Settings → Team. API errors always have the shape
 > `{ "error": { "code", "message", "details?" } }`; field errors are in `details.fields` keyed by path (e.g.
 > `financials.1.fy`). Dates are calendar dates, "today" is the IST calendar day; all times are shown in IST. Fixture
@@ -171,7 +172,9 @@ certificate to the vault and return: it becomes **32%**; add FY 2025-26, 2024-25
 10. **Given** the demo org on 2026-11-05, **When** `/profile` opens, **Then** completeness is **96%**, the heading is
     "Almost there" and the suggestions are: "Add turnover for 2025-26 so the 3-year average is accurate.", "OEM
     authorisation from Dell Technologies has expired — request a fresh one." and ""OEM authorisation – Dell Technologies
-    (desktops & servers)" in the vault has expired — upload the renewed copy.".
+    (desktops & servers)" in the vault has expired — upload the renewed copy.", followed by one info suggestion "Link the
+    D-Link India authorisation letter from the vault so packets can attach it." (the demo's CP PLUS and Dell rows are linked
+    to their vault letters; info suggestions do not change the 96%).
 11. *(gap — FR-020)* **Given** an OEM authorisation in the profile valid till today + 20 days, **Then** an info suggestion
     "OEM authorisation from <OEM> expires in 20 days — ask for a renewed MAF." appears (no score change); and for an OEM
     row with no linked vault document, an info suggestion "Link the <OEM> authorisation letter from the vault so packets can

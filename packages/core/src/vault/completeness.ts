@@ -2,7 +2,7 @@
  * Company-profile completeness (T052; FR-020). A weighted checklist of what GeM bids usually need,
  * producing a 0–100 score and actionable issues the UI links to the right form section.
  */
-import { docStatus } from './status';
+import { docStatus, reminderCopy } from './status';
 import { fyStartYear, lastCompletedFys } from './validators';
 
 export type ProfileSection = 'identity' | 'registrations' | 'financials' | 'experience' | 'oem' | 'categories' | 'contact' | 'vault';
@@ -21,7 +21,7 @@ export interface CompletenessProfile {
   isStartup?: boolean | null; dpiitNumber?: string | null; miiClass?: string | null;
   financials?: { fy: string; turnover: number; netWorth?: number | null }[] | null;
   categories?: string[] | null; hsnCodes?: string[] | null; operatingStates?: string[] | null;
-  oemAuthorizations?: { oem: string; validTill?: string | null }[] | null;
+  oemAuthorizations?: { oem: string; validTill?: string | null; documentId?: string | null }[] | null;
   signatoryName?: string | null; signatoryDesignation?: string | null; contactEmail?: string | null; contactPhone?: string | null;
 }
 
@@ -95,12 +95,19 @@ export function profileCompleteness(
   check(5, [p.signatoryName, p.signatoryDesignation].filter(present).length / 2, { field: 'signatoryName', section: 'contact', message: 'Add the authorised signatory name and designation — used on undertakings and annexures.' });
   check(4, [p.contactEmail, p.contactPhone].filter(present).length / 2, { field: 'contactEmail', section: 'contact', message: 'Add a contact email and mobile number.' });
 
-  // OEM authorisations
-  for (const o of p.oemAuthorizations ?? []) {
-    if (o.validTill && docStatus(o.validTill, now).status === 'expired') {
-      issues.push({ field: 'oemAuthorizations', section: 'oem', severity: 'warning', message: `OEM authorisation from ${o.oem} has expired — request a fresh one.` });
+  // OEM authorisations — warnings/info only, no weight (FR-017, FR-020).
+  (p.oemAuthorizations ?? []).forEach((o, i) => {
+    if (!present(o.oem)) return; // a half-typed row; the editor's own validation covers it
+    const st = o.validTill ? docStatus(o.validTill, now) : null;
+    if (st?.status === 'expired') {
+      issues.push({ field: `oemAuthorizations.${i}.validTill`, section: 'oem', severity: 'warning', message: `OEM authorisation from ${o.oem} has expired — request a fresh one.` });
+    } else if (st?.status === 'expiring' && st.daysToExpiry != null) {
+      issues.push({ field: `oemAuthorizations.${i}.validTill`, section: 'oem', severity: 'info', message: `OEM authorisation from ${o.oem} ${reminderCopy(1, st.daysToExpiry)} — ask for a renewed MAF.` });
     }
-  }
+    if (!present(o.documentId)) {
+      issues.push({ field: `oemAuthorizations.${i}.documentId`, section: 'oem', severity: 'info', message: `Link the ${o.oem} authorisation letter from the vault so packets can attach it.` });
+    }
+  });
 
   // Vault documents that back the profile
   check(5, has('gst'), { field: 'vault.gst', section: 'vault', message: 'Upload your GST registration certificate to the vault.' });
