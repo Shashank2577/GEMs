@@ -2,7 +2,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
-import { activityLog, notifications, vaultDocuments } from '@tp/db';
+import { activityLog, companyProfiles, notifications, vaultDocuments } from '@tp/db';
+import { createApp } from '../src/app';
+import { contentDisposition, safeFileName } from '../src/routes/vault';
+import type { AppDeps } from '../src/deps';
 import { runExpiryReminders } from '../src/services/reminders';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -415,5 +418,284 @@ describe('expiry reminders', () => {
     const titles = (await ctx.db.select().from(notifications).where(and(eq(notifications.kind, 'expiry'), eq(notifications.channel, 'in_app'), eq(notifications.userId, org.owner.me.user.id)))).map((n) => n.title);
     expect(titles).toEqual(expect.arrayContaining([expect.stringContaining('has expired')]));
     ctx.clock.set(NOW);
+  });
+});
+
+/** T033 (#134): download headers, replace PDF → PNG, cross-org 404s, tags, literal `%`, empty file, insert rollback. */
+describe('vault — headers, replace, isolation and rollback (T033)', () => {
+  let b: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  beforeAll(async () => { b = await seedOrgWithRoles(ctx.app, 'Vault Gaps Traders'); });
+
+  it('download sends attachment / inline with ASCII filename + UTF-8 filename* and private, no-store (FR-030)', async () => {
+    const bytes = await pdf(1);
+    const up = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(bytes, 'प्रमाणपत्र.pdf'), type: 'other', title: 'Hindi certificate' } });
+    expect(up.status).toBe(201);
+    expect(up.body.fileName).toBe('प्रमाणपत्र.pdf');
+    const d = await request(ctx.app, 'GET', `/vault/${up.body.id}/download`, { cookie: b.viewer.cookie });
+    expect(d.status).toBe(200);
+    const cd = d.headers.get('content-disposition')!;
+    expect(cd).toMatch(/^attachment; /);
+    // No ASCII letters/digits survive → generic ASCII fallback; the real name travels in filename*.
+    expect(cd).toContain('filename="document.pdf"');
+    expect(cd).toContain(`filename*=UTF-8''${encodeURIComponent('प्रमाणपत्र.pdf')}`);
+    expect(d.headers.get('cache-control')).toBe('private, no-store');
+    expect(d.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(d.headers.get('content-length')).toBe(String(bytes.length));
+    expect(new Uint8Array(await d.res.arrayBuffer())).toEqual(bytes);
+
+    const inline = await request(ctx.app, 'GET', `/vault/${up.body.id}/download?inline=1`, { cookie: b.viewer.cookie });
+    expect(inline.headers.get('content-disposition')).toMatch(/^inline; filename="document\.pdf"; filename\*=UTF-8''/);
+    expect(inline.headers.get('cache-control')).toBe('private, no-store');
+    expect(inline.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
+  it('replacing a PDF with a PNG deletes the old blob and updates mime type and page count (FR-032)', async () => {
+    const up = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(4), 'udyam.pdf'), type: 'udyam', title: 'Udyam certificate', number: 'UDYAM-MH-26-0123456' } });
+    expect(up.body.pageCount).toBe(4);
+    const [before] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, up.body.id));
+    const r = await request(ctx.app, 'PUT', `/vault/${up.body.id}/file`, { cookie: b.analyst.cookie, form: { file: file(PNG, 'udyam-scan.png', 'image/png') } });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ fileName: 'udyam-scan.png', mimeType: 'image/png', pageCount: 1, sizeBytes: PNG.length, type: 'udyam', title: 'Udyam certificate', number: 'UDYAM-MH-26-0123456' });
+    const [after] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, up.body.id));
+    expect(after!.blobKey).not.toBe(before!.blobKey);
+    expect(await ctx.deps.blobs.head(before!.blobKey)).toBeNull();
+    expect(await ctx.deps.blobs.head(after!.blobKey)).not.toBeNull();
+    const d = await request(ctx.app, 'GET', `/vault/${up.body.id}/download`, { cookie: b.viewer.cookie });
+    expect(d.headers.get('content-type')).toBe('image/png');
+    expect(new Uint8Array(await d.res.arrayBuffer())).toEqual(PNG);
+    const acts = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, up.body.id), eq(activityLog.action, 'vault.file_replaced')));
+    expect(acts).toHaveLength(1);
+  });
+
+  it('answers 404 "Document not found" for another org\'s id on every route, and leaves it untouched (FR-034)', async () => {
+    const up = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(), 'crac.pdf'), type: 'crac', title: 'CRAC NIC' } });
+    const id = up.body.id as string;
+    const other = await signup(ctx.app, { orgName: 'Intruder Pvt Ltd' });
+    const calls: [string, string, Parameters<typeof request>[3]][] = [
+      ['GET', `/vault/${id}`, {}],
+      ['GET', `/vault/${id}/download`, {}],
+      ['GET', `/vault/${id}/download?inline=1`, {}],
+      ['PATCH', `/vault/${id}`, { json: { title: 'Hijacked' } }],
+      ['PUT', `/vault/${id}/file`, { form: { file: file(PNG, 'evil.png', 'image/png') } }],
+      ['DELETE', `/vault/${id}`, {}],
+    ];
+    for (const [m, p, o] of calls) {
+      const r = await request(ctx.app, m, p, { ...o, cookie: other.cookie });
+      expect(r.status, `${m} ${p}`).toBe(404);
+      expect(r.body.error, `${m} ${p}`).toEqual({ code: 'not_found', message: 'Document not found' });
+    }
+    for (const [m, p] of [['GET', '/vault/not-a-uuid'], ['GET', '/vault/123/download'], ['PATCH', '/vault/xyz'], ['DELETE', '/vault/xyz']] as const) {
+      const r = await request(ctx.app, m, p, { cookie: b.analyst.cookie, json: m === 'PATCH' ? { title: 'x' } : undefined });
+      expect(r.status, `${m} ${p}`).toBe(404);
+    }
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, id));
+    expect(row).toMatchObject({ title: 'CRAC NIC', fileName: 'crac.pdf', mimeType: 'application/pdf' });
+    expect(await ctx.deps.blobs.head(row!.blobKey)).not.toBeNull();
+  });
+
+  it('accepts tags as a comma list and as a JSON array (FR-022)', async () => {
+    const comma = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(), 'a.pdf'), title: 'Comma tags', tags: ' gem, statutory ,,renewal ' } });
+    expect(comma.status).toBe(201);
+    expect(comma.body.tags).toEqual(['gem', 'statutory', 'renewal']);
+    const json = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(), 'b.pdf'), title: 'JSON tags', tags: '["dell", "oem, partner"]' } });
+    expect(json.status).toBe(201);
+    expect(json.body.tags).toEqual(['dell', 'oem, partner']);
+    const tooMany = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(), 'c.pdf'), tags: Array.from({ length: 21 }, (_, i) => `t${i}`).join(',') } });
+    expect(tooMany.status).toBe(400);
+  });
+
+  it('search treats % and _ literally (FR-027)', async () => {
+    const pct = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(), 'mii.pdf'), type: 'mii_certificate', title: 'MII 60% local content' } });
+    expect(pct.status).toBe(201);
+    const r = await request(ctx.app, 'GET', `/vault?q=${encodeURIComponent('60%')}`, { cookie: b.viewer.cookie });
+    expect(r.body.items.map((d: any) => d.id)).toEqual([pct.body.id]);
+    const onlyPct = await request(ctx.app, 'GET', `/vault?q=${encodeURIComponent('%')}`, { cookie: b.viewer.cookie });
+    expect(onlyPct.body.items.map((d: any) => d.id)).toEqual([pct.body.id]);
+    const underscore = await request(ctx.app, 'GET', `/vault?q=${encodeURIComponent('_')}`, { cookie: b.viewer.cookie });
+    expect(underscore.body.total).toBe(0);
+  });
+
+  it('rejects a 0-byte file with 400 "The file is empty" and stores nothing (FR-023)', async () => {
+    const before = await ctx.db.select({ id: vaultDocuments.id }).from(vaultDocuments).where(eq(vaultDocuments.orgId, b.orgId));
+    const r = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(new Uint8Array(0), 'empty.pdf') } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe('validation_error');
+    expect(r.body.error.details.fields.file).toBe('The file is empty');
+    const after = await ctx.db.select({ id: vaultDocuments.id }).from(vaultDocuments).where(eq(vaultDocuments.orgId, b.orgId));
+    expect(after.length).toBe(before.length);
+  });
+
+  it('a failed DB insert removes the blob it just wrote (FR-023)', async () => {
+    const written: string[] = [];
+    const blobs: AppDeps['blobs'] = { ...ctx.deps.blobs, put: async (key, body, o) => { written.push(key); return ctx.deps.blobs.put(key, body, o); } };
+    const db = new Proxy(ctx.db, {
+      get(target, prop, recv) {
+        if (prop === 'insert') {
+          return (table: unknown) => {
+            if (table === vaultDocuments) throw new Error('simulated insert failure');
+            return target.insert(table as typeof vaultDocuments);
+          };
+        }
+        const v = Reflect.get(target, prop, recv);
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+    const app = createApp({ ...ctx.deps, db, blobs });
+    const r = await request(app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(), 'doomed.pdf'), title: 'Doomed' } });
+    expect(r.status).toBe(500);
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatch(new RegExp(`^org/${b.orgId}/vault/[0-9a-f-]{36}/doomed\\.pdf$`));
+    expect(await ctx.deps.blobs.head(written[0]!)).toBeNull();
+    expect(await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.title, 'Doomed'))).toHaveLength(0);
+  });
+});
+
+/** T038 (#135): deleting a vault document unlinks profile OEM authorisations in the same request (FR-041). */
+describe('vault delete unlinks OEM authorisations (T038)', () => {
+  it('clears documentId only on authorisations pointing at the deleted document', async () => {
+    const c = await seedOrgWithRoles(ctx.app, 'OEM Link Traders');
+    const maf = await request(ctx.app, 'POST', '/vault', { cookie: c.analyst.cookie, form: { file: file(await pdf(), 'dell_maf.pdf'), type: 'oem_authorization', title: 'Dell MAF' } });
+    const hp = await request(ctx.app, 'POST', '/vault', { cookie: c.analyst.cookie, form: { file: file(await pdf(), 'hp_maf.pdf'), type: 'oem_authorization', title: 'HP MAF' } });
+    const crac = await request(ctx.app, 'POST', '/past-contracts', { cookie: c.analyst.cookie, json: { buyer: 'NIC', title: 'Laptops', value: 100000, cracDocumentId: maf.body.id } });
+    expect(crac.status).toBe(201);
+    const put = await request(ctx.app, 'PUT', '/profile', {
+      cookie: c.analyst.cookie,
+      json: { oemAuthorizations: [
+        { oem: 'Dell', products: 'Laptops', validTill: '2027-03-31', documentId: maf.body.id },
+        { oem: 'HP', products: 'Printers', documentId: hp.body.id },
+        { oem: 'Dell', products: 'Desktops', documentId: maf.body.id },
+        { oem: 'Lenovo', products: 'Tablets' },
+      ] },
+    });
+    expect(put.status).toBe(200);
+
+    const del = await request(ctx.app, 'DELETE', `/vault/${maf.body.id}`, { cookie: c.analyst.cookie });
+    expect(del.status).toBe(200);
+    expect(del.body).toEqual({ ok: true });
+
+    const prof = await request(ctx.app, 'GET', '/profile', { cookie: c.viewer.cookie });
+    const auths = prof.body.profile.oemAuthorizations as { oem: string; products: string; validTill?: string | null; documentId?: string | null }[];
+    expect(auths.map((a) => a.oem)).toEqual(['Dell', 'HP', 'Dell', 'Lenovo']);
+    expect(auths[0]).toMatchObject({ oem: 'Dell', products: 'Laptops', validTill: '2027-03-31', documentId: null });
+    expect(auths[1]!.documentId).toBe(hp.body.id);
+    expect(auths[2]!.documentId).toBeNull();
+    expect(auths[3]!.documentId ?? null).toBeNull();
+    const pcs = await request(ctx.app, 'GET', '/past-contracts', { cookie: c.viewer.cookie });
+    expect(pcs.body.items[0].cracDocumentId).toBeNull();
+  });
+
+  it('does not touch another org\'s profile that happens to hold the same id', async () => {
+    const d = await seedOrgWithRoles(ctx.app, 'Mine Traders');
+    const e = await seedOrgWithRoles(ctx.app, 'Theirs Traders');
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: d.analyst.cookie, form: { file: file(await pdf(), 'oem.pdf'), type: 'oem_authorization', title: 'Acer MAF' } });
+    // Simulate a stale cross-org reference written directly (the API never lets this happen).
+    await ctx.db.insert(companyProfiles).values({ orgId: e.orgId, oemAuthorizations: [{ oem: 'Acer', products: 'All', documentId: doc.body.id }] });
+    expect((await request(ctx.app, 'DELETE', `/vault/${doc.body.id}`, { cookie: d.analyst.cookie })).status).toBe(200);
+    const [theirs] = await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, e.orgId));
+    expect(theirs!.oemAuthorizations[0]!.documentId).toBe(doc.body.id);
+  });
+});
+
+/** Review fixes on PR #477: stored names stay within filesystem limits and headers stay well-formed (FR-030). */
+describe('safeFileName / contentDisposition', () => {
+  const bytes = (x: string) => new TextEncoder().encode(x).length;
+  const wellFormed = (x: string) => { expect(() => encodeURIComponent(x)).not.toThrow(); };
+
+  it('keeps any script and caps the base at 180 UTF-8 bytes on a grapheme boundary', () => {
+    const long = 'प्रमाणपत्र '.repeat(40) + '.pdf';
+    const out = safeFileName(long, 'application/pdf');
+    expect(out.endsWith('.pdf')).toBe(true);
+    expect(bytes(out.slice(0, -4))).toBeLessThanOrEqual(180);
+    expect(bytes(out)).toBeLessThan(255);
+    expect(out.startsWith('प्रमाणपत्र')).toBe(true);
+    wellFormed(out);
+    // Never ends in a dangling combining mark (virama/vowel sign) cut off from its base consonant.
+    expect(out.slice(0, -4).normalize('NFC')).toBe(out.slice(0, -4));
+  });
+
+  it('does not split an astral character at the boundary', () => {
+    const out = safeFileName(`${'a'.repeat(178)}𝐀𝐀.pdf`, 'application/pdf');
+    expect(out).toBe(`${'a'.repeat(178)}.pdf`);
+    wellFormed(out);
+    const exact = safeFileName(`${'a'.repeat(176)}𝐀.pdf`, 'application/pdf');
+    expect(exact).toBe(`${'a'.repeat(176)}𝐀.pdf`);
+  });
+
+  it('neutralises CR/LF, path tricks and bidi overrides', () => {
+    expect(safeFileName('bad\r\nname.pdf', 'application/pdf')).toBe('bad_name.pdf');
+    expect(safeFileName('..', 'application/pdf')).toBe('document.pdf');
+    expect(safeFileName('../../etc/passwd', 'application/pdf')).toBe('passwd.pdf');
+    expect(safeFileName('...hidden.pdf', 'application/pdf')).toBe('hidden.pdf');
+    expect(safeFileName('invoice\u202Efdp.exe', 'application/pdf')).toBe('invoice_fdp.pdf');
+    expect(safeFileName('C:\\scans\\gst.PDF', 'image/png')).toBe('gst.png');
+  });
+
+  it('falls back to document.<ext> in the ASCII filename and RFC 8187-escapes filename*', () => {
+    expect(contentDisposition('प्रमाणपत्र.pdf', false)).toBe(`attachment; filename="document.pdf"; filename*=UTF-8''${encodeURIComponent('प्रमाणपत्र.pdf')}`);
+    expect(contentDisposition('GST (copy) it\'s*.png', true)).toBe(`inline; filename="GST (copy) it's*.png"; filename*=UTF-8''GST%20%28copy%29%20it%27s%2A.png`);
+    expect(contentDisposition('ISO प्रमाणपत्र.pdf', false)).toMatch(/^attachment; filename="ISO _+\.pdf"/);
+  });
+
+  it('uploads a very long Devanagari file name without a filesystem error', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Long Names Traders');
+    const name = `${'प्रमाणपत्र_'.repeat(30)}.pdf`;
+    const r = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), name), type: 'other', title: 'Long name' } });
+    expect(r.status).toBe(201);
+    expect(bytes(r.body.fileName)).toBeLessThan(255);
+    const d = await request(ctx.app, 'GET', `/vault/${r.body.id}/download`, { cookie: o.viewer.cookie });
+    expect(d.status).toBe(200);
+    expect(d.headers.get('content-disposition')).toContain(`filename*=UTF-8''${encodeURIComponent(r.body.fileName)}`);
+  });
+});
+
+describe('vault delete — review fixes (FR-041)', () => {
+  it('deletes a document in an org that has no company profile row', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'No Profile Traders');
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'pan.pdf'), type: 'pan', title: 'PAN' } });
+    expect(await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId))).toHaveLength(0);
+    const d = await request(ctx.app, 'DELETE', `/vault/${doc.body.id}`, { cookie: o.analyst.cookie });
+    expect(d.status).toBe(200);
+    expect(await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.body.id))).toHaveLength(0);
+    expect(await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId))).toHaveLength(0);
+  });
+
+  it('matches the OEM documentId case-insensitively', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Upper Case Traders');
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'maf.pdf'), type: 'oem_authorization', title: 'Lenovo MAF' } });
+    const put = await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Lenovo', products: 'Laptops', documentId: String(doc.body.id).toUpperCase() }] } });
+    expect(put.status).toBe(200);
+    expect((await request(ctx.app, 'DELETE', `/vault/${doc.body.id}`, { cookie: o.analyst.cookie })).status).toBe(200);
+    const [row] = await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId));
+    expect(row!.oemAuthorizations[0]).toMatchObject({ oem: 'Lenovo', documentId: null });
+  });
+
+  it('rolls back every unlink when the row delete fails', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Rollback Traders');
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'crac.pdf'), type: 'crac', title: 'CRAC' } });
+    await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title: 'T', value: 1000, cracDocumentId: doc.body.id } });
+    await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Dell', products: 'x', documentId: doc.body.id }] } });
+    const failingTx = new Proxy(ctx.db, {
+      get(target, prop, recv) {
+        if (prop === 'transaction') {
+          return (fn: (tx: unknown) => Promise<unknown>) => target.transaction((tx) => fn(new Proxy(tx, {
+            get(t, p, r) {
+              if (p === 'delete') return () => { throw new Error('simulated delete failure'); };
+              const v = Reflect.get(t, p, r);
+              return typeof v === 'function' ? v.bind(t) : v;
+            },
+          })));
+        }
+        const v = Reflect.get(target, prop, recv);
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+    const app = createApp({ ...ctx.deps, db: failingTx });
+    expect((await request(app, 'DELETE', `/vault/${doc.body.id}`, { cookie: o.analyst.cookie })).status).toBe(500);
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.body.id));
+    expect(await ctx.deps.blobs.head(row!.blobKey)).not.toBeNull();
+    const pcs = await request(ctx.app, 'GET', '/past-contracts', { cookie: o.viewer.cookie });
+    expect(pcs.body.items[0].cracDocumentId).toBe(doc.body.id);
+    const [prof] = await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId));
+    expect(prof!.oemAuthorizations[0]!.documentId).toBe(doc.body.id);
   });
 });

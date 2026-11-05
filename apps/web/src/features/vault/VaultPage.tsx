@@ -12,15 +12,16 @@ import {
 import type { VaultDocumentDto } from '@tp/core/contracts/vault';
 import { DOC_CATEGORIES, DOC_TYPES, docTypeInfo, type DocCategory, type DocStatus, type DocType } from '@tp/core/vault/status';
 import {
-  Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, ResponsiveTable, Segmented, Select, Skeleton, StatTile, type Column,
+  Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, ResponsiveTable, Segmented, Select, Skeleton, StatTile, toast, type Column,
 } from '@/components/ui';
 import { RoleGate, useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { useLocalStorage } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { useVault, useVaultDoc, useVaultSummary, type VaultFilters } from './api';
+import { DOC_NOT_FOUND_MESSAGE, isStaleDocLink, useVault, useVaultDoc, useVaultSummary, type VaultFilters } from './api';
 import { DocTypeIcon, ExpiryBadge, STATUS_LABEL } from './doc-ui';
 import { DocumentDrawer } from './DocumentDrawer';
+import { checkVaultFile } from './file-check';
 import { ExpiryTimeline } from './ExpiryTimeline';
 import { UploadDialog } from './UploadDialog';
 
@@ -63,7 +64,7 @@ function DocCard({ doc, onOpen }: { doc: VaultDocumentDto; onOpen: () => void })
 
 function GridSkeleton() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {Array.from({ length: 8 }, (_, i) => (
         <Card key={i} className="p-4">
           <div className="flex gap-3"><Skeleton className="size-10 rounded-lg" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div></div>
@@ -93,7 +94,7 @@ function Onboarding({ onUpload }: { onUpload: (t: DocType) => void }) {
       </div>
       <div className="px-5 py-5 sm:px-8">
         <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Documents most GeM bids ask for</h3>
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {common.map((d) => (
             <li key={d.type}>
               <button
@@ -152,11 +153,24 @@ export default function VaultPage() {
   const single = useVaultDoc(docId && !inList ? docId : null);
   const openDoc = inList ?? single.data ?? null;
   const setDoc = (id: string | null) => setParam('doc', id);
+  // FR-040: a stale `?doc=<id>` (deleted document, old reminder link) gets a visible message and is dropped from the URL.
+  useEffect(() => {
+    if (isStaleDocLink(docId, !!inList, single.error)) {
+      toast.error(DOC_NOT_FOUND_MESSAGE, { id: 'vault-doc-not-found' });
+      setParam('doc', null);
+    }
+  }, [docId, inList, single.error, setParam]);
 
   // Page-level drag & drop
   const [dragging, setDragging] = useState(false);
   const onDragOver = (e: DragEvent) => { if (can('analyst') && e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } };
-  const onDrop = (e: DragEvent) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files?.[0]; if (f && can('analyst')) openUpload(f); };
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (!f || !can('analyst')) return;
+    const problem = checkVaultFile(f);
+    if (problem) toast.error(problem); else openUpload(f);
+  };
 
   const s = summary.data;
   const hasFilters = !!(status || category || type || dq.trim());
@@ -278,7 +292,7 @@ export default function VaultPage() {
               action={<Button variant="secondary" size="sm" onClick={clearFilters}>Clear filters</Button>}
             />
           ) : view === 'grid' ? (
-            <div className={cn('grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 transition-opacity', list.isPlaceholderData && 'opacity-60')}>
+            <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 transition-opacity', list.isPlaceholderData && 'opacity-60')}>
               {list.data.items.map((d) => <DocCard key={d.id} doc={d} onOpen={() => setDoc(d.id)} />)}
             </div>
           ) : (
@@ -301,9 +315,6 @@ export default function VaultPage() {
 
       <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} initialFile={uploadFile} presetType={presetType} onUploaded={(id) => setDoc(id)} />
       <DocumentDrawer doc={openDoc} open={!!docId && !!openDoc} onOpenChange={(o) => { if (!o) setDoc(null); }} />
-      {docId && single.isError && !inList && (
-        <p role="status" className="sr-only">That document could not be found.</p>
-      )}
     </div>
   );
 }

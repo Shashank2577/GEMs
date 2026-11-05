@@ -1,6 +1,13 @@
 /**
  * Vault document status & expiry reminders (T051; FR-021, FR-022) and the document-type catalog.
  * Dates are calendar dates ("YYYY-MM-DD"); "today" is the IST calendar day of `now`.
+ *
+ * GeM seller-document label vocabulary (`GEM_SELLER_DOC_LABELS`, T041; FR-026, NFR-009): the eligibility
+ * labels of GeM bid documents ("Minimum Average Annual Turnover", "Years of Past Experience Required",
+ * "MSE / Startup Relaxation for Years Of Experience and Turnover", "Document required from seller") are
+ * adapted from `buildEligibilitySummary` in erenmyeager15/india-government-tenders-scraper
+ * (Apache-2.0, https://github.com/erenmyeager15/india-government-tenders-scraper, src/routes.ts) — see
+ * NOTICE. The "Document required from seller" item names are the labels printed on public GeM bid PDFs.
  */
 import type { DocType } from '../analyse/types';
 
@@ -98,43 +105,76 @@ export interface DocTypeInfo {
   keywords: string[];
 }
 
+/**
+ * Labels GeM bid documents use for the proofs a seller must upload, mapped to the vault type that
+ * satisfies them. Their normalised forms are appended to `DOC_TYPES[].keywords`, so `guessDocType`
+ * recognises file names that sellers copy from the bid ("Bidder_Turnover.pdf", "Experience Criteria.pdf").
+ */
+export const GEM_SELLER_DOC_LABELS: Readonly<Record<string, DocType>> = {
+  // Eligibility labels (adapted from india-government-tenders-scraper `buildEligibilitySummary`, Apache-2.0).
+  'Minimum Average Annual Turnover': 'ca_turnover_certificate',
+  'Average Annual Turnover': 'ca_turnover_certificate',
+  'Years of Past Experience Required': 'work_order',
+  'Past Experience': 'work_order',
+  'MSE Relaxation for Years Of Experience and Turnover': 'udyam',
+  'MSE Relaxation': 'udyam',
+  'Startup Relaxation for Years Of Experience and Turnover': 'startup_dpiit',
+  'Startup Relaxation': 'startup_dpiit',
+  // "Document required from seller" items on GeM bid PDFs.
+  'Experience Criteria': 'work_order',
+  'Past Performance': 'crac',
+  'Bidder Turnover': 'ca_turnover_certificate',
+  'OEM Authorization Certificate': 'oem_authorization',
+  'OEM Authorisation Certificate': 'oem_authorization',
+  'Manufacturer Authorization Form': 'oem_authorization',
+  'Compliance of BoQ specification and supporting document': 'product_catalogue',
+  'BoQ Compliance': 'product_catalogue',
+  'Make in India Certificate': 'mii_certificate',
+  'Local Content Certificate': 'mii_certificate',
+  'EMD Exemption Certificate': 'emd_exemption',
+};
+
+/** Lower-case, punctuation-free form used for keyword matching ("OEM Authorization Certificate" → "oem authorization certificate"). */
+const labelKeyword = (label: string) => label.toLowerCase().replace(/[^a-z0-9&]+/g, ' ').trim();
+const gemKeywords = (type: DocType) => Object.entries(GEM_SELLER_DOC_LABELS).filter(([, t]) => t === type).map(([l]) => labelKeyword(l));
+
 export const DOC_TYPES: readonly DocTypeInfo[] = [
   { type: 'gst', label: 'GST registration', icon: 'Receipt', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'GST registration certificate (Form GST REG-06) showing your GSTIN.', keywords: ['gst', 'gstin', 'reg-06', 'reg06'] },
+    description: 'GST registration certificate (Form GST REG-06) showing your GSTIN.', keywords: ['gst', 'gstin', 'reg-06', 'reg06', 'जीएसटी'] },
   { type: 'pan', label: 'PAN card', icon: 'CreditCard', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'Permanent Account Number card of the bidding entity.', keywords: ['pan'] },
+    description: 'Permanent Account Number card of the bidding entity.', keywords: ['pan', 'पैन कार्ड'] },
   { type: 'udyam', label: 'Udyam (MSE) certificate', icon: 'BadgeCheck', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'Udyam registration — needed to claim MSE EMD exemption and purchase preference.', keywords: ['udyam', 'msme', 'mse', 'udyog'] },
+    description: 'Udyam registration — needed to claim MSE EMD exemption and purchase preference.', keywords: ['udyam', 'msme', 'mse', 'udyog', 'उद्यम', ...gemKeywords('udyam')] },
   { type: 'startup_dpiit', label: 'Startup (DPIIT) recognition', icon: 'Rocket', category: 'Statutory', expires: true, typicalValidityMonths: 120, perFinancialYear: false, commonInBids: false,
-    description: 'DPIIT recognition certificate — exempts eligible startups from turnover/experience criteria.', keywords: ['dpiit', 'startup', 'dipp'] },
+    description: 'DPIIT recognition certificate — exempts eligible startups from turnover/experience criteria.', keywords: ['dpiit', 'startup', 'dipp', ...gemKeywords('startup_dpiit')] },
   { type: 'incorporation', label: 'Incorporation certificate', icon: 'Building2', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: false,
     description: 'Certificate of incorporation / partnership deed / LLP agreement.', keywords: ['incorporation', 'coi', 'partnership', 'deed', 'llp', 'moa', 'aoa'] },
   { type: 'balance_sheet', label: 'Audited balance sheet', icon: 'FileSpreadsheet', category: 'Financial', expires: false, typicalValidityMonths: null, perFinancialYear: true, commonInBids: true,
-    description: 'Audited balance sheet and P&L for one financial year.', keywords: ['balance', 'bs', 'audited', 'financial statement', 'p&l', 'pnl'] },
+    description: 'Audited balance sheet and P&L for one financial year.', keywords: ['balance', 'bs', 'audited', 'financial statement', 'financial statements', 'p&l', 'pnl', 'profit and loss', 'profit loss'] },
   { type: 'itr', label: 'Income-tax return (ITR)', icon: 'Landmark', category: 'Financial', expires: false, typicalValidityMonths: null, perFinancialYear: true, commonInBids: false,
     description: 'ITR acknowledgement for one assessment year.', keywords: ['itr', 'income tax', 'acknowledgement'] },
   { type: 'ca_turnover_certificate', label: 'CA turnover certificate', icon: 'Calculator', category: 'Financial', expires: false, typicalValidityMonths: null, perFinancialYear: true, commonInBids: true,
-    description: 'Chartered Accountant certificate of annual turnover (usually last 3 FYs, with UDIN).', keywords: ['ca cert', 'turnover', 'udin', 'chartered'] },
+    description: 'Chartered Accountant certificate of annual turnover (usually last 3 FYs, with UDIN).', keywords: ['ca cert', 'turnover', 'udin', 'chartered', ...gemKeywords('ca_turnover_certificate')] },
   { type: 'oem_authorization', label: 'OEM authorisation', icon: 'Handshake', category: 'OEM', expires: true, typicalValidityMonths: 12, perFinancialYear: false, commonInBids: true,
-    description: 'Manufacturer authorisation (MAF) allowing you to bid for their products.', keywords: ['oem', 'maf', 'authorization', 'authorisation', 'dealer'] },
+    description: 'Manufacturer authorisation (MAF) allowing you to bid for their products.', keywords: ['oem', 'maf', 'authorization', 'authorisation', 'dealer', 'dealership', ...gemKeywords('oem_authorization')] },
   { type: 'crac', label: 'CRAC / completion certificate', icon: 'ClipboardCheck', category: 'Experience', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'Consignee Receipt & Acceptance Certificate or performance/completion certificate from a buyer.', keywords: ['crac', 'completion', 'performance', 'acceptance', 'satisfactory'] },
+    description: 'Consignee Receipt & Acceptance Certificate or performance/completion certificate from a buyer.', keywords: ['crac', 'completion', 'performance', 'acceptance', 'satisfactory', ...gemKeywords('crac')] },
   { type: 'work_order', label: 'Work / purchase order', icon: 'FileText', category: 'Experience', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'Past contract, purchase order or GeM contract as proof of experience.', keywords: ['work order', 'wo', 'purchase order', 'po', 'contract', 'supply order'] },
+    description: 'Past contract, purchase order or GeM contract as proof of experience.', keywords: ['work order', 'wo', 'purchase order', 'po', 'contract', 'supply order', ...gemKeywords('work_order')] },
   { type: 'iso', label: 'ISO certificate', icon: 'Award', category: 'Quality', expires: true, typicalValidityMonths: 36, perFinancialYear: false, commonInBids: true,
-    description: 'ISO 9001 / 14001 / 27001 etc. Valid for 3 years subject to surveillance audits.', keywords: ['iso', '9001', '14001', '27001', '45001'] },
+    description: 'ISO 9001 / 14001 / 27001 etc. Valid for 3 years subject to surveillance audits.', keywords: ['iso', '9001', '14001', '27001', '45001', 'iso9001', 'iso14001', 'iso27001', 'iso45001'] },
   { type: 'bis', label: 'BIS licence', icon: 'ShieldCheck', category: 'Quality', expires: true, typicalValidityMonths: 24, perFinancialYear: false, commonInBids: false,
     description: 'Bureau of Indian Standards licence / CRS registration for the product.', keywords: ['bis', 'isi', 'crs'] },
   { type: 'mii_certificate', label: 'Make in India declaration', icon: 'Flag', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'Local-content self-certificate (Class-I ≥ 50%, Class-II ≥ 20%); above ₹10 crore it must come from a statutory auditor.', keywords: ['mii', 'make in india', 'local content', 'class-i', 'class i'] },
+    description: 'Local-content self-certificate (Class-I ≥ 50%, Class-II ≥ 20%); above ₹10 crore it must come from a statutory auditor.', keywords: ['mii', 'make in india', 'local content', 'class-i', 'class i', ...gemKeywords('mii_certificate')] },
   { type: 'emd_exemption', label: 'EMD exemption proof', icon: 'Percent', category: 'Financial', expires: true, typicalValidityMonths: 12, perFinancialYear: false, commonInBids: false,
-    description: 'Any document supporting an EMD exemption claim (beyond Udyam / DPIIT).', keywords: ['emd', 'exemption'] },
+    description: 'Any document supporting an EMD exemption claim (beyond Udyam / DPIIT).', keywords: ['emd', 'exemption', ...gemKeywords('emd_exemption')] },
   { type: 'bank_details', label: 'Bank details / cancelled cheque', icon: 'Banknote', category: 'Financial', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: false,
     description: 'Cancelled cheque or bank mandate letter with IFSC.', keywords: ['cheque', 'bank', 'mandate', 'ifsc', 'nach'] },
   { type: 'power_of_attorney', label: 'Power of attorney / board resolution', icon: 'PenLine', category: 'Statutory', expires: true, typicalValidityMonths: 12, perFinancialYear: false, commonInBids: false,
     description: 'Authorises the signatory to sign bids on behalf of the company.', keywords: ['poa', 'power of attorney', 'board resolution', 'authority letter'] },
   { type: 'product_catalogue', label: 'Product catalogue / datasheet', icon: 'BookOpen', category: 'Other', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: false,
-    description: 'Brochures and technical datasheets for offered products.', keywords: ['catalogue', 'catalog', 'datasheet', 'brochure', 'spec sheet'] },
+    description: 'Brochures and technical datasheets for offered products.', keywords: ['catalogue', 'catalog', 'datasheet', 'brochure', 'spec sheet', ...gemKeywords('product_catalogue')] },
   { type: 'test_report', label: 'Test report', icon: 'FlaskConical', category: 'Quality', expires: true, typicalValidityMonths: 24, perFinancialYear: false, commonInBids: false,
     description: 'NABL / government lab test report for the offered product.', keywords: ['test report', 'nabl', 'lab', 'type test'] },
   { type: 'other', label: 'Other document', icon: 'File', category: 'Other', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: false,
