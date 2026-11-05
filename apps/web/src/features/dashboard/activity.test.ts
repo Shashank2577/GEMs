@@ -68,8 +68,8 @@ describe('SELF_CONTAINED', () => {
 
   it('marks sentences that read complete without a target', () => {
     expect([...SELF_CONTAINED].sort()).toEqual([
-      'annexure.template_reset', 'annexure.template_updated', 'api_token.created', 'api_token.revoked', 'demo.seeded',
-      'ingestion.run', 'member.joined', 'member.left', 'org.created', 'org.scoring_weights_updated', 'org.updated', 'vault.reminders_run',
+      'annexure.template_reset', 'annexure.template_updated', 'api_token.created', 'api_token.revoked', 'demo.removed', 'demo.seeded',
+      'ingestion.run', 'member.joined', 'member.left', 'onboarding.completed', 'org.created', 'org.scoring_weights_updated', 'org.updated', 'vault.reminders_run',
     ]);
   });
 

@@ -22,6 +22,7 @@ import type { Stage } from '@/lib/types';
 import { useDashboard, useSeedDemo } from './api';
 import { describeActivity, SELF_CONTAINED } from './activity';
 import { MatchesTrend, PipelineFunnel, VerdictDonut } from './charts';
+import { DemoBanner } from './DemoBanner';
 import { StaleBanner } from './StaleBanner';
 import { greeting, isEmptyOrg, pctDelta, summaryLine } from './summary';
 
@@ -74,6 +75,7 @@ export default function DashboardPage() {
         <>
           {/* FR-012: a failed background refresh keeps the cached widgets and shows a non-blocking banner. */}
           {q.isError && d && <StaleBanner generatedAt={d.generatedAt} onRetry={() => q.refetch()} retrying={q.isFetching} />}
+          {d?.demo && <DemoBanner />}
           <KpiGrid d={d} />
           {d && isEmptyOrg(d) && <GetStartedBanner />}
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
