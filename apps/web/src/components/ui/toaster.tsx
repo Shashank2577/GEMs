@@ -1,5 +1,6 @@
 import { Toaster as Sonner, toast as sonnerToast } from 'sonner';
 import { useTheme } from '@/lib/theme';
+import { isShownInPlanDialog } from '@/lib/plan-limit';
 import { useIsMobile } from '@/lib/hooks';
 
 /** Below the sticky 56 px top bar, so a toast never hides the menu button, bell or avatar. */
@@ -35,7 +36,9 @@ export function Toaster() {
 /**
  * Error toasts with the same text share one toast (keyed by the message), so a global handler and a call site
  * reporting the same API error (e.g. 403 `forbidden`, 002/FR-029) show it once. Pass an explicit `id` to opt out.
+ * A message already shown by the plan dialog (any 402, 008/FR-041) is not toasted again.
  */
 export const errorToastId = (message: unknown) => (typeof message === 'string' ? `error:${message}` : undefined);
-const error: typeof sonnerToast.error = (message, data) => sonnerToast.error(message, { id: errorToastId(message), ...data });
+const error: typeof sonnerToast.error = (message, data) =>
+  (isShownInPlanDialog(message) ? errorToastId(message) ?? '' : sonnerToast.error(message, { id: errorToastId(message), ...data }));
 export const toast: typeof sonnerToast = Object.assign((...args: Parameters<typeof sonnerToast>) => sonnerToast(...args), sonnerToast, { error });

@@ -1,6 +1,8 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { errorToastId } from '@/components/ui/toaster';
+import { allowedWhenExpired } from '@tp/core/contracts/plans';
+import { isPaymentRequired, localPlanExpiredError, planExpired, showPlanLimit, type PlanOrg } from './plan-limit';
 
 /** Error envelope from the API: `{ error: { code, message, details? } }`. */
 export class ApiError extends Error {
@@ -101,13 +103,29 @@ export async function apiFetch<T = unknown>(path: string, opts: RequestOptions =
     },
     body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
   };
+  // 008/FR-041: an expired trial is read-only — writes outside the allow-list open the plan dialog without a request.
+  const method = (init.method ?? 'GET').toUpperCase();
+  const org = (queryClient.getQueryData(ME_KEY) as { org?: PlanOrg } | null | undefined)?.org;
+  if (org && !allowedWhenExpired(method, path) && planExpired(org)) {
+    const e = localPlanExpiredError(org);
+    showPlanLimit(e);
+    // This write never reaches the server, so nothing else would notice an upgrade made since `/auth/me` was cached
+    // (5-min staleTime): re-check it when the cached copy is older than ME_RECHECK_MS (review S4).
+    const at = queryClient.getQueryState(ME_KEY)?.dataUpdatedAt ?? 0;
+    if (Date.now() - at > ME_RECHECK_MS) void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
+    throw new ApiError(e.status, e.code, e.message, e.details);
+  }
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}${toQueryString(query)}`, init);
   } catch {
     throw new ApiError(0, 'network_error', 'Can’t reach TenderPilot. Check your connection and try again.');
   }
-  if (!res.ok) throw await parseError(res);
+  if (!res.ok) {
+    const err = await parseError(res);
+    if (isPaymentRequired(err)) handlePaymentRequired(err);
+    throw err;
+  }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get('content-type') ?? '';
   return (ct.includes('application/json') ? await res.json() : await res.text()) as T;
@@ -144,6 +162,8 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong'): s
 
 /** Query key of `GET /auth/me` (re-exported by `lib/auth`). `null` data = signed out. */
 export const ME_KEY = ['auth', 'me'] as const;
+/** A locally blocked write (expired trial) refetches `/auth/me` when the cached copy is older than this. */
+export const ME_RECHECK_MS = 30_000;
 
 export const SESSION_ENDED_MESSAGE = 'Your session ended. Please sign in again.';
 
@@ -191,6 +211,16 @@ export function handleForbidden(err: unknown): boolean {
   toast.error(err.message, { id: errorToastId(err.message) });
   void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
   return true;
+}
+
+/**
+ * 008/FR-041b: any 402 (`plan_limit_reached`, `plan_expired`) opens the global PlanLimitDialog with the server message.
+ * A `plan_expired` the cached `/auth/me` did not predict (the trial ended while the page was open) refetches it, so the
+ * read-only banner appears.
+ */
+export function handlePaymentRequired(err: ApiError): void {
+  showPlanLimit(err);
+  if (err.code === 'plan_expired') void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
 }
 
 export const queryClient: QueryClient = new QueryClient({

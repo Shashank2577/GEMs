@@ -8,6 +8,8 @@ export interface AuthOrg {
   id: string; name: string; slug: string; plan: string;
   onboardingState: Record<string, boolean>;
   scoringWeights: Record<string, number> | null;
+  /** End of the free trial (008/FR-035); null for paid plans. Read fresh on every request (FR-043). */
+  trialEndsAt: Date | null;
 }
 
 export interface AppVariables {
