@@ -3,6 +3,7 @@
  * secrets) and by the Node server (`process.env`). Missing optional integrations degrade to
  * logged no-ops (Constitution VII).
  */
+import { MANUAL_SYNC_COOLDOWN_MIN } from '@tp/core/contracts/caps';
 
 /** All string environment variables the API understands. */
 export interface RuntimeEnv {
@@ -110,7 +111,7 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     sentryDsn: env.SENTRY_DSN || null,
     logLevel: parseLogLevel(env.LOG_LEVEL),
     healthIngestionMaxAgeMin: nonNegativeInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),
-    manualSyncCooldownMin: nonNegativeInt(env.MANUAL_SYNC_COOLDOWN_MIN, 10),
+    manualSyncCooldownMin: nonNegativeInt(env.MANUAL_SYNC_COOLDOWN_MIN, MANUAL_SYNC_COOLDOWN_MIN),
   };
 }
 

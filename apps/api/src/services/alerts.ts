@@ -10,6 +10,22 @@ import { notificationPrefs, notifications, organizations, tenders, users } from 
 import type { AppDeps } from '../deps';
 
 type NotificationRow = typeof notifications.$inferSelect;
+
+/**
+ * The dispatcher's work queue: oldest pending email/WhatsApp rows. Served by the partial index
+ * `notifications_pending_idx (created_at) WHERE status='pending' AND channel IN ('email','whatsapp')` (008/FR-029).
+ */
+export function pendingNotificationsQuery(db: AppDeps['db'], limit: number) {
+  return db
+    .select({ n: notifications, email: users.email, phone: users.phone, name: users.name, frequency: notificationPrefs.frequency, orgName: organizations.name })
+    .from(notifications)
+    .innerJoin(users, eq(users.id, notifications.userId))
+    .innerJoin(organizations, eq(organizations.id, notifications.orgId))
+    .leftJoin(notificationPrefs, and(eq(notificationPrefs.orgId, notifications.orgId), eq(notificationPrefs.userId, notifications.userId)))
+    .where(and(eq(notifications.status, 'pending'), inArray(notifications.channel, ['email', 'whatsapp'])))
+    .orderBy(notifications.createdAt)
+    .limit(limit);
+}
 type TenderRow = typeof tenders.$inferSelect;
 
 export interface DispatchReport { sent: number; skipped: number; failed: number; held: number; digests: number }
@@ -103,15 +119,7 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   const now = clock.now();
   const report: DispatchReport = { sent: 0, skipped: 0, failed: 0, held: 0, digests: 0 };
 
-  const pending = await db
-    .select({ n: notifications, email: users.email, phone: users.phone, name: users.name, frequency: notificationPrefs.frequency, orgName: organizations.name })
-    .from(notifications)
-    .innerJoin(users, eq(users.id, notifications.userId))
-    .innerJoin(organizations, eq(organizations.id, notifications.orgId))
-    .leftJoin(notificationPrefs, and(eq(notificationPrefs.orgId, notifications.orgId), eq(notificationPrefs.userId, notifications.userId)))
-    .where(and(eq(notifications.status, 'pending'), inArray(notifications.channel, ['email', 'whatsapp'])))
-    .orderBy(notifications.createdAt)
-    .limit(opts.limit ?? 500);
+  const pending = await pendingNotificationsQuery(db, opts.limit ?? 500);
   if (!pending.length) return report;
 
   const tenderIds = [...new Set(pending.map((p) => tenderIdFromLink(p.n.link)).filter((x): x is string => !!x))];

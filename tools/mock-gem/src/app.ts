@@ -14,6 +14,8 @@
  *                                      (404 page, HTML login page, PDF without text layer, > 25 MB stream)
  *   POST /__admin/reset                restore the recorded fixtures
  *   GET  /__admin/state                current bid numbers + counters
+ *   GET  /__admin/requests             arrival log of the last 1,000 non-admin requests ({at, method, path}) — the
+ *                                      load script measures GeM inter-arrival times from it (spec 008 FR-024, NFR-002)
  *
  * Fixture dates are rebased so that the fixture reference date maps to "now" at reset time.
  */
@@ -65,6 +67,8 @@ export interface MockGemOptions {
   rebase?: boolean;
 }
 
+const REQUEST_LOG_MAX = 1000;
+
 export function createMockGem(opts: MockGemOptions = {}) {
   const now = opts.now ?? (() => new Date());
   const fixtures = loadFixtures();
@@ -76,6 +80,8 @@ export function createMockGem(opts: MockGemOptions = {}) {
     failMode: 'off' as 'off' | 'down' | 'html',
     documentMode: 'normal' as DocumentMode,
     requests: { listing: 0, documents: 0, bootstrap: 0, results: 0 },
+    /** Arrival log (ms since epoch, real clock) of the last REQUEST_LOG_MAX non-admin requests. */
+    requestLog: [] as { at: number; method: string; path: string }[],
   };
 
   const reset = () => {
@@ -88,6 +94,7 @@ export function createMockGem(opts: MockGemOptions = {}) {
     state.failMode = 'off';
     state.documentMode = 'normal';
     state.requests = { listing: 0, documents: 0, bootstrap: 0, results: 0 };
+    state.requestLog = [];
   };
   reset();
 
@@ -119,6 +126,14 @@ export function createMockGem(opts: MockGemOptions = {}) {
   const findById = (id: string) => state.docs.find((d) => String(d.b_id[0]) === id) ?? fixtures.extra.find((d) => String(d.b_id[0]) === id);
 
   const app = new Hono();
+
+  app.use('*', async (c, next) => {
+    if (!c.req.path.startsWith('/__admin')) {
+      state.requestLog.push({ at: Date.now(), method: c.req.method, path: c.req.path });
+      if (state.requestLog.length > REQUEST_LOG_MAX) state.requestLog.splice(0, state.requestLog.length - REQUEST_LOG_MAX);
+    }
+    await next();
+  });
 
   app.get('/', (c) => c.redirect('/all-bids'));
 
@@ -258,6 +273,8 @@ export function createMockGem(opts: MockGemOptions = {}) {
     reset();
     return c.json({ ok: true, total: state.docs.length });
   });
+
+  app.get('/__admin/requests', (c) => c.json({ items: state.requestLog }));
 
   app.get('/__admin/state', (c) => c.json({
     total: state.docs.length,

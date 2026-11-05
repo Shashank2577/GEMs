@@ -7,7 +7,7 @@ import { createMemoryBlobStore } from '../src/adapters/memory-blob';
 import { createAnthropicClient, parseJsonLoose } from '../src/adapters/llm';
 import { createResendMailer } from '../src/adapters/mailer';
 import { createMetaWhatsApp } from '../src/adapters/whatsapp';
-import { createDeps } from '../src/adapters/index';
+import { createDeps, noopGemLease } from '../src/adapters/index';
 import { silentLogger } from '../src/adapters/logger';
 import { hashPassword, verifyPassword, sha256Hex, randomToken } from '../src/lib/crypto';
 import { slugify } from '../src/lib/slug';
@@ -186,12 +186,16 @@ describe('ops config and deps (008/T013)', () => {
     expect(loadConfig({ LOG_LEVEL: 'verbose', MANUAL_SYNC_COOLDOWN_MIN: 'soon' })).toMatchObject({ logLevel: 'info', manualSyncCooldownMin: 10 });
   });
 
-  it('createDeps wires a rate limiter, a no-op error reporter and a no-op GeM lease', async () => {
-    const deps = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
+  it('createDeps wires a rate limiter, a no-op error reporter and the GeM lease (no-op only when unthrottled)', async () => {
+    const deps = createDeps({ env: { GEM_MIN_INTERVAL_MS: '0' }, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     expect(typeof deps.rateLimiter.hit).toBe('function');
     expect(typeof deps.rateLimiter.reset).toBe('function');
     expect(() => deps.errors.capture(new Error('boom'), { rid: 'r1' })).not.toThrow();
     await expect(deps.gemLease.acquire(25_000)).resolves.toBeUndefined();
+    // Default (1 req/s): the cluster-wide Postgres lease from US4 (lib/gem-lease.ts), not the no-op.
+    const throttled = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
+    expect(throttled.gemLease).not.toBe(noopGemLease);
+    expect(typeof throttled.gemLease.acquire).toBe('function');
   });
 });
 
