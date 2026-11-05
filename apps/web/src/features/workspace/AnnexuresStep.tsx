@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Download, Eye, FileSignature, PencilLine, RotateCcw, ExternalLink } from 'lucide-react';
 import type { WorkspaceAnnexure, WorkspaceDetail } from '@tp/core/contracts/apply';
 import {
-  Badge, Button, Card, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, Input, Skeleton, Textarea, Tooltip, toast,
+  Badge, Button, Card, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, Input, Skeleton, Textarea, Tooltip, toast,
 } from '@/components/ui';
-import { RoleGate } from '@/lib/auth';
-import { errorMessage } from '@/lib/api';
+import { unknownPlaceholderMessage, unknownPlaceholders } from '@tp/core/packet/placeholders';
+import { useCan } from '@/lib/auth';
+import { ApiError, errorMessage } from '@/lib/api';
 import { useIsMobile } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { previewAnnexure, useResetTemplate, useSaveTemplate, useTemplates } from './api';
-import { INSERTABLE_PLACEHOLDERS, PLACEHOLDER_LABEL, placeholderLabel } from './labels';
+import { INSERTABLE_PLACEHOLDERS, placeholderLabel } from './labels';
 
 export function AnnexuresStep({ data, selected, onSelect, onNext }: { data: WorkspaceDetail; selected: string | null; onSelect: (k: string) => void; onNext: () => void }) {
   const list = data.annexures;
@@ -18,6 +19,8 @@ export function AnnexuresStep({ data, selected, onSelect, onNext }: { data: Work
   const [version, setVersion] = useState(0);
   const [editing, setEditing] = useState<WorkspaceAnnexure | null>(null);
   const isMobile = useIsMobile();
+  // FR-043: the template editor is for Bid Manager+ only.
+  const canEditTemplates = useCan('bid_manager');
 
   if (!list.length) return null;
   const src = `${current.pdfUrl}?v=${version}#toolbar=0&navpanes=0`;
@@ -64,9 +67,7 @@ export function AnnexuresStep({ data, selected, onSelect, onNext }: { data: Work
             <div className="truncate text-sm font-semibold">{current.title}</div>
             <div className="text-xs text-muted-foreground">Filled with your profile and this tender · sign & stamp before uploading</div>
           </div>
-          <RoleGate min="bid_manager">
-            <Button size="sm" variant="ghost" onClick={() => setEditing(current)}><PencilLine /> Edit template</Button>
-          </RoleGate>
+          {canEditTemplates && <Button size="sm" variant="ghost" onClick={() => setEditing(current)}><PencilLine /> Edit template</Button>}
           <Button asChild size="sm" variant="ghost"><a href={`${current.pdfUrl}`} target="_blank" rel="noreferrer"><ExternalLink /> Open</a></Button>
           <Button asChild size="sm" variant="secondary"><a href={`${current.pdfUrl}?download=1`}><Download /> Download</a></Button>
         </div>
@@ -81,7 +82,7 @@ export function AnnexuresStep({ data, selected, onSelect, onNext }: { data: Work
         )}
       </Card>
 
-      {editing && <TemplateEditor wsId={data.workspace.id} annexure={editing} onClose={() => setEditing(null)} onSaved={() => setVersion((v) => v + 1)} />}
+      {editing && canEditTemplates && <TemplateEditor wsId={data.workspace.id} annexure={editing} onClose={() => setEditing(null)} onSaved={() => setVersion((v) => v + 1)} />}
     </div>
   );
 }
@@ -108,8 +109,29 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
   const save = useSaveTemplate();
   const reset = useResetTemplate();
   const ta = useRef<HTMLTextAreaElement>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
+  /** Message from an `unknown_placeholder` refusal (FR-041); cleared when the body changes. */
+  const [serverUnknown, setServerUnknown] = useState<string | null>(null);
 
   useEffect(() => { if (tpl) { setTitle(tpl.title); setBody(tpl.body); } }, [tpl]);
+  useEffect(() => { setServerUnknown(null); }, [body]);
+
+  const unknown = useMemo(() => unknownPlaceholders(body), [body]);
+  const bodyError = unknown.length ? unknownPlaceholderMessage(unknown) : serverUnknown;
+  // FR-092: unsaved edits prompt before closing the editor or leaving the page.
+  const dirty = !!tpl && (title !== tpl.title || body !== tpl.body);
+  useEffect(() => {
+    if (!dirty) return;
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', h);
+    return () => window.removeEventListener('beforeunload', h);
+  }, [dirty]);
+  const requestClose = () => { if (dirty) setConfirmClose(true); else onClose(); };
+  /** Show unknown-placeholder refusals inline under the body instead of as a toast. */
+  const handleError = (e: unknown) => {
+    if (e instanceof ApiError && e.code === 'unknown_placeholder') setServerUnknown(e.message);
+    else toast.error(errorMessage(e));
+  };
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   const insert = (p: string) => {
@@ -123,11 +145,11 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
   };
   const preview = async () => {
     setPreviewing(true);
-    try { setPreviewUrl(await previewAnnexure(wsId, annexure.key, title, body)); } catch (e) { toast.error(errorMessage(e)); } finally { setPreviewing(false); }
+    try { setPreviewUrl(await previewAnnexure(wsId, annexure.key, title, body)); } catch (e) { handleError(e); } finally { setPreviewing(false); }
   };
   const doSave = () => save.mutate({ key: annexure.key, title, body }, {
     onSuccess: () => { toast.success('Template saved for your organisation'); onSaved(); onClose(); },
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: handleError,
   });
   const doReset = () => reset.mutate(annexure.key, {
     onSuccess: (t) => { setTitle(t.title); setBody(t.body); onSaved(); toast.success('Restored the TenderPilot template'); },
@@ -135,7 +157,8 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
   });
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
+    <>
+    <Dialog open onOpenChange={(o) => !o && requestClose()}>
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Edit “{annexure.title}”</DialogTitle>
@@ -145,20 +168,28 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="grid grid-cols-1 content-start gap-3">
               <Field label="Title"><Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></Field>
-              <Field label="Body">
+              <Field label="Body" error={bodyError}>
                 <Textarea ref={ta} value={body} onChange={(e) => setBody(e.target.value)} rows={16} className="font-mono text-[12.5px] leading-relaxed" spellCheck />
               </Field>
               <div>
                 <div className="mb-1.5 text-xs font-medium text-muted-foreground">Insert placeholder</div>
                 <div className="flex flex-wrap gap-1">
                   {INSERTABLE_PLACEHOLDERS.map((p) => (
-                    <button key={p} type="button" onClick={() => insert(p)} className="rounded-md border bg-card px-1.5 py-0.5 font-mono text-2xs hover:border-primary/40 hover:text-primary focus-ring" title={PLACEHOLDER_LABEL[p]?.label ?? p}>{p}</button>
+                    <button key={p.path} type="button" onClick={() => insert(p.path)} className="rounded-md border bg-card px-1.5 py-0.5 font-mono text-2xs hover:border-primary/40 hover:text-primary focus-ring" title={p.label} aria-label={`Insert ${p.label} ({{${p.path}}})`}>{p.path}</button>
                   ))}
                 </div>
               </div>
             </div>
             <div className="flex min-h-[320px] flex-col overflow-hidden rounded-xl border bg-muted/30">
-              {previewUrl ? <iframe title="Draft preview" src={`${previewUrl}#toolbar=0`} className="h-full min-h-[420px] w-full flex-1" /> : (
+              {unknown.length > 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center" data-testid="unknown-placeholders">
+                  <AlertCircle className="size-8 text-danger" aria-hidden />
+                  <p className="text-sm text-muted-foreground">Fix these placeholders to preview:</p>
+                  <div className="flex flex-wrap justify-center gap-1">
+                    {unknown.map((p) => <mark key={p} className="rounded-md bg-danger-soft px-1.5 py-0.5 font-mono text-xs text-danger">{`{{${p}}}`}</mark>)}
+                  </div>
+                </div>
+              ) : previewUrl ? <iframe title="Draft preview" src={`${previewUrl}#toolbar=0`} className="h-full min-h-[420px] w-full flex-1" /> : (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
                   <Eye className="size-8 text-muted-foreground" aria-hidden />
                   <p className="text-sm text-muted-foreground">Preview the draft with this bid’s data before saving.</p>
@@ -169,10 +200,20 @@ function TemplateEditor({ wsId, annexure, onClose, onSaved }: { wsId: string; an
         )}
         <DialogFooter className="flex-wrap gap-2">
           {tpl?.custom && <Button variant="ghost" onClick={doReset} loading={reset.isPending} className="mr-auto"><RotateCcw /> Restore default</Button>}
-          <Button variant="secondary" onClick={preview} loading={previewing} disabled={!tpl || body.trim().length < 20}><Eye /> Preview</Button>
+          <Button variant="secondary" onClick={preview} loading={previewing} disabled={!tpl || body.trim().length < 20 || unknown.length > 0}><Eye /> Preview</Button>
           <Button onClick={doSave} loading={save.isPending} disabled={!tpl || title.trim().length < 3 || body.trim().length < 20}>Save template</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <ConfirmDialog
+      open={confirmClose}
+      onOpenChange={setConfirmClose}
+      title="Discard unsaved changes?"
+      description="Your edits to this template have not been saved."
+      cancelLabel="Keep editing"
+      confirmLabel="Discard changes"
+      onConfirm={() => { setConfirmClose(false); onClose(); }}
+    />
+    </>
   );
 }

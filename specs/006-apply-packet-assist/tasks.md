@@ -158,11 +158,11 @@ task is sized at ≤ 1 day.
 
 ### Remaining
 
-- [ ] T046 [P] [US4] Export `TEMPLATE_PLACEHOLDERS` (all context paths with friendly labels) and `unknownPlaceholders(body)` from `packages/core/src/packet/templates.ts`; unit tests in `packages/core/test/packet/templates.test.ts` FR-041 (#228)
-- [ ] T047 [US4] Reject unknown placeholders with 400 `unknown_placeholder` (`details.unknown`) in `PUT /annexure-templates/:key` and `POST …/preview` + API tests in `apps/api/src/routes/packets.ts`, `apps/api/test/packet.test.ts` FR-041 (#248)
-- [ ] T048 [P] [US4] Build the editor palette from `TEMPLATE_PLACEHOLDERS` (replacing the local list) and show the unknown-placeholder error inline in `apps/web/src/features/workspace/AnnexuresStep.tsx`, `apps/web/src/features/workspace/labels.tsx` FR-041, FR-043 (#233)
-- [ ] T049 [P] [US4] Render **Edit template** only for Bid Manager+ (`useCan('bid_manager')`) in `apps/web/src/features/workspace/AnnexuresStep.tsx` FR-043 (#234)
-- [ ] T050 [US4] "Discard unsaved changes?" confirm when closing the template editor with edits in `apps/web/src/features/workspace/AnnexuresStep.tsx` FR-092 (#237)
+- [x] T046 [P] [US4] Export `TEMPLATE_PLACEHOLDERS` (all context paths with friendly labels) and `unknownPlaceholders(body)` from `packages/core/src/packet/templates.ts`; unit tests in `packages/core/test/packet/templates.test.ts` FR-041 (#228)
+- [x] T047 [US4] Reject unknown placeholders with 400 `unknown_placeholder` (`details.unknown`) in `PUT /annexure-templates/:key` and `POST …/preview` + API tests in `apps/api/src/routes/packets.ts`, `apps/api/test/packet.test.ts` FR-041 (#248)
+- [x] T048 [P] [US4] Build the editor palette from `TEMPLATE_PLACEHOLDERS` (replacing the local list) and show the unknown-placeholder error inline in `apps/web/src/features/workspace/AnnexuresStep.tsx`, `apps/web/src/features/workspace/labels.tsx` FR-041, FR-043 (#233)
+- [x] T049 [P] [US4] Render **Edit template** only for Bid Manager+ (`useCan('bid_manager')`) in `apps/web/src/features/workspace/AnnexuresStep.tsx` FR-043 (#234)
+- [x] T050 [US4] "Discard unsaved changes?" confirm when closing the template editor with edits in `apps/web/src/features/workspace/AnnexuresStep.tsx` FR-092 (#237)
 - [ ] T051 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in `qa/evidence/006/US4/` — scenarios 1–11: list of 6 in order with badges, blanks badge/tooltip + profile banner (empty-profile org), iframe preview and headers via API (`content-disposition`, `no-store`, alias, 404), PDF text assertions (letterhead, Ref/Date, signature block, footer) using `pdf-lib`/`pdfjs` text extraction, Analyst 403 + no Edit button (after T049), Bid Manager edit → preview → save → other workspace uses it → Restore default, short body 400, unknown placeholder 400 (after T047), ₹/Devanagari sanitising, `@mobile` Preview PDF button, axe; spec `e2e/006-apply-packet-assist/US4-annexures.e2e.ts`; `VERDICT.md` FR-034…FR-044 (#239)
 
 **Checkpoint**: Annexures verified on screen and in PDF bytes
