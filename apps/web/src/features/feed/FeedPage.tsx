@@ -265,6 +265,7 @@ export default function FeedPage() {
                 key={v.id}
                 role="tab"
                 data-view-tab={v.id}
+                title={v.name}
                 aria-selected={on}
                 onClick={() => setParams(filtersToParams(viewParamsToFilters(v.params)), { replace: true })}
                 className={cn(

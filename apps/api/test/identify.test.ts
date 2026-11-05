@@ -105,6 +105,18 @@ describe('GET /tenders', () => {
     }
   });
 
+  it('status=closed also lists open-status tenders whose deadline has passed (FR-036)', async () => {
+    const lapsed = await tenderId('GEM/2026/B/6421001');
+    const [orig] = await ctx.db.select({ endAt: tenders.endAt }).from(tenders).where(eq(tenders.id, lapsed));
+    try {
+      await ctx.db.update(tenders).set({ endAt: new Date(REF.getTime() - 3_600_000) }).where(eq(tenders.id, lapsed));
+      expect((await get('/tenders?status=closed')).body.items.map((t: { id: string }) => t.id)).toEqual([lapsed]);
+      expect((await get('/tenders?status=open')).body.total).toBe(35);
+    } finally {
+      await ctx.db.update(tenders).set({ endAt: orig.endAt }).where(eq(tenders.id, lapsed));
+    }
+  });
+
   it('rejects bad query values with 400', async () => {
     expect((await get('/tenders?sort=bogus')).status).toBe(400);
     expect((await get('/tenders?pageSize=1000')).status).toBe(400);

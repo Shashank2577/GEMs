@@ -3,7 +3,7 @@
  * Tenders are global public GeM data; everything org-specific (matches, analyses, workspaces,
  * seen/dismissed) is joined and filtered by the caller's org (Constitution IV).
  */
-import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   analyses, bidWorkspaces, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, watchlists,
@@ -40,7 +40,8 @@ const NEW_WINDOW_MS = 7 * 86_400_000;
 function buildFilters(q: TenderQuery, org: string, now: Date, omit?: 'state' | 'ministry' | 'category'): SQL[] {
   const conds: SQL[] = [];
   const status = q.status ?? 'open';
-  if (status !== 'all') conds.push(eq(tenders.status, status));
+  if (status === 'closed') conds.push(or(eq(tenders.status, 'closed'), and(eq(tenders.status, 'open'), lt(tenders.endAt, now)))!);
+  else if (status !== 'all') conds.push(eq(tenders.status, status));
   if (status === 'open') conds.push(or(isNull(tenders.endAt), gte(tenders.endAt, now))!);
   if (q.q) {
     for (const word of q.q.split(/\s+/).filter(Boolean).slice(0, 8)) {
