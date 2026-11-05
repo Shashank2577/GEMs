@@ -209,3 +209,20 @@ describe('io parsing', () => {
     ]);
   });
 });
+
+describe('review round 2 (N-R1, N-R2)', () => {
+  it('an approved verdict whose findings mention an earlier qa:rejected stays approved', async () => {
+    const { verdictOf } = await import('./dod-check');
+    const t = '## QA verdict — APPROVED\n\n### Findings\nRound 1 qa:rejected findings are fixed; REJECTED earlier.\n\n### Verdict\n**Verdict:** approved\n`qa:approved`\n';
+    expect(verdictOf(t)).toBe('approved');
+  });
+  it('a rejection in the Verdict section still wins', async () => {
+    const { verdictOf } = await import('./dod-check');
+    expect(verdictOf('## QA verdict — APPROVED\n\n### Verdict\n`qa:rejected`\n')).toBe('rejected');
+  });
+  it('escaped pipes inside a criterion do not shift the Verdict column', async () => {
+    const { criterionRows } = await import('./dod-check');
+    const rows = criterionRows('| # | Criterion | Verdict |\n|---|---|---|\n| 1 | a \\| b | met |\n');
+    expect(rows).toEqual([{ row: '| 1 | a \\| b | met |', verdict: 'met' }]);
+  });
+});

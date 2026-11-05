@@ -41,9 +41,9 @@ Every PR into `main` and every push to `main` runs `.github/workflows/ci.yml`; s
 
 ### Branch protection on `main`
 
-Required status checks: `ci-gate` and `dod` (branch must be up to date). `ci-gate` stands for `typecheck`, `unit`,
-`api`, `e2e` and `migrations-additive` (FR-003): requiring those directly would let a skipped job (e.g. after the path
-filter errored) count as passing;
+Required status checks (FR-003): `typecheck`, `unit`, `api`, `e2e`, `migrations-additive`, `dod`, plus the
+aggregator `ci-gate` (branch must be up to date). A skipped job counts as passing for branch protection, so `ci-gate`
+closes the gap where the path filter itself errors and every gated job is skipped;
 force pushes and branch deletion disabled; applies to admins. The workflows must already exist on `main` for the
 checks to be selectable. Apply (repo admin, from a clone of the repo):
 
@@ -53,7 +53,7 @@ gh api -X PUT repos/:owner/:repo/branches/main/protection \
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["ci-gate", "dod"]
+    "contexts": ["typecheck", "unit", "api", "e2e", "migrations-additive", "dod", "ci-gate"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": null,

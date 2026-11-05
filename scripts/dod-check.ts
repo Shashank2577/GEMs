@@ -80,7 +80,7 @@ export function resolveStory(pr: PrInfo, commits: Commit[], index: StoryIndex): 
 /** Normalise a table cell: drop markdown emphasis/code markers, emoji and surrounding space. */
 const cell = (c: string) => c.replace(/[*_`]/g, '').replace(/[^\p{L}\p{N}\s#:./-]/gu, '').trim().toLowerCase();
 const splitRow = (l: string) => {
-  const parts = l.trim().split('|');
+  const parts = l.trim().split(/(?<!\\)\|/);
   return parts.slice(1, parts[parts.length - 1].trim() === '' ? -1 : undefined);
 };
 const isSeparator = (l: string) => l.trim().startsWith('|') && splitRow(l).every((c) => /^\s*:?-+:?\s*$/.test(c));
@@ -109,7 +109,12 @@ const stripComments = (t: string) => t.replace(/<!--[\s\S]*?-->/g, '');
 
 /** Pure: the overall verdict signalled by a VERDICT.md (template heading, `qa:` label, or a `Verdict:` line). */
 export function verdictOf(text: string): 'approved' | 'rejected' | 'missing' {
-  const t = stripComments(text);
+  const full = stripComments(text);
+  // Only the `QA verdict — …` heading(s) and the `### Verdict` section carry the verdict; findings that mention an
+  // earlier round's `qa:rejected` must not flip an approval.
+  const headings = full.split('\n').filter((l) => /^#{1,3}\s*QA verdict\b/i.test(l));
+  const section = /^#{1,6}\s*Verdict\s*$([\s\S]*?)(?=^#{1,6}\s|$(?![\s\S]))/im.exec(full);
+  const t = section ? [...headings, section[1]].join('\n') : full;
   const verdictLines = [...t.matchAll(/\bVerdict[*_]*[ \t]*:[*_` \t]*([^\n]*)/gi)].map((m) => m[1].toLowerCase());
   const rejected =
     /^#{1,3}\s*QA verdict\s*[—–-].*\bREJECTED\b/im.test(t) ||
