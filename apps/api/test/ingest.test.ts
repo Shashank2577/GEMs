@@ -7,7 +7,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { analyses, ingestionRuns, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
 import { toGemSolrDate } from '@tp/core/gem/normalize';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
-import { dispatchNotifications } from '../src/services/alerts';
+import { createResendMailer } from '../src/adapters/mailer';
+import { isTransientSendError, isTransientStatus, ProviderError } from '../src/adapters/provider-error';
+import { createMetaWhatsApp } from '../src/adapters/whatsapp';
+import { CLAIM_LEASE_MS, dispatchNotifications } from '../src/services/alerts';
 import { IngestionBusyError, planPages, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -483,5 +486,163 @@ describe('format-drift guard (FR-014)', () => {
     expect(d.logs.filter((l) => l.level === 'error' && l.msg === 'ingestion.format_drift')).toHaveLength(1);
     const runs = await request(ctx.app, 'GET', '/ingestion/runs', { cookie: team.viewer.cookie });
     expect(runs.body.lastRun).toMatchObject({ status: 'failed', error: expect.stringMatching(/^GeM response format changed/) });
+  });
+});
+
+// ───────────── US4 gap: retries with back-off, error classification, concurrent dispatch (FR-047, SC-006) ─────────────
+
+describe('alert delivery retries (FR-047, SC-006)', () => {
+  const MIN = 60_000;
+  type Mail = Parameters<typeof ctx.deps.mailer.send>[0];
+  /** Swap in a configured mailer: `onMine` handles our test rows (by subject prefix), every other message is sent. */
+  async function withMailer<T>(prefix: string, onMine: (m: Mail) => Promise<{ id?: string }>, fn: (mine: Mail[]) => Promise<T>): Promise<T> {
+    const mine: Mail[] = [];
+    const orig = ctx.deps.mailer;
+    ctx.deps.mailer = {
+      configured: true,
+      send: async (m) => {
+        if (!m.subject.startsWith(prefix)) return { id: 'other' };
+        mine.push(m);
+        return onMine(m);
+      },
+    };
+    try { return await fn(mine); } finally { ctx.deps.mailer = orig; }
+  }
+  const addRow = async (title: string, extra: Partial<typeof notifications.$inferInsert> = {}) => {
+    const [row] = await ctx.db.insert(notifications).values({
+      orgId: team.orgId, userId: team.owner.me.user.id, channel: 'email', kind: 'system', title, body: 'x', status: 'pending', dedupeKey: title, ...extra,
+    }).returning();
+    return row;
+  };
+  const rowOf = async (id: string) => (await ctx.db.select().from(notifications).where(eq(notifications.id, id)))[0];
+
+  beforeAll(() => { ctx.clock.set(new Date('2026-11-07T04:30:00.000Z')); }); // 10:00 IST, after the digest hour
+
+  it('a transient failure stays pending, is retried at +5 min then +30 min, and is marked failed after 3 attempts', async () => {
+    const row = await addRow('Retry-A 503');
+    await withMailer('Retry-A', async () => { throw new ProviderError('Resend error 503: upstream', true, 503); }, async (mine) => {
+      const t0 = ctx.clock.now();
+      const r1 = await dispatchNotifications(ctx.deps);
+      expect(r1.retried).toBeGreaterThanOrEqual(1);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'pending', attempts: 1, error: 'Resend error 503: upstream', nextAttemptAt: new Date(t0.getTime() + 5 * MIN) });
+      // Not due yet: nothing is attempted.
+      ctx.clock.advance(4 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(1);
+      ctx.clock.advance(1 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(2);
+      const t2 = ctx.clock.now();
+      expect(await rowOf(row.id)).toMatchObject({ status: 'pending', attempts: 2, nextAttemptAt: new Date(t2.getTime() + 30 * MIN) });
+      ctx.clock.advance(29 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(2);
+      ctx.clock.advance(1 * MIN);
+      const r3 = await dispatchNotifications(ctx.deps);
+      expect(r3.failed).toBeGreaterThanOrEqual(1);
+      expect(mine).toHaveLength(3);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'failed', attempts: 3, nextAttemptAt: null, error: 'Resend error 503: upstream' });
+      // Terminal: never tried again.
+      ctx.clock.advance(60 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(3);
+    });
+  });
+
+  it('the Resend adapter: a network error is retried and the next attempt is sent; a 4xx fails at once', async () => {
+    const flaky = await addRow('Retry-B network');
+    const bad = await addRow('Retry-C invalid');
+    let calls = 0;
+    const resend = createResendMailer({
+      apiKey: 'k', from: 'alerts@tenderpilot.test', logger: ctx.deps.logger,
+      fetch: (async (_url: string, init?: RequestInit) => {
+        const subject = JSON.parse(String(init?.body)).subject as string;
+        if (subject.startsWith('Retry-C')) return new Response('{"message":"invalid to"}', { status: 422 });
+        if (subject.startsWith('Retry-B') && calls++ === 0) throw new TypeError('fetch failed');
+        return new Response('{"id":"re_1"}', { status: 200 });
+      }) as typeof fetch,
+    });
+    await withMailer('Retry-', (m) => resend.send(m), async () => {
+      await dispatchNotifications(ctx.deps);
+      expect(await rowOf(flaky.id)).toMatchObject({ status: 'pending', attempts: 1, error: expect.stringMatching(/^Resend network error: fetch failed/) });
+      expect(await rowOf(bad.id)).toMatchObject({ status: 'failed', attempts: 1, nextAttemptAt: null, error: expect.stringMatching(/^Resend error 422/) });
+      ctx.clock.advance(5 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(await rowOf(flaky.id)).toMatchObject({ status: 'sent', attempts: 2, nextAttemptAt: null, sentAt: ctx.clock.now() });
+    });
+  });
+
+  it('classifies provider errors: network/408/429/5xx and Meta throttling codes are transient, other 4xx permanent', async () => {
+    const wa = (status: number, body: string) => createMetaWhatsApp({
+      token: 't', phoneNumberId: '1', fetch: (async () => new Response(body, { status })) as unknown as typeof fetch,
+    }).send({ to: '+919812345678', text: 'x' }).then(() => null, (e) => e as ProviderError);
+    expect((await wa(500, '{}'))?.transient).toBe(true);
+    expect((await wa(429, '{}'))?.transient).toBe(true);
+    expect((await wa(400, '{"error":{"code":131056,"message":"pair rate limit"}}'))?.transient).toBe(true);
+    expect((await wa(400, '{"error":{"code":131026,"message":"undeliverable"}}'))?.transient).toBe(false);
+    expect((await wa(401, '{"error":{"code":190}}'))?.transient).toBe(false);
+    const waNet = await createMetaWhatsApp({ token: 't', phoneNumberId: '1', fetch: (async () => { throw new TypeError('fetch failed'); }) as unknown as typeof fetch })
+      .send({ to: '+919812345678', text: 'x' }).then(() => null, (e) => e);
+    expect(isTransientSendError(waNet)).toBe(true);
+    expect(isTransientStatus(408)).toBe(true);
+    expect(isTransientStatus(404)).toBe(false);
+    expect(isTransientSendError(new Error('boom'))).toBe(false);
+  });
+
+  it('concurrent dispatchers send each row exactly once; re-running is a no-op', async () => {
+    const rows = await Promise.all([1, 2, 3, 4, 5, 6].map((i) => addRow(`Conc-${i}`)));
+    await withMailer('Conc-', async (m) => { await new Promise((r) => setTimeout(r, 20)); return { id: m.subject }; }, async (mine) => {
+      const reports = await Promise.all([dispatchNotifications(ctx.deps), dispatchNotifications(ctx.deps), dispatchNotifications(ctx.deps)]);
+      expect(mine.map((m) => m.subject).sort()).toEqual(rows.map((r) => r.title).sort());
+      expect(reports.reduce((s, r) => s + r.failed + r.retried, 0)).toBe(0);
+      for (const r of rows) expect(await rowOf(r.id)).toMatchObject({ status: 'sent', attempts: 1, nextAttemptAt: null });
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(rows.length);
+    });
+  });
+
+  it('a row claimed by a dispatcher that died is retried once its lease expires', async () => {
+    const row = await addRow('Lease-1', { nextAttemptAt: new Date(ctx.clock.now().getTime() + CLAIM_LEASE_MS) });
+    await withMailer('Lease-', async () => ({ id: 'ok' }), async (mine) => {
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(0);
+      ctx.clock.advance(CLAIM_LEASE_MS);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(1);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'sent', attempts: 1 });
+    });
+  });
+
+  it('a daily digest that fails transiently is retried (the day\'s digest slot is freed) and then sent once', async () => {
+    const daily = await signup(ctx.app, { role: 'analyst', ownerCookie: team.owner.cookie, name: 'Retry Digest' });
+    await ctx.db.update(notificationPrefs).set({ frequency: 'daily', email: true }).where(eq(notificationPrefs.userId, daily.me.user.id));
+    const ids = (await ctx.db.insert(notifications).values([1, 2].map((i) => ({
+      orgId: team.orgId, userId: daily.me.user.id, channel: 'email' as const, kind: 'tender_match' as const, title: `Match ${i}`, body: 'x', status: 'pending' as const,
+    }))).returning()).map((r) => r.id);
+    let fail = true;
+    const orig = ctx.deps.mailer;
+    const digests: Mail[] = [];
+    ctx.deps.mailer = {
+      configured: true,
+      send: async (m) => {
+        if (m.to !== daily.email) return { id: 'other' };
+        digests.push(m);
+        if (fail) throw new ProviderError('Resend error 429: slow down', true, 429);
+        return { id: 'digest' };
+      },
+    };
+    try {
+      await dispatchNotifications(ctx.deps);
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'pending', attempts: 1 });
+      expect(await count(notifications, and(eq(notifications.userId, daily.me.user.id), eq(notifications.kind, 'digest'))!)).toBe(0);
+      fail = false;
+      ctx.clock.advance(5 * MIN);
+      const r = await dispatchNotifications(ctx.deps);
+      expect(r.digests).toBe(1);
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'sent', attempts: 2 });
+      expect(digests).toHaveLength(2);
+      expect(digests[1].subject).toBe('Daily digest: 2 new GeM tenders matched today');
+      expect(await count(notifications, and(eq(notifications.userId, daily.me.user.id), eq(notifications.kind, 'digest'))!)).toBe(1);
+    } finally { ctx.deps.mailer = orig; }
   });
 });
