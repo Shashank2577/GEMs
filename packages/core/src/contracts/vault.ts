@@ -29,7 +29,9 @@ const optId = (validate: (v: string) => string | null) =>
     }),
   );
 
-export const isoDateSchema = z.string().regex(ISO_DATE, 'Use a date like 2025-03-31').refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), 'Not a real date');
+/** Round-trip check: `Date.parse` rolls 2029-02-30 over to 2 March instead of rejecting it. */
+const isRealDate = (s: string) => { const t = Date.parse(`${s}T00:00:00Z`); return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === s; };
+export const isoDateSchema = z.string().regex(ISO_DATE, 'Use a date like 2025-03-31').refine(isRealDate, 'Not a real date');
 const optDate = z.preprocess(blankToNull, isoDateSchema.nullable().optional());
 
 const listOf = (item: z.ZodTypeAny, max = 200) => z.array(item).max(max).optional();
@@ -50,7 +52,8 @@ export const oemAuthorizationSchema = z.object({
   oem: z.string().trim().min(1, 'OEM name is required').max(120),
   products: z.string().trim().max(500).default(''),
   validTill: optDate,
-  documentId: z.preprocess(blankToNull, z.string().uuid().nullable().optional()),
+  // Lowercased so ids compare with Postgres' canonical uuid text (FR-061).
+  documentId: z.preprocess(blankToNull, z.string().uuid().transform((v) => v.toLowerCase()).nullable().optional()),
 });
 
 export const MSE_CATEGORIES = ['micro', 'small', 'medium'] as const;
@@ -68,7 +71,8 @@ export const profileInputSchema = z.object({
   tradeName: optText(),
   gstin: optId(validateGstin),
   pan: optId(validatePan),
-  cin: optId(validateCin),
+  // Explicit wrapper so the CIN year bound always uses the real clock here (validateCin(raw, now), FR-015).
+  cin: optId((v) => validateCin(v)),
   udyamNumber: optId(validateUdyam),
   mseCategory: z.preprocess(blankToNull, z.enum(MSE_CATEGORIES).nullable().optional()),
   mseSocialCategory: z.preprocess(blankToNull, z.enum(MSE_SOCIAL_CATEGORIES).nullable().optional()),
@@ -100,6 +104,11 @@ export const profileInputSchema = z.object({
   oemAuthorizations: listOf(oemAuthorizationSchema, 100),
   certifications: listOf(z.string().trim().min(1).max(120), 50),
   maxEmdCapacity: z.preprocess(blankToNull, z.coerce.number().int().nonnegative().nullable().optional()),
+  /**
+   * Optimistic concurrency (FR-014): the `updatedAt` the client last loaded (null = no profile saved yet).
+   * Not a profile field — the API compares it with the stored `updated_at` and answers 409 on mismatch.
+   */
+  expectedUpdatedAt: z.string().datetime({ offset: true, message: 'Use an ISO timestamp' }).nullable().optional(),
 }).superRefine((p, ctx) => {
   if (p.gstin && p.pan && !validateGstin(p.gstin) && !validatePan(p.pan) && p.gstin.slice(2, 12) !== p.pan) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['gstin'], message: `This GSTIN belongs to PAN ${p.gstin.slice(2, 12)}, not ${p.pan}` });
@@ -233,9 +242,28 @@ export interface VaultDocumentDto {
   fileName: string; mimeType: string; sizeBytes: number; pageCount: number | null;
   uploadedBy: { id: string; name: string } | null; createdAt: string; updatedAt: string;
   status: DocStatus; daysToExpiry: number | null;
+  /**
+   * Next reminder to be sent (FR-053): `days` = threshold before expiry (30/7/1) or 0 for the post-expiry notice,
+   * `date` = IST calendar day it goes out. null = no expiry date or all reminders sent.
+   */
+  nextReminder: { days: number; date: string } | null;
   /** Relative API path for download (`?inline=1` for preview). */
   downloadUrl: string;
 }
+
+/** A previous file of a vault document, kept on renewal/replace (FR-065, FR-066). Newest first, at most 5. */
+export interface VaultVersionDto {
+  id: string; fileName: string; mimeType: string; sizeBytes: number; pageCount: number | null;
+  /** Expiry date the document had while this file was current. */
+  expiryDate: string | null;
+  replacedBy: { id: string; name: string } | null;
+  replacedAt: string;
+  /** Relative API path for download (`?inline=1` for preview). */
+  downloadUrl: string;
+}
+
+/** Versions kept per document (FR-065). */
+export const VAULT_MAX_VERSIONS = 5;
 
 export interface VaultSummary {
   total: number; valid: number; expiring: number; expired: number;

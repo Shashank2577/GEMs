@@ -1,7 +1,8 @@
 /** Past contracts / CRACs — saved immediately (separate API from the profile form). */
 import { useEffect, useState } from 'react';
 import { Briefcase, Link2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { BUYER_TYPES, BUYER_TYPE_LABELS, pastContractCreateSchema, type PastContractDto } from '@tp/core/contracts/vault';
+import { BUYER_TYPES, BUYER_TYPE_LABELS, pastContractCreateSchema, type PastContractDto, type VaultDocumentDto } from '@tp/core/contracts/vault';
+import { docTypeInfo } from '@tp/core/vault/status';
 import {
   Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DropdownMenu,
   DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, ErrorState, Field, Input, ResponsiveTable, Select, SkeletonList, toast, type Column,
@@ -10,7 +11,7 @@ import { errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDateIST, formatINR, formatINRCompact } from '@/lib/format';
 import { useVault } from '@/features/vault/api';
-import { serverFieldErrors } from '@/features/vault/UploadDialog';
+import { serverFieldErrors, UploadDialog } from '@/features/vault/UploadDialog';
 import { useDeletePastContract, usePastContracts, useSavePastContract } from './api';
 import { RupeeInput } from './RupeeInput';
 
@@ -26,6 +27,17 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
   const [errors, setErrors] = useState<Record<string, string>>({});
   const save = useSavePastContract();
   const docs = useVault({ category: 'Experience' });
+  const [uploading, setUploading] = useState(false);
+  // The just-uploaded CRAC, shown in the picker until the refetched vault list includes it (no blank picker).
+  const [uploaded, setUploaded] = useState<VaultDocumentDto | null>(null);
+  const onUploaded = (id: string, doc?: VaultDocumentDto) => {
+    // FR-059/FR-062: only Experience documents count as proof; the type may have been changed in the dialog.
+    // "Open existing" on a duplicate (FR-067) passes only the id: link it if it is one of the Experience documents.
+    const known = doc ?? docs.data?.items.find((x) => x.id === id);
+    if (!known || docTypeInfo(known.type).category !== 'Experience') { toast.warning('Uploaded to the vault, but only Experience documents can be linked as proof'); return; }
+    if (doc) setUploaded(doc);
+    set('cracDocumentId', id);
+  };
   useEffect(() => { if (open) { setD(editing ? fromDto(editing) : empty); setErrors({}); } }, [open, editing]);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
 
@@ -44,7 +56,11 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
     });
   };
 
-  const docOptions = [{ value: '__none', label: 'Not linked' }, ...(docs.data?.items ?? []).map((x) => ({ value: x.id, label: x.title }))];
+  const docOptions = [
+    { value: '__none', label: 'Not linked' },
+    ...[...(docs.data?.items ?? []), ...(uploaded && !docs.data?.items.some((x) => x.id === uploaded.id) ? [uploaded] : [])].map((x) => ({ value: x.id, label: x.title })),
+    { value: '__upload', label: 'Upload a new CRAC…' },
+  ];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
@@ -70,9 +86,14 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
           <Field label="Category" error={errors.category}><Input value={d.category} onChange={(e) => set('category', e.target.value)} placeholder="e.g. Desktop computers" /></Field>
           <Field label="GeM contract no." error={errors.gemContractNo}><Input value={d.gemContractNo} onChange={(e) => set('gemContractNo', e.target.value)} placeholder="GEMC-5116877…" className="font-mono text-[13px]" /></Field>
           <Field label="CRAC / completion certificate" error={errors.cracDocumentId} hint="Link the proof from your vault (Experience documents)." className="sm:col-span-2">
-            <Select value={d.cracDocumentId || '__none'} onValueChange={(v) => set('cracDocumentId', v === '__none' ? '' : v)} options={docOptions} />
+            <Select
+              value={d.cracDocumentId || '__none'} options={docOptions}
+              onValueChange={(v) => (v === '__upload' ? setUploading(true) : set('cracDocumentId', v === '__none' ? '' : v))}
+            />
           </Field>
         </form>
+        {/* FR-062: rendered inside the contract dialog so it stacks on top and the draft is kept. */}
+        <UploadDialog open={uploading} onOpenChange={setUploading} presetType="crac" onUploaded={onUploaded} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="submit" form="pc-form" loading={save.isPending}>{editing ? 'Save contract' : 'Add contract'}</Button>
@@ -81,6 +102,8 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
     </Dialog>
   );
 }
+
+const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
 export function PastContracts() {
   const { can } = useAuth();
@@ -106,8 +129,9 @@ export function PastContracts() {
     { key: 'crac', header: 'Proof', hideOnMobile: true, cell: (c) => c.cracDocumentId ? <Badge tone="success" size="sm"><Link2 />Linked</Badge> : <Badge tone="warning" size="sm">No CRAC</Badge> },
     ...(canWrite ? [{ key: 'actions', header: <span className="sr-only">Actions</span>, className: 'w-10', cell: (c: PastContractDto) => (
       <DropdownMenu>
-        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`Actions for ${c.title}`} onClick={(e) => e.stopPropagation()}><MoreHorizontal /></Button></DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`Actions for ${c.title}`} onClick={stop} onKeyDown={stop}><MoreHorizontal /></Button></DropdownMenuTrigger>
+        {/* The menu is portalled, but React events still bubble to the row's onRowClick (Enter/click → Edit). */}
+        <DropdownMenuContent align="end" onClick={stop} onKeyDown={stop}>
           <DropdownMenuItem onSelect={() => { setEditing(c); setOpen(true); }}><Pencil />Edit</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDeleting(c)} className="text-danger focus:text-danger"><Trash2 />Delete</DropdownMenuItem>
         </DropdownMenuContent>

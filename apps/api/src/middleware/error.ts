@@ -3,11 +3,12 @@ import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { HttpError } from '../lib/errors';
 import { zodToHttpError } from '../lib/validate';
+import { redactPath } from './request';
 import type { AppEnv } from '../types';
 
 /** app.onError handler → `{ error: { code, message, details? } }`. */
 export function errorHandler(err: Error, c: Context<AppEnv>) {
-  if (err instanceof HttpError) return c.json(err.toJSON(), err.status);
+  if (err instanceof HttpError) return c.json(err.toJSON(), err.status, err.headers);
   if (err instanceof ZodError) {
     const e = zodToHttpError(err);
     return c.json(e.toJSON(), e.status);
@@ -19,8 +20,14 @@ export function errorHandler(err: Error, c: Context<AppEnv>) {
     return c.json({ error: { code, message: err.message || 'Request failed' } }, status);
   }
   const logger = c.var.deps?.logger;
-  const meta = { rid: c.var.requestId, path: c.req.path, error: err?.message, stack: err?.stack?.split('\n').slice(0, 6).join(' | ') };
+  const meta = {
+    rid: c.var.requestId, orgId: c.var.org?.id ?? null, userId: c.var.user?.id ?? null, path: redactPath(c.req.path),
+    error: err?.message, stack: err?.stack?.split('\n').slice(0, 6).join(' | '),
+  };
   if (logger) logger.error('unhandled error', meta); else console.error('[tp] unhandled error', meta);
+  try {
+    c.var.deps?.errors.capture(err, { rid: c.var.requestId, orgId: c.var.org?.id, userId: c.var.user?.id, route: c.req.routePath });
+  } catch { /* reporting must never mask the 500 */ }
   return c.json({ error: { code: 'internal_error', message: 'Something went wrong on our side. Please try again.', details: { requestId: c.var.requestId } } }, 500);
 }
 

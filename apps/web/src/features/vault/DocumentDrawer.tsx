@@ -1,6 +1,7 @@
-/** Preview drawer: inline PDF/image preview, metadata (view & edit), replace file, download, delete. */
+/** Preview drawer: inline PDF/image preview, metadata (view & edit), renew / replace file, versions, download, delete. */
 import { useEffect, useState } from 'react';
-import { Calendar, Download, ExternalLink, FileWarning, Hash, Pencil, RefreshCw, Tag, Trash2, User } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { BellRing, Calendar, CalendarClock, Download, ExternalLink, FileWarning, Hash, History, Pencil, RefreshCw, Tag, Trash2, User } from 'lucide-react';
 import type { VaultDocumentDto } from '@tp/core/contracts/vault';
 import { VAULT_ACCEPT } from '@tp/core/contracts/vault';
 import { docTypeInfo } from '@tp/core/vault/status';
@@ -10,9 +11,13 @@ import {
 import { apiUrl, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
-import { useDeleteVault, useReplaceVaultFile, useUpdateVault } from './api';
-import { DocTypeIcon, ExpiryBadge } from './doc-ui';
+import { useDeleteVault, useReplaceVaultFile, useUpdateVault, useVaultVersions } from './api';
+import { checkVaultFile } from './file-check';
+import { DocTypeIcon, DuplicatePrompt, ExpiryBadge } from './doc-ui';
 import { DocumentForm, validateDraft, type DocDraft } from './DocumentForm';
+import { nextReminderLine } from './reminders';
+import { RenewDialog } from './RenewDialog';
+import { duplicateOf, versionLine, type DuplicateInfo } from './renew';
 import { serverFieldErrors } from './UploadDialog';
 
 const toDraft = (d: VaultDocumentDto): DocDraft => ({
@@ -36,14 +41,37 @@ function Preview({ doc }: { doc: VaultDocumentDto }) {
   );
 }
 
+/** Previous files kept on renewal/replace, newest first, each downloadable — viewers included (T071; FR-066, FR-068). */
+function Versions({ docId }: { docId: string }) {
+  const q = useVaultVersions(docId);
+  const items = q.data?.items ?? [];
+  if (q.isLoading) return <Skeleton className="h-10 w-full" />;
+  if (q.isError || !items.length) return null;
+  return (
+    <section aria-labelledby="vault-versions" className="grid gap-1.5">
+      <h3 id="vault-versions" className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground"><History className="size-3.5" aria-hidden />Versions</h3>
+      <ul className="divide-y rounded-lg border" data-testid="vault-versions">
+        {items.map((v) => (
+          <li key={v.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+            <span className="min-w-0 flex-1 break-words">{versionLine(v)}</span>
+            <Button variant="ghost" size="sm" asChild>
+              <a href={apiUrl(`/vault/${docId}/versions/${v.id}/download`)} download aria-label={`Download ${v.fileName}`}><Download />Download</a>
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Meta({ icon: Icon, label, children }: { icon: typeof Calendar; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 py-2">
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <dt className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
-        <dd className="mt-0.5 break-words text-sm">{children}</dd>
-      </div>
+    // A <dl> group may only hold <dt>/<dd> (axe definition-list / dlitem): the icon lives inside the <dt>.
+    <div className="relative min-w-0 py-2 pl-[26px]">
+      <dt className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Icon className="absolute left-0 top-2.5 size-4 text-muted-foreground" aria-hidden />{label}
+      </dt>
+      <dd className="mt-0.5 break-words text-sm">{children}</dd>
     </div>
   );
 }
@@ -55,12 +83,18 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
   const [draft, setDraft] = useState<DocDraft | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirm, setConfirm] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+  const [, setParams] = useSearchParams();
+  const openDoc = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('doc', id); return n; });
+  /** Replace file refused as a duplicate (FR-067): the file to re-send with allowDuplicate and the existing document. */
+  const [replaceDup, setReplaceDup] = useState<{ file: File; info: DuplicateInfo } | null>(null);
   const update = useUpdateVault();
   const replace = useReplaceVaultFile();
   const del = useDeleteVault();
 
   useEffect(() => { if (doc) { setDraft(toDraft(doc)); setErrors({}); } }, [doc?.id, doc?.updatedAt]);
-  useEffect(() => { if (!open) setEditing(false); }, [open]);
+  useEffect(() => { if (!open) { setEditing(false); setRenewing(false); } }, [open]);
+  useEffect(() => setReplaceDup(null), [doc?.id, open]);
 
   if (!doc) return null;
   const info = docTypeInfo(doc.type);
@@ -79,11 +113,18 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
     });
   };
 
-  const onReplace = (f: File | undefined) => {
+  const onReplace = (f: File | undefined, allowDuplicate = false) => {
     if (!f) return;
-    replace.mutate({ id: doc.id, file: f }, {
+    const problem = checkVaultFile(f);
+    if (problem) { toast.error(problem); return; }
+    setReplaceDup(null);
+    replace.mutate({ id: doc.id, file: f, fields: { allowDuplicate } }, {
       onSuccess: () => toast.success('File replaced', { description: 'Metadata kept. Update the expiry date if this is a renewed copy.' }),
-      onError: (err) => toast.error(errorMessage(err)),
+      onError: (err) => {
+        const d = duplicateOf(err);
+        if (d) setReplaceDup({ file: f, info: d });
+        else toast.error(errorMessage(err));
+      },
     });
   };
 
@@ -111,10 +152,17 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
             </div>
           </SheetHeader>
           <SheetBody className="grid content-start gap-5">
+            {replaceDup && (
+              <DuplicatePrompt
+                title={replaceDup.info.title} busy={replace.isPending}
+                onOpenExisting={() => { const id = replaceDup.info.existingId; setReplaceDup(null); openDoc(id); }}
+                onUploadAnyway={() => onReplace(replaceDup.file, true)}
+              />
+            )}
             {doc.status === 'expired' && (
               <div role="status" className="flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft/60 px-3 py-2.5 text-sm">
                 <FileWarning className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
-                <p>This document expired on <strong>{formatDateIST(doc.expiryDate)}</strong>. Bids that need it can’t be marked ready until you upload the renewed copy{canWrite ? ' with “Replace file”' : ''}.</p>
+                <p>This document expired on <strong>{formatDateIST(doc.expiryDate)}</strong>. Bids that need it can’t be marked ready until you upload the renewed copy{canWrite ? ' with “Renew”' : ''}.</p>
               </div>
             )}
             {editing && draft ? (
@@ -124,15 +172,23 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
             ) : (
               <>
                 <Preview doc={doc} />
-                <dl className="grid gap-x-6 sm:grid-cols-2">
+                <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
                   <Meta icon={Hash} label="Number">{doc.number ? <span className="font-mono text-[13px]">{doc.number}</span> : <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={User} label="Issued by">{doc.issuer ?? <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={Calendar} label="Issue date">{formatDateIST(doc.issueDate, { fallback: '—' })}</Meta>
-                  <Meta icon={Calendar} label="Expiry date">{doc.expiryDate ? <>{formatDateIST(doc.expiryDate)}</> : <span className="text-muted-foreground">Does not expire</span>}</Meta>
+                  <Meta icon={Calendar} label="Expiry date">{doc.expiryDate ? (
+                    <>
+                      {formatDateIST(doc.expiryDate)}
+                      <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground" data-testid="next-reminder">
+                        <BellRing className="size-3.5 shrink-0" aria-hidden />{nextReminderLine(doc.nextReminder)}
+                      </span>
+                    </>
+                  ) : <span className="text-muted-foreground">Does not expire</span>}</Meta>
                   <Meta icon={Tag} label="Tags">{doc.tags.length ? <span className="flex flex-wrap gap-1">{doc.tags.map((t) => <Badge key={t} size="sm">{t}</Badge>)}</span> : <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={Download} label="File">{doc.fileName} · {formatBytes(doc.sizeBytes)}{doc.pageCount ? ` · ${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'}` : ''}</Meta>
                 </dl>
                 <p className="text-xs text-muted-foreground">Uploaded {relativeTime(doc.createdAt)}{doc.uploadedBy ? ` by ${doc.uploadedBy.name}` : ''}{doc.updatedAt !== doc.createdAt ? ` · updated ${relativeTime(doc.updatedAt)}` : ''}</p>
+                <Versions docId={doc.id} />
               </>
             )}
           </SheetBody>
@@ -149,12 +205,13 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
                   <Button variant="ghost" size="sm" asChild><a href={apiUrl(`/vault/${doc.id}/download`, { inline: 1 })} target="_blank" rel="noreferrer"><ExternalLink />Open</a></Button>
                 </div>
                 {canWrite && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button variant="ghost" size="icon-sm" aria-label="Delete document" className="text-danger hover:bg-danger-soft hover:text-danger" onClick={() => setConfirm(true)}><Trash2 /></Button>
                     <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border bg-card px-3 text-[13px] font-medium hover:bg-muted focus-within:ring-2 focus-within:ring-ring">
                       <RefreshCw className={replace.isPending ? 'size-3.5 animate-spin' : 'size-3.5'} aria-hidden />{replace.isPending ? 'Replacing…' : 'Replace file'}
                       <input type="file" className="sr-only" accept={VAULT_ACCEPT} disabled={replace.isPending} onChange={(e) => { onReplace(e.target.files?.[0]); e.target.value = ''; }} />
                     </label>
+                    <Button variant="outline" size="sm" onClick={() => setRenewing(true)}><CalendarClock />Renew</Button>
                     <Button size="sm" onClick={() => setEditing(true)}><Pencil />Edit details</Button>
                   </div>
                 )}
@@ -163,6 +220,12 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      {canWrite && (
+        <RenewDialog
+          doc={doc} open={renewing} onOpenChange={setRenewing}
+          onOpenExisting={openDoc}
+        />
+      )}
       <ConfirmDialog
         open={confirm} onOpenChange={setConfirm} loading={del.isPending} onConfirm={onDelete} confirmLabel="Delete document"
         title={`Delete “${doc.title}”?`}

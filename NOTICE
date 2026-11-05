@@ -9,18 +9,80 @@ listed here with its licence.
    Licence: Apache License 2.0
    Used in: packages/core/src/gem/client.ts (BidPlus /all-bids → /all-bids-data request shape and CSRF
    bootstrap), packages/core/src/gem/parse.ts (field names and the bid-type → document-route mapping),
-   packages/core/src/gem/normalize.ts (Solr response unwrapping approach).
+   packages/core/src/gem/normalize.ts (Solr response unwrapping approach), packages/core/src/vault/status.ts
+   (GeM seller-document label vocabulary: the buildEligibilitySummary eligibility labels in src/routes.ts, used
+   in GEM_SELLER_DOC_LABELS and DOC_TYPES keywords).
+   Spec 004 Analyse (ported at commit 46925c6, 2026-11-04):
+   - packages/core/test/fixtures/bids/synthetic-tender.pdf — copied unchanged from
+     test/fixtures/synthetic-tender.pdf.
+   - packages/core/test/analyse/pdf-text.test.ts — the pooled-Buffer byte-safety case and the
+     invalid "%PDF-1.7" rejection case, adapted from src/pdf.test.ts (node:test → vitest).
+   - packages/core/src/gem/client.ts fetchBidDocument byte cap (25 MB, GemError code 'too_large') —
+     approach adapted from src/http.ts fetchBoundedResource({maxBytes}) (content-length check, then
+     streamed byte count with cancel), with its test idea from src/http.test.ts.
+   Spec 008 Operations & Scale (US4, 2026-11-05; upstream LICENSE re-checked: Apache-2.0):
+   - packages/core/src/gem/http.ts — SourceHttpError, SourceBodyLimitError, canRetrySource, waitForSourceDelay,
+     fetchBoundedResource and isPdfBody ported from src/http.ts. Modified: Fetch API instead of undici,
+     Uint8Array instead of Node Buffer (runs on Cloudflare Workers), readBoundedBody split out and now used by
+     packages/core/src/gem/client.ts for the bid-document byte cap, an optional beforeAttempt hook (cluster-wide
+     GeM lease), status/url on the result.
+   - packages/core/src/gem/http.test.ts — cases adapted from src/http.test.ts (node:test → vitest).
+   - Planned (spec 008 US1, not yet in this repository): .github/workflows/ci.yml and dod.yml will adapt the
+     structure of .github/workflows/ci.yml (minimal permissions, timeouts, production-dependency audit step).
+   Spec 004 Analyse US2 extraction (ported at commit 46925c6, 2026-11-05), packages/core/src/analyse/rules.ts:
+   - label variants from src/routes.ts buildEligibilitySummary: "MSE/Startup Relaxation for Years Of
+     Experience (and Turnover)" with values "Yes | Complete" / "No | Complete", and "Years of Past
+     Experience Required for same/similar service";
+   - from src/routes.ts mergeGemPdfDetails: the "Dated: dd-mm-yyyy" published-date pattern and "Contract
+     Period" as a GeM label;
+   - INDIAN_STATES (list copied) and the inferIndianState idea (here word-bounded, position-ordered and
+     scoped to the consignee block).
+   Spec 006 Apply (ported at commit 46925c6, 2026-11-05):
+   - apps/api/src/services/packet.ts buildWorkspacePacket loadBytes — the "independent Uint8Array copy before
+     PDF load" hardening (Uint8Array.from(bytes) before parsing) adapted from src/pdf.ts parseGemPdfText.
+   - apps/api/src/services/packet.ts buildWorkspacePacket input-size pre-check (413 packet_too_large, 006/FR-056) —
+     the "fail fast against an explicit byte budget before doing any work" shape adapted from src/run-budget.ts
+     (the idea only; no code copied).
+   Licence text: https://www.apache.org/licenses/LICENSE-2.0
 
 2. gem-search — https://github.com/arush15june/gem-search
    Licence: MIT License, Copyright (c) 2026 Aarush Jain
    Used in: packages/core/src/gem/client.ts and packages/core/src/gem/parse.ts (public endpoint payload
    fields and pagination parameters).
+   Also used in: packages/core/src/gem/award.ts (parseBidResult — TypeScript port of get_bid_result() from
+   gem.py: the bid-result view route /bidding/bid/getBidResultView/<b_id> and the bidder-row / categories
+   regular expressions), with the test fixture packages/core/test/fixtures/gem/bid-result.html built to the
+   same markup (spec 007, T004/T032).
+   Licence text: https://opensource.org/license/mit
 
-3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
+3. GEM-SCRAPER — https://github.com/IshanMaheshwari-777/GEM-SCRAPER
+   Licence: none. The upstream repository has no licence file, so no licence is claimed or granted here; the
+   heuristics were ported with THIS project's owner's approval (not the upstream author's;
+   docs/delivery/TEAM_PLAYBOOK.md reference-scrapers list; specs/006-apply-packet-assist/plan.md, T092). This is an
+   exception to .cairn/workflow/memory/constitution.md (Apache-2.0/MIT only) awaiting human ratification.
+   Used in: packages/core/src/gem/award.ts (parseAwardResult — TypeScript port of the table heuristics of
+   scrape_ra_schedule() in scraper.py: financial-table header keywords, rank / seller / last-numeric-cell price
+   column rules, trophy/winner row marker, trailing portal-tag stripping), spec 006 T092. The fixture
+   packages/core/test/fixtures/gem/ra-result.html is synthetic, built to that structure (the reference
+   ra_page_dump.html is a GeM home page without an evaluation table).
+   Differs from upstream: the rank cell is never used as the price, amount cells are never used as seller
+   names, rows without a price are skipped, and the first winner-marked row is taken (upstream: the last).
+
+4. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
    Licence: MIT License
    Used in: CONVENTIONS.md and .aisdlc/ (review and QA process templates only; no runtime code).
 
 Other reference repositories in the owner's reference set (Giridar33/gem-tender-tracker,
-PranavTamada/Tender_Scraper, IshanMaheshwari-777/GEM-SCRAPER, Mujahid-Alam/gem-tender-pdf-extractor,
+PranavTamada/Tender_Scraper, Mujahid-Alam/gem-tender-pdf-extractor,
 Giri-Aayush/gem, rounittxx/gem-bid-scraper) were consulted for portal behaviour but no code or text from
 them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.
+
+Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
+copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for our own label table
+(spec 004, packages/core/src/analyse/rules.ts; asserted in packages/core/test/analyse/corpus.test.ts).
+
+Test fixtures packages/core/test/fixtures/bids/real-*.pdf embed subsets of GNU FreeSans
+(https://www.gnu.org/software/freefont/), GPLv3 with the font exception, which permits embedding the
+font in documents without the documents becoming subject to the GPL.
+
+Inter typeface (apps/web/public/fonts/inter-*.woff2): Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter), SIL Open Font License 1.1 (https://openfontlicense.org). Self-hosted subset of the Google Fonts build.

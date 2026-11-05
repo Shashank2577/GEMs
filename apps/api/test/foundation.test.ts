@@ -1,18 +1,23 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createFsBlobStore } from '../src/adapters/blob-fs';
 import { createMemoryBlobStore } from '../src/adapters/memory-blob';
 import { createAnthropicClient, parseJsonLoose } from '../src/adapters/llm';
 import { createResendMailer } from '../src/adapters/mailer';
 import { createMetaWhatsApp } from '../src/adapters/whatsapp';
-import { createDeps } from '../src/adapters/index';
+import { createDeps, noopGemLease } from '../src/adapters/index';
 import { silentLogger } from '../src/adapters/logger';
 import { hashPassword, verifyPassword, sha256Hex, randomToken } from '../src/lib/crypto';
 import { slugify } from '../src/lib/slug';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import type { BlobStore } from '../src/deps';
+import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
+import { loadConfig } from '../src/env';
+import {
+  HttpError, payloadTooLarge, paymentRequired, rateLimitMessage, serviceUnavailable, tooManyRequests, unprocessable,
+} from '../src/lib/errors';
 
 describe('crypto', () => {
   it('hashes and verifies passwords with PBKDF2', async () => {
@@ -129,6 +134,133 @@ describe('provider adapters', () => {
   it('scheduled pipeline runs every step', async () => {
     const deps = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     const report = await runScheduledJobs(deps);
-    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders']);
+    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup', 'rate-limit-cleanup']);
+  });
+});
+
+describe('error helpers (008/FR-018, FR-021, FR-040)', () => {
+  it('paymentRequired → 402 with code, message and details', () => {
+    const e = paymentRequired('plan_limit_reached', 'Your Starter plan allows 5 watchlists.', { limit: 'watchlists', used: 5, max: 5 });
+    expect(e).toBeInstanceOf(HttpError);
+    expect(e.status).toBe(402);
+    expect(e.toJSON()).toEqual({ error: { code: 'plan_limit_reached', message: 'Your Starter plan allows 5 watchlists.', details: { limit: 'watchlists', used: 5, max: 5 } } });
+  });
+
+  it('tooManyRequests → 429 rate_limited with {rule, retryAfter} and a Retry-After header', () => {
+    const e = tooManyRequests('watchlist.preview.user', 42);
+    expect(e.status).toBe(429);
+    expect(e.code).toBe('rate_limited');
+    expect(e.details).toEqual({ rule: 'watchlist.preview.user', retryAfter: 42 });
+    expect(e.headers).toEqual({ 'Retry-After': '42' });
+    expect(e.message).toBe('Too many requests. Try again in 42 seconds.');
+    // Fractions round up and never go below 1 s.
+    expect(tooManyRequests('api.ip', 0.2).headers).toEqual({ 'Retry-After': '1' });
+    expect(tooManyRequests('x', 5, 'Custom').message).toBe('Custom');
+  });
+
+  it('rate-limit messages: auth rules in minutes ("attempts"), others in seconds up to 2 min', () => {
+    expect(rateLimitMessage('auth.fail.email', 840)).toBe('Too many attempts. Try again in 14 minutes.');
+    expect(rateLimitMessage('auth.fail.email', 30)).toBe('Too many attempts. Try again in 1 minute.');
+    expect(rateLimitMessage('api.user', 1)).toBe('Too many requests. Try again in 1 second.');
+    expect(rateLimitMessage('api.user', 119)).toBe('Too many requests. Try again in 119 seconds.');
+    expect(rateLimitMessage('upload.org', 3000)).toBe('Too many requests. Try again in 50 minutes.');
+  });
+
+  it('payloadTooLarge 413, unprocessable 422, serviceUnavailable 503', () => {
+    expect(payloadTooLarge('Files can be at most 20 MB.').toJSON()).toEqual({ error: { code: 'payload_too_large', message: 'Files can be at most 20 MB.' } });
+    expect(payloadTooLarge().status).toBe(413);
+    const u = unprocessable('document_too_long', 'This document has 412 pages; the limit is 300.', { pages: 412 });
+    expect([u.status, u.code, u.details]).toEqual([422, 'document_too_long', { pages: 412 }]);
+    const s = serviceUnavailable('gem_busy', 'GeM is busy — we’ll retry shortly');
+    expect([s.status, s.code, s.message]).toEqual([503, 'gem_busy', 'GeM is busy — we’ll retry shortly']);
+    expect(serviceUnavailable().code).toBe('service_unavailable');
+  });
+});
+
+describe('ops config and deps (008/T013)', () => {
+  it('reads the ops env keys with safe defaults', () => {
+    const d = loadConfig({});
+    expect(d).toMatchObject({ adminToken: null, sentryDsn: null, logLevel: 'info', healthIngestionMaxAgeMin: 120, manualSyncCooldownMin: 10, trustProxy: 'none' });
+    const c = loadConfig({ ADMIN_TOKEN: 'adm', SENTRY_DSN: 'https://k@sentry.io/1', LOG_LEVEL: 'DEBUG', HEALTH_INGESTION_MAX_AGE_MIN: '90', MANUAL_SYNC_COOLDOWN_MIN: '0', TRUST_PROXY: '1' });
+    expect(c).toMatchObject({ adminToken: 'adm', sentryDsn: 'https://k@sentry.io/1', logLevel: 'debug', healthIngestionMaxAgeMin: 90, manualSyncCooldownMin: 0, trustProxy: 'xff' });
+    expect(loadConfig({ LOG_LEVEL: 'verbose', MANUAL_SYNC_COOLDOWN_MIN: 'soon' })).toMatchObject({ logLevel: 'info', manualSyncCooldownMin: 10 });
+  });
+
+  it('createDeps wires a rate limiter, a no-op error reporter and the GeM lease (no-op only when unthrottled)', async () => {
+    const deps = createDeps({ env: { GEM_MIN_INTERVAL_MS: '0' }, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
+    expect(typeof deps.rateLimiter.hit).toBe('function');
+    expect(typeof deps.rateLimiter.reset).toBe('function');
+    expect(() => deps.errors.capture(new Error('boom'), { rid: 'r1' })).not.toThrow();
+    await expect(deps.gemLease.acquire(25_000)).resolves.toBeUndefined();
+    // Default (1 req/s): the cluster-wide Postgres lease from US4 (lib/gem-lease.ts), not the no-op.
+    const throttled = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
+    expect(throttled.gemLease).not.toBe(noopGemLease);
+    expect(typeof throttled.gemLease.acquire).toBe('function');
+  });
+});
+
+describe('PATCH /org onboarding state (007 US3)', () => {
+  let ctx: TestContext;
+  beforeAll(async () => { ctx = await createTestContext(); });
+  afterAll(async () => { await ctx.close(); });
+
+  const activityActions = async (cookie: string) =>
+    (await request(ctx.app, 'GET', '/api/activity', { cookie })).body.items.map((i: { action: string }) => i.action) as string[];
+
+  it('merges keys, keeping existing ones, and writes no org.updated activity for ticks', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    const a = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { company: true } } });
+    expect(a.status).toBe(200);
+    const b = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { categories: true } } });
+    expect(b.body.onboardingState).toEqual({ company: true, categories: true });
+    expect(await activityActions(owner.cookie)).not.toContain('org.updated');
+  });
+
+  it('forbids analyst and viewer', async () => {
+    const { analyst, viewer } = await seedOrgWithRoles(ctx.app);
+    for (const u of [analyst, viewer]) {
+      const r = await request(ctx.app, 'PATCH', '/api/org', { cookie: u.cookie, json: { onboardingState: { company: true } } });
+      expect(r.status).toBe(403);
+    }
+  });
+
+  it('rejects unknown keys with details.fields.onboardingState', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    const r = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { bogus: true } } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields.onboardingState).toBeTruthy();
+    const many = Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`k${i}`, true]));
+    const r2 = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: many } });
+    expect(r2.status).toBe(400);
+    expect(r2.body.error.details.fields.onboardingState).toBeTruthy();
+  });
+
+  it('logs onboarding.completed once with durationSec', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    ctx.clock.advance(95_000);
+    const r = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { completed: true } } });
+    expect(r.status).toBe(200);
+    await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { completed: true } } });
+    const list = (await request(ctx.app, 'GET', '/api/activity', { cookie: owner.cookie })).body.items as { action: string; meta: { durationSec?: number } }[];
+    const done = list.filter((i) => i.action === 'onboarding.completed');
+    expect(done).toHaveLength(1);
+    expect(done[0].meta.durationSec).toBeGreaterThanOrEqual(95);
+  });
+
+  it('concurrent completed PATCHes log onboarding.completed exactly once', async () => {
+    const { owner, bidManager } = await seedOrgWithRoles(ctx.app);
+    const rs = await Promise.all([owner, bidManager, owner, bidManager, owner].map((u) =>
+      request(ctx.app, 'PATCH', '/api/org', { cookie: u.cookie, json: { onboardingState: { completed: true } } })));
+    expect(rs.every((r) => r.status === 200 && r.body.onboardingState.completed === true)).toBe(true);
+    const list = (await request(ctx.app, 'GET', '/api/activity', { cookie: owner.cookie })).body.items as { action: string }[];
+    expect(list.filter((i) => i.action === 'onboarding.completed')).toHaveLength(1);
+  });
+
+  it('concurrent PATCHes of different onboarding keys all survive', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    const keys = ['company', 'categories', 'watchlist', 'documents'];
+    await Promise.all(keys.map((k) => request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { [k]: true } } })));
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: owner.cookie });
+    expect(me.body.org.onboardingState).toEqual(Object.fromEntries(keys.map((k) => [k, true])));
   });
 });

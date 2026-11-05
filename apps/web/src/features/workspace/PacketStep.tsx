@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core';
@@ -9,12 +9,12 @@ import {
 } from 'lucide-react';
 import type { PacketDto, PacketItemInput, WorkspaceDetail } from '@tp/core/contracts/apply';
 import { Badge, Button, Card, EmptyState, Progress, Tooltip, toast } from '@/components/ui';
-import { useCan } from '@/lib/auth';
-import { errorMessage } from '@/lib/api';
-import { formatDateIST, pluralize, relativeTime } from '@/lib/format';
-import { useLocalStorage } from '@/lib/hooks';
-import { cn } from '@/lib/utils';
 import { formatBytes } from '@/components/ui/dropzone';
+import { errorMessage } from '@/lib/api';
+import { useCan } from '@/lib/auth';
+import { formatDateIST, pluralize, relativeTime } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import { packetReorderAnnouncements } from './a11y';
 import { useBuildPacket } from './api';
 
 const LIMIT = 20 * 1024 * 1024;
@@ -23,7 +23,7 @@ interface Row extends PacketItemInput { uid: string; sizeBytes: number; group: s
 
 const uidOf = (i: PacketItemInput) => `${i.kind}:${i.refId ?? ''}`;
 
-function allRows(data: WorkspaceDetail): { rows: Row[]; defaults: string[] } {
+function allRows(data: WorkspaceDetail): { rows: Row[]; proposed: string[]; computed: string[] } {
   const vault = new Map(data.vaultDocs.map((d) => [d.id, d]));
   const make = (i: PacketItemInput): Row => {
     const d = i.kind === 'vault' && i.refId ? vault.get(i.refId) : undefined;
@@ -36,22 +36,64 @@ function allRows(data: WorkspaceDetail): { rows: Row[]; defaults: string[] } {
     };
   };
   const out = new Map<string, Row>();
+  // Proposed order (006/FR-055): the last successful build's order, shared by the whole team.
   for (const i of data.defaultPacketItems) out.set(uidOf(i), make(i));
-  const defaults = [...out.keys()];
+  const proposed = [...out.keys()];
+  // Computed default (006/FR-045): what "Default order" resets to.
+  const computedItems = data.computedPacketItems ?? data.defaultPacketItems;
+  for (const i of computedItems) if (!out.has(uidOf(i))) out.set(uidOf(i), make(i));
+  const computed = computedItems.map(uidOf);
   for (const a of data.annexures) if (a.key !== 'oem_auth_request') { const r = make({ kind: 'annexure', refId: a.key, title: a.title, pages: 1 }); if (!out.has(r.uid)) out.set(r.uid, r); }
   for (const d of data.vaultDocs) { const r = make({ kind: 'vault', refId: d.id, title: d.title }); if (!out.has(r.uid)) out.set(r.uid, r); }
   for (const d of data.tenderDocs) { const r = make({ kind: 'tender_doc', refId: d.id, title: d.fileName }); if (!out.has(r.uid)) out.set(r.uid, r); }
-  return { rows: [...out.values()], defaults };
+  return { rows: [...out.values()], proposed, computed };
+}
+
+const sameOrder = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+interface PacketDraft { basePacketId: string | null; order: string[] }
+
+/**
+ * Per-browser packet order kept only as an unsaved draft (006/FR-055), stored under `tp:packet-order:<workspaceId>` as
+ * `{ basePacketId, order }` where `basePacketId` is the latest ready build the draft was made on. `null` means "use the
+ * server's proposed order". A draft made on an older build (a newer ready build now exists — ours or a teammate's) is
+ * dropped; this also clears the draft after our own successful build, once the refreshed workspace arrives, so the
+ * list never flashes back to the previous order in between.
+ */
+function usePacketDraft(workspaceId: string, basePacketId: string | null) {
+  const key = `tp:packet-order:${workspaceId}`;
+  const read = (): PacketDraft | null => {
+    try {
+      const v = JSON.parse(localStorage.getItem(key) ?? 'null') as PacketDraft | null;
+      return v && Array.isArray(v.order) ? { basePacketId: v.basePacketId ?? null, order: v.order.map(String) } : null;
+    } catch { return null; }
+  };
+  const [draft, setDraftState] = useState<PacketDraft | null>(read);
+  useEffect(() => { setDraftState(read()); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const write = useCallback((v: PacketDraft | null) => {
+    setDraftState(v);
+    try { if (v) localStorage.setItem(key, JSON.stringify(v)); else localStorage.removeItem(key); } catch { /* storage unavailable */ }
+  }, [key]);
+  const stale = !!draft && draft.basePacketId !== basePacketId;
+  useEffect(() => { if (stale) write(null); }, [stale, write]);
+  const setDraft = useCallback((order: string[] | null) => write(order ? { basePacketId, order } : null), [write, basePacketId]);
+  return [stale ? null : draft?.order ?? null, setDraft] as const;
 }
 
 const KIND_ICON = { cover: BookOpen, annexure: FileSignature, vault: FileText, tender_doc: FileStack } as const;
 
 export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: () => void }) {
   const canWrite = useCan('analyst');
-  const { rows, defaults } = useMemo(() => allRows(data), [data]);
+  const { rows, proposed, computed } = useMemo(() => allRows(data), [data]);
   const byUid = useMemo(() => new Map(rows.map((r) => [r.uid, r])), [rows]);
-  const [order, setOrder] = useLocalStorage<string[] | null>(`tp:packet-order:${data.workspace.id}`, null);
-  const included = (order ?? defaults).filter((u) => byUid.has(u));
+  const latestReadyId = data.packets.find((p) => p.status === 'ready')?.id ?? null;
+  const [order, setOrder] = usePacketDraft(data.workspace.id, latestReadyId);
+  const shared = proposed.filter((u) => byUid.has(u));
+  const included = (order ?? shared).filter((u) => byUid.has(u));
+  const isComputed = sameOrder(included, computed);
+  const isDraft = !!order && !sameOrder(included, shared);
+  const fromLastBuild = !order && !sameOrder(shared, computed);
+  const resetOrder = () => setOrder(sameOrder(shared, computed) ? null : computed);
   const available = rows.filter((r) => !included.includes(r.uid));
   const build = useBuildPacket(data.workspace.id);
   const [phase, setPhase] = useState(0);
@@ -66,6 +108,7 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
     const from = included.indexOf(String(e.active.id)), to = included.indexOf(String(e.over.id));
     setOrder(arrayMove(included, from, to));
   };
+  const announcements = packetReorderAnnouncements(included, (id) => byUid.get(id)?.title ?? 'document');
   const move = (uid: string, dir: -1 | 1) => {
     const i = included.indexOf(uid), j = i + dir;
     if (j < 0 || j >= included.length) return;
@@ -84,7 +127,10 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
   }, [build.isPending]);
 
   const doBuild = () => build.mutate(items.map(({ kind, refId, title, pages: p }) => ({ kind, refId, title, pages: p })), {
-    onSuccess: (p) => toast.success(`Packet ready — ${p.pageCount} pages`, { description: p.warnings.length ? `${pluralize(p.warnings.length, 'warning')} to review` : 'Download it and check every page before uploading on GeM.' }),
+    onSuccess: (p) => {
+      // The draft is dropped by usePacketDraft once the refreshed workspace shows this build as the latest ready one.
+      toast.success(`Packet ready — ${p.pageCount} pages`, { description: p.warnings.length ? `${pluralize(p.warnings.length, 'warning')} to review` : 'Download it and check every page before uploading on GeM.' });
+    },
     onError: (e) => toast.error(errorMessage(e)),
   });
 
@@ -96,11 +142,13 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-semibold">Packet contents</h3>
               <p className="text-xs text-muted-foreground">Drag to reorder (or use the arrows). The index page lists every document with its page number.</p>
+              {isDraft && canWrite && <p className="mt-1 text-2xs text-muted-foreground">Unsaved order on this device — build the packet to share it with your team.</p>}
+              {fromLastBuild && <p className="mt-1 text-2xs text-muted-foreground">Order from the last successful build.</p>}
             </div>
-            {order && <Button size="xs" variant="ghost" onClick={() => setOrder(null)}><RotateCcw /> Default order</Button>}
+            {canWrite && !isComputed && <Button size="xs" variant="ghost" onClick={resetOrder}><RotateCcw /> Default order</Button>}
           </div>
           {items.length ? (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={{ announcements, screenReaderInstructions: { draggable: 'To pick up a document, press space or enter. Use the up and down arrow keys to move it, space or enter to drop it, escape to cancel.' } }}>
               <SortableContext items={included} strategy={verticalListSortingStrategy}>
                 <ol className="divide-y" aria-label="Documents in the packet, in order">
                   {items.map((r, i) => (
@@ -144,7 +192,8 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
           </div>
           <div className="mt-4">
             <div className="mb-1.5 flex justify-between text-xs"><span className="text-muted-foreground">Estimated size</span><span className={cn('tabular font-medium', size > LIMIT && 'text-danger')}>{formatBytes(size)} / 20 MB</span></div>
-            <Progress value={(size / LIMIT) * 100} tone={size > LIMIT ? 'danger' : size > LIMIT * 0.75 ? 'warning' : 'success'} size="sm" />
+            <Progress value={(size / LIMIT) * 100} tone={size > LIMIT ? 'danger' : size > LIMIT * 0.75 ? 'warning' : 'success'} size="sm"
+              aria-label="Estimated packet size" aria-valuetext={`${(size / (1024 * 1024)).toFixed(1)} MB of 20 MB`} />
             {size > LIMIT && <p className="mt-2 text-xs text-danger">Above GeM’s typical per-file limit — remove large scans or compress them in the vault.</p>}
           </div>
           {canWrite && (
@@ -154,7 +203,7 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
           )}
           {build.isPending && (
             <div className="mt-3 space-y-2" role="status" aria-live="polite">
-              <Progress value={20 + phase * 25} size="sm" />
+              <Progress value={20 + phase * 25} size="sm" aria-label="Packet build progress" />
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="size-3.5 animate-spin" aria-hidden />{['Rendering annexures…', 'Merging documents…', 'Writing index & bookmarks…', 'Saving the packet…'][phase]}</p>
             </div>
           )}

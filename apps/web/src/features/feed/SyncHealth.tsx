@@ -6,6 +6,7 @@ import { formatNumberIN, formatTimeIST, formatDateIST, relativeTime } from '@/li
 import { useNow } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { useIngestionRuns, useSyncNow } from './api';
+import { cooldownRetryAt, syncCooldownUntil } from './cooldown';
 
 type Health = 'ok' | 'stale' | 'error' | 'never';
 
@@ -22,13 +23,17 @@ const statusTone = { success: 'success', partial: 'warning', failed: 'danger', r
 
 /** "Synced 4 min ago · 1,243 open bids" pill with recent-run details and Sync now for managers (FR-007). */
 export function SyncHealth({ className }: { className?: string }) {
-  const now = useNow(30_000);
+  const now = useNow(5_000);
   const runs = useIngestionRuns();
   const sync = useSyncNow();
   if (runs.isLoading) return <Skeleton className={cn('h-8 w-52 rounded-full', className)} />;
   if (runs.isError || !runs.data) return null;
   const { lastSuccessAt, lastRun, openTenders, items } = runs.data;
   const health = healthOf(lastSuccessAt, lastRun, now);
+  // 008/FR-026: server-computed cooldown (platform-wide, 10 min by default); a 429's retryAt applies at once.
+  const cooldownUntil = syncCooldownUntil(runs.data, now, cooldownRetryAt(sync.error));
+  const cooldownMin = runs.data.manualSyncCooldownMin ?? 10;
+  const cooldownText = cooldownUntil ? `Next manual sync at ${formatTimeIST(cooldownUntil)} IST` : null;
   const label = sync.isPending
     ? 'Syncing with GeM…'
     : health === 'never' ? 'Not synced yet'
@@ -40,7 +45,7 @@ export function SyncHealth({ className }: { className?: string }) {
         <button
           type="button"
           className={cn('inline-flex h-8 items-center gap-2 rounded-full border bg-card px-3 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:text-foreground focus-ring', className)}
-          aria-label={`GeM sync status: ${label}`}
+          aria-label={`GeM sync status: ${label} · ${formatNumberIN(openTenders)} open bids`}
         >
           {sync.isPending ? <Loader2 className="size-3.5 animate-spin text-primary" /> : (
             <span className="relative flex size-2">
@@ -85,9 +90,27 @@ export function SyncHealth({ className }: { className?: string }) {
         <div className="flex items-center justify-between gap-2 border-t bg-subtle/60 px-4 py-3">
           <p className="flex items-center gap-1.5 text-2xs text-muted-foreground"><ShieldCheck className="size-3.5" />Public listings only · ≤ 1 request/sec</p>
           <RoleGate min="bid_manager">
-            <Button size="xs" onClick={() => sync.mutate()} loading={sync.isPending}>{!sync.isPending && <RefreshCw />}Sync now</Button>
+            {/* Disabled buttons swallow hover, so the tooltip lives on a wrapper; the hint is also announced. */}
+            <span title={cooldownText ?? undefined} className="inline-flex">
+              <Button
+                size="xs"
+                onClick={() => sync.mutate()}
+                loading={sync.isPending}
+                disabled={!!cooldownUntil && !sync.isPending}
+                aria-describedby={cooldownText ? 'sync-cooldown-hint' : undefined}
+              >
+                {!sync.isPending && <RefreshCw />}Sync now
+              </Button>
+            </span>
           </RoleGate>
         </div>
+        {cooldownText && (
+          <RoleGate min="bid_manager">
+            <p id="sync-cooldown-hint" role="status" className="border-t bg-subtle/60 px-4 pb-3 pt-2 text-right text-2xs text-muted-foreground">
+              {cooldownText} — manual syncs are kept {cooldownMin} minutes apart, for every organisation, to stay polite to GeM.
+            </p>
+          </RoleGate>
+        )}
       </PopoverContent>
     </Popover>
   );

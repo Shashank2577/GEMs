@@ -1,0 +1,32 @@
+{
+  "#how": {
+    "barBottom": -774,
+    "headTop": 220,
+    "scMarginTop": "80px",
+    "sectionTop": 80
+  },
+  "#control": {
+    "barBottom": -1604,
+    "headTop": 251,
+    "scMarginTop": "80px",
+    "sectionTop": 80
+  },
+  "#teams": {
+    "barBottom": -2371,
+    "headTop": 220,
+    "scMarginTop": "80px",
+    "sectionTop": 80
+  },
+  "#pricing": {
+    "barBottom": -3149,
+    "headTop": 221,
+    "scMarginTop": "80px",
+    "sectionTop": 80
+  },
+  "#faq": {
+    "barBottom": -4025,
+    "headTop": 220,
+    "scMarginTop": "80px",
+    "sectionTop": 80
+  }
+}

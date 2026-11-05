@@ -1,0 +1,26 @@
+{
+  "owner": {
+    "myBids": "below first row",
+    "awaiting": "Go+Drop x2",
+    "myBidsTop": 1079.75,
+    "closingSoonTop": 465.5,
+    "newMatchesTop": 1651
+  },
+  "bidManager": {
+    "myBids": "after KPI tiles",
+    "awaiting": "Go+Drop x2",
+    "myBidsTop": 444.5,
+    "kpiBottom": 324,
+    "closingSoonTop": 780.25
+  },
+  "analyst": {
+    "myBids": "visible",
+    "awaiting": "read-only (0 Go/Drop buttons)"
+  },
+  "viewer": {
+    "myBids": "hidden",
+    "awaiting": "hidden"
+  },
+  "viewerPatch": 403,
+  "analystPatchStatus": 200
+}

@@ -1,0 +1,12 @@
+# sc8b-200-pages-truncated — project desktop — 2026-11-05T07:26:52.464Z
+### 200-page upload
+> POST /api/tenders/:id/documents
+< 201
+{"id":"d6e94bba-9241-453b-ad92-1c1e2f1ccc7a","tenderId":"3177decf-047e-4cb7-9582-dc87d07f1a76","orgId":"a14a46d5-cc9f-44db-bb48-74ca52bad1c0","kind":"bid","fileName":"200-pages.pdf","sizeBytes":52155,"pageCount":150,"totalPages":200,"sourceUrl":null,"hasText":true,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T07:26:53.204Z","warnings":[{"code":"pages_truncated","analysed":150,"total":200}]}
+
+### Analyse
+> POST /api/tenders/:id/analyse
+< 201
+{"id":"44cef157-181f-4096-8b2c-0443163a43c3","orgId":"a14a46d5-cc9f-44db-bb48-74ca52bad1c0","tenderId":"3177decf-047e-4cb7-9582-dc87d07f1a76","status":"done","method":"rules","requirements":[{"key":"bid_end","label":"Bid end date","value":"2026-11-25T07:26:52.598Z","method":"RULE","source":{"quote":"GeM BidPlus listing data"},"numeric":null,"mandatory":false,"confidence":0.7}],"factors":[{"key":"turnover","label":"Average annual turnover","detail":"No minimum turnover criterion found in the bid.","status":"na","weight":20,"blocking":false},{"key":"experience","label":"Years of experience","detail":"No minimum experience criterion found in the bid.","status":"na","weight":18,"blocking":false}
+
+GET analysis → status=done warnings=[{"code":"llm_budget_exhausted","total":1,"covered":0}] documents=[{"id":"d6e94bba-9241-453b-ad92-1c1e2f1ccc7a","fileName":"200-pages.pdf","kind":"bid","pageCount":150,"totalPages":200}]

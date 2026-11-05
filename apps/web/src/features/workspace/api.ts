@@ -12,7 +12,7 @@ export const wsKeys = {
   templates: ['annexure-templates'] as const,
 };
 
-export type AssistResponse = AssistPayload & { stage: string; workspaceUrl: string; readiness: { percent: number; blockers: number } };
+export type AssistResponse = AssistPayload & { stage: string; workspaceUrl: string; readiness: { percent: number; blockers: number; analysed: boolean } };
 
 export function useWorkspace(id: string) {
   return useQuery({ queryKey: wsKeys.detail(id), queryFn: () => api.get<WorkspaceDetail>(`/workspaces/${id}`) });
@@ -92,6 +92,17 @@ export function useComment(id: string) {
   });
 }
 
+export function useDeleteComment(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => api.delete<void>(`/workspaces/${id}/comments/${commentId}`),
+    onSuccess: (_r, commentId) => {
+      qc.setQueryData<WorkspaceDetail>(wsKeys.detail(id), (d) => (d ? { ...d, comments: d.comments.filter((c) => c.id !== commentId) } : d));
+      qc.invalidateQueries({ queryKey: wsKeys.detail(id) });
+    },
+  });
+}
+
 export function useBuildPacket(id: string) {
   const refresh = useRefresh(id);
   return useMutation({
@@ -145,8 +156,15 @@ export async function previewAnnexure(wsId: string, key: string, title: string, 
   });
   if (!res.ok) {
     let msg = 'Preview failed';
-    try { msg = (await res.json()).error?.message ?? msg; } catch { /* ignore */ }
-    throw new ApiError(res.status, 'preview_failed', msg);
+    let code = 'preview_failed';
+    let details: unknown;
+    try {
+      const err = (await res.json()).error;
+      msg = err?.message ?? msg;
+      code = err?.code ?? code;
+      details = err?.details;
+    } catch { /* ignore */ }
+    throw new ApiError(res.status, code, msg, details);
   }
   return URL.createObjectURL(await res.blob());
 }

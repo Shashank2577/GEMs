@@ -3,6 +3,7 @@
  * packets and the submission assistant. See specs/001-gem-tender-copilot/contracts/api.md (Apply).
  */
 import { z } from 'zod';
+import { PACKET_MAX_ITEMS } from './caps';
 import type { ActivityItem } from './auth';
 import type { AnalysisDto, ChecklistItem } from './analyse';
 import type { Readiness, ReadinessItem, ReadinessState } from '../packet/mapping';
@@ -21,6 +22,26 @@ export const STAGE_LABELS: Record<StageName, string> = {
   identified: 'Identified', analysing: 'Analysing', go: 'Go', preparing: 'Preparing', ready: 'Ready to submit',
   submitted: 'Submitted', won: 'Won', lost: 'Lost', dropped: 'Dropped',
 };
+
+/** Stages that require a recorded GeM submission first (FR-008). */
+export const OUTCOME_STAGES: readonly StageName[] = ['won', 'lost'];
+/** Stages from which a bid may be marked won or lost (submitted, or correcting an existing result) (FR-008). */
+export const OUTCOME_ALLOWED_FROM: readonly StageName[] = ['submitted', 'won', 'lost'];
+export const INVALID_TRANSITION_MESSAGE =
+  'Record the submission on GeM first — a bid can only be won or lost after it was submitted.';
+
+export type TransitionCheck = { ok: true } | { ok: false; code: 'invalid_transition'; message: string };
+
+/**
+ * Stage transition rules (T019; FR-008). Every move is allowed except reaching `won`/`lost` from a stage
+ * other than `submitted`, `won` or `lost`. The `ready` guard (FR-005) needs readiness and lives in the API.
+ */
+export function canTransition(from: StageName, to: StageName): TransitionCheck {
+  if (OUTCOME_STAGES.includes(to) && !OUTCOME_ALLOWED_FROM.includes(from)) {
+    return { ok: false, code: 'invalid_transition', message: INVALID_TRANSITION_MESSAGE };
+  }
+  return { ok: true };
+}
 
 /** Active pipeline columns (Kanban), in order. */
 export const PIPELINE_STAGES: StageName[] = ['identified', 'analysing', 'go', 'preparing', 'ready', 'submitted', 'won', 'lost'];
@@ -75,7 +96,8 @@ export const packetItemSchema = z.object({
 });
 export type PacketItemInput = z.infer<typeof packetItemSchema>;
 
-export const packetBuildSchema = z.object({ items: z.array(packetItemSchema).max(200).optional() });
+/** 008/FR-032: at most PACKET_MAX_ITEMS (40) items; the API answers 413 `packet_too_large` before this schema runs. */
+export const packetBuildSchema = z.object({ items: z.array(packetItemSchema).max(PACKET_MAX_ITEMS).optional() });
 
 export const assistValuesSchema = z.record(z.string().min(1).max(80), z.string().max(2000));
 
@@ -127,7 +149,8 @@ export interface WorkspaceCard {
   outcome: WorkspaceOutcome | null;
   tender: Pick<WorkspaceTender, 'id' | 'bidNumber' | 'title' | 'organisation' | 'ministry' | 'state' | 'endAt' | 'emdAmount' | 'estimatedValue' | 'status'>;
   analysis: { id: string; score: number | null; verdict: 'go' | 'review' | 'no_go' | null; stale: boolean } | null;
-  readiness: { percent: number; blockers: number; total: number; covered: number };
+  /** `analysed: false` (with percent 0) when the tender has no analysis yet (FR-009). */
+  readiness: { percent: number; blockers: number; total: number; covered: number; analysed: boolean };
   commentCount: number;
 }
 
@@ -195,8 +218,10 @@ export interface WorkspaceDetail {
   vaultDocs: WorkspaceVaultDoc[];
   tenderDocs: WorkspaceTenderDoc[];
   members: WorkspaceMember[];
-  /** Default packet order (cover → cover letter → annexures → documents). */
+  /** Proposed order (006/FR-055): the last ready build's items (still-valid refs, newly required items appended), else the computed default. */
   defaultPacketItems: PacketItemInput[];
+  /** The computed default order (006/FR-045) — what "Default order" resets to. */
+  computedPacketItems: PacketItemInput[];
   /** Profile gaps that leave blanks in annexures. */
   profileGaps: string[];
 }

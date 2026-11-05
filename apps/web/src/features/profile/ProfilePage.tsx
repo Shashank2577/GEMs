@@ -3,12 +3,14 @@
  * Sectioned form with sticky section nav, live inline validation (the same zod schema the API uses),
  * a live completeness meter, and a save bar that appears when there are unsaved changes.
  * Past contracts save immediately through their own endpoints.
+ * Leaving with unsaved edits is guarded both for tab close (beforeunload) and in-app navigation (useBlocker, FR-013);
+ * saves carry `expectedUpdatedAt` so a newer save by someone else returns 409 instead of being overwritten (FR-014).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import {
-  BadgeCheck, Briefcase, Building2, Eye, Flag, Handshake, HelpCircle, IndianRupee, Info, Layers, Rocket, RotateCcw, Save, UserRoundPen, Wand2,
+  AlertTriangle, BadgeCheck, Briefcase, Building2, Eye, Flag, Handshake, HelpCircle, IndianRupee, Info, Layers, RefreshCw, Rocket, RotateCcw, Save, UserRoundPen, Wand2,
 } from 'lucide-react';
 import {
   MII_CLASSES, MII_CLASS_INFO, MSE_CATEGORIES, MSE_SOCIAL_CATEGORIES, profileInputSchema, type CompanyProfileDto, type ProfileInput,
@@ -17,7 +19,7 @@ import { profileCompleteness } from '@tp/core/vault/completeness';
 import { INDIAN_STATES } from '@tp/core/gem/states';
 import { gstinPan, gstinState, panEntityType, validateGstin } from '@tp/core/vault/validators';
 import {
-  Badge, Button, Card, ErrorState, Field, Input, PageHeader, Segmented, Select, Skeleton, Switch, Textarea, Tooltip, toast,
+  Badge, Button, Card, ConfirmDialog, ErrorState, Field, Input, PageHeader, Segmented, Select, Skeleton, Switch, Textarea, Tooltip, toast,
 } from '@/components/ui';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -132,14 +134,23 @@ export default function ProfilePage() {
   const [blurred, setBlurred] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   const [active, setActive] = useState<string>('identity');
+  /** 409 message from a save that lost a race with someone else's save (FR-014). The draft is kept until Reload. */
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [reloading, setReloading] = useState(false);
 
   // Adopt fresh server data unless the user has unsaved edits (e.g. a past-contract change refetches the profile).
   const prevSaved = useRef<Draft | null>(null);
+  /**
+   * The server version the draft is based on (FR-014). Set only when the draft is (re)adopted from the server —
+   * not on every background refetch — so a stale draft is never sent with a newer timestamp.
+   */
+  const baseUpdatedAt = useRef<string | null>(null);
   useEffect(() => {
-    if (!saved) return;
-    setDraft((d) => (!d || !prevSaved.current || same(d, prevSaved.current) ? saved : d));
+    if (!saved || !profile.data) return;
+    const adopt = !draft || !prevSaved.current || same(draft, prevSaved.current);
+    if (adopt) { setDraft(saved); baseUpdatedAt.current = profile.data.profile.updatedAt; }
     prevSaved.current = saved;
-  }, [saved]);
+  }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty = !!draft && !!saved && !same(draft, saved);
   const clientErrors = useMemo(() => (draft ? validate(draft) : {}), [draft]);
@@ -162,6 +173,13 @@ export default function ProfilePage() {
     window.addEventListener('beforeunload', h);
     return () => window.removeEventListener('beforeunload', h);
   }, [dirty]);
+  // …and before in-app navigation to another page (FR-013). Query-string changes on /profile are not "leaving".
+  const blocker = useBlocker(useCallback(
+    ({ currentLocation, nextLocation }: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }) => dirty && currentLocation.pathname !== nextLocation.pathname,
+    [dirty],
+  ));
+  // A pending block is moot once the edits are gone (saved or discarded meanwhile).
+  useEffect(() => { if (blocker.state === 'blocked' && !dirty) blocker.reset(); }, [blocker, dirty]);
 
   // Section scroll-spy
   useEffect(() => {
@@ -201,18 +219,30 @@ export default function ProfilePage() {
       jump(sectionOf(first), first.split('.')[0]);
       return;
     }
-    save.mutate(draft as unknown as ProfileInput, {
+    save.mutate({ ...draft, expectedUpdatedAt: baseUpdatedAt.current } as unknown as ProfileInput, {
       onSuccess: (r) => {
-        setDraft(stripMeta(r.profile)); setSubmitted(false); setBlurred(new Set()); setServerErrors({});
+        setDraft(stripMeta(r.profile)); baseUpdatedAt.current = r.profile.updatedAt; prevSaved.current = stripMeta(r.profile); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null);
         toast.success('Profile saved', { description: `${r.completeness}% complete${r.issues[0] ? ` · next: ${r.issues[0].message}` : ''}` });
       },
       onError: (e) => {
+        if (e instanceof ApiError && e.isConflict) { setConflict(e.message); toast.error(e.message); return; }
         if (e instanceof ApiError && e.details && typeof e.details === 'object' && 'fields' in e.details) setServerErrors((e.details as { fields: Record<string, string> }).fields);
         toast.error(errorMessage(e));
       },
     });
   };
-  const discard = () => { setDraft(saved); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); };
+  const discard = () => { setDraft(saved); baseUpdatedAt.current = profile.data!.profile.updatedAt; setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null); };
+  // Replace the (stale) draft with the latest saved profile only when the user asks to (FR-014).
+  const reload = async () => {
+    setReloading(true);
+    const r = await profile.refetch();
+    setReloading(false);
+    if (!r.data) { toast.error(errorMessage(r.error)); return; }
+    const fresh = stripMeta(r.data.profile);
+    prevSaved.current = fresh;
+    baseUpdatedAt.current = r.data.profile.updatedAt;
+    setDraft(fresh); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null);
+  };
 
   // Smart helpers from GSTIN
   const gstOk = !!draft.gstin && !validateGstin(draft.gstin);
@@ -237,6 +267,14 @@ export default function ProfilePage() {
         }
       />
 
+      {conflict && !readOnly && (
+        <div role="alert" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-danger/40 bg-danger-soft/60 px-4 py-3 text-sm">
+          <AlertTriangle className="size-4 shrink-0 text-danger" aria-hidden />
+          <span className="min-w-0 flex-1">{conflict}</span>
+          <Button size="sm" variant="secondary" onClick={reload} loading={reloading}><RefreshCw />Reload</Button>
+        </div>
+      )}
+
       {readOnly && (
         <div className="mb-6 flex items-center gap-2.5 rounded-xl border bg-info-soft/60 px-4 py-3 text-sm"><Eye className="size-4 shrink-0 text-info" aria-hidden />You have view-only access. Ask an owner or bid manager to make changes.</div>
       )}
@@ -244,8 +282,9 @@ export default function ProfilePage() {
       {/* Phone/tablet: section pills + compact meter */}
       <div className="sticky top-14 z-10 -mx-4 mb-4 border-b bg-background/90 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:hidden">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => jump('identity')} className="flex shrink-0 items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3 text-xs font-semibold focus-ring" aria-label={`Profile ${percent}% complete`}>
-            <span className="scale-[0.42] -m-[22px]"><Ring value={percent} /></span>{percent}%
+          <button type="button" onClick={() => jump('identity')} className="flex shrink-0 items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3 text-xs font-semibold focus-ring">
+            {/* Name from content — the ring's img name "Profile N% complete" — not an aria-label that omits the visible "N%" (axe label-content-name-mismatch). */}
+            <span className="scale-[0.42] -m-[22px]"><Ring value={percent} /></span><span aria-hidden>{percent}%</span>
           </button>
           <nav aria-label="Profile sections" className="-mr-4 flex gap-1.5 overflow-x-auto pr-4 scrollbar-thin">
             {SECTIONS.map((s) => (
@@ -296,10 +335,10 @@ export default function ProfilePage() {
               <Field label="Incorporation date" error={errors.incorporationDate}>
                 <Input id="f-incorporationDate" type="date" value={txt('incorporationDate')} onChange={(e) => set('incorporationDate', e.target.value || null)} max={new Date().toISOString().slice(0, 10)} />
               </Field>
-              <Field label="GSTIN" error={errors.gstin} hint={gstOk ? <span className="text-success">✓ Valid · {gstStateName} · PAN {gstPan}</span> : '15 characters, e.g. 27AAPCS1234K1Z5'}>
-                <Input id="f-gstin" value={txt('gstin')} onChange={(e) => set('gstin', e.target.value.toUpperCase())} maxLength={15} className="font-mono uppercase tracking-wider" placeholder="27AAPCS1234K1Z5" autoComplete="off" spellCheck={false} />
+              <Field label="GSTIN" error={errors.gstin} hint={gstOk ? <span className="text-[hsl(158_72%_27%)] dark:text-success">✓ Valid · {gstStateName} · PAN {gstPan}</span> : '15 characters, e.g. 27AAPCS1234K1Z2'}>
+                <Input id="f-gstin" value={txt('gstin')} onChange={(e) => set('gstin', e.target.value.toUpperCase())} maxLength={15} className="font-mono uppercase tracking-wider" placeholder="27AAPCS1234K1Z2" autoComplete="off" spellCheck={false} />
               </Field>
-              <Field label="PAN" error={errors.pan} hint={panType && !errors.pan ? <span className="text-success">✓ {panType}</span> : '10 characters, e.g. AAPCS1234K'}>
+              <Field label="PAN" error={errors.pan} hint={panType && !errors.pan ? <span className="text-[hsl(158_72%_27%)] dark:text-success">✓ {panType}</span> : '10 characters, e.g. AAPCS1234K'}>
                 <Input id="f-pan" value={txt('pan')} onChange={(e) => set('pan', e.target.value.toUpperCase())} maxLength={10} className="font-mono uppercase tracking-wider" placeholder="AAPCS1234K" autoComplete="off" spellCheck={false} />
               </Field>
               <Field label="CIN" error={errors.cin} hint="Companies and LLPs only (LLPIN not required)">
@@ -343,7 +382,7 @@ export default function ProfilePage() {
                     <Field label="Owner category" error={errors.mseSocialCategory} hint="SC/ST and women-owned MSEs have reserved procurement targets">
                       <Select id="f-mseSocialCategory" value={draft.mseSocialCategory ?? 'general'} onValueChange={(v) => set('mseSocialCategory', v as Draft['mseSocialCategory'])} options={MSE_SOCIAL_CATEGORIES.map((c) => ({ value: c, label: c === 'sc_st' ? 'SC / ST' : c === 'women' ? 'Women-owned' : 'General' }))} />
                     </Field>
-                    {draft.mseCategory === 'medium' && <p className="flex items-start gap-2 text-xs text-warning sm:col-span-2"><Info className="mt-0.5 size-3.5 shrink-0" />Medium enterprises don’t get EMD exemption or MSE purchase preference.</p>}
+                    {draft.mseCategory === 'medium' && <p className="flex items-start gap-2 text-xs text-[hsl(32_90%_32%)] dark:text-warning sm:col-span-2"><Info className="mt-0.5 size-3.5 shrink-0" />Medium enterprises don’t get EMD exemption or MSE purchase preference.</p>}
                   </div>
                 )}
               </div>
@@ -473,6 +512,16 @@ export default function ProfilePage() {
         </div>,
         document.body,
       )}
+
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(o) => { if (!o && blocker.state === 'blocked') blocker.reset(); }}
+        title="Discard unsaved changes?"
+        description="Your edits to the company profile have not been saved."
+        cancelLabel="Stay"
+        confirmLabel="Discard and leave"
+        onConfirm={() => { if (blocker.state === 'blocked') blocker.proceed(); }}
+      />
     </div>
   );
 }

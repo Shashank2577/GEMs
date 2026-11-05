@@ -3,6 +3,7 @@
  * preferences, API tokens and activity (contracts/api.md § Platform).
  */
 import { z } from 'zod';
+import { ONBOARDING_KEYS } from './experience';
 import { emailSchema, paginationQuerySchema, phoneE164Schema, roleSchema, type RoleName } from './common';
 
 export const PASSWORD_MIN_LENGTH = 8;
@@ -47,6 +48,66 @@ export const changePasswordInputSchema = z.object({
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordInputSchema>;
 
+// ───────────── Password reset (002/FR-011) ─────────────
+
+export const forgotPasswordInputSchema = z.object({ email: emailSchema });
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>;
+
+export const resetPasswordInputSchema = z.object({
+  token: z.string().min(10).max(200),
+  newPassword: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
+
+/** Minutes a password reset link stays valid. */
+export const PASSWORD_RESET_TTL_MINUTES = 60;
+
+/** Human duration of a reset link for emails and UI copy: 60 → "1 hour", 120 → "2 hours", 90 → "90 minutes". */
+export function resetTtlText(minutes: number = PASSWORD_RESET_TTL_MINUTES): string {
+  if (minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
+// ───────────── Sessions (002/FR-012) ─────────────
+
+export interface SessionSummary {
+  id: string;
+  /** True for the session making the request ("This device"). */
+  current: boolean;
+  /** Raw User-Agent recorded at sign-in (may be null for sessions created before FR-012). */
+  userAgent: string | null;
+  /** Human summary, e.g. "Chrome on Windows". */
+  device: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+}
+export interface SessionsResponse { items: SessionSummary[]; total: number }
+export interface RevokeOtherSessionsResponse { revoked: number }
+
+/** "Mozilla/5.0 (Windows NT 10.0…) … Chrome/120…" → "Chrome on Windows". Unknown parts → "Unknown browser/device". */
+export function summarizeUserAgent(ua: string | null | undefined): string {
+  if (!ua) return 'Unknown device';
+  const browser =
+    /Edg(e|A|iOS)?\//.test(ua) ? 'Edge'
+      : /OPR\/|Opera/.test(ua) ? 'Opera'
+        : /SamsungBrowser\//.test(ua) ? 'Samsung Internet'
+          : /Firefox\/|FxiOS\//.test(ua) ? 'Firefox'
+            : /Chrome\/|CriOS\//.test(ua) ? 'Chrome'
+              : /Safari\//.test(ua) && /Version\//.test(ua) ? 'Safari'
+                : /^curl\//i.test(ua) ? 'curl'
+                  : null;
+  const os =
+    /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+      : /Android/.test(ua) ? 'Android'
+        : /Windows/.test(ua) ? 'Windows'
+          : /CrOS/.test(ua) ? 'ChromeOS'
+            : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
+              : /Linux/.test(ua) ? 'Linux'
+                : null;
+  if (browser && os) return `${browser} on ${os}`;
+  return browser ?? (os ? `Unknown browser on ${os}` : 'Unknown device');
+}
+
 // ───────────── Me ─────────────
 
 export interface MeUser { id: string; name: string; email: string; phone: string | null }
@@ -78,13 +139,65 @@ export const notificationPrefsSchema = z.object({
   expiryReminders: z.boolean(),
 });
 export type NotificationPrefs = z.infer<typeof notificationPrefsSchema>;
+/** Defaults when a (org, user) has no stored row (002/FR-031). */
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = { inApp: true, email: true, whatsapp: false, frequency: 'instant', expiryReminders: true };
+
+/**
+ * Outcome of `POST /me/notifications/test` per channel (002/FR-034):
+ * `sent` delivered to the provider, `skipped` channel not configured on this server or no mobile number,
+ * `failed` provider error, `off` the channel is switched off in the user's preferences. The in-app row is always
+ * created, so `inApp` is always `sent`.
+ */
+export type TestAlertOutcome = 'sent' | 'skipped' | 'failed' | 'off';
+/** Why a channel was `skipped`: the provider is not configured on this server, or the account has no mobile number. */
+export type TestAlertSkipReason = 'not_configured' | 'no_phone';
+export interface TestAlertResult {
+  inApp: 'sent';
+  email: TestAlertOutcome;
+  whatsapp: TestAlertOutcome;
+  /** Present only when a channel was `skipped` (optional, added after the first release: older servers omit it). */
+  skipReasons?: Partial<Record<'email' | 'whatsapp', TestAlertSkipReason>>;
+}
+export const TEST_ALERT_TITLE = 'Test alert from TenderPilot';
 
 // ───────────── API tokens ─────────────
 
 export const API_TOKEN_PREFIX = 'tp_';
-export const createApiTokenInputSchema = z.object({ name: z.string().trim().min(1).max(80) });
-export type CreateApiTokenInput = z.infer<typeof createApiTokenInputSchema>;
-export interface ApiTokenSummary { id: string; name: string; lastUsedAt: string | null; createdAt: string }
+/** Allowed token lifetimes in days; `null` = never expires (002/FR-037). */
+export const API_TOKEN_EXPIRY_DAYS = [30, 90, 365] as const;
+export type ApiTokenExpiryDays = (typeof API_TOKEN_EXPIRY_DAYS)[number];
+export const API_TOKEN_DEFAULT_EXPIRY_DAYS: ApiTokenExpiryDays = 90;
+/** Max active (non-expired) tokens per user per organization (002/FR-037). */
+export const API_TOKEN_LIMIT = 10;
+/**
+ * 006/FR-074: `full` = every route the member's role allows; `read` = "Extension (read-only)": GET only, any write is
+ * 403 `read_only_token` "This API token is read-only". Chosen at creation (by a cookie session) and never changeable.
+ */
+export const API_TOKEN_SCOPES = ['full', 'read'] as const;
+export type ApiTokenScope = (typeof API_TOKEN_SCOPES)[number];
+export const apiTokenScopeSchema = z.enum(API_TOKEN_SCOPES);
+export const API_TOKEN_READ_ONLY_MESSAGE = 'This API token is read-only';
+export const createApiTokenInputSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  /** Defaults to `full` so existing clients keep their behaviour. */
+  scope: apiTokenScopeSchema.default('full'),
+  expiresInDays: z.union(
+    API_TOKEN_EXPIRY_DAYS.map((d) => z.literal(d)) as unknown as [z.ZodLiteral<ApiTokenExpiryDays>, z.ZodLiteral<ApiTokenExpiryDays>, ...z.ZodLiteral<ApiTokenExpiryDays>[]],
+  ).nullable().default(API_TOKEN_DEFAULT_EXPIRY_DAYS),
+});
+export type CreateApiTokenInput = z.input<typeof createApiTokenInputSchema>;
+export interface ApiTokenSummary {
+  id: string;
+  name: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+  /** ISO timestamp; null = never expires. */
+  expiresAt: string | null;
+  /** Last 4 characters of the secret (`tp_…<hint>`); null for tokens created before hints existed. */
+  hint: string | null;
+  /** 006/FR-074. */
+  scope: ApiTokenScope;
+}
 /** Returned once on creation; `token` is never retrievable again. */
 export interface CreatedApiToken extends ApiTokenSummary { token: string }
 
@@ -99,7 +212,13 @@ export type ChangeRoleInput = z.infer<typeof changeRoleInputSchema>;
 export const updateOrgInputSchema = z.object({
   name: z.string().trim().min(2).max(160).optional(),
   /** Merged into the existing onboarding state (keys set to the given booleans). */
-  onboardingState: z.record(z.string(), z.boolean()).optional(),
+  onboardingState: z.record(z.string(), z.boolean()).superRefine((o, ctx) => {
+    // Whitelist (FR-048). Issues sit on the field itself so API errors map to `details.fields.onboardingState`.
+    const keys = Object.keys(o);
+    const bad = keys.filter((k) => !(ONBOARDING_KEYS as readonly string[]).includes(k));
+    if (bad.length) ctx.addIssue({ code: 'custom', message: `Unknown onboarding key: ${bad[0]}` });
+    if (keys.length > 16) ctx.addIssue({ code: 'custom', message: 'At most 16 onboarding keys' });
+  }).optional(),
   /** Replaces the scoring weights; `null` resets to defaults. */
   scoringWeights: z.record(z.string(), z.number().min(0).max(100)).nullable().optional(),
 });
@@ -118,7 +237,8 @@ export interface CreatedInvitation { id: string; email: string; role: RoleName; 
 // ───────────── Activity ─────────────
 
 export const activityQuerySchema = paginationQuerySchema.extend({
-  entityType: z.string().max(60).optional(),
+  /** One entity type, or several comma-separated (e.g. `user,invitation`; at most 12 used). */
+  entityType: z.string().max(400).optional(),
   entityId: z.string().max(100).optional(),
   userId: z.string().uuid().optional(),
 });
@@ -132,4 +252,6 @@ export interface ActivityItem {
   entityId: string | null;
   meta: Record<string, unknown>;
   createdAt: string;
+  /** Human label + in-app link for the entity, resolved server-side when possible (GET /activity, dashboard). */
+  target?: { label: string; href: string } | null;
 }

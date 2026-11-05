@@ -1,0 +1,82 @@
+# Captured 2026-11-05T04:49:40Z from API on :8810 (commit 3a480ae)
+
+$ curl -sI http://localhost:8810/api/health
+HTTP/1.1 200 OK
+cache-control: no-store
+content-type: application/json
+referrer-policy: no-referrer
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-request-id: a68090e9-96ed-4cc7-94fa-912c6671f39d
+Date: Thu, 05 Nov 2026 04:49:40 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+$ curl -sI http://localhost:8810/api/auth/me
+HTTP/1.1 401 Unauthorized
+cache-control: no-store
+content-type: application/json
+referrer-policy: no-referrer
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-request-id: d044e505-73d2-43df-ad56-fb5790a350ee
+Date: Thu, 05 Nov 2026 04:49:40 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+$ curl -sI http://localhost:8810/
+HTTP/1.1 200 OK
+cache-control: no-cache
+content-length: 1736
+content-security-policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; object-src 'self' blob:; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+content-type: text/html; charset=utf-8
+referrer-policy: no-referrer
+x-content-type-options: nosniff
+x-frame-options: DENY
+Date: Thu, 05 Nov 2026 04:49:40 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+$ curl -sI http://localhost:8810/login
+HTTP/1.1 200 OK
+cache-control: no-cache
+content-security-policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; object-src 'self' blob:; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+content-type: text/html; charset=UTF-8
+referrer-policy: no-referrer
+x-content-type-options: nosniff
+x-frame-options: DENY
+Date: Thu, 05 Nov 2026 04:49:40 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+$ curl -sI -H 'X-Forwarded-Proto: https' http://localhost:8810/api/health   # https simulation (HSTS)
+HTTP/1.1 200 OK
+cache-control: no-store
+content-type: application/json
+referrer-policy: no-referrer
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-request-id: c91b0bf2-0df1-4059-9f74-4b0ffeb21b6a
+Date: Thu, 05 Nov 2026 04:49:40 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+$ curl -sI -H 'X-Forwarded-Proto: https' http://localhost:8810/login
+HTTP/1.1 200 OK
+cache-control: no-cache
+content-security-policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; object-src 'self' blob:; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+content-type: text/html; charset=UTF-8
+referrer-policy: no-referrer
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: DENY
+Date: Thu, 05 Nov 2026 04:49:40 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

@@ -1,0 +1,12 @@
+# sc1-demo-isolation — project desktop — 2026-11-05T04:31:12.116Z
+org A feed: 77 bids; org B feed: 37 bid(s) [GEM/2026/B/6421021, GEM/2026/B/6421019, GEM/2026/B/6421016, GEM/2026/B/6421008, GEM/2026/B/6421029, GEM/2026/B/6421005, GEM/2026/B/6421011, GEM/2026/B/6421028, GEM/2026/B/6421003, GEM/2026/B/6421036, GEM/2026/B/6421026, GEM/2026/B/6421020, GEM/2026/B/6421033, GEM/2026/B/6421023, GEM/2026/B/6421007, GEM/2026/B/6421024, GEM/2026/B/6421010, GEM/2026/B/6421031, GEM/2026/B/6421018, GEM/2026/B/6421002, GEM/2026/R/6421025, GEM/2026/B/6421012, GEM/2026/B/6421035, GEM/2026/B/6421001, GEM/2026/B/6421022, GEM/2026/B/6421027, GEM/2026/B/6421009, GEM/2026/B/6421015, GEM/2026/B/6421032, GEM/2026/B/6421013, GEM/2026/R/6421034, GEM/2026/B/6421004, GEM/2026/B/6421014, GEM/2026/B/6421017, GEM/2026/B/6421006, GEM/2026/B/6421030, GEM/2026/B/7123456]
+demo bid numbers visible to A only: 40
+org B dashboard tiles: {"newMatchesToday":0,"closingThisWeek":0,"activeBids":0,"emdAtStake":0,"winRate":null,"expiringDocs":0}
+baseline org C (never saw demo) tiles: {"newMatchesToday":0,"closingThisWeek":0,"activeBids":0,"emdAtStake":0,"winRate":null,"expiringDocs":0}
+### org B POST /api/watchlists/preview (5 demo-ish keywords)
+> cookie: org B
+< 200
+< ratelimit-remaining: 29
+< content-type: application/json
+{"count":11,"sample":[{"id":"cb22a128-efef-4d3f-82bc-54eeab19433e","source":"gem","bidNumber":"GEM/2026/B/6421021","gemBidId":"7421021","bidType":"bid","title":"Laptop - Notebook","items":[{"name":"Laptop - Notebook","quantity":18}],"category":"Laptop - Notebook","quantity":18,"ministry":"Kerala","department":"Kerala State IT Mission","organisation":null,"buyerOffice":"Kerala State IT Mission, Thiruvananthapuram","state":"Kerala","city":"Thiruvananthapuram","startAt":"2026-11-03T10:30:00.000Z","endAt":"2026-11-07T09:30:00.000Z","openingAt":null,"emdAmount":45000,"estimatedValue":1440000,"epbgP
+

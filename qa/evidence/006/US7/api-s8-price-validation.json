@@ -1,0 +1,257 @@
+[
+  {
+    "label": "l1Price -5",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"won\",\"l1Price\":-5}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.l1Price: Number must be greater than or equal to 0",
+      "details": {
+        "fields": {
+          "outcome.l1Price": "Number must be greater than or equal to 0"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "l1Price"
+            ],
+            "message": "Number must be greater than or equal to 0",
+            "code": "too_small"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "l1Price 1.5",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"won\",\"l1Price\":1.5}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.l1Price: Expected integer, received float",
+      "details": {
+        "fields": {
+          "outcome.l1Price": "Expected integer, received float"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "l1Price"
+            ],
+            "message": "Expected integer, received float",
+            "code": "invalid_type"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "l1Price \"abc\"",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"won\",\"l1Price\":\"abc\"}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.l1Price: Expected number, received string",
+      "details": {
+        "fields": {
+          "outcome.l1Price": "Expected number, received string"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "l1Price"
+            ],
+            "message": "Expected number, received string",
+            "code": "invalid_type"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "l1Price 10^13 + 1",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"won\",\"l1Price\":10000000000001}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.l1Price: Number must be less than or equal to 10000000000000",
+      "details": {
+        "fields": {
+          "outcome.l1Price": "Number must be less than or equal to 10000000000000"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "l1Price"
+            ],
+            "message": "Number must be less than or equal to 10000000000000",
+            "code": "too_big"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "l1Price 10^15",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"won\",\"l1Price\":1000000000000000}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.l1Price: Number must be less than or equal to 10000000000000",
+      "details": {
+        "fields": {
+          "outcome.l1Price": "Number must be less than or equal to 10000000000000"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "l1Price"
+            ],
+            "message": "Number must be less than or equal to 10000000000000",
+            "code": "too_big"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "ourPrice -1",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"lost\",\"l1Price\":100,\"ourPrice\":-1}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.ourPrice: Number must be greater than or equal to 0",
+      "details": {
+        "fields": {
+          "outcome.ourPrice": "Number must be greater than or equal to 0"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "ourPrice"
+            ],
+            "message": "Number must be greater than or equal to 0",
+            "code": "too_small"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "ourPrice 2.5",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"lost\",\"ourPrice\":2.5}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.ourPrice: Expected integer, received float",
+      "details": {
+        "fields": {
+          "outcome.ourPrice": "Expected integer, received float"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "ourPrice"
+            ],
+            "message": "Expected integer, received float",
+            "code": "invalid_type"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "notes 2001 chars",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"won\",\"notes\":\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.notes: String must contain at most 2000 character(s)",
+      "details": {
+        "fields": {
+          "outcome.notes": "String must contain at most 2000 character(s)"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "notes"
+            ],
+            "message": "String must contain at most 2000 character(s)",
+            "code": "too_big"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "bad result",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"draw\"}}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "outcome.result: Invalid enum value. Expected 'won' | 'lost', received 'draw'",
+      "details": {
+        "fields": {
+          "outcome.result": "Invalid enum value. Expected 'won' | 'lost', received 'draw'"
+        },
+        "issues": [
+          {
+            "path": [
+              "outcome",
+              "result"
+            ],
+            "message": "Invalid enum value. Expected 'won' | 'lost', received 'draw'",
+            "code": "invalid_enum_value"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "l1Price exactly 10^13 (boundary, accepted)",
+    "request": "PATCH /api/workspaces/f6694a9d-18d5-4d3f-8912-771953288d3a {\"outcome\":{\"result\":\"won\",\"l1Price\":10000000000000,\"ourPrice\":0}}",
+    "status": 200,
+    "response": {
+      "id": "f6694a9d-18d5-4d3f-8912-771953288d3a",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "won",
+      "owner": {
+        "id": "da1b208b-582d-4a4a-9442-9ec47723cc75",
+        "name": "QA analyst mw37m7rp9",
+        "email": "analyst.mw37m7rp9@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:57.205Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": {
+        "at": "2026-11-05T07:13:58.456Z",
+        "result": "won",
+        "l1Price": 10000000000000,
+        "ourPrice": 0
+      },
+      "submittedAt": "2026-11-05T07:13:58.066Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:57.993Z",
+      "updatedAt": "2026-11-05T07:13:58.456Z"
+    }
+  }
+]

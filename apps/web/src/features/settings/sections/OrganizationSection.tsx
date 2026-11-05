@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Crown, FlaskConical, Sparkles } from 'lucide-react';
+import { PLANS, formatPlanPrice, type PlanKey } from '@tp/core/contracts/plans';
 import { Badge, Button, Field, Input, toast } from '@/components/ui';
 import { errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -9,10 +10,15 @@ import { useSeedDemo } from '@/features/dashboard/api';
 import { useUpdateOrg } from '../api';
 import { Panel, fieldErrors } from './Panel';
 
+/** Price shown for a plan, from the single PLANS config (007/FR-086). */
+function planPrice(key: PlanKey): string {
+  return formatPlanPrice(PLANS.find((p) => p.key === key)!);
+}
+
 const PLAN: Record<string, { label: string; tone: 'neutral' | 'primary' | 'accent' | 'success'; blurb: string }> = {
   trial: { label: 'Free trial', tone: 'accent', blurb: 'All Pro features for 14 days. No card needed.' },
-  starter: { label: 'Starter', tone: 'neutral', blurb: '₹2,999/month · 3 users · 5 watchlists' },
-  pro: { label: 'Pro', tone: 'primary', blurb: '₹7,999/month · 10 users · unlimited watchlists, WhatsApp alerts' },
+  starter: { label: 'Starter', tone: 'neutral', blurb: `${planPrice('starter')}/month · 3 users · 5 watchlists` },
+  pro: { label: 'Pro', tone: 'primary', blurb: `${planPrice('pro')}/month · 10 users · unlimited watchlists, WhatsApp alerts` },
   enterprise: { label: 'Enterprise', tone: 'success', blurb: 'Custom limits, SSO and a dedicated success manager' },
 };
 

@@ -32,7 +32,7 @@ export function ExpiryTimeline({ summary, loading, onOpen }: { summary?: VaultSu
         <p className="text-xs text-muted-foreground">Reminders go out 30, 7 and 1 day before expiry</p>
       </div>
       {items.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-lg bg-success-soft/60 px-3 py-3 text-sm text-success">
+        <div className="flex items-center gap-2 rounded-lg bg-success-soft/60 px-3 py-3 text-sm text-[hsl(158_72%_27%)] dark:text-success">
           <CheckCircle2 className="size-4" aria-hidden />Nothing expires in the next 90 days. You’re bid-ready.
         </div>
       ) : (
@@ -63,7 +63,7 @@ export function ExpiryTimeline({ summary, loading, onOpen }: { summary?: VaultSu
               <div className="absolute -left-[4.5rem] top-0 flex w-16 flex-col items-start gap-1">
                 <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">Expired</span>
                 {expired.length ? (
-                  <button type="button" onClick={() => onOpen(expired[0]!.id)} className="rounded-md bg-danger-soft px-2 py-1 text-xs font-semibold text-danger hover:bg-danger/15 focus-ring">
+                  <button type="button" onClick={() => onOpen(expired[0]!.id)} className="rounded-md bg-danger-soft px-2 py-1 text-xs font-semibold text-[hsl(350_74%_43%)] dark:text-danger hover:bg-danger/15 focus-ring">
                     {expired.length} doc{expired.length === 1 ? '' : 's'}
                   </button>
                 ) : <span className="text-xs text-muted-foreground">None</span>}
@@ -71,13 +71,13 @@ export function ExpiryTimeline({ summary, loading, onOpen }: { summary?: VaultSu
             </div>
           </div>
           {/* Phone: compact list */}
-          <ul className="grid gap-1.5 sm:hidden">
+          <ul className="grid min-w-0 grid-cols-1 gap-1.5 sm:hidden">
             {items.slice(0, 5).map((i) => (
-              <li key={i.id}>
-                <button type="button" onClick={() => onOpen(i.id)} className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-muted focus-ring">
+              <li key={i.id} className="min-w-0">
+                <button type="button" onClick={() => onOpen(i.id)} className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-muted focus-ring">
                   <DocTypeIcon type={i.type} size="sm" />
                   <span className="min-w-0 flex-1 truncate text-sm">{i.title}</span>
-                  <span className={cn('shrink-0 text-xs font-medium tabular', i.status === 'expired' ? 'text-danger' : i.daysToExpiry <= 7 ? 'text-danger' : i.status === 'expiring' ? 'text-warning' : 'text-muted-foreground')}>
+                  <span className={cn('shrink-0 text-xs font-medium tabular', i.status === 'expired' ? 'text-[hsl(350_74%_43%)] dark:text-danger' : i.daysToExpiry <= 7 ? 'text-[hsl(350_74%_43%)] dark:text-danger' : i.status === 'expiring' ? 'text-[hsl(32_90%_32%)] dark:text-warning' : 'text-muted-foreground')}>
                     {i.daysToExpiry < 0 ? 'Expired' : i.daysToExpiry === 0 ? 'Today' : `${i.daysToExpiry}d`}
                   </span>
                 </button>

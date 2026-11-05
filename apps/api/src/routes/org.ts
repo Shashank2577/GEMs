@@ -1,21 +1,22 @@
 /**
- * Organization routes (FR-031..033): /org, /org/members, /org/invitations, /activity.
+ * Organization routes (FR-031..033): /org, /org/members, /org/invitations (+ resend, 002/FR-020), /activity.
  * Mounted at /api.
  */
-import { and, asc, count, desc, eq, gt, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { Hono } from 'hono';
-import { activityLog, apiTokens, invitations, memberships, organizations, users, type Db } from '@tp/db';
+import { Hono, type Context } from 'hono';
+import { activityLog, apiTokens, invitations, memberships, organizations, savedViews, sessions, users, type Db, type Role } from '@tp/db';
 import {
   activityQuerySchema, changeRoleInputSchema, inviteInputSchema, updateOrgInputSchema,
   type ActivityItem, type CreatedInvitation, type Member, type MembersResponse, type PendingInvitation,
 } from '@tp/core/contracts/auth';
 import { ROLE_LABELS } from '@tp/core/contracts/common';
 import { logActivity } from '../lib/activity';
+import { enrichActivity } from '../lib/activity-target';
 import { randomToken, sha256Hex } from '../lib/crypto';
 import { HttpError, conflict, forbidden, notFound } from '../lib/errors';
 import { parseJson, parseQuery } from '../lib/validate';
-import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { orgId, requireAuth, requireRole, requireSession, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
 export const orgRoutes = new Hono<AppEnv>();
@@ -25,6 +26,22 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 
+/** Email an invitation link (002/FR-015). A mail failure is logged, never fails the request; the link is not logged. */
+async function sendInviteEmail(c: Context<AppEnv>, to: string, roleName: Role, inviteUrl: string) {
+  const org = c.var.org.name, inviter = c.var.user.name, role = ROLE_LABELS[roleName];
+  try {
+    await c.var.deps.mailer.send({
+      to,
+      subject: `${inviter} invited you to ${org} on TenderPilot`,
+      text: `${inviter} invited you to join ${org} on TenderPilot as ${role}.\n\nAccept the invitation: ${inviteUrl}\n\nThis link expires in 7 days.`,
+      html: `<p>${escapeHtml(inviter)} invited you to join <strong>${escapeHtml(org)}</strong> on TenderPilot as <strong>${role}</strong>.</p>`
+        + `<p><a href="${inviteUrl}">Accept the invitation</a></p><p style="color:#666">This link expires in 7 days.</p>`,
+    });
+  } catch (e) {
+    c.var.deps.logger.warn('invitation email failed', { error: (e as Error).message });
+  }
+}
+
 async function getMember(db: Db, oid: string, uid: string): Promise<Member | null> {
   const [m] = await db.select({
     userId: users.id, name: users.name, email: users.email, phone: users.phone, role: memberships.role, joinedAt: memberships.createdAt,
@@ -33,9 +50,26 @@ async function getMember(db: Db, oid: string, uid: string): Promise<Member | nul
   return m ? { ...m, joinedAt: m.joinedAt.toISOString() } : null;
 }
 
-async function ownerCount(db: Db, oid: string): Promise<number> {
-  const [r] = await db.select({ n: count() }).from(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.role, 'owner')));
-  return Number(r?.n ?? 0);
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+const LAST_OWNER = {
+  demote: 'An organization needs at least one Owner. Make someone else an Owner first.',
+  remove: 'You cannot remove the last Owner of the organization.',
+  leave: 'You are the last Owner of this organization. Make someone else an Owner before you leave.',
+} as const;
+
+/**
+ * FR-024 under concurrency: lock the organization row (FOR UPDATE) so membership changes in one org run one at a
+ * time, then re-read the owners and refuse (409 `last_owner`) when `uid` is the only one. Call inside the transaction
+ * that makes the change; two owners leaving / demoting each other at once can no longer leave the org ownerless.
+ */
+async function assertNotLastOwner(tx: Tx, oid: string, uid: string, why: keyof typeof LAST_OWNER): Promise<void> {
+  // NO KEY UPDATE (not UPDATE): serialises membership changes in this org without blocking the FOR KEY SHARE locks
+  // that foreign-key checks take on the org row (e.g. activity_log / api_tokens inserts in other requests).
+  await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, oid)).for('no key update');
+  const owners = await tx.select({ userId: memberships.userId }).from(memberships)
+    .where(and(eq(memberships.orgId, oid), eq(memberships.role, 'owner')));
+  if (owners.length <= 1 && owners.some((o) => o.userId === uid)) throw new HttpError(409, 'last_owner', LAST_OWNER[why]);
 }
 
 function memberIdParam(id: string) {
@@ -52,9 +86,20 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
   const { db } = c.var.deps;
   const patch: Partial<typeof organizations.$inferInsert> = {};
   if (body.name !== undefined) patch.name = body.name;
-  if (body.onboardingState !== undefined) patch.onboardingState = { ...(c.var.org.onboardingState ?? {}), ...body.onboardingState };
+  // Merge in SQL (jsonb ||) so concurrent PATCHes of different keys never overwrite each other with a stale snapshot.
+  const mergeState = (o: Record<string, boolean>) => sql`coalesce(${organizations.onboardingState}, '{}'::jsonb) || ${JSON.stringify(o)}::jsonb`;
+  if (body.onboardingState !== undefined) patch.onboardingState = mergeState(body.onboardingState) as unknown as Record<string, boolean>;
   if (body.scoringWeights !== undefined) patch.scoringWeights = body.scoringWeights;
   if (!Object.keys(patch).length) return c.json(c.var.org);
+  const notCompleted = sql`coalesce((${organizations.onboardingState}->>'completed')::boolean, false) = false`;
+  // FR-052: the completed flip is a conditional UPDATE, so exactly one of N concurrent requests gets a row back
+  // (the others re-check the predicate after the row lock is released) and logs `onboarding.completed`.
+  let completedAt: Date | null = null;
+  if (body.onboardingState?.completed === true) {
+    const [flipped] = await db.update(organizations).set({ onboardingState: mergeState(body.onboardingState) as unknown as Record<string, boolean> })
+      .where(and(eq(organizations.id, orgId(c)), notCompleted)).returning({ createdAt: organizations.createdAt });
+    completedAt = flipped?.createdAt ?? null;
+  }
   const [org] = await db.update(organizations).set(patch).where(eq(organizations.id, orgId(c))).returning({
     id: organizations.id, name: organizations.name, slug: organizations.slug, plan: organizations.plan,
     onboardingState: organizations.onboardingState, scoringWeights: organizations.scoringWeights,
@@ -64,6 +109,13 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
     await logActivity(db, {
       orgId: orgId(c), userId: userId(c), action: 'org.updated', entityType: 'organization', entityId: orgId(c),
       meta: { fields: Object.keys(patch).filter((k) => k !== 'onboardingState') },
+    });
+  }
+  // FR-052 / SC-001: how long sign-up to "finished setting up" took.
+  if (completedAt) {
+    const durationSec = Math.max(0, Math.round((c.var.deps.clock.now().getTime() - completedAt.getTime()) / 1000));
+    await logActivity(db, {
+      orgId: orgId(c), userId: userId(c), action: 'onboarding.completed', entityType: 'organization', entityId: orgId(c), meta: { durationSec },
     });
   }
   return c.json(org);
@@ -96,13 +148,16 @@ orgRoutes.get('/org/members', requireAuth, async (c) => {
 
 orgRoutes.post('/org/invitations', requireRole('bid_manager'), async (c) => {
   const body = await parseJson(c, inviteInputSchema);
-  const { db, clock, config, mailer, logger } = c.var.deps;
+  const { db, clock, config } = c.var.deps;
   const oid = orgId(c);
   if (body.role === 'owner' && c.var.role !== 'owner') throw forbidden('Only an Owner can invite another Owner');
 
   const [already] = await db.select({ id: users.id }).from(memberships).innerJoin(users, eq(users.id, memberships.userId))
     .where(and(eq(memberships.orgId, oid), eq(users.email, body.email)));
-  if (already) throw conflict(`${body.email} is already a member of this organization`, { fields: { email: 'Already a member' } });
+  if (already) {
+    const msg = `${body.email} is already a member of this organization`;
+    throw conflict(msg, { fields: { email: msg } });
+  }
 
   // Re-inviting replaces any pending invitation for the same email.
   await db.delete(invitations).where(and(eq(invitations.orgId, oid), eq(invitations.email, body.email), isNull(invitations.acceptedAt)));
@@ -115,20 +170,40 @@ orgRoutes.post('/org/invitations', requireRole('bid_manager'), async (c) => {
 
   await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.invited', entityType: 'invitation', entityId: row.id, meta: { email: body.email, role: body.role } });
 
-  const org = c.var.org.name, inviter = c.var.user.name, role = ROLE_LABELS[body.role];
-  try {
-    await mailer.send({
-      to: body.email,
-      subject: `${inviter} invited you to ${org} on TenderPilot`,
-      text: `${inviter} invited you to join ${org} on TenderPilot as ${role}.\n\nAccept the invitation: ${inviteUrl}\n\nThis link expires in 7 days.`,
-      html: `<p>${escapeHtml(inviter)} invited you to join <strong>${escapeHtml(org)}</strong> on TenderPilot as <strong>${role}</strong>.</p>`
-        + `<p><a href="${inviteUrl}">Accept the invitation</a></p><p style="color:#666">This link expires in 7 days.</p>`,
-    });
-  } catch (e) {
-    logger.warn('invitation email failed', { error: (e as Error).message });
-  }
+  await sendInviteEmail(c, body.email, body.role, inviteUrl);
 
   const out: CreatedInvitation = { id: row.id, email: body.email, role: body.role, inviteUrl, expiresAt: expiresAt.toISOString() };
+  return c.json(out, 201);
+});
+
+/**
+ * Resend a pending invitation (002/FR-020): a fresh token (the old link stops working) and a new 7-day expiry,
+ * emailed again. Deliberately also revives an expired, unaccepted invitation (expired rows are kept until replaced or
+ * revoked, so "Resend" is how an admin renews one). `invitedBy` becomes the member who resent it: the email and the
+ * invite preview name them, and they are the one vouching for the new link. 404 for other orgs' or accepted
+ * invitations.
+ */
+orgRoutes.post('/org/invitations/:id/resend', requireRole('bid_manager'), async (c) => {
+  const id = c.req.param('id');
+  if (!UUID_RE.test(id)) throw notFound('Invitation');
+  const { db, clock, config } = c.var.deps;
+  const oid = orgId(c);
+  const pending = and(eq(invitations.id, id), eq(invitations.orgId, oid), isNull(invitations.acceptedAt));
+  const [found] = await db.select({ role: invitations.role }).from(invitations).where(pending);
+  if (!found) throw notFound('Invitation');
+  if (found.role === 'owner' && c.var.role !== 'owner') throw forbidden('Only an Owner can invite another Owner');
+
+  const token = randomToken();
+  const expiresAt = new Date(clock.now().getTime() + INVITE_TTL_MS);
+  const [row] = await db.update(invitations).set({ tokenHash: await sha256Hex(token), expiresAt, invitedBy: userId(c) })
+    .where(pending).returning({ id: invitations.id, email: invitations.email, role: invitations.role });
+  if (!row) throw notFound('Invitation');
+  const inviteUrl = `${config.appUrl}/invite/${token}`;
+
+  await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.invite_resent', entityType: 'invitation', entityId: row.id, meta: { email: row.email, role: row.role } });
+  await sendInviteEmail(c, row.email, row.role, inviteUrl);
+
+  const out: CreatedInvitation = { id: row.id, email: row.email, role: row.role, inviteUrl, expiresAt: expiresAt.toISOString() };
   return c.json(out, 201);
 });
 
@@ -144,6 +219,30 @@ orgRoutes.delete('/org/invitations/:id', requireRole('bid_manager'), async (c) =
   return c.json({ ok: true as const });
 });
 
+// 002/FR-027: leave the active organization. Registered before `/org/members/:userId` so "me" is never an id.
+orgRoutes.delete('/org/members/me', requireSession, async (c) => {
+  const { db } = c.var.deps;
+  const oid = orgId(c);
+  const uid = userId(c);
+  const nextOrgId = await db.transaction(async (tx) => {
+    await assertNotLastOwner(tx, oid, uid, 'leave');
+    await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, uid)));
+    await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, uid)));
+    await logActivity(tx, { orgId: oid, userId: uid, action: 'member.left', entityType: 'user', entityId: uid, meta: { name: c.var.user.name, email: c.var.user.email, role: c.var.role } });
+    const [next] = await tx.select({ orgId: memberships.orgId }).from(memberships)
+      .where(eq(memberships.userId, uid)).orderBy(asc(memberships.createdAt)).limit(1);
+    const nextId = next?.orgId ?? null;
+    // Sign-in resumes in the org the user is moved to, never the one they left (002/FR-021).
+    // Lock order users -> sessions, the same as the reset-password transaction (auth.ts). Sign-in / switch-org touch
+    // sessions then users, but they are not transactions, so they cannot deadlock with this code.
+    await tx.update(users).set({ lastOrgId: nextId }).where(eq(users.id, uid));
+    await tx.update(sessions).set({ activeOrgId: nextId }).where(eq(sessions.id, c.var.sessionId!));
+    return nextId;
+  });
+  return c.json({ ok: true as const, nextOrgId });
+});
+
 orgRoutes.patch('/org/members/:userId', requireRole('owner'), async (c) => {
   const target = memberIdParam(c.req.param('userId'));
   const { role } = await parseJson(c, changeRoleInputSchema);
@@ -152,11 +251,19 @@ orgRoutes.patch('/org/members/:userId', requireRole('owner'), async (c) => {
   const m = await getMember(db, oid, target);
   if (!m) throw notFound('Member');
   if (m.role === role) return c.json(m);
-  if (m.role === 'owner' && (await ownerCount(db, oid)) <= 1) {
-    throw new HttpError(409, 'last_owner', 'An organization needs at least one Owner. Make someone else an Owner first.');
-  }
-  await db.update(memberships).set({ role }).where(and(eq(memberships.orgId, oid), eq(memberships.userId, target)));
-  await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.role_changed', entityType: 'user', entityId: target, meta: { from: m.role, to: role, name: m.name } });
+  const member = and(eq(memberships.orgId, oid), eq(memberships.userId, target));
+  await db.transaction(async (tx) => {
+    if (role !== 'owner') await assertNotLastOwner(tx, oid, target, 'demote');
+    // Re-read under a row lock: the member may have left / been removed (→ 404) or changed role since `getMember`.
+    const [prev] = await tx.select({ role: memberships.role }).from(memberships).where(member).for('update');
+    if (!prev) throw notFound('Member');
+    const [row] = await tx.update(memberships).set({ role }).where(member).returning({ role: memberships.role });
+    if (!row) throw notFound('Member');
+    // Logged in the same transaction, so the entry exists exactly when the change does.
+    if (prev.role !== role) {
+      await logActivity(tx, { orgId: oid, userId: userId(c), action: 'member.role_changed', entityType: 'user', entityId: target, meta: { from: prev.role, to: role, name: m.name } });
+    }
+  });
   return c.json({ ...m, role });
 });
 
@@ -166,14 +273,16 @@ orgRoutes.delete('/org/members/:userId', requireRole('owner'), async (c) => {
   const oid = orgId(c);
   const m = await getMember(db, oid, target);
   if (!m) throw notFound('Member');
-  if (m.role === 'owner' && (await ownerCount(db, oid)) <= 1) {
-    throw new HttpError(409, 'last_owner', 'You cannot remove the last Owner of the organization.');
-  }
   await db.transaction(async (tx) => {
-    await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, target)));
+    await assertNotLastOwner(tx, oid, target, 'remove');
+    const [removed] = await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, target)))
+      .returning({ role: memberships.role });
+    // Already gone (left or removed concurrently): nothing to do, nothing to log.
+    if (!removed) throw notFound('Member');
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, target)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, target)));
+    await logActivity(tx, { orgId: oid, userId: userId(c), action: 'member.removed', entityType: 'user', entityId: target, meta: { name: m.name, email: m.email, role: removed.role } });
   });
-  await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.removed', entityType: 'user', entityId: target, meta: { name: m.name, email: m.email, role: m.role } });
   return c.json({ ok: true as const });
 });
 
@@ -183,7 +292,8 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
   const q = parseQuery(c, activityQuerySchema);
   const { db } = c.var.deps;
   const conds: SQL[] = [eq(activityLog.orgId, orgId(c))];
-  if (q.entityType) conds.push(eq(activityLog.entityType, q.entityType));
+  const types = (q.entityType ?? '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 12);
+  if (types.length) conds.push(inArray(activityLog.entityType, types));
   if (q.entityId) conds.push(eq(activityLog.entityId, q.entityId));
   if (q.userId) conds.push(eq(activityLog.userId, q.userId));
   const where = and(...conds);
@@ -196,9 +306,9 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
       .limit(q.pageSize).offset((q.page - 1) * q.pageSize),
     db.select({ n: count() }).from(activityLog).where(where),
   ]);
-  const items: ActivityItem[] = rows.map((r) => ({
+  const items: ActivityItem[] = await enrichActivity(db, orgId(c), rows.map((r) => ({
     id: r.id, action: r.action, entityType: r.entityType, entityId: r.entityId, meta: r.meta ?? {},
     createdAt: r.createdAt.toISOString(), user: r.userId ? { id: r.userId, name: r.userName ?? '' } : null,
-  }));
+  })));
   return c.json({ items, total: Number(n) });
 });

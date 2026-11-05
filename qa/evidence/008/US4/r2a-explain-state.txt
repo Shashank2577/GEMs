@@ -1,0 +1,14 @@
+# QA round 2 addendum — real SQL of GET /api/tenders?state=Maharashtra via auto_explain on tenderpilot_test_us4_500k (500,000 tenders / 30,000 open), head 4f8d276
+1:2026-11-05 07:29:20.830 UTC [6446] LOG:  duration: 0.038 ms  plan:
+10:2026-11-05 07:29:20.832 UTC [6446] LOG:  duration: 0.027 ms  plan:
+18:2026-11-05 07:29:20.835 UTC [6446] LOG:  duration: 0.390 ms  plan:
+27:2026-11-05 07:29:20.845 UTC [6446] LOG:  duration: 0.470 ms  plan:
+36:	              ->  Index Scan using tenders_open_state_idx on tenders  (cost=0.41..5054.73 rows=1210 width=434) (actual time=0.068..0.225 rows=26 loops=1)
+42:2026-11-05 07:29:20.850 UTC [6446] LOG:  duration: 0.015 ms  plan:
+56:2026-11-05 07:29:20.863 UTC [6455] LOG:  duration: 0.051 ms  plan:
+62:2026-11-05 07:29:20.878 UTC [6452] LOG:  duration: 23.688 ms  plan:
+90:	                                      ->  Bitmap Index Scan on tenders_open_state_idx  (cost=0.00..177.07 rows=1222 width=0) (actual time=2.858..2.858 rows=3563 loops=1)
+98:2026-11-05 07:29:20.890 UTC [6454] LOG:  duration: 0.010 ms  plan:
+105:2026-11-05 07:29:20.891 UTC [6456] LOG:  duration: 0.095 ms  plan:
+117:2026-11-05 07:29:20.916 UTC [6453] LOG:  duration: 55.905 ms  plan:
+129:	                    ->  Index Scan using tenders_open_created_idx on tenders  (cost=0.29..7412.79 rows=10148 width=26) (actual time=0.077..45.350 rows=30000 loops=1)

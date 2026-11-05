@@ -15,28 +15,26 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
-import { formatDateIST, formatINR, formatINRCompact, formatNumberIN, pluralize, relativeTime } from '@/lib/format';
+import { formatDateIST, formatINR, formatINRCompact, formatNumberIN, relativeTime } from '@/lib/format';
 import { useDocumentTitle, useNow } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import type { Stage } from '@/lib/types';
 import { useDashboard, useSeedDemo } from './api';
 import { describeActivity, SELF_CONTAINED } from './activity';
 import { MatchesTrend, PipelineFunnel, VerdictDonut } from './charts';
+import { DecisionsCard } from './DecisionsCard';
+import { DemoBanner } from './DemoBanner';
+import { MyBidsCard } from './MyBidsCard';
+import { StaleBanner } from './StaleBanner';
+import { greeting, isEmptyOrg, pctDelta, roleGate, summaryLine } from './summary';
+
+/** FR-073: shown instead of "Create a watchlist" to roles that would get a 403. */
+export const ASK_FOR_WATCHLISTS = 'Ask an Owner or Bid Manager to set up watchlists.';
 
 const ONBOARDING_REDIRECT_KEY = 'tp:onboarding-redirected';
 
-function greeting(now: Date) {
-  const h = Number(now.toLocaleString('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }));
-  return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-}
-
-function pctDelta(cur: number, prev: number): number | null {
-  if (!prev) return cur ? null : 0;
-  return Math.round(((cur - prev) / prev) * 100);
-}
-
 export default function DashboardPage() {
-  const { me, can } = useAuth();
+  const { me, can, role } = useAuth();
   const now = useNow(60_000);
   const q = useDashboard();
   useDocumentTitle('Dashboard');
@@ -54,6 +52,17 @@ export default function DashboardPage() {
 
   const firstName = me?.user.name.split(' ')[0] ?? '';
   const d = q.data;
+  // FR-073: setup is a bid_manager+ job (analysts/viewers get Go / No-Go in its place). FR-071/072: persona widgets.
+  const gate = roleGate(role);
+  const showSetup = !!d && !d.setupComplete && gate.setupCard;
+  const showPersona = gate.persona; // viewers see neither widget
+  const isOwner = gate.ownerLayout;
+  const persona = (
+    <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+      <MyBidsCard items={d?.myWork} />
+      <DecisionsCard items={d?.awaitingDecision} />
+    </div>
+  );
 
   return (
     <div className="grid gap-6 [&>*]:min-w-0">
@@ -76,16 +85,21 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {q.isError ? (
+      {q.isError && !d ? (
         <ErrorState error={q.error} onRetry={() => q.refetch()} retrying={q.isFetching} />
       ) : (
         <>
+          {/* FR-012: a failed background refresh keeps the cached widgets and shows a non-blocking banner. */}
+          {q.isError && d && <StaleBanner generatedAt={d.generatedAt} onRetry={() => q.refetch()} retrying={q.isFetching} />}
+          {d?.demo && <DemoBanner />}
           <KpiGrid d={d} />
+          {showPersona && !isOwner && persona}
           {d && isEmptyOrg(d) && <GetStartedBanner />}
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             <ClosingSoon d={d} className="lg:col-span-2" />
-            {d && !d.setupComplete ? <SetupCard d={d} /> : <VerdictCard d={d} />}
+            {showSetup ? <SetupCard d={d} /> : <VerdictCard d={d} />}
           </div>
+          {showPersona && isOwner && persona}
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             <Card className="lg:col-span-2">
               <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -97,7 +111,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>{d ? <MatchesTrend data={d.matchesByDay} /> : <Skeleton className="h-56 w-full" />}</CardContent>
             </Card>
-            {d && !d.setupComplete ? <VerdictCard d={d} /> : <ExpiringCard d={d} />}
+            {showSetup ? <VerdictCard d={d} /> : <ExpiringCard d={d} />}
           </div>
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             <Card>
@@ -107,26 +121,15 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>{d ? <PipelineFunnel pipeline={d.pipeline} value={d.pipelineValue} /> : <SkeletonRows n={7} />}</CardContent>
             </Card>
-            {d && !d.setupComplete ? <ExpiringCard d={d} /> : <RecentMatches d={d} />}
+            {showSetup ? <ExpiringCard d={d} /> : <RecentMatches d={d} />}
             <ActivityCard d={d} />
           </div>
-          {d && !d.setupComplete && <RecentMatches d={d} />}
+          {showSetup && <RecentMatches d={d} />}
         </>
       )}
     </div>
   );
 }
-
-function summaryLine(d: DashboardResponse): ReactNode {
-  const parts: string[] = [];
-  if (d.tiles.newMatchesToday) parts.push(`${pluralize(d.tiles.newMatchesToday, 'new match', 'new matches')} today`);
-  if (d.stats.closingToday) parts.push(`${pluralize(d.stats.closingToday, 'bid')} closing today`);
-  if (d.stats.expiredDocs) parts.push(`${pluralize(d.stats.expiredDocs, 'expired document')}`);
-  if (!parts.length) return d.tiles.activeBids ? `${pluralize(d.tiles.activeBids, 'active bid')} in your pipeline. Nothing urgent right now.` : 'Here’s what’s happening on GeM for your business.';
-  return `${parts.join(' · ')}.`;
-}
-
-const isEmptyOrg = (d: DashboardResponse) => !d.demo && d.tiles.activeBids === 0 && d.recentMatches.length === 0 && !d.setup.find((s) => s.key === 'watchlist')?.done;
 
 function KpiGrid({ d }: { d?: DashboardResponse }) {
     const tiles: { label: ReactNode; value: ReactNode; icon: LucideIcon; tone: 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'info'; to: string; delta?: number | null; hint?: ReactNode; sparkline?: ReactNode; invert?: boolean }[] = [
@@ -135,7 +138,8 @@ function KpiGrid({ d }: { d?: DashboardResponse }) {
       delta: d ? pctDelta(d.tiles.newMatchesToday, d.stats.newMatchesYesterday) : null, hint: 'vs yesterday',
     },
     {
-      label: 'Closing this week', value: d ? formatNumberIN(d.tiles.closingThisWeek) : '', icon: CalendarClock, tone: d?.stats.closingToday ? 'danger' : 'warning',
+      label: <Tooltip content="Open bids matched or in your pipeline, closing in the next 7 days."><span className="cursor-help underline decoration-dotted underline-offset-4">Closing this week</span></Tooltip>,
+      value: d ? formatNumberIN(d.tiles.closingThisWeek) : '', icon: CalendarClock, tone: d?.stats.closingToday ? 'danger' : 'warning',
       to: '/tenders?matched=1&closing=7&sort=endAt', hint: d ? (d.stats.closingToday ? <span className="font-medium text-danger">{d.stats.closingToday} today</span> : 'none today') : undefined,
     },
     { label: 'Active bids', value: d ? formatNumberIN(d.tiles.activeBids) : '', icon: KanbanSquare, tone: 'info', to: '/pipeline', hint: d ? `${d.pipeline.ready} ready to submit` : undefined },
@@ -183,7 +187,11 @@ function GetStartedBanner() {
               {!seed.isPending && <FlaskConical />} Explore with demo data
             </Button>
           )}
-          <Button asChild><Link to="/watchlists?new=1"><Radar /> Create a watchlist</Link></Button>
+          {can('analyst') ? (
+            <Button asChild><Link to="/watchlists?new=1"><Radar /> Create a watchlist</Link></Button>
+          ) : (
+            <p className="max-w-60 self-center text-sm text-muted-foreground">{ASK_FOR_WATCHLISTS}</p>
+          )}
         </div>
       </div>
     </Card>
@@ -250,7 +258,7 @@ function SetupCard({ d }: { d: DashboardResponse }) {
           <CardTitle>Finish setting up</CardTitle>
           <span className="tabular text-xs font-medium text-muted-foreground">{done}/{d.setup.length}</span>
         </div>
-        <Progress value={pct} className="mt-2" />
+        <Progress value={pct} className="mt-2" aria-label={`Setup ${done} of ${d.setup.length} done`} />
       </CardHeader>
       <CardContent className="flex-1">
         <ul className="flex flex-col gap-1">
@@ -301,7 +309,7 @@ function ExpiringCard({ d }: { d?: DashboardResponse }) {
           <ul className="flex flex-col gap-1">
             {d.expiringDocuments.map((doc) => (
               <li key={doc.id}>
-                <Link to="/vault" className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/60 focus-ring">
+                <Link to="/vault?status=expiring" className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/60 focus-ring">
                   <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', doc.status === 'expired' ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-warning')}>
                     <FileWarning className="size-4" aria-hidden />
                   </span>
@@ -323,6 +331,7 @@ function ExpiringCard({ d }: { d?: DashboardResponse }) {
 }
 
 function RecentMatches({ d }: { d?: DashboardResponse }) {
+  const { can } = useAuth();
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -334,8 +343,8 @@ function RecentMatches({ d }: { d?: DashboardResponse }) {
       </CardHeader>
       <CardContent className="flex-1">
         {!d ? <SkeletonRows n={4} /> : d.recentMatches.length === 0 ? (
-          <EmptyState compact icon={Radar} title="No matches yet" body="Create a watchlist and we’ll match every new GeM bid against it."
-            action={<Button size="sm" asChild><Link to="/watchlists?new=1">Create watchlist</Link></Button>} />
+          <EmptyState compact icon={Radar} title="No matches yet" body={can('analyst') ? 'Create a watchlist and we’ll match every new GeM bid against it.' : ASK_FOR_WATCHLISTS}
+            action={can('analyst') ? <Button size="sm" asChild><Link to="/watchlists?new=1">Create watchlist</Link></Button> : undefined} />
         ) : (
           <ul className="flex flex-col gap-1">
             {d.recentMatches.map((m) => (

@@ -2,7 +2,9 @@
 # pipeline, and stores files in R2. Database: Neon Postgres (DATABASE_URL secret).
 #
 # Secrets (wrangler secret put <NAME>): DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY,
-#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID. Optional ones may be omitted (features degrade to no-ops).
+#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, SENTRY_DSN. Optional ones may be omitted (features degrade to no-ops).
+# Sentry environment: the Worker always runs with NODE_ENV=production, so a staging deploy must set the var
+#   SENTRY_ENVIRONMENT=staging (otherwise its events are tagged "production").
 # Deploy: pnpm deploy   (builds apps/web, then `wrangler deploy`)
 name = "tenderpilot"
 main = "apps/api/src/worker.ts"
@@ -27,6 +29,12 @@ APP_URL = "https://tenderpilot.workers.dev"
 GEM_BASE_URL = "https://bidplus.gem.gov.in"
 LLM_MODEL = "claude-sonnet-5-5"
 MAIL_FROM = "TenderPilot <alerts@tenderpilot.in>"
+# Packet build input cap (008 FR-032 / 006 FR-056): 40 MB keeps pdf-lib's 2-3x peak (ADR-0007) under the 128 MB isolate.
+PACKET_MAX_INPUT_BYTES = "41943040"
+# Client-IP source for the per-IP auth rate limits (002/FR-010). The Worker default is "cloudflare"
+# (cf-connecting-ip, which Cloudflare always overwrites), so this only needs setting to change it
+# ("xff" | "none"). Behind another proxy in front of Cloudflare, keep "cloudflare" unless you know why not.
+TRUST_PROXY = "cloudflare"
 
 [observability]
 enabled = true

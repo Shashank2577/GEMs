@@ -1,14 +1,15 @@
+import type { Logger } from 'drizzle-orm/logger';
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
 
 export type Db = ReturnType<typeof drizzlePg<typeof schema>>;
 export { schema };
 
-/** Local / CI / Node: node-postgres pool. */
-export async function createNodeDb(url: string): Promise<{ db: Db; close: () => Promise<void> }> {
+/** Local / CI / Node: node-postgres pool. `logger` sees every query (e.g. query counting in tests, 002/NFR-001). */
+export async function createNodeDb(url: string, opts: { logger?: Logger } = {}): Promise<{ db: Db; close: () => Promise<void> }> {
   const pg = await import('pg');
   const pool = new pg.default.Pool({ connectionString: url, max: 10 });
-  const db = drizzlePg(pool, { schema });
+  const db = drizzlePg(pool, { schema, logger: opts.logger });
   return { db, close: () => pool.end() };
 }
 

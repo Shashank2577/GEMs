@@ -98,7 +98,8 @@ apps/api/src/
 │   └── rate-limit.ts    # (gap) Postgres-backed attempt counter
 ├── adapters/mailer.ts   # Resend | log mailer (invites, resets)
 └── routes/
-    ├── auth.ts          # /auth/*, /me, /me/password, /me/notification-prefs, /me/api-tokens (+ gap /me/sessions, reset)
+    ├── auth.ts          # /auth/*, /me, /me/password, /me/notification-prefs, /me/api-tokens, forgot/reset password
+    ├── sessions.ts      # /me/sessions list + revoke (FR-012)
     └── org.ts           # /org, /org/members, /org/invitations, /activity (+ gap leave, resend)
 
 apps/api/test/
@@ -154,7 +155,7 @@ Auth column: `—` public, `S` session cookie only, `A` any member (cookie or be
 | DELETE `/api/org/invitations/:id` | M | – | 200 `{ok}` | 404 |
 | PATCH `/api/org/members/:userId` | O | `{role}` | 200 `Member` | 403; 404; 409 last_owner |
 | DELETE `/api/org/members/:userId` | O | – | 200 `{ok}` | 403; 404; 409 last_owner |
-| GET `/api/activity` | A | `page,pageSize,entityType,entityId,userId` | 200 `{items:ActivityItem[],total}` | 400 |
+| GET `/api/activity` | A | `page,pageSize,entityType (one or comma-separated list),entityId,userId` | 200 `{items:ActivityItem[] (each with optional server-resolved target:{label,href}|null),total}` | 400 |
 | GET/PUT `/api/scoring-weights` | A / M | PUT: partial weights, `{}` resets | 200 `{weights,defaults,custom}` | 400; 403 |
 | GET `/api/ingestion/runs`, POST `/api/ingestion/run` | A / M | – | runs summary / run result | 403 |
 | (gap) POST `/api/auth/forgot-password` | — | `{email}` | 200 `{ok:true}` always | 400; 429 |
@@ -164,7 +165,7 @@ Auth column: `—` public, `S` session cookie only, `A` any member (cookie or be
 | (gap) POST `/api/me/sessions/revoke-others` | S | – | 200 `{revoked:n}` | – |
 | (gap) DELETE `/api/org/members/me` | S | – | 200 `{ok, nextOrgId:string|null}` | 409 last_owner |
 | (gap) POST `/api/org/invitations/:id/resend` | M | – | 201 `CreatedInvitation` | 404 |
-| (gap) POST `/api/me/notifications/test` | A | – | 200 `{inApp:'sent', email:'sent'|'skipped'|'failed'|'off', whatsapp:…}` | 429 (1/min) |
+| (gap) POST `/api/me/notifications/test` | S | – | 200 `{inApp:'sent', email:'sent'|'skipped'|'failed'|'off', whatsapp:…}` (in-app row always created) | 403 (token); 429 (1/min) |
 
 ## Data model touch-points (`packages/db/src/schema.ts`)
 
@@ -202,11 +203,33 @@ preview → `POST /auth/accept-invite` → find unexpired, unaccepted invite by 
 new+name+password) → (gap) email-mismatch 403 → tx {membership ON CONFLICT DO NOTHING, prefs, accepted_at} →
 `logActivity(member.joined)` → start session or switch active org → `Me`.
 
-**Rate limiting (gap, FR-010)**: `lib/rate-limit.ts` `hit(db, key, kind, {limit, windowMs})` does an
-`INSERT … ON CONFLICT (key,kind) DO UPDATE SET count = CASE WHEN window_start < now()-window THEN 1 ELSE count+1 END,
-window_start = CASE … END RETURNING count, window_start` → if over limit throw 429 with `Retry-After`. Login calls
-`check` before password verification and `hit` only on failure; success calls `reset(email)`. Client IP from
-`cf-connecting-ip` → `x-forwarded-for` first hop → `'unknown'`.
+**Rate limiting (FR-010, FR-011)**: `lib/rate-limit.ts` keeps a **fixed window** per `(key, kind)` in `auth_attempts`.
+`hit(db, key, kind, {limit, windowMs}, now)` is one atomic
+`INSERT … ON CONFLICT (key,kind) DO UPDATE SET count = CASE WHEN window_start <= now-window THEN 1 ELSE count+1 END,
+window_start = CASE … END RETURNING count, window_start`; `over = count > limit`.
+Credential checks (login, accept-invite existing user, change password) use `credentialLimiter(db, email, ip, now)`:
+`reserve()` hits the `login_ip` (30/15 min) counter **first**, then `login_email` (10/15 min), **before** PBKDF2, and throws
+429 `rate_limited` + `Retry-After` when either is over, so a parallel burst can never get more than the cap through.
+**Limiter order** (#482 item 1): the IP counter is taken first and a request refused by it stops there, so a blocked IP
+cannot keep advancing a victim's email counter (lock-out of others); if the email counter is the one that is over, the IP
+reservation is released, so a locked-out user who keeps retrying does not burn the shared IP budget. Forgot-password uses
+the same order (`reserveIpThenKey`: `reset_ip` then `reset_email`);
+`succeed()` deletes the email counter and decrements the IP counter (a valid login does not use the IP budget, but cannot
+clear an attacker's failures either). Forgot-password hits `reset_email` (3/h) and `reset_ip` (20/h) for every email,
+existing or not, then does the lookup, token write and email in the background (`lib/defer.ts`: `waitUntil` on Workers,
+fire-and-forget with a caught rejection on Node; the Worker closes its DB pool only after deferred work settles).
+Reset-password looks up a valid token before hashing and counts invalid tokens against `login_ip`.
+**Invitation resend** (#482 items 9, 11; FR-020): `POST /org/invitations/:id/resend` replaces the token hash, sets a new
+7-day expiry and sets `invited_by` to **the member who resent it** (the email and the invite preview name them, and they
+vouch for the new link; the original inviter stays visible in the activity log). It deliberately **also revives an expired,
+unaccepted invitation**: expired rows are kept until replaced or revoked, so "Resend" is how an admin renews one. Accepted
+invitations and other orgs' invitations are 404. The pending list (`GET /org/members`) shows only unexpired rows.
+**Security headers** (decision, FR-050): `X-Frame-Options: DENY` everywhere except `SAMEORIGIN` on `content-disposition: inline` file responses (in-app previews, `middleware/security.ts`); the SPA CSP keeps `style-src 'unsafe-inline'` (Radix/sonner inline styles) and adds `frame-src`/`object-src`/`worker-src 'self' blob:` for PDF previews.
+**Client IP** (decision): read only from a trusted proxy, selected by `TRUST_PROXY`: `cloudflare` (the Worker default) →
+`cf-connecting-ip`; `xff`/`1` → first `x-forwarded-for` hop (Node behind a reverse proxy); unset (Node default) → `null`.
+A `null` IP means per-IP limits are **skipped** (per-email limits still apply), so un-proxied clients do not share one
+bucket and forged headers cannot lock out someone else's IP. The scheduled job (`runScheduledJobs` step `auth-cleanup`)
+prunes `auth_attempts` windows older than 1 h and `password_resets` used or expired more than 1 day ago.
 
 **Session end in the client (gap, FR-013)**: `queryClient` gets a `QueryCache`/`MutationCache` `onError`: if
 `ApiError.status === 401` and `ME_KEY` currently has a user → `qc.clear()`, `setQueryData(ME_KEY, null)` (RequireAuth

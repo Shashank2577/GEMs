@@ -1,0 +1,197 @@
+[
+  {
+    "label": "submit {} from Go",
+    "request": "POST /api/workspaces/4454ad83-f88f-4336-bd5c-b15c54b9b677/submitted {}",
+    "status": 200,
+    "response": {
+      "id": "4454ad83-f88f-4336-bd5c-b15c54b9b677",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "submitted",
+      "owner": {
+        "id": "be48c6e9-43d6-48c1-810f-6d5d5b5abcdd",
+        "name": "QA analyst mw37lsg64",
+        "email": "analyst.mw37lsg64@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:37.350Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": null,
+      "submittedAt": "2026-11-05T07:13:38.270Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:38.189Z",
+      "updatedAt": "2026-11-05T07:13:38.273Z"
+    }
+  },
+  {
+    "label": "submit with explicit submittedAt",
+    "request": "POST /api/workspaces/4454ad83-f88f-4336-bd5c-b15c54b9b677/submitted {\"submittedAt\":\"2026-11-01T10:00:00+05:30\"}",
+    "status": 200,
+    "response": {
+      "id": "4454ad83-f88f-4336-bd5c-b15c54b9b677",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "submitted",
+      "owner": {
+        "id": "be48c6e9-43d6-48c1-810f-6d5d5b5abcdd",
+        "name": "QA analyst mw37lsg64",
+        "email": "analyst.mw37lsg64@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:37.350Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": null,
+      "submittedAt": "2026-11-01T04:30:00.000Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:38.189Z",
+      "updatedAt": "2026-11-05T07:13:38.313Z"
+    }
+  },
+  {
+    "label": "note > 1000",
+    "request": "POST /api/workspaces/4454ad83-f88f-4336-bd5c-b15c54b9b677/submitted {\"note\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}",
+    "status": 400,
+    "response": {
+      "code": "validation_error",
+      "message": "note: String must contain at most 1000 character(s)",
+      "details": {
+        "fields": {
+          "note": "String must contain at most 1000 character(s)"
+        },
+        "issues": [
+          {
+            "path": [
+              "note"
+            ],
+            "message": "String must contain at most 1000 character(s)",
+            "code": "too_big"
+          }
+        ]
+      },
+      "error": true
+    }
+  },
+  {
+    "label": "stage won",
+    "request": "PATCH /api/workspaces/4454ad83-f88f-4336-bd5c-b15c54b9b677 {\"stage\":\"won\"}",
+    "status": 200,
+    "response": {
+      "id": "4454ad83-f88f-4336-bd5c-b15c54b9b677",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "won",
+      "owner": {
+        "id": "be48c6e9-43d6-48c1-810f-6d5d5b5abcdd",
+        "name": "QA analyst mw37lsg64",
+        "email": "analyst.mw37lsg64@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:37.350Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": {
+        "at": "2026-11-05T07:13:38.385Z",
+        "result": "won"
+      },
+      "submittedAt": "2026-11-01T04:30:00.000Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:38.189Z",
+      "updatedAt": "2026-11-05T07:13:38.385Z"
+    }
+  },
+  {
+    "label": "submit on won",
+    "request": "POST /api/workspaces/4454ad83-f88f-4336-bd5c-b15c54b9b677/submitted {}",
+    "status": 409,
+    "response": {
+      "code": "conflict",
+      "message": "This bid already has an outcome recorded.",
+      "error": true
+    }
+  },
+  {
+    "label": "stage lost (correct result)",
+    "request": "PATCH /api/workspaces/4454ad83-f88f-4336-bd5c-b15c54b9b677 {\"stage\":\"lost\"}",
+    "status": 200,
+    "response": {
+      "id": "4454ad83-f88f-4336-bd5c-b15c54b9b677",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "lost",
+      "owner": {
+        "id": "be48c6e9-43d6-48c1-810f-6d5d5b5abcdd",
+        "name": "QA analyst mw37lsg64",
+        "email": "analyst.mw37lsg64@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:37.350Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": {
+        "at": "2026-11-05T07:13:38.385Z",
+        "result": "won"
+      },
+      "submittedAt": "2026-11-01T04:30:00.000Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:38.189Z",
+      "updatedAt": "2026-11-05T07:13:38.456Z"
+    }
+  },
+  {
+    "label": "submit on lost",
+    "request": "POST /api/workspaces/4454ad83-f88f-4336-bd5c-b15c54b9b677/submitted {}",
+    "status": 409,
+    "response": {
+      "code": "conflict",
+      "message": "This bid already has an outcome recorded.",
+      "error": true
+    }
+  },
+  {
+    "label": "stage dropped",
+    "request": "PATCH /api/workspaces/3bf3e8ce-8e65-40fe-8bbe-cc881c537c9c {\"stage\":\"dropped\"}",
+    "status": 200,
+    "response": {
+      "id": "3bf3e8ce-8e65-40fe-8bbe-cc881c537c9c",
+      "tenderId": "c3fc703c-0c6c-4001-83c6-e2732d0a56c2",
+      "stage": "dropped",
+      "owner": {
+        "id": "be48c6e9-43d6-48c1-810f-6d5d5b5abcdd",
+        "name": "QA analyst mw37lsg64",
+        "email": "analyst.mw37lsg64@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:37.350Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": null,
+      "submittedAt": null,
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:38.231Z",
+      "updatedAt": "2026-11-05T07:13:38.518Z"
+    }
+  },
+  {
+    "label": "submit on dropped",
+    "request": "POST /api/workspaces/3bf3e8ce-8e65-40fe-8bbe-cc881c537c9c/submitted {}",
+    "status": 409,
+    "response": {
+      "code": "conflict",
+      "message": "This bid was dropped. Move it back to the pipeline first.",
+      "error": true
+    }
+  },
+  {
+    "label": "malformed id",
+    "request": "POST /api/workspaces/not-a-uuid/submitted {}",
+    "status": 404,
+    "response": {
+      "code": "not_found",
+      "message": "Bid workspace not found",
+      "error": true
+    }
+  }
+]

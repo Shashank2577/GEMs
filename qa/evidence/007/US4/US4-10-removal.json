@@ -1,0 +1,77 @@
+{
+  "demoCounts": {
+    "workspaces": 16,
+    "vault": 15,
+    "watchlists": 3,
+    "watchlistNames": [
+      "IT hardware – Maharashtra & Goa",
+      "CCTV & surveillance – West India",
+      "Networking & power (pan-India, ≥ ₹5 L)"
+    ],
+    "vaultTitles": [
+      "Cancelled cheque & bank mandate – HDFC Bank",
+      "Make in India self-certificate (Class-I, 62% local content)",
+      "CRAC – Central Railway desktop supply (₹58 L)",
+      "CRAC – Pune Municipal Corporation CCTV (₹96 L)",
+      "OEM authorisation – Dell Technologies (desktops & servers)",
+      "OEM authorisation – CP PLUS (CCTV)",
+      "ISO 9001:2015 quality management certificate",
+      "CA certificate – average turnover (last 3 FYs)",
+      "Audited balance sheet FY 2022-23",
+      "Audited balance sheet FY 2023-24",
+      "Audited balance sheet FY 2024-25",
+      "Certificate of incorporation",
+      "Udyam registration certificate (Micro)",
+      "PAN card – Aarav Technologies Pvt Ltd",
+      "GST registration certificate (Form GST REG-06)"
+    ]
+  },
+  "first": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "removed": {
+        "workspaces": 16,
+        "analyses": 20,
+        "matches": 30,
+        "comments": 2,
+        "notifications": 6,
+        "activity": 12,
+        "pastContracts": 5,
+        "vaultDocuments": 15,
+        "watchlists": 3,
+        "profileReset": true
+      }
+    }
+  },
+  "after": {
+    "workspaces": 0,
+    "vault": 1,
+    "watchlists": 2,
+    "watchlistNames": [
+      "IT hardware – Maharashtra & Goa",
+      "My laptops"
+    ],
+    "vaultTitles": [
+      "Real GST"
+    ]
+  },
+  "second": {
+    "status": 200,
+    "body": {
+      "ok": true,
+      "removed": {
+        "workspaces": 0,
+        "analyses": 0,
+        "matches": 0,
+        "comments": 0,
+        "notifications": 0,
+        "activity": 0,
+        "pastContracts": 0,
+        "vaultDocuments": 0,
+        "watchlists": 0,
+        "profileReset": false
+      }
+    }
+  }
+}

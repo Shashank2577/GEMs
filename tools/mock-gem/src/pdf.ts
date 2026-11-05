@@ -183,3 +183,41 @@ export async function renderBuiltinPdf(f: BidDocFacts): Promise<Uint8Array> {
   line('Delivery Days', String(f.deliveryDays));
   return doc.save();
 }
+
+/**
+ * A "scanned" bid document: pages carry only drawn shapes (no text layer), like a photocopy scanned
+ * to PDF. TenderPilot should store it with hasText:false and flag "No text — scanned?" (FR-003).
+ */
+export async function renderScannedPdf(pages = 3): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.setTitle('Scanned bid document');
+  for (let p = 0; p < pages; p++) {
+    const page = doc.addPage([595, 842]);
+    page.drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(0.97, 0.96, 0.93) });
+    for (let i = 0; i < 38; i++) {
+      // Grey bars where lines of text would be.
+      const w = 380 + ((i * 37 + p * 11) % 120);
+      page.drawRectangle({ x: 60, y: 770 - i * 19, width: w, height: 7, color: rgb(0.55, 0.55, 0.55), opacity: 0.6 });
+    }
+  }
+  return doc.save();
+}
+
+/**
+ * An endless-looking PDF body larger than `bytes` (default 26 MB), produced lazily so the mock never
+ * holds it in memory and stops as soon as the client cancels (FR-008 byte cap). No content-length is
+ * advertised, so the client must enforce the cap while streaming.
+ */
+export function oversizePdfStream(bytes = 26 * 1024 * 1024, chunkBytes = 1024 * 1024): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  const filler = enc.encode(`% ${'x'.repeat(chunkBytes - 3)}\n`);
+  let sent = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(c) {
+      if (sent === 0) { const head = enc.encode('%PDF-1.7\n'); sent += head.length; c.enqueue(head); return; }
+      if (sent >= bytes) { c.close(); return; }
+      sent += filler.length;
+      c.enqueue(filler);
+    },
+  });
+}

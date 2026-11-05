@@ -2,6 +2,7 @@
 /** Popup: connect with an API token, pick a bid workspace, view/copy values, and ask the page to highlight/fill. */
 import { ApiError, api, ensureHostPermission, loadSettings, normalizeBase, saveSettings, type Settings } from './api';
 import type { PayloadField } from './fill';
+import { clearFillReport, renderFillReport } from './report';
 import type { ContentRequest, ContentResponse } from './messages';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -59,7 +60,7 @@ async function loadWorkspace(id: string) {
   const meta = $('ws-meta');
   const mk = (label: string, value: string) => { const s = document.createElement('span'); s.innerHTML = `${label} <b></b>`; s.querySelector('b')!.textContent = value; meta.append(s); };
   mk('Bid', p.tender.bidNumber);
-  mk('Readiness', `${p.readiness.percent}%`);
+  mk('Readiness', p.readiness.analysed ? `${p.readiness.percent}%` : 'Not analysed'); // 006/FR-009
   const open = document.createElement('a'); open.href = p.workspaceUrl; open.target = '_blank'; open.textContent = 'Open workspace ↗'; meta.append(open);
   const docs = $('docs'); docs.replaceChildren();
   for (const d of p.documents) {
@@ -130,14 +131,27 @@ async function init() {
     try {
       const r = await sendToPage({ type: 'tp:scan', fields });
       if (!r.ok) throw new Error(r.error);
-      if ('scan' in r) setStatus(`${r.scan.fillable} field(s) can be filled — click the TP chips or “Fill allowed fields”. ${r.scan.forbidden} price/OTP/submit field(s) left for you.`);
+      if ('scan' in r) setStatus(`${r.scan.fillable} field(s) can be filled — click the TP chips or “Fill allowed fields”. ${r.scan.forbidden} price/OTP/submit field(s) left for you${r.scan.manual ? `; ${r.scan.manual} yes/no question(s) to answer yourself` : ''}.`);
     } catch (e) { showError((e as Error).message); }
   });
   $('fill').addEventListener('click', async () => {
     try {
       const r = await sendToPage({ type: 'tp:fill', fields });
       if (!r.ok) throw new Error(r.error);
-      if ('report' in r) setStatus(`Filled ${r.report.filled.length} field(s). ${r.report.forbidden} protected field(s) untouched — enter price and authenticate yourself.`, true);
+      if ('report' in r) {
+        setStatus(`Filled ${r.report.filled.length} field(s). ${r.report.forbidden} protected field(s) untouched — enter price and authenticate yourself.`, true);
+        renderFillReport($('fill-report'), r.report);
+      }
+    } catch (e) { showError((e as Error).message); }
+  });
+
+  $('clear').addEventListener('click', async () => {
+    try {
+      const r = await sendToPage({ type: 'tp:clear' });
+      if (!r.ok) throw new Error(r.error);
+      showError(null);
+      clearFillReport($('fill-report'));
+      setStatus('Highlights cleared. Values already filled stay in the form.');
     } catch (e) { showError((e as Error).message); }
   });
 

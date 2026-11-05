@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { and, eq, inArray } from 'drizzle-orm';
+import { activityLog, memberships, users } from '@tp/db';
 import { createTestContext, request, seedOrgWithRoles, signup, uniqueEmail, TEST_APP_URL, type TestContext } from './helpers';
 
 let ctx: TestContext;
@@ -247,15 +249,80 @@ describe('invitations & roles', () => {
     expect(login.body.org.name).toBe('Alpha Supplies');
   });
 
-  it('a signed-in user accepting an invite joins with their current account', async () => {
+  it('002/FR-021: sign-in resumes the last-used org across sign-outs, else the oldest membership', async () => {
+    const a = await signup(ctx.app, { orgName: 'Oldest Org' });
+    const b = await signup(ctx.app, { orgName: 'Newer Org' });
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: b.cookie, json: { email: a.email, role: 'analyst' } });
+    const token = inv.body.inviteUrl.split('/invite/')[1];
+    const login = () => request(ctx.app, 'POST', '/api/auth/login', { json: { email: a.email, password: a.password } });
+
+    // accepting (signed in) makes B active; sign out → sign in lands in B
+    expect((await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: a.cookie, json: { token } })).body.org.name).toBe('Newer Org');
+    expect((await request(ctx.app, 'POST', '/api/auth/logout', { cookie: a.cookie })).status).toBe(200);
+    const l1 = await login();
+    expect(l1.body.org.name).toBe('Newer Org');
+
+    // switching in an older session counts too
+    const s2 = (await login()).cookie!;
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: l1.cookie!, json: { orgId: a.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: s2, json: { orgId: b.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: l1.cookie!, json: { orgId: b.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: s2, json: { orgId: a.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: l1.cookie!, json: { orgId: b.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/logout', { cookie: l1.cookie! });
+    await request(ctx.app, 'POST', '/api/auth/logout', { cookie: s2 });
+    expect((await login()).body.org.name).toBe('Newer Org');
+
+    // removed from B → falls back to the oldest membership
+    expect((await request(ctx.app, 'DELETE', `/api/org/members/${a.me.user.id}`, { cookie: b.cookie })).status).toBe(200);
+    const l3 = await login();
+    expect(l3.status).toBe(200);
+    expect(l3.body.org.name).toBe('Oldest Org');
+  });
+
+  it('a signed-in user accepting an invite for their email joins with their current account', async () => {
     const host = await signup(ctx.app, { orgName: 'Host Org' });
     const guest = await signup(ctx.app, { orgName: 'Guest Org' });
-    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: host.cookie, json: { email: uniqueEmail('alias'), role: 'viewer' } });
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: host.cookie, json: { email: guest.email, role: 'viewer' } });
     const token = inv.body.inviteUrl.split('/invite/')[1];
     const acc = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: guest.cookie, json: { token } });
     expect(acc.status).toBe(200);
+    expect(acc.cookie).toBeNull(); // keeps the existing session
     expect(acc.body).toMatchObject({ user: { email: guest.email }, org: { name: 'Host Org' }, role: 'viewer' });
     expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: guest.cookie })).body.org.name).toBe('Host Org');
+  });
+
+  it('002/FR-018: a signed-in user with a different email cannot redeem the invitation', async () => {
+    const host = await signup(ctx.app, { orgName: 'Bound Org' });
+    const ravi = await signup(ctx.app, { orgName: 'Ravi Org' });
+    const asha = uniqueEmail('asha');
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: host.cookie, json: { email: asha, role: 'analyst' } });
+    const token = inv.body.inviteUrl.split('/invite/')[1];
+
+    const r = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: ravi.cookie, json: { token } });
+    expect(r.status).toBe(403);
+    expect(r.body.error).toMatchObject({
+      code: 'invite_email_mismatch',
+      message: `This invitation was sent to ${asha}. Sign out and continue as that account.`,
+    });
+    expect(r.cookie).toBeNull();
+    // no membership, active org unchanged, invitation still usable by the right person
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: ravi.cookie });
+    expect(me.body.org.name).toBe('Ravi Org');
+    expect(me.body.orgs.map((o: any) => o.name)).toEqual(['Ravi Org']);
+    const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: host.cookie });
+    expect(members.body.items.map((m: any) => m.email)).not.toContain(ravi.email);
+    expect(members.body.invitations.map((i: any) => i.email)).toEqual([asha]);
+    const acts = await request(ctx.app, 'GET', '/api/activity?pageSize=100', { cookie: host.cookie });
+    expect(acts.body.items.some((i: any) => i.action === 'member.joined' && i.user?.id === ravi.me.user.id)).toBe(false);
+
+    // a name/password in the body does not bypass the binding
+    const r2 = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: ravi.cookie, json: { token, name: 'Ravi', password: ravi.password } });
+    expect(r2.status).toBe(403);
+
+    const ok = await request(ctx.app, 'POST', '/api/auth/accept-invite', { json: { token, name: 'Asha', password: 'pass-word-1' } });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ user: { email: asha }, org: { name: 'Bound Org' }, role: 'analyst' });
   });
 
   it('expired and invalid invitations are rejected', async () => {
@@ -286,16 +353,19 @@ describe('invitations & roles', () => {
     expect((await request(ctx.app, 'POST', '/api/org/invitations', { cookie: bidManager.cookie, json: e() })).status).toBe(201);
     // only owners can invite owners
     expect((await request(ctx.app, 'POST', '/api/org/invitations', { cookie: bidManager.cookie, json: { email: uniqueEmail(), role: 'owner' } })).status).toBe(403);
-    // cannot invite an existing member
-    expect((await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: analyst.email, role: 'viewer' } })).status).toBe(409);
+    // cannot invite an existing member; the full sentence is the email field error (US2 scenario 3)
+    const dup = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: analyst.email, role: 'viewer' } });
+    expect(dup.status).toBe(409);
+    const dupMsg = `${analyst.email} is already a member of this organization`;
+    expect(dup.body.error).toMatchObject({ code: 'conflict', message: dupMsg, details: { fields: { email: dupMsg } } });
 
     // PATCH /org: bid_manager+
     expect((await request(ctx.app, 'PATCH', '/api/org', { cookie: analyst.cookie, json: { name: 'Hacked' } })).status).toBe(403);
-    const upd = await request(ctx.app, 'PATCH', '/api/org', { cookie: bidManager.cookie, json: { name: 'Roles Pvt Ltd', onboardingState: { profile: true } } });
+    const upd = await request(ctx.app, 'PATCH', '/api/org', { cookie: bidManager.cookie, json: { name: 'Roles Pvt Ltd', onboardingState: { company: true } } });
     expect(upd.status).toBe(200);
-    expect(upd.body).toMatchObject({ name: 'Roles Pvt Ltd', onboardingState: { profile: true } });
-    const upd2 = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { vault: true }, scoringWeights: { turnover: 20 } } });
-    expect(upd2.body.onboardingState).toEqual({ profile: true, vault: true });
+    expect(upd.body).toMatchObject({ name: 'Roles Pvt Ltd', onboardingState: { company: true } });
+    const upd2 = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { documents: true }, scoringWeights: { turnover: 20 } } });
+    expect(upd2.body.onboardingState).toEqual({ company: true, documents: true });
     expect(upd2.body.scoringWeights).toEqual({ turnover: 20 });
     expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: viewer.cookie })).body.org.name).toBe('Roles Pvt Ltd');
 
@@ -334,6 +404,63 @@ describe('invitations & roles', () => {
     expect(act.body.items.map((i: any) => i.action)).toEqual(expect.arrayContaining(['member.removed', 'member.role_changed', 'member.joined']));
   });
 
+  it('002/FR-020: bid managers can resend a pending invitation with a fresh link and expiry', async () => {
+    const { owner, bidManager, analyst } = await seedOrgWithRoles(ctx.app, 'Resend Co');
+    const email = uniqueEmail('resend');
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email, role: 'analyst' } });
+    const oldToken = inv.body.inviteUrl.split('/invite/')[1];
+    const mailsTo = () => ctx.mailer.sent.filter((m) => m.to === email);
+    expect(mailsTo()).toHaveLength(1);
+    try {
+      ctx.clock.advance(3 * 24 * 60 * 60 * 1000);
+      expect((await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: analyst.cookie })).status).toBe(403);
+
+      const r = await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: bidManager.cookie });
+      expect(r.status).toBe(201);
+      expect(r.body).toMatchObject({ id: inv.body.id, email, role: 'analyst' });
+      expect(r.body.inviteUrl).toMatch(new RegExp(`^${TEST_APP_URL}/invite/[A-Za-z0-9_-]+$`));
+      expect(r.body.inviteUrl).not.toBe(inv.body.inviteUrl);
+      expect(new Date(r.body.expiresAt).getTime()).toBe(ctx.clock.now().getTime() + 7 * 24 * 60 * 60 * 1000);
+      expect(mailsTo()).toHaveLength(2);
+      expect(mailsTo().at(-1)).toMatchObject({ to: email, subject: expect.stringContaining('Resend Co'), text: expect.stringContaining(r.body.inviteUrl) });
+
+      // the old link stops working, the new one previews; still exactly one pending row
+      expect((await request(ctx.app, 'GET', `/api/auth/invite/${oldToken}`)).status).toBe(404);
+      const newToken = r.body.inviteUrl.split('/invite/')[1];
+      const preview = await request(ctx.app, 'GET', `/api/auth/invite/${newToken}`);
+      expect(preview.body).toMatchObject({ email, role: 'analyst', orgName: 'Resend Co', expiresAt: r.body.expiresAt });
+      const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: owner.cookie });
+      expect(members.body.invitations.filter((i: any) => i.email === email)).toHaveLength(1);
+      expect(members.body.invitations.find((i: any) => i.email === email).expiresAt).toBe(r.body.expiresAt);
+
+      const act = await request(ctx.app, 'GET', '/api/activity?entityType=invitation', { cookie: owner.cookie });
+      expect(act.body.items[0]).toMatchObject({ action: 'member.invite_resent', entityId: inv.body.id, meta: { email, role: 'analyst' }, user: { id: bidManager.me.user.id } });
+
+      // an expired, unaccepted invitation can be revived
+      ctx.clock.advance(8 * 24 * 60 * 60 * 1000);
+      expect((await request(ctx.app, 'GET', `/api/auth/invite/${newToken}`)).status).toBe(404);
+      const revived = await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: owner.cookie });
+      expect(revived.status).toBe(201);
+      const accepted = await request(ctx.app, 'POST', '/api/auth/accept-invite', { json: { token: revived.body.inviteUrl.split('/invite/')[1], name: 'Resent', password: 'pass-word-1' } });
+      expect(accepted.status).toBe(200);
+      // accepted invitations cannot be resent
+      expect((await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: owner.cookie })).status).toBe(404);
+    } finally { ctx.clock.set(new Date()); }
+
+    // unknown ids and malformed ids are 404
+    expect((await request(ctx.app, 'POST', `/api/org/invitations/${crypto.randomUUID()}/resend`, { cookie: owner.cookie })).status).toBe(404);
+    expect((await request(ctx.app, 'POST', '/api/org/invitations/not-a-uuid/resend', { cookie: owner.cookie })).status).toBe(404);
+  });
+
+  it('only an Owner can resend an Owner invitation', async () => {
+    const { owner, bidManager } = await seedOrgWithRoles(ctx.app);
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: uniqueEmail(), role: 'owner' } });
+    const r = await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: bidManager.cookie });
+    expect(r.status).toBe(403);
+    expect(r.body.error.message).toBe('Only an Owner can invite another Owner');
+    expect((await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: owner.cookie })).status).toBe(201);
+  });
+
   it('bid managers can revoke pending invitations', async () => {
     const { owner, bidManager, analyst } = await seedOrgWithRoles(ctx.app);
     const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: uniqueEmail(), role: 'viewer' } });
@@ -341,6 +468,129 @@ describe('invitations & roles', () => {
     expect((await request(ctx.app, 'DELETE', `/api/org/invitations/${inv.body.id}`, { cookie: bidManager.cookie })).status).toBe(200);
     const token = inv.body.inviteUrl.split('/invite/')[1];
     expect((await request(ctx.app, 'GET', `/api/auth/invite/${token}`)).status).toBe(404);
+  });
+});
+
+describe('DELETE /api/org/members/me — leave organization (002/FR-027)', () => {
+  it('removes own membership + own tokens for that org, logs member.left and moves the session to the next org', async () => {
+    const a = await seedOrgWithRoles(ctx.app, 'Leave Alpha');
+    const home = await signup(ctx.app, { orgName: 'Leave Home' });
+    // `home` joins Alpha as an analyst with their existing account, so they have two orgs.
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: a.owner.cookie, json: { email: home.email, role: 'analyst' } });
+    const acc = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: home.cookie, json: { token: inv.body.inviteUrl.split('/invite/')[1] } });
+    expect(acc.body.org.name).toBe('Leave Alpha');
+    const alphaToken = (await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: home.cookie, json: { name: 'alpha ext' } })).body.token;
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: home.cookie, json: { orgId: home.me.org.id } });
+    const homeToken = (await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: home.cookie, json: { name: 'home ext' } })).body.token;
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: home.cookie, json: { orgId: a.orgId } });
+
+    const r = await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: home.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true, nextOrgId: home.me.org.id });
+
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: home.cookie });
+    expect(me.body.org.id).toBe(home.me.org.id);
+    expect(me.body.orgs.map((o: any) => o.name)).toEqual(['Leave Home']);
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { bearer: alphaToken })).status).toBe(401);
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { bearer: homeToken })).status).toBe(200);
+
+    const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: a.owner.cookie });
+    expect(members.body.items.map((m: any) => m.email)).not.toContain(home.email);
+    const act = await request(ctx.app, 'GET', '/api/activity?entityType=user', { cookie: a.owner.cookie });
+    expect(act.body.items[0]).toMatchObject({ action: 'member.left', entityId: home.me.user.id, user: { id: home.me.user.id }, meta: { role: 'analyst' } });
+    // the switch back to the org they left is refused
+    expect((await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: home.cookie, json: { orgId: a.orgId } })).status).toBe(404);
+  });
+
+  it('leaving the only org returns nextOrgId null and the session has no organization', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const r = await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: a.viewer.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true, nextOrgId: null });
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: a.viewer.cookie });
+    expect(me.status).toBe(403);
+    expect(me.body.error.code).toBe('no_organization');
+  });
+
+  it('the last Owner gets 409 last_owner; a non-last Owner may leave', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const last = await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: a.owner.cookie });
+    expect(last.status).toBe(409);
+    expect(last.body.error.code).toBe('last_owner');
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: a.owner.cookie })).body.role).toBe('owner');
+
+    await request(ctx.app, 'PATCH', `/api/org/members/${a.bidManager.me.user.id}`, { cookie: a.owner.cookie, json: { role: 'owner' } });
+    expect((await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: a.owner.cookie })).status).toBe(200);
+    const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: a.bidManager.cookie });
+    expect(members.body.items.filter((m: any) => m.role === 'owner').map((m: any) => m.userId)).toEqual([a.bidManager.me.user.id]);
+  });
+
+  it('two owners leaving at the same time cannot leave the org without an Owner (FR-024 race)', async () => {
+    for (let round = 0; round < 3; round++) {
+      const a = await seedOrgWithRoles(ctx.app);
+      await request(ctx.app, 'PATCH', `/api/org/members/${a.bidManager.me.user.id}`, { cookie: a.owner.cookie, json: { role: 'owner' } });
+      const res = await Promise.all([a.owner, a.bidManager].map((u) => request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: u.cookie })));
+      expect(res.map((r) => r.status).sort()).toEqual([200, 409]);
+      expect(res.find((r) => r.status === 409)!.body.error.code).toBe('last_owner');
+      const owners = await ctx.db.select().from(memberships).where(and(eq(memberships.orgId, a.orgId), eq(memberships.role, 'owner')));
+      expect(owners).toHaveLength(1);
+    }
+  });
+
+  it('two owners demoting / removing each other at the same time: exactly one wins (200), the other gets 409 last_owner', async () => {
+    for (let round = 0; round < 3; round++) {
+      const a = await seedOrgWithRoles(ctx.app);
+      const [o1, o2] = [a.owner, a.bidManager];
+      await request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'owner' } });
+      const res = await Promise.all([
+        request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'viewer' } }),
+        request(ctx.app, 'DELETE', `/api/org/members/${o1.me.user.id}`, { cookie: o2.cookie }),
+      ]);
+      const detail = res.map((r) => `${r.status} ${r.text}`).join(' | ');
+      expect(res.map((r) => r.status).sort(), detail).toEqual([200, 409]);
+      expect(res.find((r) => r.status === 409)!.body.error.code).toBe('last_owner');
+      const owners = await ctx.db.select().from(memberships).where(and(eq(memberships.orgId, a.orgId), eq(memberships.role, 'owner')));
+      expect(owners, detail).toHaveLength(1);
+      // the loser left no trace in the activity log
+      const acts = await ctx.db.select({ action: activityLog.action }).from(activityLog)
+        .where(and(eq(activityLog.orgId, a.orgId), inArray(activityLog.action, ['member.role_changed', 'member.removed'])));
+      expect(acts.map((x) => x.action).sort(), detail).toEqual(['member.role_changed', res[0].status === 200 ? 'member.role_changed' : 'member.removed'].sort());
+    }
+  });
+
+  it('two owners removing the same member at the same time: one 200, one 404, one activity entry', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const o2 = a.bidManager;
+    await request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: a.owner.cookie, json: { role: 'owner' } });
+    const target = a.analyst.me.user.id;
+    const res = await Promise.all([a.owner, o2].map((o) => request(ctx.app, 'DELETE', `/api/org/members/${target}`, { cookie: o.cookie })));
+    expect(res.map((r) => r.status).sort()).toEqual([200, 404]);
+    const removed = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, a.orgId), eq(activityLog.action, 'member.removed')));
+    expect(removed).toHaveLength(1);
+    // and a role change for a member who is gone is a 404, not a phantom success
+    const gone = await request(ctx.app, 'PATCH', `/api/org/members/${target}`, { cookie: a.owner.cookie, json: { role: 'viewer' } });
+    expect(gone.status).toBe(404);
+  });
+
+  it('sets the remembered org to the next org, so the next sign-in does not resume the org that was left', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const home = await signup(ctx.app, { orgName: 'Remember Home' });
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: a.owner.cookie, json: { email: home.email, role: 'viewer' } });
+    await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: home.cookie, json: { token: inv.body.inviteUrl.split('/invite/')[1] } });
+    expect((await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: home.cookie })).body.nextOrgId).toBe(home.me.org.id);
+    const [u] = await ctx.db.select({ lastOrgId: users.lastOrgId }).from(users).where(eq(users.id, home.me.user.id));
+    expect(u.lastOrgId).toBe(home.me.org.id);
+    const login = await request(ctx.app, 'POST', '/api/auth/login', { json: { email: home.email, password: home.password } });
+    expect(login.body.org.id).toBe(home.me.org.id);
+  });
+
+  it('is session-only: an API token gets 403 and nothing changes', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const token = (await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: a.analyst.cookie, json: { name: 'ext' } })).body.token;
+    const r = await request(ctx.app, 'DELETE', '/api/org/members/me', { bearer: token });
+    expect(r.status).toBe(403);
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: a.analyst.cookie })).body.role).toBe('analyst');
+    expect((await request(ctx.app, 'DELETE', '/api/org/members/me')).status).toBe(401);
   });
 });
 
@@ -376,6 +626,8 @@ describe('organization isolation (Constitution IV)', () => {
     // nor revoke org B's invitations
     const invB = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: b.owner.cookie, json: { email: uniqueEmail(), role: 'viewer' } });
     expect((await request(ctx.app, 'DELETE', `/api/org/invitations/${invB.body.id}`, { cookie: a.owner.cookie })).status).toBe(404);
+    // nor resend them
+    expect((await request(ctx.app, 'POST', `/api/org/invitations/${invB.body.id}/resend`, { cookie: a.owner.cookie })).status).toBe(404);
   });
 
   it('activity supports filters and pagination', async () => {

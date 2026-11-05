@@ -1,0 +1,18 @@
+{
+  "title": "TenderPilot — GeM tender co-pilot for Indian sellers",
+  "ogImage": {
+    "width": 1200,
+    "height": 630,
+    "bytes": 397650
+  },
+  "offers": [
+    {
+      "price": "2999",
+      "currency": "INR"
+    },
+    {
+      "price": "7999",
+      "currency": "INR"
+    }
+  ]
+}

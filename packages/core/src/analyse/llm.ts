@@ -29,8 +29,12 @@ a bidder must upload. Be literal: only report what the text states. Amounts are 
 
 export interface LlmPrompt { system: string; prompt: string; maxTokens: number }
 
-export function buildLlmPrompt(pages: string[], known: Requirement[] = []): LlmPrompt {
-  let budget = MAX_CHARS;
+/**
+ * `maxChars` caps the document text included (default 60,000); an analysis passes what is left of its overall
+ * 90,000-character budget (008/FR-031).
+ */
+export function buildLlmPrompt(pages: string[], known: Requirement[] = [], maxChars = MAX_CHARS): LlmPrompt {
+  let budget = Math.max(0, Math.min(MAX_CHARS, maxChars));
   const parts: string[] = [];
   pages.forEach((p, i) => {
     if (budget <= 0) return;
@@ -131,7 +135,16 @@ export function mergeRequirements(rules: Requirement[], llm: Requirement[]): Req
   return out;
 }
 
-export interface LlmExtractResult { requirements: Requirement[]; used: boolean; error?: string }
+/** Characters sent for one prompt (system + user text) — what the 008/FR-031 budget counts. */
+export const promptChars = (p: Pick<LlmPrompt, 'system' | 'prompt'>) => p.system.length + p.prompt.length;
+
+export interface LlmExtractResult {
+  requirements: Requirement[];
+  used: boolean;
+  error?: string;
+  /** Characters sent to the LLM (0 when not called). */
+  inputChars: number;
+}
 
 /** Run the LLM extractor and merge; on any failure, fall back to the rule results. */
 export async function enrichWithLlm(
@@ -139,13 +152,16 @@ export async function enrichWithLlm(
   rules: Requirement[],
   completeJson: CompleteJson | null | undefined,
   src: { documentId?: string; fileName?: string } = {},
+  opts: { maxChars?: number } = {},
 ): Promise<LlmExtractResult> {
-  if (!completeJson || !pages.length) return { requirements: rules, used: false };
+  if (!completeJson || !pages.length) return { requirements: rules, used: false, inputChars: 0 };
+  const prompt = buildLlmPrompt(pages, rules, opts.maxChars);
+  const inputChars = promptChars(prompt);
   try {
-    const reply = await completeJson(buildLlmPrompt(pages, rules));
+    const reply = await completeJson(prompt);
     const llm = parseLlmRequirements(reply, src);
-    return { requirements: mergeRequirements(rules, llm), used: true };
+    return { requirements: mergeRequirements(rules, llm), used: true, inputChars };
   } catch (e) {
-    return { requirements: rules, used: false, error: (e as Error).message };
+    return { requirements: rules, used: false, error: (e as Error).message, inputChars };
   }
 }

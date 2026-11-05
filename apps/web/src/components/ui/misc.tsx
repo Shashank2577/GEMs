@@ -16,7 +16,8 @@ export const Progress = forwardRef<
   const t = tone === 'auto' ? (v >= 80 ? 'success' : v >= 50 ? 'warning' : 'danger') : tone;
   const bar = { primary: 'bg-primary', success: 'bg-success', warning: 'bg-warning', danger: 'bg-danger' }[t];
   return (
-    <ProgressPrimitive.Root ref={ref} value={v} className={cn('relative w-full overflow-hidden rounded-full bg-muted', size === 'sm' ? 'h-1.5' : 'h-2', className)} {...props}>
+    // A progressbar needs an accessible name (axe aria-progressbar-name); callers should pass a specific aria-label.
+    <ProgressPrimitive.Root ref={ref} value={v} aria-label={props['aria-labelledby'] ? undefined : `${Math.round(v)}% complete`} className={cn('relative w-full overflow-hidden rounded-full bg-muted', size === 'sm' ? 'h-1.5' : 'h-2', className)} {...props}>
       <ProgressPrimitive.Indicator className={cn('h-full rounded-full transition-[width] duration-700 ease-out', bar)} style={{ width: `${v}%` }} />
     </ProgressPrimitive.Root>
   );

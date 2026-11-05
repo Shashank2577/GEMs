@@ -1,0 +1,13 @@
+# sc3-datafix — project desktop — 2026-11-05T04:31:44.317Z
+--- BEFORE migration 0009
+GEM/2026/B/LEGACYmw31tlvh source=gem matches: B,A
+GEM/2026/B/REALmw31tlvh source=gem matches: B
+
+--- AFTER migration 0009 (psql -f packages/db/migrations/0009_demo_source_datafix.sql)
+GEM/2026/B/LEGACYmw31tlvh source=demo matches: A
+GEM/2026/B/REALmw31tlvh source=gem matches: B
+
+--- AFTER second run (idempotent)
+GEM/2026/B/LEGACYmw31tlvh source=demo matches: A
+GEM/2026/B/REALmw31tlvh source=gem matches: B
+

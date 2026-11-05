@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { assistPayload, type FieldDescriptor } from '@tp/core/assist/allowlist';
-import { fillAll, fillOne, pickOption, plan, type FillTarget, type MarkState, type PayloadField } from '../src/fill';
+import { fillAll, fillOne, pickOption, plan, skipReasonText, type FillTarget, type MarkState, type PayloadField } from '../src/fill';
 
 interface Fake extends FillTarget { value: string; state: MarkState; writes: number; options?: { value: string; text: string }[] }
 
@@ -119,6 +119,16 @@ describe('fillAll on a GeM-like form (US5 acceptance 1)', () => {
     expect(entries.map((e) => e.status)).toEqual(['disabled', 'no_value', 'fillable']);
   });
 
+  it('reports human-readable skip reasons, never raw codes (FR-075)', () => {
+    const noVal = fake({ label: 'Warranty' });
+    const off = fake({ label: 'Make', type: 'text' }, { disabled: true });
+    const r = fillAll([noVal, off], fields.map((x) => (x.key === 'warranty_months' ? { ...x, value: '' } : x)));
+    const reasons = r.skipped.map((x) => x.reason);
+    expect(reasons).toContain('no prepared value');
+    expect(reasons.join(' ')).not.toMatch(/no_value/);
+    for (const code of ['fillable', 'forbidden', 'unmatched', 'no_value', 'disabled', 'manual']) expect(skipReasonText(code)).not.toBe(code);
+  });
+
   it('fillOne re-checks the descriptor before writing', () => {
     const t = fake({ label: 'Make' });
     const [entry] = plan([t], fields);
@@ -135,5 +145,28 @@ describe('pickOption', () => {
     expect(pickOption(YESNO, 'No')).toBe('N');
     expect(pickOption([{ value: 'a', text: 'Bharat (India)' }], 'Narnia')).toBeNull();
     expect(pickOption([], 'x')).toBeNull();
+  });
+});
+
+
+describe('radio / checkbox questions (T082, FR-077)', () => {
+  const fields: PayloadField[] = [{ key: 'mse_claim', label: 'MSE preference claimed', value: 'Yes', selectorHints: ['\\bmse\\b'] }];
+  const radio = (label: string, name = 'q1') => fake({ tagName: 'input', type: 'radio', name, label }, { kind: 'choice' });
+
+  it('reports a matching radio as manual and never writes', () => {
+    const r = radio('Do you want to avail MSE purchase preference?', 'mseClaim');
+    const [e] = plan([r], fields);
+    expect(e.status).toBe('manual');
+    expect(e.field?.key).toBe('mse_claim');
+    expect(fillOne(e, { overwrite: true })).toEqual({ ok: false, reason: 'left for you' });
+    const report = fillAll([r], fields, { overwrite: true });
+    expect(r.writes).toBe(0);
+    expect(report.filled).toEqual([]);
+    expect(report.skipped).toEqual([{ key: 'mse_claim', label: 'MSE preference claimed', reason: 'left for you — choose “Yes” yourself' }]);
+  });
+
+  it('still treats a price-like radio as forbidden and an unrelated one as unmatched', () => {
+    expect(plan([radio('Quoted price includes GST?')], fields)[0].status).toBe('forbidden');
+    expect(plan([radio('Preferred colour')], fields)[0].status).toBe('unmatched');
   });
 });

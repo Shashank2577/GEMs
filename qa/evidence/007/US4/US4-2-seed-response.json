@@ -1,0 +1,14 @@
+{
+  "status": 201,
+  "body": {
+    "ok": true,
+    "tenders": 40,
+    "watchlists": 3,
+    "matches": 28,
+    "analyses": 20,
+    "workspaces": 16,
+    "vaultDocuments": 15,
+    "pastContracts": 5,
+    "created": true
+  }
+}

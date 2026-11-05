@@ -267,6 +267,35 @@ All ports recorded in a new root `NOTICE` (the file is referenced from `gem/clie
 ## Research & Decisions
 
 - **Text extraction**: `unpdf` over `pdf-parse` (erenmyeager15) because it runs on Workers and gives per-page text, which provenance needs. Decision kept.
+- **Workers budget (T052, NFR-005) — decision: cap extraction at 150 pages per PDF, with an upload warning.**
+  Measured with a generated 24.65 MB / 300-page PDF (text pages padded with incompressible image streams) through
+  `extractPages` alone, run under `wrangler dev --local` (workerd 1.20261103.1, offline) in a scratch Worker and sampled
+  via workerd `VmRSS`:
+
+  | run | wall | workerd RSS above its 127 MB idle baseline |
+  |---|---|---|
+  | all 300 pages, unpdf `extractText` (all pages in parallel) | 2.2 s | +185 MB |
+  | all 300 pages, sequential per page + cleanup (now `extractPdf`) | 2.0 s | +169 MB |
+  | first 150 pages, sequential | 1.3 s | +119 MB |
+  | first 100 pages, sequential | 0.9 s | +131 MB |
+
+  Node (tsx): 300 pages = 3.5 s wall / 4.6 s CPU, heap 98 MB + external 65 MB after extraction; text 1.9 MB.
+  **Caveats, stated plainly:** (1) this was the extraction step only, not the full upload route (the Worker's DB is Neon over
+  WebSocket, which cannot reach the local Postgres, so upload + analyse end to end was not run under workerd); the real
+  upload additionally holds the multipart `File`, its `arrayBuffer`, and the blob-put body. (2) Local workerd does not enforce
+  the 128 MB isolate limit or the CPU limit, so nothing "failed"; RSS includes the runtime itself, so the numbers are an
+  upper-bound indicator, not an isolate-heap reading. (3) The runs are noisy (+-15 MB). The file bytes dominate
+  (~4 copies of 25 MB), so a page cap trims ~30-50 MB, not more; the larger remaining risk is multiple copies of the upload.
+  Because the full 300-page case measured above the 128 MB budget, the conservative response (per the task) is applied:
+  `MAX_EXTRACT_PAGES = 150` (typical GeM bid + ATC are 20-100 pages) in `packages/core/src/contracts/analyse.ts`; extraction
+  runs sequentially page by page (`extractPdf` in `pdf-text.ts`); an upload over the cap stores the first 150 pages, answers
+  with a `pages_truncated` warning (shown as a toast) and records `totalPages` on the `tender.document_uploaded` activity.
+  GeM-fetched documents are capped the same way. The real page count is persisted (`tender_documents.total_pages`, migration
+  0012) and shown in the Documents tab and on the Analysis panel, so truncation is never silent (see ADR-0007 Amendment 1).
+  **Scope of the measurement:** T052 measured text extraction under workerd only (local `wrangler dev`); upload, analyse and
+  the DB path were exercised under Node/vitest, never end to end under workerd or production Workers limits. CI-safe coverage lives in `apps/api/test/analyse-large.test.ts`
+  (160-page PDF). Follow-up if production still reports memory-limit errors: avoid the extra `new Uint8Array(data)` copy by
+  storing to R2 first and handing pdf.js ownership of the buffer, and stream the multipart body.
 - **Label-to-next-label parsing** over line-prefix parsing (Mujahid-Alam) or single-regex-per-field (erenmyeager15): robust to bilingual labels that wrap and interleave. Kept; extend the label table instead.
 - **OCR**: Claude PDF document input (vision) instead of bundling Tesseract (WASM too heavy for Workers, poor on Hindi+English mixed scans). Only when configured; otherwise a clear notice.
 - **Model tiers**: Sonnet 5.5 for routine enrichment (cost/latency), Opus 5.5 for OCR transcription (vision accuracy on scans), Fable 5.1 only for escalations on blocking criteria (rare, expensive, opt-in).

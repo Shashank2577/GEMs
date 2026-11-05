@@ -4,13 +4,18 @@
  *   GET  /all-bids                     HTML page; sets `csrf_gem_cookie` and embeds `csrf_bd_gem_nk`
  *   POST /all-bids-data                form `payload=<json>&csrf_bd_gem_nk=<token>` → Solr-style JSON (10/page)
  *   GET  /showbidDocument/:id          generated GeM-style bid document PDF (also /showradocumentPdf, /showdirectradocumentPdf)
+ *   GET  /bidding/bid/getBidResultView/:id   public bid-result (award) HTML, deterministic per id (007/T033)
  *
  * Admin switches for E2E (not part of GeM):
  *   POST /__admin/publish {count?}     publish N new bids (simulates fresh tenders)
  *   POST /__admin/corrigendum/:bidNumber {days?}   extend a bid's end date (bid number URL-encoded, or ?bidNumber=)
  *   POST /__admin/fail {mode:'down'|'html'|'off'}  simulate GeM outages
+ *   POST /__admin/document-mode {mode:'normal'|'404'|'html'|'scanned'|'oversize'}  how /showbidDocument answers
+ *                                      (404 page, HTML login page, PDF without text layer, > 25 MB stream)
  *   POST /__admin/reset                restore the recorded fixtures
  *   GET  /__admin/state                current bid numbers + counters
+ *   GET  /__admin/requests             arrival log of the last 1,000 non-admin requests ({at, method, path}) — the
+ *                                      load script measures GeM inter-arrival times from it (spec 008 FR-024, NFR-002)
  *
  * Fixture dates are rebased so that the fixture reference date maps to "now" at reset time.
  */
@@ -21,10 +26,13 @@ import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { parseGemDate, toGemSolrDate } from '@tp/core/gem/normalize';
 import { parseBidPlusDoc, type BidPlusDoc } from '@tp/core/gem/parse';
-import { renderBidPdf } from './pdf';
+import { oversizePdfStream, renderBidPdf, renderScannedPdf } from './pdf';
 
 const FIXTURE_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../packages/core/test/fixtures/gem');
 const PAGE_SIZE = 10;
+
+export const DOCUMENT_MODES = ['normal', '404', 'html', 'scanned', 'oversize'] as const;
+export type DocumentMode = (typeof DOCUMENT_MODES)[number];
 
 type Doc = BidPlusDoc & { b_id: number[]; b_bid_number: string[] };
 
@@ -59,6 +67,8 @@ export interface MockGemOptions {
   rebase?: boolean;
 }
 
+const REQUEST_LOG_MAX = 1000;
+
 export function createMockGem(opts: MockGemOptions = {}) {
   const now = opts.now ?? (() => new Date());
   const fixtures = loadFixtures();
@@ -68,7 +78,10 @@ export function createMockGem(opts: MockGemOptions = {}) {
     pending: [] as Doc[],
     nextSyntheticId: 7429001,
     failMode: 'off' as 'off' | 'down' | 'html',
-    requests: { listing: 0, documents: 0, bootstrap: 0 },
+    documentMode: 'normal' as DocumentMode,
+    requests: { listing: 0, documents: 0, bootstrap: 0, results: 0 },
+    /** Arrival log (ms since epoch, real clock) of the last REQUEST_LOG_MAX non-admin requests. */
+    requestLog: [] as { at: number; method: string; path: string }[],
   };
 
   const reset = () => {
@@ -79,7 +92,9 @@ export function createMockGem(opts: MockGemOptions = {}) {
     state.pending = fixtures.extra.map((d) => shiftDoc(d, shift));
     state.nextSyntheticId = 7429001;
     state.failMode = 'off';
-    state.requests = { listing: 0, documents: 0, bootstrap: 0 };
+    state.documentMode = 'normal';
+    state.requests = { listing: 0, documents: 0, bootstrap: 0, results: 0 };
+    state.requestLog = [];
   };
   reset();
 
@@ -111,6 +126,14 @@ export function createMockGem(opts: MockGemOptions = {}) {
   const findById = (id: string) => state.docs.find((d) => String(d.b_id[0]) === id) ?? fixtures.extra.find((d) => String(d.b_id[0]) === id);
 
   const app = new Hono();
+
+  app.use('*', async (c, next) => {
+    if (!c.req.path.startsWith('/__admin')) {
+      state.requestLog.push({ at: Date.now(), method: c.req.method, path: c.req.path });
+      if (state.requestLog.length > REQUEST_LOG_MAX) state.requestLog.splice(0, state.requestLog.length - REQUEST_LOG_MAX);
+    }
+    await next();
+  });
 
   app.get('/', (c) => c.redirect('/all-bids'));
 
@@ -173,7 +196,14 @@ export function createMockGem(opts: MockGemOptions = {}) {
     state.requests.documents++;
     if (state.failMode === 'down') return new Response('Service Unavailable', { status: 503 });
     const doc = findById(id);
-    if (!doc) return new Response('<html><body>Bid not found</body></html>', { status: 404, headers: { 'content-type': 'text/html' } });
+    const notFound = () => new Response('<html><body>Bid not found</body></html>', { status: 404, headers: { 'content-type': 'text/html' } });
+    if (!doc || state.documentMode === '404') return notFound();
+    const pdfHeaders = { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="GeM-Bidding-${id}.pdf"`, 'cache-control': 'no-store' };
+    if (state.documentMode === 'html') {
+      return new Response('<!DOCTYPE html><html><body><h1>Session expired</h1><p>Please login again.</p></body></html>', { headers: { 'content-type': 'text/html; charset=UTF-8' } });
+    }
+    if (state.documentMode === 'scanned') return new Response((await renderScannedPdf()) as unknown as BodyInit, { headers: pdfHeaders });
+    if (state.documentMode === 'oversize') return new Response(oversizePdfStream(), { headers: pdfHeaders });
     const t = parseBidPlusDoc(doc, { now: now() });
     if (!t) return new Response('Bad bid', { status: 500 });
     const bytes = await renderBidPdf(t);
@@ -188,6 +218,15 @@ export function createMockGem(opts: MockGemOptions = {}) {
   app.get('/showbidDocument/:id', (c) => servePdf(c.req.param('id')));
   app.get('/showradocumentPdf/:id', (c) => servePdf(c.req.param('id')));
   app.get('/showdirectradocumentPdf/:id', (c) => servePdf(c.req.param('id')));
+
+  // Public result view (same markup that packages/core/src/gem/award.ts parses; see test/fixtures/gem/bid-result.html).
+  app.get('/bidding/bid/getBidResultView/:id', (c) => {
+    state.requests.results++;
+    if (state.failMode === 'down') return c.text('Service Unavailable', 503);
+    const id = c.req.param('id');
+    if (!/^\d+$/.test(id)) return c.html('<html><body>Bid not found</body></html>', 404);
+    return c.html(renderBidResultHtml(id));
+  });
 
   // ───────────── admin (E2E) ─────────────
   const readJson = async (c: { req: { text(): Promise<string> } }) => {
@@ -222,15 +261,26 @@ export function createMockGem(opts: MockGemOptions = {}) {
     return c.json({ ok: true, failMode: state.failMode });
   });
 
+  app.post('/__admin/document-mode', async (c) => {
+    const body = await readJson(c);
+    const mode = body.mode ?? c.req.query('mode');
+    if (!DOCUMENT_MODES.includes(mode)) return c.json({ ok: false, error: `mode must be one of ${DOCUMENT_MODES.join(', ')}` }, 400);
+    state.documentMode = mode;
+    return c.json({ ok: true, documentMode: state.documentMode });
+  });
+
   app.post('/__admin/reset', (c) => {
     reset();
     return c.json({ ok: true, total: state.docs.length });
   });
 
+  app.get('/__admin/requests', (c) => c.json({ items: state.requestLog }));
+
   app.get('/__admin/state', (c) => c.json({
     total: state.docs.length,
     pending: state.pending.length,
     failMode: state.failMode,
+    documentMode: state.documentMode,
     requests: state.requests,
     bids: state.docs.map((d) => ({ bidNumber: d.b_bid_number[0], id: d.b_id[0], end: d.final_end_date_sort })),
   }));
@@ -239,3 +289,24 @@ export function createMockGem(opts: MockGemOptions = {}) {
 }
 
 export type MockGem = ReturnType<typeof createMockGem>;
+
+/** Deterministic GeM-style result page for a numeric b_id: three sellers, L1 = 9,50,000 + (id mod 97) × 25,000. */
+export function renderBidResultHtml(id: string): string {
+  const l1 = 950_000 + (Number(id) % 97) * 25_000;
+  const rows = [
+    ['Kaveri Systems &amp; Services Pvt Ltd', l1, 'L1'],
+    ['Northline Computers', Math.round(l1 * 1.04), 'L2'],
+    ['Deccan Office Automation LLP', Math.round(l1 * 1.09), 'L3'],
+  ] as const;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Bid Result | GeM (mock)</title>
+<script type="text/javascript">var bid_id = "${id}"; var categoris = "Desktop Computers (Q2),Monitor (Q2)";</script></head>
+<body><table class="table table-bordered" id="financial_evaluation"><tbody>
+${rows.map(([name, price, level], i) => `<tr>
+<td class="productDtl">${i + 1}</td>
+<td><span class="seller_name">${name}</span></td>
+<td><span class="item_name">Offered item</span></td>
+<td><span class="bid_price">${price.toFixed(2)}</span></td>
+<td><strong>${level}</strong></td>
+</tr>`).join('\n')}
+</tbody></table></body></html>`;
+}

@@ -39,7 +39,8 @@ organisation answers **404** `not_found` (never 403, never data).
 > `signupViaApi()` (role Owner, empty profile and vault). "Demo org" = a fresh org after `POST /api/demo/seed` (company
 > "Aarav Technologies Pvt Ltd", GSTIN `27AAJCA4721K1ZK`, PAN `AAJCA4721K`, CIN `U72900PN2016PTC165432`, Udyam
 > `UDYAM-MH-26-0012345`, 5 past contracts, 15 vault documents including an ISO 9001 certificate expiring in **10** days, a
-> CA turnover certificate expiring in **25** days and a Dell OEM authorisation that expired **5** days ago). Other roles
+> CA turnover certificate expiring in **25** days and a Dell OEM authorisation that expired **5** days ago; the profile's
+> CP PLUS and Dell Technologies OEM rows are linked to their vault letters, the D-Link India row is not). Other roles
 > are added by inviting users from Settings → Team. API errors always have the shape
 > `{ "error": { "code", "message", "details?" } }`; field errors are in `details.fields` keyed by path (e.g.
 > `financials.1.fy`). Dates are calendar dates, "today" is the IST calendar day; all times are shown in IST. Fixture
@@ -171,7 +172,9 @@ certificate to the vault and return: it becomes **32%**; add FY 2025-26, 2024-25
 10. **Given** the demo org on 2026-11-05, **When** `/profile` opens, **Then** completeness is **96%**, the heading is
     "Almost there" and the suggestions are: "Add turnover for 2025-26 so the 3-year average is accurate.", "OEM
     authorisation from Dell Technologies has expired — request a fresh one." and ""OEM authorisation – Dell Technologies
-    (desktops & servers)" in the vault has expired — upload the renewed copy.".
+    (desktops & servers)" in the vault has expired — upload the renewed copy.", followed by one info suggestion "Link the
+    D-Link India authorisation letter from the vault so packets can attach it." (the demo's CP PLUS and Dell rows are linked
+    to their vault letters; info suggestions do not change the 96%).
 11. *(gap — FR-020)* **Given** an OEM authorisation in the profile valid till today + 20 days, **Then** an info suggestion
     "OEM authorisation from <OEM> expires in 20 days — ask for a renewed MAF." appears (no score change); and for an OEM
     row with no linked vault document, an info suggestion "Link the <OEM> authorisation letter from the vault so packets can
@@ -242,7 +245,7 @@ open it, click **Download**, and verify the bytes equal the original.
     changed `last_reminder_days` is reset to null (the 30/7/1 cycle restarts).
 12. **Given** **Replace file** with a new PDF, **Then** `PUT /api/vault/:id/file` returns **200** with the new file name,
     size and page count, metadata unchanged; the toast "File replaced" has description "Metadata kept. Update the expiry
-    date if this is a renewed copy."; the old blob is deleted when its key differs; `activity_log` has
+    date if this is a renewed copy."; the old file is kept as a version (FR-065); `activity_log` has
     `vault.file_replaced`.
 13. **Given** the delete (trash) button, **When** the user confirms "Delete “<title>”?" with **Delete document**, **Then**
     `DELETE /api/vault/:id` returns **200** `{ok:true}`, the row and blob are removed, any past contract whose CRAC pointed
@@ -302,10 +305,12 @@ lose eligible bids; reminders are a key reason to keep using the product.
    (demo org: **3**) and links to the vault.
 9. *(gap — FR-052)* **Given** a Bid Manager on `/vault`, **When** they choose **Send reminders now** (page header overflow
    menu), **Then** `POST /api/vault/reminders/run` runs the reminder job for their org only and returns **200**
-   `{documents, notifications}`; the toast reads "Reminders sent for <n> document(s)" or "No reminders due"; an Analyst gets
+   `{documents, notifications}`; the toast reads "Reminders sent for <n> document" / "Reminders sent for <n> documents"
+   (pluralised), or "No reminders due" when no notification was created (`notifications` = 0); an Analyst gets
    **403**; calling it twice the same day creates no duplicates.
 10. *(gap — FR-053)* **Given** the drawer of an expiring or expired document, **Then** the line "Next reminder: 7 days
-    before expiry (<date>)" or "All reminders sent" is shown under the expiry date.
+    before expiry (<date>)", "Next reminder: expiry notice (<date>)" (the post-expiry "has expired" reminder still to
+    come: today if due now, else the day after expiry) or "All reminders sent" is shown under the expiry date.
 
 ---
 
@@ -521,8 +526,9 @@ further 7/1-day reminders arrive for the old expiry.
   `cache-control: private, no-store` and `x-content-type-options: nosniff`.
 - **FR-031**: `PATCH /api/vault/:id` (analyst+) MUST update metadata, re-check issue ≤ expiry against stored values, reset
   `last_reminder_days` when the expiry date changes, bump `updated_at` and log `vault.updated`.
-- **FR-032**: `PUT /api/vault/:id/file` (analyst+) MUST replace the file with the same checks as upload, keep metadata,
-  delete the old blob when the key changed and log `vault.file_replaced`.
+- **FR-032**: `PUT /api/vault/:id/file` (analyst+) MUST replace the file with the same checks as upload, keep metadata
+  (unless renewal fields are sent, FR-064), keep the old file as a version instead of deleting its blob (FR-065; amended
+  by US6) and log `vault.file_replaced`.
 - **FR-033**: `DELETE /api/vault/:id` (analyst+) MUST unlink past contracts' CRAC references, delete the row and the blob,
   and log `vault.deleted`. *(gap)* The web app MUST check the 20 MB limit on every file-selection path (dropzone, page
   drop, **Change**, **Replace file**) before uploading.
@@ -569,7 +575,9 @@ further 7/1-day reminders arrive for the old expiry.
 - **FR-052** *(gap)*: `POST /api/vault/reminders/run` (bid_manager+) MUST run `runExpiryReminders({orgId})` for the
   caller's org and return `{documents, notifications}`; the vault page MUST expose it as **Send reminders now**.
 - **FR-053** *(gap)*: The drawer MUST show the next reminder date (or "All reminders sent") for documents with an expiry
-  date, computed with `REMINDER_THRESHOLDS` and `last_reminder_days` (exposed as `nextReminder` on the DTO).
+  date, computed with `REMINDER_THRESHOLDS` and `last_reminder_days` (exposed as `nextReminder: {days, date} | null` on
+  the DTO). `days: 0` is the post-expiry notice (dated today if due now, else the day after expiry) and reads
+  "Next reminder: expiry notice (<date>)".
 
 **Experience & OEM (US5)**
 

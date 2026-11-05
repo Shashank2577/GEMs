@@ -51,7 +51,7 @@ export function CompletenessCard({ percent, issues, onJump, className }: {
           {issues.length > shown.length && <li className="px-1.5 pt-1 text-xs text-muted-foreground">+{issues.length - shown.length} more suggestions</li>}
         </ul>
       ) : (
-        <p className="mt-4 flex items-center gap-2 border-t pt-3 text-[13px] text-success"><CheckCircle2 className="size-4" aria-hidden />Everything bids usually ask for is in place.</p>
+        <p className="mt-4 flex items-center gap-2 border-t pt-3 text-[13px] text-[hsl(158_72%_27%)] dark:text-success"><CheckCircle2 className="size-4" aria-hidden />Everything bids usually ask for is in place.</p>
       )}
     </Card>
   );

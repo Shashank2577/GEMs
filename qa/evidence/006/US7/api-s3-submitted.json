@@ -1,0 +1,50 @@
+[
+  {
+    "label": "POST submitted (UI)",
+    "request": "POST /api/workspaces/044b8314-5b05-445c-bc0e-fc11a600e76d/submitted",
+    "status": 200,
+    "response": {
+      "id": "044b8314-5b05-445c-bc0e-fc11a600e76d",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "submitted",
+      "owner": {
+        "id": "25223ded-c16c-45c7-b800-0b5d255b78ff",
+        "name": "QA analyst mw37lo7e3",
+        "email": "analyst.mw37lo7e3@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:31.850Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": null,
+      "submittedAt": "2026-11-05T07:13:34.992Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:32.717Z",
+      "updatedAt": "2026-11-05T07:13:34.994Z"
+    }
+  },
+  {
+    "label": "activity workspace.submitted",
+    "request": "GET /api/activity?entityType=workspace",
+    "status": 200,
+    "response": {
+      "id": "f706b81c-7aed-45b5-ac9c-6732d1c39a6f",
+      "action": "workspace.submitted",
+      "entityType": "workspace",
+      "entityId": "044b8314-5b05-445c-bc0e-fc11a600e76d",
+      "meta": {
+        "from": "ready",
+        "note": "Submitted by Ravi with DSC",
+        "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+        "submittedAt": "2026-11-05T07:13:34.992Z",
+        "openBlockers": 0
+      },
+      "createdAt": "2026-11-05T07:13:34.996Z",
+      "user": {
+        "id": "25223ded-c16c-45c7-b800-0b5d255b78ff",
+        "name": "QA analyst mw37lo7e3"
+      }
+    }
+  }
+]

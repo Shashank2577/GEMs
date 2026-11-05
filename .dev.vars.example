@@ -5,6 +5,9 @@ APP_URL=http://localhost:8787
 GEM_BASE_URL=http://localhost:4010
 # GEM_MIN_INTERVAL_MS=1000
 # GEM_MAX_PAGES=5
+# Packet build input cap in bytes; larger selections get 413 packet_too_large. The Worker uses 40 MB (008 FR-032,
+# wrangler.toml); the code default without this variable is 006 FR-056's 60 MB (Node server only).
+PACKET_MAX_INPUT_BYTES=41943040
 
 # Optional integrations — leave empty to run in rules-only / log-only mode.
 ANTHROPIC_API_KEY=
@@ -15,6 +18,12 @@ WHATSAPP_TOKEN=
 WHATSAPP_PHONE_ID=
 
 # Node server only (apps/api/src/node.ts)
+# Which proxy header carries the client IP, used by the per-IP auth rate limits (002/FR-010).
+#   unset/none  no trusted proxy: IP is unknown, per-IP limits are skipped (per-email limits still apply)
+#   xff (or 1)  first x-forwarded-for hop: ONLY when a reverse proxy you control sets/overwrites that header
+#   cloudflare  cf-connecting-ip (the default on the Worker; see wrangler.toml)
+# Never enable it while clients can reach the API directly: they could forge the header.
+# TRUST_PROXY=xff
 PORT=8787
 BLOB_DIR=.data/blobs
 AUTO_MIGRATE=1

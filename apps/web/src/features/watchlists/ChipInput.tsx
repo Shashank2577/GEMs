@@ -124,9 +124,9 @@ export function MultiSelect({
             id={id}
             type="button"
             className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm shadow-xs hover:border-foreground/20 focus-ring"
-            aria-label={label}
+            aria-label={value.length ? `${label}: ${value.length} selected` : placeholder ? `${label}: ${placeholder}` : label}
           >
-            <span className={cn('truncate', !value.length && 'text-muted-foreground/70')}>
+            <span className={cn('truncate', !value.length && 'text-muted-foreground')}>
               {value.length ? `${value.length} selected` : placeholder}
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />

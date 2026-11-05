@@ -20,37 +20,30 @@ import { createNodeDb, type Db, type Role } from '@tp/db';
 import { runMigrations } from '@tp/db/migrate';
 import type { Me } from '@tp/core/contracts/auth';
 import { createApp, type App } from '../src/app';
-import type { AppDeps, LlmClient } from '../src/deps';
+import type { AppDeps, GemLease, LlmClient, RateLimiter } from '../src/deps';
 import { loadConfig, loadGemConfig } from '../src/env';
 import { createFsBlobStore } from '../src/adapters/blob-fs';
 import { createFixedClock } from '../src/adapters/clock';
 import { silentLogger } from '../src/adapters/logger';
 import { createLogMailer } from '../src/adapters/mailer';
 import { createLogWhatsApp } from '../src/adapters/whatsapp';
+import { noopErrorReporter } from '../src/adapters/errors';
+import { noopGemLease } from '../src/adapters/index';
+import { noopRateLimiter } from '../src/lib/rate-limiter';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://tp:tp@localhost:5433/tenderpilot_test';
 export const TEST_APP_URL = 'http://tp.test';
 
 const migrated = new Map<string, Promise<void>>();
 
-/** Run migrations once per process per database, serialised across processes by an advisory lock. */
+/**
+ * Run migrations once per process per database. `runMigrations` itself serialises runs across processes (polled
+ * advisory lock); a blocking lock here would deadlock with the CREATE INDEX CONCURRENTLY of another worker's run.
+ */
 export function ensureMigrated(url = TEST_DATABASE_URL): Promise<void> {
   let p = migrated.get(url);
   if (!p) {
-    p = (async () => {
-      const { db, close } = await createNodeDb(url);
-      // A dedicated connection holds the lock while the migrator runs on its own pool.
-      const pool = (db as unknown as { $client: { connect(): Promise<{ query(q: string): Promise<unknown>; release(): void }> } }).$client;
-      const client = await pool.connect();
-      try {
-        await client.query('select pg_advisory_lock(727001)');
-        await runMigrations(url);
-      } finally {
-        await client.query('select pg_advisory_unlock(727001)').catch(() => {});
-        client.release();
-        await close();
-      }
-    })();
+    p = runMigrations(url).then(() => undefined);
     migrated.set(url, p);
   }
   return p;
@@ -75,6 +68,18 @@ export interface TestContextOptions {
   gemBaseUrl?: string;
   fetch?: typeof fetch;
   databaseUrl?: string;
+  /** TRUST_PROXY for client-IP rate limiting (default unset = no trusted proxy, IP limits skipped). */
+  trustProxy?: 'cloudflare' | 'xff';
+  /**
+   * Request rate limiter (008/FR-017). Default: never limits, so suites that are not about limits can make any
+   * number of calls under the fixed clock. Limit tests pass `createMemoryRateLimiter()` or `createPgRateLimiter(db)`
+   * (a function receives the context's db).
+   */
+  rateLimiter?: RateLimiter | ((db: Db) => RateLimiter);
+  /** Cluster-wide GeM lease (008/FR-024). Default: never waits. Lease tests pass `(db) => createPgGemLease(db, …)`. */
+  gemLease?: GemLease | ((db: Db) => GemLease);
+  /** Extra env vars for loadConfig/loadGemConfig (e.g. `MANUAL_SYNC_COOLDOWN_MIN`). */
+  env?: Record<string, string>;
 }
 
 export async function createTestContext(opts: TestContextOptions = {}) {
@@ -86,7 +91,7 @@ export async function createTestContext(opts: TestContextOptions = {}) {
   const clock = createFixedClock(opts.now ?? new Date());
   const mailer = createLogMailer(silentLogger);
   const whatsapp = createLogWhatsApp(silentLogger);
-  const env = { APP_URL: TEST_APP_URL, NODE_ENV: 'test', GEM_BASE_URL: opts.gemBaseUrl ?? 'http://127.0.0.1:4010', GEM_MIN_INTERVAL_MS: '0' };
+  const env = { APP_URL: TEST_APP_URL, NODE_ENV: 'test', GEM_BASE_URL: opts.gemBaseUrl ?? 'http://127.0.0.1:4010', GEM_MIN_INTERVAL_MS: '0', TRUST_PROXY: opts.trustProxy, ...opts.env };
   const deps: AppDeps = {
     db,
     blobs: createFsBlobStore(blobDir),
@@ -98,6 +103,9 @@ export async function createTestContext(opts: TestContextOptions = {}) {
     config: loadConfig(env),
     logger: silentLogger,
     fetch: opts.fetch ?? ((input, init) => fetch(input, init)),
+    rateLimiter: typeof opts.rateLimiter === 'function' ? opts.rateLimiter(db) : opts.rateLimiter ?? noopRateLimiter,
+    errors: noopErrorReporter,
+    gemLease: typeof opts.gemLease === 'function' ? opts.gemLease(db) : opts.gemLease ?? noopGemLease,
   };
   const app = createApp(deps);
   return {

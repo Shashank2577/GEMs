@@ -3,8 +3,9 @@ import type { IngestionRunDto } from '@tp/core/contracts/identify';
 import { Badge, Button, EmptyState, ErrorState, ResponsiveTable, SkeletonList, StatTile, toast, type Column } from '@/components/ui';
 import { errorMessage } from '@/lib/api';
 import { RoleGate } from '@/lib/auth';
-import { formatDateIST, formatNumberIN, relativeTime } from '@/lib/format';
+import { formatDateIST, formatNumberIN, formatTimeIST, relativeTime } from '@/lib/format';
 import { useNow } from '@/lib/hooks';
+import { cooldownRetryAt, syncCooldownUntil } from '../../feed/cooldown';
 import { useRunIngestion, useRuns } from '../api';
 import { Panel } from './Panel';
 
@@ -13,7 +14,7 @@ const statusLabel = { success: 'Success', partial: 'Partial', failed: 'Failed', 
 const duration = (ms: number | null) => (ms == null ? '—' : ms < 1000 ? `${ms} ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60_000)} min`);
 
 export default function SyncSection() {
-  const now = useNow(30_000);
+  const now = useNow(15_000);
   const q = useRuns();
   const run = useRunIngestion();
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
@@ -21,6 +22,9 @@ export default function SyncSection() {
   const { items, lastSuccessAt, lastRun, openTenders, totalTenders } = q.data;
   const stale = !lastSuccessAt || now.getTime() - Date.parse(lastSuccessAt) > 2 * 3_600_000;
   const health = !lastRun ? 'never' : lastRun.status === 'failed' ? 'error' : stale ? 'stale' : 'ok';
+  // 008/FR-026: Sync now waits for the platform-wide cooldown (server value; a 429's retryAt applies at once).
+  const cooldownUntil = syncCooldownUntil(q.data, now, cooldownRetryAt(run.error));
+  const cooldownText = cooldownUntil ? `Next manual sync at ${formatTimeIST(cooldownUntil)} IST` : null;
 
   const columns: Column<IngestionRunDto>[] = [
     { key: 'when', header: 'Started', primary: true, cell: (r) => <span><span className="font-medium">{formatDateIST(r.startedAt, { time: true })}</span> <span className="text-xs text-muted-foreground">({relativeTime(r.startedAt, now)})</span></span> },
@@ -46,10 +50,24 @@ export default function SyncSection() {
       <Panel title="Ingestion runs" description="TenderPilot reads public BidPlus listings every 30 minutes, politely rate-limited. It never logs in to GeM on your behalf."
         aside={
           <RoleGate min="bid_manager">
-            <Button variant="secondary" loading={run.isPending}
-              onClick={() => run.mutate(undefined, { onSuccess: () => toast.success('Sync finished'), onError: (e) => toast.error(errorMessage(e)) })}>
-              {!run.isPending && <RefreshCw />} Sync now
-            </Button>
+            <div className="flex flex-col gap-1.5 sm:items-end">
+              {/* Disabled buttons swallow hover, so the tooltip lives on a wrapper; the hint is also announced. */}
+              <span title={cooldownText ?? undefined} className="inline-flex">
+                <Button variant="secondary" loading={run.isPending} disabled={!!cooldownUntil && !run.isPending}
+                  aria-describedby={cooldownText ? 'settings-sync-cooldown-hint' : undefined}
+                  onClick={() => run.mutate(undefined, {
+                    onSuccess: () => toast.success('Sync finished'),
+                    onError: (e) => (cooldownRetryAt(e) ? toast.info('GeM was synced moments ago', { description: errorMessage(e) }) : toast.error(errorMessage(e))),
+                  })}>
+                  {!run.isPending && <RefreshCw />} Sync now
+                </Button>
+              </span>
+              {cooldownText && (
+                <p id="settings-sync-cooldown-hint" role="status" className="max-w-[16rem] text-xs text-muted-foreground sm:text-right">
+                  {cooldownText} · manual syncs are kept {q.data.manualSyncCooldownMin ?? 10} min apart to stay polite to GeM.
+                </p>
+              )}
+            </div>
           </RoleGate>
         }>
         {lastRun?.status === 'failed' && lastRun.error && (

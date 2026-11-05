@@ -2,6 +2,8 @@
  * TenderPilot database schema — single source of truth (see specs/001-gem-tender-copilot/data-model.md).
  * Every org-owned table carries org_id (Constitution IV).
  */
+import { sql } from 'drizzle-orm';
+import type { AnalysisWarning } from '@tp/core/contracts/analyse';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -19,6 +21,8 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   phone: text('phone'), // E.164, for WhatsApp alerts
+  // Org the user last worked in; survives sign-out so the next sign-in resumes there (002/FR-021, US2 scenario 14).
+  lastOrgId: uuid('last_org_id').references(() => organizations.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
 }, (t) => ({ emailUq: uniqueIndex('users_email_uq').on(t.email) }));
 
@@ -60,7 +64,46 @@ export const sessions = pgTable('sessions', {
   activeOrgId: uuid('active_org_id').references(() => organizations.id, { onDelete: 'set null' }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: createdAt(),
+  /** Raw User-Agent at sign-in (truncated), for "Where you're signed in" (002/FR-012). */
+  userAgent: text('user_agent'),
+  /** Refreshed at most every 5 minutes by resolveAuth (002/FR-012). */
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
 }, (t) => ({ tokenUq: uniqueIndex('sessions_token_uq').on(t.tokenHash) }));
+
+/** Failed-authentication counters for rate limiting (002/FR-010). key = normalised email or client IP. */
+export const authAttempts = pgTable('auth_attempts', {
+  key: text('key').notNull(),
+  kind: text('kind').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull().default(0),
+}, (t) => ({ pk: primaryKey({ columns: [t.key, t.kind] }) }));
+
+/**
+ * Generic fixed-window request counters (008/FR-017): one row per (`<rule>:<subject>`, aligned window start).
+ * Written by `apps/api/src/lib/rate-limiter.ts` with a single upsert; dead windows are pruned by the scheduler.
+ */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.key, t.windowStart] }),
+  // Pruning deletes by window_start (lib/rate-limiter.ts#pruneRateLimits).
+  windowIdx: index('rate_limits_window_idx').on(t.windowStart),
+}));
+
+/** Single-use password reset links (002/FR-011). Only the SHA-256 of the token is stored. */
+export const passwordResets = pgTable('password_resets', {
+  id: id(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => ({
+  tokenUq: uniqueIndex('password_resets_token_uq').on(t.tokenHash),
+  userIdx: index('password_resets_user_idx').on(t.userId),
+}));
 
 /** Personal API tokens (browser extension). */
 export const apiTokens = pgTable('api_tokens', {
@@ -69,9 +112,21 @@ export const apiTokens = pgTable('api_tokens', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   tokenHash: text('token_hash').notNull(),
+  /** Last 4 characters of the secret, shown in the list as `tp_…a1B2` (002/FR-037). Null for tokens created before it existed. */
+  tokenHint: text('token_hint'),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  /** Null = never expires (002/FR-037). Expired tokens are rejected by resolveAuth. */
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  /**
+   * 006/FR-074: `'read'` = "Extension (read-only)" — refused (403) on every non-GET request (middleware/auth.ts).
+   * Fixed at creation; there is no route to change it. Existing rows default to `'full'`.
+   */
+  scope: text('scope').$type<'full' | 'read'>().notNull().default('full'),
   createdAt: createdAt(),
-}, (t) => ({ tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash) }));
+}, (t) => ({
+  tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash),
+  orgUserIdx: index('api_tokens_org_user_idx').on(t.orgId, t.userId),
+}));
 
 export const notificationPrefs = pgTable('notification_prefs', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -114,7 +169,7 @@ export const companyProfiles = pgTable('company_profiles', {
   categories: jsonb('categories').$type<string[]>().notNull().default([]),
   hsnCodes: jsonb('hsn_codes').$type<string[]>().notNull().default([]),
   operatingStates: jsonb('operating_states').$type<string[]>().notNull().default([]),
-  oemAuthorizations: jsonb('oem_authorizations').$type<{ oem: string; products: string; validTill?: string; documentId?: string }[]>().notNull().default([]),
+  oemAuthorizations: jsonb('oem_authorizations').$type<{ oem: string; products: string; validTill?: string | null; documentId?: string | null }[]>().notNull().default([]),
   certifications: jsonb('certifications').$type<string[]>().notNull().default([]), // e.g. ISO 9001, BIS
   maxEmdCapacity: bigint('max_emd_capacity', { mode: 'number' }),
   updatedAt: updatedAt(),
@@ -161,9 +216,31 @@ export const vaultDocuments = pgTable('vault_documents', {
   pageCount: integer('page_count'),
   uploadedBy: uuid('uploaded_by').references(() => users.id),
   lastReminderDays: integer('last_reminder_days'),
+  /** Hex SHA-256 of the current file for duplicate detection (FR-067); null = unknown (pre-existing rows). */
+  contentSha256: text('content_sha256'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type) }));
+}, (t) => ({
+  orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type),
+  shaIdx: index('vault_org_sha_idx').on(t.orgId, t.contentSha256),
+  // 005 T009 (NFR-004): the daily reminder scan filters on expiry_date across orgs.
+  expiryIdx: index('vault_expiry_idx').on(t.expiryDate),
+}));
+
+/** Previous files of a vault document, kept on renewal/replace (FR-065; at most 5 per document). */
+export const vaultDocumentVersions = pgTable('vault_document_versions', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  documentId: uuid('document_id').notNull().references(() => vaultDocuments.id, { onDelete: 'cascade' }),
+  blobKey: text('blob_key').notNull(),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  pageCount: integer('page_count'),
+  expiryDate: date('expiry_date'),
+  replacedBy: uuid('replaced_by').references(() => users.id),
+  replacedAt: timestamp('replaced_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgIdx: index('vault_versions_org_idx').on(t.orgId), docIdx: index('vault_versions_doc_idx').on(t.documentId, t.replacedAt.desc()) }));
 
 // ───────────── Tenders (global, public GeM data) ─────────────
 
@@ -202,6 +279,24 @@ export const tenders = pgTable('tenders', {
   bidUq: uniqueIndex('tenders_source_bid_uq').on(t.source, t.bidNumber),
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
+  // 008/FR-027: ~6 % of tenders are open and every feed/dashboard query filters on it. Built CONCURRENTLY by the
+  // hand-edited non-transactional migration 0017 (`-- tp:non-transactional`, see migrate.ts).
+  openCreatedIdx: index('tenders_open_created_idx').on(t.createdAt.desc().nullsFirst()).where(sql`status = 'open'`),
+  // Closing-date sort (review S5): the feed's "still open" filter is `coalesce(end_at, 'infinity') >= now`, so the index
+  // is on that expression — expired-but-not-yet-closed rows are skipped by the range, not read and filtered.
+  // Replaces tenders_open_end_idx (end_at); built CONCURRENTLY by the hand-edited non-transactional migration 0018.
+  openClosingIdx: index('tenders_open_closing_idx').on(sql`coalesce(${t.endAt}, 'infinity'::timestamptz)`).where(sql`status = 'open'`),
+  // DESC NULLS LAST = the feed's "highest value" sort; also serves minValue/maxValue ranges.
+  openValueIdx: index('tenders_open_value_idx').on(t.estimatedValue.desc().nullsLast()).where(sql`status = 'open'`),
+  // `?state=X` (US4 scenario 4, PR #515 QA finding 1): equality on state, then the default sort (created_at DESC), then
+  // the "still open" expression, so one index answers the page query in order (`state = X` and `coalesce(end_at, …)
+  // >= now` are both Index Conds, no sort, LIMIT stops early) and the count/facet queries as a single bitmap scan.
+  // With only (state) the planner preferred tenders_open_created_idx + filter for the page and a BitmapAnd of the
+  // non-partial tenders_state_idx and tenders_open_closing_idx for count/facets (it estimates "still open" at the
+  // default 1/3 because partial-index expression stats are not used). Rebuilt by migration 0019.
+  openStateIdx: index('tenders_open_state_idx').on(t.state, t.createdAt.desc().nullsFirst(), sql`coalesce(${t.endAt}, 'infinity'::timestamptz)`).where(sql`status = 'open'`),
+  openMinistryIdx: index('tenders_open_ministry_idx').on(t.ministry).where(sql`status = 'open'`),
+  openCategoryIdx: index('tenders_open_category_idx').on(t.category).where(sql`status = 'open'`),
 }));
 
 export const tenderEvents = pgTable('tender_events', {
@@ -221,9 +316,11 @@ export const tenderDocuments = pgTable('tender_documents', {
   fileName: text('file_name').notNull(),
   blobKey: text('blob_key').notNull(),
   sizeBytes: integer('size_bytes').notNull(),
-  pageCount: integer('page_count'),
+  pageCount: integer('page_count'), // pages actually read (capped, 004/NFR-005)
+  totalPages: integer('total_pages'), // the PDF's real page count; null for rows that predate the column
   text: text('text'), // extracted text, pages separated by \f
   sourceUrl: text('source_url'),
+  textSource: text('text_source').$type<'pdf' | 'ocr'>().notNull().default('pdf'), // FR-052
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_docs_tender_idx').on(t.tenderId) }));
 
@@ -236,9 +333,26 @@ export const ingestionRuns = pgTable('ingestion_runs', {
   tendersCreated: integer('tenders_created').notNull().default(0),
   tendersUpdated: integer('tenders_updated').notNull().default(0),
   matchesCreated: integer('matches_created').notNull().default(0),
+  /**
+   * Why the listing phase stopped (003/FR-011): `all_known` page reached, `end` of results, page `cap` used up,
+   * `explicit` page count fetched, or `error`. Null for runs that never got that far (or predate the column).
+   */
+  listingStop: text('listing_stop').$type<'all_known' | 'end' | 'cap' | 'explicit' | 'error'>(),
   error: text('error'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, () => ({
+  // 008/FR-025: at most one running ingestion, cluster-wide (cron ticks, manual syncs, every isolate).
+  oneRunningUq: uniqueIndex('ingestion_runs_one_running_uq').on(sql`(true)`).where(sql`status = 'running'`),
+}));
+
+/**
+ * Cluster-wide GeM request slots (008/FR-024, NFR-002). One row (`id = 'gem'`): each request atomically moves
+ * `next_slot_at` forward by the minimum interval and sleeps until its own slot (`apps/api/src/lib/gem-lease.ts`).
+ */
+export const gemThrottle = pgTable('gem_throttle', {
+  id: text('id').primaryKey(),
+  nextSlotAt: timestamp('next_slot_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ───────────── Identify: watchlists & matches ─────────────
@@ -267,6 +381,18 @@ export const watchlists = pgTable('watchlists', {
   updatedAt: updatedAt(),
 }, (t) => ({ orgIdx: index('watchlists_org_idx').on(t.orgId) }));
 
+/** Personal saved feed views (003/FR-035): URL-style params, scoped to (org, user). */
+export const savedViews = pgTable('saved_views', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  params: jsonb('params').$type<Record<string, string[]>>().notNull(),
+  position: integer('position').notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => ({ nameUq: uniqueIndex('saved_views_name_uq').on(t.orgId, t.userId, t.name) }));
+
 export const tenderMatches = pgTable('tender_matches', {
   id: id(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -290,7 +416,7 @@ export interface Requirement {
   value?: string | number | boolean | null;
   numeric?: number | null; // normalised rupees / years / days / percent
   mandatory: boolean;
-  source: { documentId?: string; fileName?: string; page?: number; quote?: string };
+  source: { documentId?: string; fileName?: string; page?: number; quote?: string; ocr?: boolean };
   method: 'RULE' | 'LLM' | 'MANUAL';
   confidence: number; // 0..1
 }
@@ -315,6 +441,9 @@ export interface ChecklistItem {
   generated?: string; // annexure template key if it is generated, not uploaded
 }
 
+export type StaleReason =
+  | 'corrigendum' | 'document_added' | 'document_removed' | 'profile_changed' | 'vault_changed' | 'weights_changed';
+
 export const analyses = pgTable('analyses', {
   id: id(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -329,11 +458,23 @@ export const analyses = pgTable('analyses', {
   verdict: text('verdict').$type<'go' | 'review' | 'no_go'>(),
   summary: text('summary'),
   error: text('error'),
-  stale: boolean('stale').notNull().default(false), // corrigendum after analysis
+  stale: boolean('stale').notNull().default(false), // inputs changed after analysis (FR-043)
+  staleReason: text('stale_reason').$type<StaleReason>(),
+  staleAt: timestamp('stale_at', { withTimezone: true }),
+  notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
+  /** Machine-readable caveats rendered by the web (008/FR-031: `llm_budget_exhausted`, `llm_quota_reached`). */
+  warnings: jsonb('warnings').$type<AnalysisWarning[]>().notNull().default([]),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ orgTenderIdx: index('analyses_org_tender_idx').on(t.orgId, t.tenderId) }));
+}, (t) => ({
+  orgTenderIdx: index('analyses_org_tender_idx').on(t.orgId, t.tenderId),
+  // 008/FR-027: "latest analysis per (org, tender)" lookups in the feed sort/decorate.
+  orgTenderCreatedIdx: index('analyses_org_tender_created_idx').on(t.orgId, t.tenderId, t.createdAt.desc().nullsFirst()),
+}));
+
+/** 008/FR-031/FR-037 analysis warnings; one definition, in the core contract (review N1). */
+export type { AnalysisWarning };
 
 // ───────────── Apply: workspace & packet ─────────────
 
@@ -357,7 +498,22 @@ export const bidWorkspaces = pgTable('bid_workspaces', {
   position: real('position').notNull().default(0), // kanban order within stage
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId) }));
+}, (t) => ({
+  uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId),
+  /** Pipeline/dashboard stage aggregates (007/NFR-001). */
+  orgStageIdx: index('bid_workspaces_org_stage_idx').on(t.orgId, t.stage),
+}));
+
+/**
+ * Last parsed GeM bid-result hint per BidPlus `b_id` (007/T033, FR-030). Public data, not org-scoped: any org with a
+ * workspace for the tender is served from here within the TTL instead of fetching GeM again.
+ * `hint` is a `BidResultHint` from @tp/core/gem/award (available, or not published yet).
+ */
+export const gemResultHints = pgTable('gem_result_hints', {
+  gemBidId: text('gem_bid_id').primaryKey(),
+  hint: jsonb('hint').$type<Record<string, unknown>>().notNull(),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull(),
+});
 
 export const comments = pgTable('comments', {
   id: id(),
@@ -366,7 +522,10 @@ export const comments = pgTable('comments', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
   createdAt: createdAt(),
-});
+}, (t) => ({
+  /** Comment thread per workspace (006/NFR-001). */
+  wsIdx: index('comments_ws_idx').on(t.workspaceId),
+}));
 
 export const annexureTemplates = pgTable('annexure_templates', {
   id: id(),
@@ -376,7 +535,10 @@ export const annexureTemplates = pgTable('annexure_templates', {
   body: text('body').notNull(), // {{placeholders}}
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (t) => ({
+  /** One override per (org, key) (006/FR-036). System templates (org_id NULL) are code, not rows. */
+  orgKeyUq: uniqueIndex('annexure_templates_org_key_uq').on(t.orgId, t.key),
+}));
 
 export interface PacketItem {
   kind: 'cover' | 'annexure' | 'vault' | 'tender_doc';
@@ -395,6 +557,10 @@ export const packets = pgTable('packets', {
   blobKey: text('blob_key'),
   sizeBytes: integer('size_bytes'),
   pageCount: integer('page_count'),
+  /** Snapshot of the computed default item uids (`kind:refId`) at build time (006/FR-055): items of a later
+   *  computed default whose uid is not in here are "newly required" and appended to the proposed order.
+   *  NULL = built before FR-055: append nothing. Never backfill with [] (that would re-append every item). */
+  defaultUids: jsonb('default_uids').$type<string[]>(),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
 }, (t) => ({ wsIdx: index('packets_ws_idx').on(t.workspaceId) }));
@@ -419,6 +585,8 @@ export const notifications = pgTable('notifications', {
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
+  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0017).
+  pendingIdx: index('notifications_pending_idx').on(t.createdAt).where(sql`status = 'pending' AND channel IN ('email','whatsapp')`),
 }));
 
 export const activityLog = pgTable('activity_log', {
@@ -430,4 +598,7 @@ export const activityLog = pgTable('activity_log', {
   entityId: text('entity_id'),
   meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: createdAt(),
-}, (t) => ({ orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt) }));
+}, (t) => ({
+  orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt),
+  orgTypeIdx: index('activity_org_type_idx').on(t.orgId, t.entityType, t.createdAt),
+}));

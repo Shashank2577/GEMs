@@ -1,6 +1,7 @@
-import { test as base, expect, type Page, type APIRequestContext } from '@playwright/test';
+import { test as base, expect, request as playwrightRequest, type Page, type APIRequestContext, type Browser, type BrowserContext } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 export const GEM_URL = `http://127.0.0.1:${process.env.E2E_GEM_PORT || 4011}`;
 
@@ -83,19 +84,178 @@ export function saveTranscript(story: string, name: string, content: unknown) {
   return file;
 }
 
-/** Phone viewport (375×812, iPhone X class) for layout checks. */
+// ───────────── 007 Experience & Growth helpers (T002, T003) ─────────────
+
+/** Evidence screenshot for spec 007: writes `qa/evidence/007/<story>/<name>.png` (story = 'US1' … 'US7'). */
+export function evidence007(page: Page, story: string, name: string) {
+  return evidence(page, '007', story, name);
+}
+
+export type InvitedRole = 'bid_manager' | 'analyst' | 'viewer';
+
+export interface InvitedUser {
+  user: ReturnType<typeof uniqueUser>;
+  role: InvitedRole;
+  /** Logged-in API context for the invited user (dispose() it when done). */
+  api: APIRequestContext;
+  /** Cookies of the logged-in session, usable with `browser.newContext({ storageState })`. */
+  storageState: Awaited<ReturnType<APIRequestContext['storageState']>>;
+  /** A browser context logged in as this user, with the project's base URL, timezone and locale. */
+  newContext(browser: Browser): Promise<BrowserContext>;
+  /** Shortcut: a fresh page in `newContext(browser)`. */
+  newPage(browser: Browser): Promise<Page>;
+}
+
+/**
+ * Invite a new member with `role` into the org of `request` (must be an Owner/Bid Manager session), accept the
+ * invitation and return a logged-in context for them. Usage:
+ *   const analyst = await inviteAs(page.request, 'analyst');
+ *   const p = await analyst.newPage(browser); await p.goto('/dashboard');
+ */
+/** Contexts opened by inviteAs(); closed by the auto fixture on `test` after every test, pass or fail. */
+const openedContexts = new Set<{ dispose(): Promise<void> }>();
+async function disposeOpenedContexts() {
+  const all = [...openedContexts];
+  openedContexts.clear();
+  await Promise.all(all.map((c) => c.dispose().catch(() => { /* already closed */ })));
+}
+
+export async function inviteAs(request: APIRequestContext, role: InvitedRole): Promise<InvitedUser> {
+  const info = base.info();
+  const use = info.project.use;
+  const baseURL = use.baseURL;
+  const user = uniqueUser(role.replace('_', ''));
+  const inv = await request.post('/api/org/invitations', { data: { email: user.email, role } });
+  expect(inv.status(), await inv.text()).toBe(201);
+  const token = String((await inv.json()).inviteUrl).split('/invite/')[1];
+  expect(token, 'invite token').toBeTruthy();
+  const api = await playwrightRequest.newContext({ baseURL });
+  openedContexts.add(api);
+  const acc = await api.post('/api/auth/accept-invite', { data: { token, name: user.name, password: user.password } });
+  expect(acc.status(), await acc.text()).toBe(200);
+  const storageState = await api.storageState();
+  const newContext = async (browser: Browser) => {
+    // Only device/locale fields from the project — not test-runner options like trace/screenshot/video modes.
+    const ctx = await browser.newContext({
+      viewport: use.viewport, userAgent: use.userAgent, deviceScaleFactor: use.deviceScaleFactor, isMobile: use.isMobile, hasTouch: use.hasTouch,
+      locale: use.locale, timezoneId: use.timezoneId, baseURL, storageState,
+      recordVideo: { dir: info.outputPath('videos'), size: use.viewport ?? undefined },
+    });
+    openedContexts.add({ dispose: () => ctx.close() });
+    return ctx;
+  };
+  return {
+    user, role, api, storageState, newContext,
+    async newPage(browser) { return (await newContext(browser)).newPage(); },
+  };
+}
+
+/** Phone viewport used by the 007 mobile checks (375 × 812). */
 export async function atPhone(page: Page) {
   await page.setViewportSize({ width: 375, height: 812 });
 }
 
-/** Asserts the current page does not scroll horizontally (no element wider than the viewport). */
+/** Assert the page does not scroll horizontally (`scrollWidth ≤ innerWidth`). */
 export async function noHorizontalOverflow(page: Page) {
-  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(scrollWidth, `page scrolls horizontally: scrollWidth ${scrollWidth} > clientWidth ${clientWidth}`).toBeLessThanOrEqual(clientWidth);
+  const m = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+  expect(m.scrollWidth, `horizontal overflow: scrollWidth ${m.scrollWidth} > innerWidth ${m.innerWidth}`).toBeLessThanOrEqual(m.innerWidth);
+  return m;
 }
 
-export const test = base;
+/** Seed the demo dataset into the current org and return the seed response plus the org's workspace cards. */
+export async function seedDemoAndGetWorkspaces(request: APIRequestContext) {
+  const seeded = await request.post('/api/demo/seed');
+  expect(seeded.ok(), await seeded.text()).toBeTruthy();
+  const list = await request.get('/api/workspaces');
+  expect(list.ok(), await list.text()).toBeTruthy();
+  const body = await list.json();
+  return { seed: await seeded.json(), workspaces: body.items as { id: string; stage: string; tender: { id: string; title: string } & Record<string, unknown> }[], list: body };
+}
+
+export const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+
+type AxeResults = Awaited<ReturnType<AxeBuilder['analyze']>>;
+type A11yOpts = { spec?: string; story?: string; include?: string[]; exclude?: string[]; disableRules?: string[] };
+
+/**
+ * Accessibility audit with axe (WCAG 2.1 A/AA). Saves the full result as JSON next to the evidence and fails on any
+ * serious or critical violation. Two call forms:
+ * - `a11y(page, spec, story, name)` (002/T014) → `qa/evidence/<spec>/<story>/axe-<name>.json`;
+ * - `a11y(page, name, opts?)` → `qa/evidence/<spec>/<story>/<name>-<project>.axe.json`, with `story` defaulting to the
+ *   `US<n>` in the test file name (e.g. US1-dashboard.e2e.ts → 'US1') and `spec` to the `e2e/<nnn>-…` folder.
+ */
+export async function a11y(page: Page, spec: string, story: string, name: string): Promise<AxeResults>;
+export async function a11y(page: Page, name: string, opts?: A11yOpts): Promise<AxeResults>;
+export async function a11y(page: Page, nameOrSpec: string, optsOrStory: A11yOpts | string = {}, explicitName?: string): Promise<AxeResults> {
+  const info = base.info();
+  const positional = typeof optsOrStory === 'string';
+  const opts: A11yOpts = positional ? { spec: nameOrSpec, story: optsOrStory } : optsOrStory;
+  const name = positional ? String(explicitName) : nameOrSpec;
+  // Spec from the test file path: e2e/<nnn>-<slug>/… → '<nnn>' (falls back to the folder name).
+  const folder = basename(dirname(info.file));
+  const spec = opts.spec ?? folder.match(/^(\d{3})-/)?.[1] ?? folder;
+  const story = opts.story ?? basename(info.file).match(/US\d+/)?.[0] ?? 'misc';
+  let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
+  for (const sel of opts.include ?? []) builder = builder.include(sel);
+  for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
+  if (opts.disableRules?.length) builder = builder.disableRules(opts.disableRules);
+  const results = await builder.analyze();
+  const dir = join('qa', 'evidence', spec, story);
+  mkdirSync(dir, { recursive: true });
+  const fileName = positional ? `axe-${name}.json` : `${name}-${info.project.name}.axe.json`;
+  const file = join(dir, fileName);
+  writeFileSync(file, JSON.stringify({ url: results.url, timestamp: results.timestamp, violations: results.violations, incomplete: results.incomplete, passes: results.passes.length }, null, 2));
+  await info.attach(fileName, { path: file, contentType: 'application/json' });
+  const blocking = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+  expect(blocking.map((v) => ({ id: v.id, impact: v.impact, help: v.help, targets: v.nodes.slice(0, 5).map((n) => n.target.join(' ')) })), `axe serious/critical violations on ${name}`).toEqual([]);
+  return results;
+}
+
+/** Lightweight axe check (WCAG 2.1 A/AA): fails the test on any serious or critical violation; no evidence file. */
+export async function checkA11y(page: Page, opts: { include?: string[]; exclude?: string[]; disableRules?: string[] } = {}) {
+  let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
+  for (const sel of opts.include ?? []) builder = builder.include(sel);
+  for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
+  if (opts.disableRules?.length) builder = builder.disableRules(opts.disableRules);
+  const results = await builder.analyze();
+  const blocking = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+  expect(blocking.map((v) => ({ id: v.id, impact: v.impact, help: v.help, targets: v.nodes.slice(0, 5).map((n) => n.target.join(' ')) })), `axe serious/critical violations on ${page.url()}`).toEqual([]);
+  return results;
+}
+
+// ───────────── 005 Profile & Vault helpers (T002) ─────────────
+// makePdf / makePng / uploadVaultDoc are the implementations in e2e/005-profile-vault/support.ts (re-exported,
+// not duplicated; that module resolves pdf-lib from apps/api). `inviteAs` above covers the analyst/viewer contexts.
+
+/** `makePdf(pages)` — a real multi-page PDF; `makePng()` — a genuine decodable PNG. */
+export { makePdf, makePng } from '../005-profile-vault/support';
+/** `uploadVaultDoc(request, {name, bytes, fields})` — multipart POST /api/vault, expects 201, returns the document DTO. */
+export { apiUploadOk as uploadVaultDoc } from '../005-profile-vault/support';
+
+/** PUT /api/profile with `body`; expects 200 and returns `{profile, completeness, issues, averageTurnover}`. */
+export async function putProfile(request: APIRequestContext, body: Record<string, unknown>) {
+  const res = await request.put('/api/profile', { data: body });
+  expect(res.status(), await res.text()).toBe(200);
+  return res.json();
+}
+
+/** POST /api/past-contracts (buyerType defaults to 'central'); expects 201 and returns the contract DTO. */
+export async function addPastContract(request: APIRequestContext, body: Record<string, unknown>) {
+  const res = await request.post('/api/past-contracts', { data: { buyerType: 'central', ...body } });
+  expect(res.status(), await res.text()).toBe(201);
+  return res.json();
+}
+
+/** Evidence screenshot for spec 005: writes `qa/evidence/005/<story>/<name>.png` (story = 'US1' … 'US6', 'HARDEN'). */
+export function evidence005(page: Page, story: string, name: string) {
+  return evidence(page, '005', story, name);
+}
+
+/** `test` with an auto fixture that disposes every context opened by inviteAs(), even when the test fails. */
+export const test = base.extend<{ _disposeInvited: void }>({
+  _disposeInvited: [async ({}, use) => {
+    await use();
+    await disposeOpenedContexts();
+  }, { auto: true }],
+});
 export { expect };

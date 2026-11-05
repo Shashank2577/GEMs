@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Lock, Phone, UserRound } from 'lucide-react';
+import { AlertTriangle, Lock, Phone, UserRound } from 'lucide-react';
 import { Button, Field, Input, toast } from '@/components/ui';
 import { toE164IndianMobile } from '@tp/core/vault/validators';
 import { errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { PasswordInput } from '@/features/auth/PasswordInput';
-import { useChangePassword, useUpdateMe } from '../api';
+import { useChangePassword, usePrefs, useUpdateMe } from '../api';
+import { whatsappStopsWarning } from '../notification-copy';
 import { Panel, fieldErrors } from './Panel';
+import { SessionsPanel } from './SessionsPanel';
 
 /** "+919822012345" → "98220 12345" for display. */
 export const displayMobile = (e164: string | null | undefined) => (e164?.startsWith('+91') ? `${e164.slice(3, 8)} ${e164.slice(8)}` : e164 ?? '');
@@ -15,6 +17,7 @@ export default function AccountSection() {
   const { me } = useAuth();
   const update = useUpdateMe();
   const pw = useChangePassword();
+  const prefs = usePrefs();
   const [name, setName] = useState(me?.user.name ?? '');
   const [phone, setPhone] = useState(displayMobile(me?.user.phone));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -23,6 +26,8 @@ export default function AccountSection() {
   const [pwErr, setPwErr] = useState<Record<string, string>>({});
   useEffect(() => { setName(me?.user.name ?? ''); setPhone(displayMobile(me?.user.phone)); }, [me?.user.name, me?.user.phone]);
   if (!me) return null;
+  // T065 (002/FR-032): clearing the mobile silently stops WhatsApp alerts — say so before saving.
+  const waWarning = whatsappStopsWarning({ storedPhone: me.user.phone, draftPhone: phone, whatsappOn: prefs.data?.whatsapp });
 
   const save = (e: FormEvent) => {
     e.preventDefault();
@@ -60,7 +65,10 @@ export default function AccountSection() {
             <Field label="Email" hint="Contact your org owner to change it.">
               <Input value={me.user.email} readOnly className="text-muted-foreground" />
             </Field>
-            <Field label="Mobile (WhatsApp)" error={errors.phone} hint="Indian mobile, e.g. 98220 12345">
+            <Field label="Mobile (WhatsApp)" error={errors.phone}
+              hint={waWarning
+                ? <span role="status" className="inline-flex items-center gap-1.5 font-medium text-[hsl(32_90%_32%)] dark:text-warning"><AlertTriangle className="size-3.5 shrink-0" aria-hidden />{waWarning}</span>
+                : 'Indian mobile, e.g. 98220 12345'}>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} leading={<Phone />} inputMode="tel" autoComplete="tel-national" placeholder="98220 12345" />
             </Field>
           </div>
@@ -79,6 +87,7 @@ export default function AccountSection() {
           </div>
         </Panel>
       </form>
+      <SessionsPanel />
     </div>
   );
 }

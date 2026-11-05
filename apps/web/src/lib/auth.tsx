@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Navigate, useLocation } from 'react-router-dom';
-import { api, ApiError } from './api';
+import { api, ApiError, ME_KEY, queryClient, resetSessionCache } from './api';
 import type { Me, Role } from './types';
 
 export type { Me, Role } from './types';
@@ -14,7 +14,7 @@ export function can(role: Role | null | undefined, min: Role): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[min];
 }
 
-export const ME_KEY = ['auth', 'me'] as const;
+export { ME_KEY };
 
 /** GET /api/auth/me. `data` is null when signed out (401). */
 export function useMe() {
@@ -40,43 +40,76 @@ interface AuthContextValue {
   login: (input: { email: string; password: string }) => Promise<Me>;
   signup: (input: { name: string; email: string; password: string; orgName: string }) => Promise<Me>;
   acceptInvite: (input: { token: string; name?: string; password?: string }) => Promise<Me>;
+  /** Set a new password from an emailed link; signs in (002/FR-011). */
+  resetPassword: (input: { token: string; newPassword: string }) => Promise<Me>;
   logout: () => Promise<void>;
   switchOrg: (orgId: string) => Promise<Me>;
+  /**
+   * Leave the active organization (002/FR-027). The server moves the session to the next org; with none left the
+   * user is signed out. Resolves with the left org's name and `nextOrgId` (null = signed out).
+   */
+  leaveOrg: () => Promise<{ orgName: string; nextOrgId: string | null }>;
+}
+
+/**
+ * 002/FR-027: leave the active org. The server moves the session to the next org (or none); then load the new `Me`,
+ * or sign out when no org is left. Once the DELETE succeeded this never rejects: a failing `/auth/me` falls back to
+ * dropping the org-scoped cache and refetching `ME_KEY`.
+ */
+export async function leaveOrganization(me: Me | null, setMe: (m: Me | null) => void): Promise<{ orgName: string; nextOrgId: string | null }> {
+  const orgName = me?.org.name ?? 'the organization';
+  const { nextOrgId } = await api.delete<{ ok: true; nextOrgId: string | null }>('/org/members/me');
+  if (nextOrgId) {
+    try {
+      setMe(await api.get<Me>('/auth/me'));
+    } catch {
+      // Keep the (now stale) user only to avoid a sign-out flash; drop every org-scoped query and refetch /auth/me.
+      resetSessionCache(me);
+      void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
+    }
+  } else {
+    try { await api.post('/auth/logout'); } catch { /* the membership is gone either way */ }
+    setMe(null);
+  }
+  return { orgName, nextOrgId };
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const qc = useQueryClient();
   const meQuery = useMe();
   const me = meQuery.data ?? null;
 
-  const setMe = useCallback((m: Me | null) => qc.setQueryData(ME_KEY, m), [qc]);
+  /** Replace the signed-in user and drop every other cached query (keeps the observed ME_KEY query). */
+  const setMe = useCallback((m: Me | null) => resetSessionCache(m), []);
 
-  const loginM = useMutation({ mutationFn: (b: { email: string; password: string }) => api.post<Me>('/auth/login', b) });
-  const signupM = useMutation({ mutationFn: (b: { name: string; email: string; password: string; orgName: string }) => api.post<Me>('/auth/signup', b) });
-  const inviteM = useMutation({ mutationFn: (b: { token: string; name?: string; password?: string }) => api.post<Me>('/auth/accept-invite', b) });
+  // `authFlow`: a 401 here is a form error, not a session end (002/FR-013).
+  const meta = { authFlow: true };
+  const loginM = useMutation({ meta, mutationFn: (b: { email: string; password: string }) => api.post<Me>('/auth/login', b) });
+  const signupM = useMutation({ meta, mutationFn: (b: { name: string; email: string; password: string; orgName: string }) => api.post<Me>('/auth/signup', b) });
+  const inviteM = useMutation({ meta, mutationFn: (b: { token: string; name?: string; password?: string }) => api.post<Me>('/auth/accept-invite', b) });
+  const resetM = useMutation({ meta, mutationFn: (b: { token: string; newPassword: string }) => api.post<Me>('/auth/reset-password', b) });
 
   const value = useMemo<AuthContextValue>(() => ({
     me,
     role: me?.role ?? null,
     isLoading: meQuery.isLoading,
     can: (min) => can(me?.role, min),
-    login: async (b) => { const m = await loginM.mutateAsync(b); qc.clear(); setMe(m); return m; },
-    signup: async (b) => { const m = await signupM.mutateAsync(b); qc.clear(); setMe(m); return m; },
-    acceptInvite: async (b) => { const m = await inviteM.mutateAsync(b); qc.clear(); setMe(m); return m; },
+    login: async (b) => { const m = await loginM.mutateAsync(b); setMe(m); return m; },
+    signup: async (b) => { const m = await signupM.mutateAsync(b); setMe(m); return m; },
+    acceptInvite: async (b) => { const m = await inviteM.mutateAsync(b); setMe(m); return m; },
+    resetPassword: async (b) => { const m = await resetM.mutateAsync(b); setMe(m); return m; },
     logout: async () => {
       try { await api.post('/auth/logout'); } catch { /* ignore */ }
-      qc.clear();
       setMe(null);
     },
     switchOrg: async (orgId) => {
       const m = await api.post<Me>('/auth/switch-org', { orgId });
-      qc.clear();
       setMe(m);
       return m;
     },
-  }), [me, meQuery.isLoading, loginM, signupM, inviteM, qc, setMe]);
+    leaveOrg: () => leaveOrganization(me, setMe),
+  }), [me, meQuery.isLoading, loginM, signupM, inviteM, resetM, setMe]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,0 +1,620 @@
+{
+  "url": "http://localhost:8840/settings/activity",
+  "timestamp": "2026-11-05T06:52:03.935Z",
+  "violations": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-not-tabbable",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
+          "target": [
+            ".z-\\[60\\]"
+          ],
+          "failureSummary": "Fix all of the following:\n  Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-disabled",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Collapse sidebar\" data-state=\"closed\">",
+                  "target": [
+                    ".\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\">",
+                  "target": [
+                    "#radix-\\:r3\\:"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-8 w-full items-center gap-2 rounded-lg border bg-card px-2.5 text-[13px] text-muted-foreground shadow-xs transition-colors hover:border-foreground/15 hover:text-foreground focus-ring\">",
+                  "target": [
+                    ".hover\\:border-foreground\\/15.h-8.shadow-xs"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden"
+            },
+            {
+              "id": "focusable-not-tabbable",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" class=\"rounded-md focus-ring\" href=\"/dashboard\">",
+                  "target": [
+                    ".rounded-md[aria-label=\"TenderPilot home\"][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/dashboard\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/tenders\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"tenders\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/watchlists\">",
+                  "target": [
+                    "a[href$=\"watchlists\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/vault\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"vault\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/profile\">",
+                  "target": [
+                    "a[href$=\"profile\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/notifications\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring bg-card text-foreground shadow-sm ring-1 ring-border\" href=\"/settings\">",
+                  "target": [
+                    ".ring-1"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<aside class=\"fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out md:block w-[248px]\" aria-label=\"Sidebar\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            "aside"
+          ],
+          "failureSummary": "Fix all of the following:\n  Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden\n  Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-disabled",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button class=\"ml-auto hidden h-8 w-full max-w-sm items-center gap-2 rounded-lg border bg-subtle px-3 text-[13px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground focus-ring md:mr-auto md:ml-0 md:flex\">",
+                  "target": [
+                    ".max-w-sm"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Theme: light\" id=\"radix-:r9:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r9\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"QM Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<header class=\"sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-xl sm:px-6\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".sticky"
+          ],
+          "failureSummary": "Fix all of the following:\n  Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-not-tabbable",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/organization\">",
+                  "target": [
+                    "a[href$=\"organization\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/account\">",
+                  "target": [
+                    "a[href$=\"account\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/team\">",
+                  "target": [
+                    "a[href$=\"team\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/notifications\">",
+                  "target": [
+                    ".py-2.gap-2\\.5[href$=\"notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/scoring\">",
+                  "target": [
+                    "a[href$=\"scoring\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/api-tokens\">",
+                  "target": [
+                    "a[href$=\"api-tokens\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/sync\">",
+                  "target": [
+                    "a[href$=\"sync\"]"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring bg-primary-soft text-primary\" href=\"/settings/activity\">",
+                  "target": [
+                    ".bg-primary-soft"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<nav aria-label=\"Settings sections\" class=\"scrollbar-thin -mx-4 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".-mx-4"
+          ],
+          "failureSummary": "Fix all of the following:\n  Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-disabled",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" id=\"activity-member\">",
+                  "target": [
+                    "#activity-member"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"true\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"open\" class=\"flex h-9 w-full item...\" id=\"activity-type\" aria-controls=\"radix-:rt:\" data-radix-popper-si...=\"bottom\" data-radix-popper-al...=\"start\">",
+                  "target": [
+                    "#activity-type"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<header class=\"flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".py-4"
+          ],
+          "failureSummary": "Fix all of the following:\n  Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-not-tabbable",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.715Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.715Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.714Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.714Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.580Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.580Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.554Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.554Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.545Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.545Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.528Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.528Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.516Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.516Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.491Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.491Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.409Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.409Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.396Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.396Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.375Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.375Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.360Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.360Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.286Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.286Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.222Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.222Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.203Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.203Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.125Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.125Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.104Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.104Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:47.029Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:47.029Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:20 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:50:46.996Z\" data-state=\"closed\">1 minute ago</time>",
+                  "target": [
+                    "time[datetime=\"2026-11-05T06:50:46.996Z\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 12:19 pm IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T06:49:35.591Z\" data-state=\"closed\">2 minutes ago</time>",
+                  "target": [
+                    "time[title=\"05 Nov 2026, 12:19 pm IST\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 9:20 am IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T03:50:47.591Z\" data-state=\"closed\">3 hours ago</time>",
+                  "target": [
+                    "time[title=\"05 Nov 2026, 9:20 am IST\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 8:20 am IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-05T02:50:47.591Z\" data-state=\"closed\">4 hours ago</time>",
+                  "target": [
+                    "time[title=\"05 Nov 2026, 8:20 am IST\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 5:20 am IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-04T23:50:47.591Z\" data-state=\"closed\">7 hours ago</time>",
+                  "target": [
+                    "time[title=\"05 Nov 2026, 5:20 am IST\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"05 Nov 2026, 4:20 am IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-04T22:50:47.591Z\" data-state=\"closed\">8 hours ago</time>",
+                  "target": [
+                    "time[title=\"05 Nov 2026, 4:20 am IST\"]"
+                  ]
+                },
+                {
+                  "html": "<time tabindex=\"0\" title=\"04 Nov 2026, 10:20 am IST\" class=\"rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring\" datetime=\"2026-11-04T04:50:47.591Z\" data-state=\"closed\">yesterday</time>",
+                  "target": [
+                    "time[title=\"04 Nov 2026, 10:20 am IST\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"px-5 py-5\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".py-5"
+          ],
+          "failureSummary": "Fix all of the following:\n  Focusable content should have tabindex=\"-1\", be removed from the DOM, or not be hidden with aria-hidden"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-disabled",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+                  "target": [
+                    ".h-8.\\[\\&_svg\\]\\:size-4.transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\]:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"relative inline-flex...\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".h-8.\\[\\&_svg\\]\\:size-4.transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\]:nth-child(3)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Focusable content should be disabled, be removed from the DOM, or not be hidden with aria-hidden"
+        }
+      ]
+    }
+  ],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-not-tabbable",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check if the focusable elements immediately move the focus indicator"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check if the focusable elements immediately move the focus indicator"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-not-tabbable",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(4)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check if the focusable elements immediately move the focus indicator"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(4)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check if the focusable elements immediately move the focus indicator"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">SI</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">SI</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        }
+      ]
+    }
+  ],
+  "passes": 23
+}

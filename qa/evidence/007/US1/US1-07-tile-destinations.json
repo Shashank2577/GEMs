@@ -1,0 +1,8 @@
+{
+  "/New matches today/": "/tenders?matched=1",
+  "/Closing this week/": "/tenders?matched=1&closing=7&sort=endAt",
+  "/Active bids/": "/pipeline",
+  "/EMD at stake/": "/pipeline",
+  "/Win rate/": "/pipeline?stage=won",
+  "/Docs expiring/": "/vault?status=expiring"
+}

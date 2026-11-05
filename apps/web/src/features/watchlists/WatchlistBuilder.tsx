@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { BellRing, Info, Loader2, Radar, Sparkles } from 'lucide-react';
+import { AlertCircle, BellRing, Info, Loader2, Radar, Sparkles } from 'lucide-react';
 import type { TenderListResponse, WatchlistCriteriaInput, WatchlistDto } from '@tp/core/contracts/identify';
 import { INDIAN_STATES } from '@tp/core/gem/states';
 import {
@@ -16,7 +16,7 @@ import { api, ApiError } from '@/lib/api';
 import { formatINR, formatNumberIN } from '@/lib/format';
 import { useIsMobile } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { useCreateWatchlist, useUpdateWatchlist, useWatchlistPreview } from './api';
+import { previewPausedMessage, useCreateWatchlist, useUpdateWatchlist, useWatchlistPreview } from './api';
 import { ChipInput, MultiSelect } from './ChipInput';
 
 export interface Draft {
@@ -79,6 +79,8 @@ function Preview({ draft }: { draft: Draft }) {
   const criteria = useDebouncedValue(useMemo(() => draftToCriteria(draft), [draft]), 400);
   const ready = hasCriteria(draft);
   const q = useWatchlistPreview(criteria, ready);
+  // While a 429 waits for its retry the query is not in error yet: the failure reason carries the wait.
+  const paused = previewPausedMessage(q.error ?? q.failureReason);
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex items-center justify-between gap-2">
@@ -88,6 +90,8 @@ function Preview({ draft }: { draft: Draft }) {
       <div className="mt-3 rounded-xl border bg-card p-4 shadow-xs" aria-live="polite">
         {!ready ? (
           <p className="text-sm text-muted-foreground">Add a keyword, state or buyer to see matching open bids.</p>
+        ) : paused ? (
+          <p className="text-sm text-muted-foreground" role="status">{paused}</p>
         ) : q.isError ? (
           <p className="text-sm text-danger">Preview unavailable — {(q.error as Error).message}</p>
         ) : (
@@ -133,6 +137,8 @@ export function WatchlistBuilder({ open, onOpenChange, editing, initial }: {
   const isMobile = useIsMobile();
   const [d, setD] = useState<Draft>(() => initial ?? draftFrom(''));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** Form-level server error that isn't tied to a field, e.g. the 50-watchlist limit (FR-027). */
+  const [formError, setFormError] = useState<string | null>(null);
   const create = useCreateWatchlist();
   const update = useUpdateWatchlist();
   const saving = create.isPending || update.isPending;
@@ -141,6 +147,7 @@ export function WatchlistBuilder({ open, onOpenChange, editing, initial }: {
     if (!open) return;
     setD(editing ? draftFrom(editing.name, editing.criteria) : initial ?? draftFrom(''));
     setErrors({});
+    setFormError(null);
   }, [open, editing, initial]);
 
   // Buyer suggestions from currently open tenders.
@@ -162,6 +169,7 @@ export function WatchlistBuilder({ open, onOpenChange, editing, initial }: {
     const c = draftToCriteria(d);
     if (c.minValue != null && c.maxValue != null && c.minValue > c.maxValue) errs.maxLakh = 'Maximum must be at least the minimum';
     setErrors(errs);
+    setFormError(null);
     if (Object.values(errs).some(Boolean)) return;
     try {
       if (editing) {
@@ -177,6 +185,8 @@ export function WatchlistBuilder({ open, onOpenChange, editing, initial }: {
         const f = (e.details as { fields: Record<string, string> }).fields;
         setErrors({ name: f.name ?? '', keywords: f.criteria ?? f['criteria.keywords'] ?? '', maxLakh: f['criteria.maxValue'] ?? '', hsnCodes: Object.entries(f).find(([k]) => k.startsWith('criteria.hsnCodes'))?.[1] ?? '' });
       }
+      // The limit message is shown inline in the form; a toast would only repeat it.
+      if (e instanceof ApiError && e.code === 'watchlist_limit') { setFormError(e.message); return; }
       toast.error(e instanceof Error ? e.message : 'Could not save the watchlist');
     }
   };
@@ -191,6 +201,12 @@ export function WatchlistBuilder({ open, onOpenChange, editing, initial }: {
         <SheetBody className="p-0">
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
             <form className="grid min-w-0 grid-cols-1 content-start gap-5 px-5 py-5" onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
+              {formError && (
+                <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft px-3 py-2.5 text-[13px] text-danger animate-fade-in">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>{formError}</span>
+                </div>
+              )}
               <Field className="content-start" label="Name" required error={errors.name}>
                 <Input value={d.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Laptops & desktops — West India" maxLength={80} autoFocus={!isMobile} />
               </Field>
