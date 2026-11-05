@@ -1,0 +1,55 @@
+## signup
+org":{"id":"19f5ad3d-7f24-4fc7-8bef-f5125ad6622e","name":"Harden Traders","slug":"harden-traders","plan":"trial","onboardingState":{},"scoringWeights":null},"role":"owner","orgs":[{"id":"19f5ad3d-7f24-4fc7-8bef-f5125ad6622e","name":"Harden Traders","slug":"harden-traders","role":"owner"}]}
+HTTP 201
+
+## GET /dashboard before demo (keys)
+HTTP200
+['activity', 'awaitingDecision', 'closingSoon', 'demo', 'expiringDocuments', 'generatedAt', 'matchesByDay', 'myWork', 'pipeline', 'pipelineValue', 'recentMatches', 'setup', 'setupComplete', 'stats', 'tiles', 'verdicts']
+demo= False myWork= [] awaitingDecision= []
+setup[0]= {'key': 'company', 'label': 'Add company basics', 'description': 'Legal name and GSTIN power annexures and eligibility checks.', 'done': False, 'href': '/profile'}
+## POST /demo/seed
+{"ok":true,"tenders":40,"watchlists":3,"matches":28,"analyses":20,"workspaces":16,"vaultDocuments":15,"pastContracts":5,"created":true}
+HTTP 201
+## POST /demo/seed repeat
+{"ok":true,"tenders":40,"watchlists":3,"matches":28,"analyses":20,"workspaces":16,"vaultDocuments":15,"pastContracts":5,"created":false}
+HTTP 200
+## GET /dashboard after seed
+HTTP200
+['activity', 'awaitingDecision', 'closingSoon', 'demo', 'expiringDocuments', 'generatedAt', 'matchesByDay', 'myWork', 'pipeline', 'pipelineValue', 'recentMatches', 'setup', 'setupComplete', 'stats', 'tiles', 'verdicts']
+demo= True setupComplete= True
+myWork= [{"workspaceId": "a7682a75-5cb4-4d87-8a45-ba5dae577377", "tenderId": "5889013f-8e19-48f1-95ca-261a5049d50b", "bidNumber": "GEM/2026/B/6448851", "title": "Network Video Recorder \u2013 32 channel with 4 x 8 TB HDD", "stage": "ready", "dueAt": "2026-11-04T14:09:00.000Z", "endAt": "2026-11-05T14:09:00.000Z", "readiness": {"percent": 100, "blockers": 0, "analysed": true}}, {"workspaceId": "05c39f53-a94d-40f2-afb7-af77632af563", "tenderId": "f3c454e5-e7a3-4474-a72e-c9dda8706c44", "bidNumber": "GEM/2026/B/6464689", "title": "Desktop Computers (Q2) \u2013 Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor", "stage": "preparing", "dueAt": "2026-11-05T11:30:00.000Z", "endAt": "2026-11-06T11:30:00.000Z", "readiness": {"percent": 89, "blockers": 1, "analysed": true}}, {"workspaceId": "0c2c9046-2f06-48f8-ba1f-9e9d219347b2", "tenderId": "982f5424-242a-4264-8021-92378fba4967", "bidNumber": "GEM/2026
+awaitingDecision= [{"workspaceId": "d79293cb-624d-4dcb-a39f-5e206e383909", "tenderId": "8844d7f7-b76e-412a-9cde-ab29dd72a95a", "bidNumber": "GEM/2026/B/6488446", "title": "Multifunction Machine MFM (Q2) \u2013 A3 mono laser, 35 ppm, duplex", "score": 100, "verdict": "go", "endAt": "2026-11-08T07:30:00.000Z"}, {"workspaceId": "1ffbc2c3-85f3-41f0-8a9a-3367415681cc", "tenderId": "24031c52-fba6-4e98-b97e-581ccd330841", "bidNumber": "GEM/2026/B/6535960", "title": "Rack Server \u2013 2 x Intel Xeon Silver, 256 GB RAM, 8 x 1.92 TB SSD", "score": 80, "verdict": "no_go", "endAt": "2026-11-13T09:30:00.000Z"}]
+pipelineValue {'identified': 16146000, 'analysing': 8103000, 'go': 5023000, 'preparing': 3886000, 'ready': 962000, 'submitted': 10472000, 'won': 3367000, 'lost': 395000, 'dropped': 0}
+expiringDocuments n 3
+## PATCH /org unknown key
+{"error":{"code":"validation_error","message":"onboardingState: Unknown onboarding key: bogus","details":{"fields":{"onboardingState":"Unknown onboarding key: bogus"},"issues":[{"path":["onboardingState"],"message":"Unknown onboarding key: bogus","code":"custom"}]}}}
+HTTP 400
+## PATCH /org non-bool
+{"error":{"code":"validation_error","message":"onboardingState.company: Expected boolean, received string","details":{"fields":{"onboardingState.company":"Expected boolean, received string"},"issues":[{"path":["onboardingState","company"],"message":"Expected boolean, received string","code":"invalid_type"}]}}}
+HTTP 400
+## PATCH /org 17 keys
+{"error":{"code":"validation_error","message":"onboardingState: Unknown onboarding key: k0","details":{"fields":{"onboardingState":"Unknown onboarding key: k0"},"issues":[{"path":["onboardingState"],"message":"Unknown onboarding key: k0","code":"custom"},{"path":["onboardingState"],"message":"At most 16 onboarding keys","code":"custom"}]}}}
+HTTP 400
+## PATCH /org valid
+{"id":"19f5ad3d-7f24-4fc7-8bef-f5125ad6622e","name":"Harden Traders","slug":"harden-traders","plan":"trial","onboardingState":{"demo":true,"company":true,"categories":true},"scoringWeights":null}
+HTTP 200
+## PATCH /org valid merge
+{"id":"19f5ad3d-7f24-4fc7-8bef-f5125ad6622e","name":"Harden Traders","slug":"harden-traders","plan":"trial","onboardingState":{"demo":true,"company":true,"watchlist":true,"categories":true},"scoringWeights":null}
+HTTP 200
+## GET /tenders isDemo
+HTTP200
+['items', 'total', 'facets']
+[('GEM/2026/B/6654745', True), ('GEM/2026/B/6662664', True), ('GEM/2026/B/6646826', True), ('GEM/2026/B/6638907', True), ('GEM/2026/B/6670583', True)]
+## DELETE /demo
+{"ok":true,"removed":{"workspaces":16,"analyses":20,"matches":28,"comments":2,"notifications":6,"activity":12,"pastContracts":5,"vaultDocuments":15,"watchlists":3,"profileReset":true}}
+HTTP 200
+## DELETE /demo repeat
+{"ok":true,"removed":{"workspaces":0,"analyses":0,"matches":0,"comments":0,"notifications":0,"activity":0,"pastContracts":0,"vaultDocuments":0,"watchlists":0,"profileReset":false}}
+HTTP 200
+## GET /dashboard after removal
+demo= False myWork= [] awaitingDecision= []
+## viewer/DELETE unauth
+unauth DELETE /demo HTTP 401
+detail keys with isDemo: True True
+nested tender: False
+org without demo: total 0 []
