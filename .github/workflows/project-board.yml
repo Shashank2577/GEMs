@@ -1,0 +1,65 @@
+# Keeps the "TenderPilot Delivery" GitHub Projects (v2) board in sync with this repo's issues and PRs.
+# Creates the board on first run, adds every issue/PR, and sets Status from ai-sdlc labels:
+#   status:ready -> Ready, status:in-progress -> In progress, status:in-review / open PR -> In review,
+#   qa:rejected -> Rework, qa:approved / closed -> Done, type:epic -> Epics.
+# Needs secret PROJECT_TOKEN: a classic PAT with `project` + `repo` scopes (GITHUB_TOKEN cannot write user boards).
+name: project-board
+on:
+  issues: { types: [opened, edited, labeled, unlabeled, closed, reopened] }
+  pull_request: { types: [opened, reopened, closed, ready_for_review, labeled] }
+  workflow_dispatch: {}
+  schedule: [{ cron: '17 * * * *' }]
+permissions: { contents: read, issues: read, pull-requests: read }
+concurrency: { group: project-board, cancel-in-progress: false }
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check token
+        id: tok
+        env: { T: '${{ secrets.PROJECT_TOKEN }}' }
+        run: if [ -z "$T" ]; then echo "::warning::PROJECT_TOKEN secret missing — board sync skipped"; echo "ok=0" >> $GITHUB_OUTPUT; else echo "ok=1" >> $GITHUB_OUTPUT; fi
+      - name: Sync board
+        if: steps.tok.outputs.ok == '1'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const owner = context.repo.owner, repo = context.repo.repo, TITLE = 'TenderPilot Delivery';
+            const STATUSES = ['Epics', 'Backlog', 'Ready', 'In progress', 'In review', 'Rework', 'Done'];
+            const gql = (q, v = {}) => github.graphql(q, v);
+            const { user } = await gql(`query($l:String!){user(login:$l){id projectsV2(first:100){nodes{id number title url}}}}`, { l: owner });
+            let project = user.projectsV2.nodes.find(p => p.title === TITLE);
+            if (!project) {
+              const { repository } = await gql(`query($o:String!,$r:String!){repository(owner:$o,name:$r){id}}`, { o: owner, r: repo });
+              project = (await gql(`mutation($u:ID!,$t:String!,$r:ID!){createProjectV2(input:{ownerId:$u,title:$t,repositoryId:$r}){projectV2{id number title url}}}`, { u: user.id, t: TITLE, r: repository.id })).createProjectV2.projectV2;
+              core.notice(`Created board ${project.url}`);
+            }
+            // Status field with our options
+            let fields = (await gql(`query($p:ID!){node(id:$p){... on ProjectV2{fields(first:50){nodes{... on ProjectV2SingleSelectField{id name options{id name}}}}}}}`, { p: project.id })).node.fields.nodes;
+            let status = fields.find(f => f && f.name === 'Status');
+            const have = new Set((status?.options || []).map(o => o.name));
+            if (!status || STATUSES.some(s => !have.has(s))) {
+              const opts = STATUSES.map(name => ({ name, color: name === 'Done' ? 'GREEN' : name === 'Rework' ? 'RED' : name === 'In review' ? 'BLUE' : name === 'In progress' ? 'YELLOW' : name === 'Ready' ? 'PURPLE' : 'GRAY', description: '' }));
+              if (status) status = (await gql(`mutation($f:ID!,$o:[ProjectV2SingleSelectFieldOptionInput!]!){updateProjectV2Field(input:{fieldId:$f,singleSelectOptions:$o}){projectV2Field{... on ProjectV2SingleSelectField{id name options{id name}}}}}`, { f: status.id, o: opts })).updateProjectV2Field.projectV2Field;
+              else status = (await gql(`mutation($p:ID!,$o:[ProjectV2SingleSelectFieldOptionInput!]!){createProjectV2Field(input:{projectId:$p,dataType:SINGLE_SELECT,name:"Status",singleSelectOptions:$o}){projectV2Field{... on ProjectV2SingleSelectField{id name options{id name}}}}}`, { p: project.id, o: opts })).createProjectV2Field.projectV2Field;
+            }
+            const optId = n => status.options.find(o => o.name === n).id;
+            const pick = (labels, state, isPr, merged) => {
+              const L = new Set(labels);
+              if (L.has('type:epic')) return 'Epics';
+              if (state === 'closed' || merged || L.has('qa:approved')) return 'Done';
+              if (L.has('qa:rejected')) return 'Rework';
+              if (isPr || L.has('status:in-review')) return 'In review';
+              if (L.has('status:in-progress')) return 'In progress';
+              if (L.has('status:ready')) return 'Ready';
+              return 'Backlog';
+            };
+            const items = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'all', per_page: 100 });
+            for (const it of items) {
+              const isPr = !!it.pull_request;
+              const { addProjectV2ItemById } = await gql(`mutation($p:ID!,$c:ID!){addProjectV2ItemById(input:{projectId:$p,contentId:$c}){item{id}}}`, { p: project.id, c: it.node_id });
+              const s = pick(it.labels.map(l => l.name), it.state, isPr, isPr && it.pull_request.merged_at);
+              await gql(`mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){projectV2Item{id}}}`, { p: project.id, i: addProjectV2ItemById.item.id, f: status.id, o: optId(s) });
+            }
+            core.notice(`Board synced: ${items.length} items → ${project.url}`);
