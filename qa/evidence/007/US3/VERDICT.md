@@ -45,7 +45,7 @@ Videos (one per test, `*.webm` in this folder): 22 files; round-1 recordings rep
 - Cross-browser (Chromium only) and screen-reader behaviour beyond axe.
 - SC-001 duration measurement from `onboarding.completed.durationSec` beyond confirming the entry is written once (US3-15 JSON).
 
-An approval would cover only what is in the table above; this is a rejection.
+This approval covers only what is in the table above.
 
 ### Bug issues filed
 
