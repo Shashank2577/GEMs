@@ -64,7 +64,7 @@ analysisRoutes.post('/tenders/:id/documents', bodyLimit(TENDER_DOC_UPLOAD_MAX_BY
 
 analysisRoutes.post('/tenders/:id/fetch-documents', requireRole('analyst'), rateLimit('gem.fetch.org'), async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
-  const r = await fetchGemDocuments(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, viewer: c.var.org });
+  const r = await fetchGemDocuments(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, viewer: c.var.org, refresh: c.req.query('refresh') === '1' });
   return c.json({ items: r.documents.map((d) => toDocumentDto(d, r.tender.bidNumber)), total: r.documents.length, fetched: r.fetched }, r.fetched ? 201 : 200);
 });
 

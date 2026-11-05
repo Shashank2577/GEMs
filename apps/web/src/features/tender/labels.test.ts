@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Requirement } from '@tp/core/contracts/analyse';
 import type { TenderDocumentDto } from '@tp/core/contracts/analyse';
-import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, analysisWarningText, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, friendlyAnalysisError, truncatedDocuments, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
+import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, analysisWarningText, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, friendlyAnalysisError, truncatedDocuments, isAnalysisRunning, mismatchedDocuments, staleReasonCopy, staleSinceCopy } from './labels';
 
 describe('staleReasonCopy (FR-043)', () => {
   it('falls back to the corrigendum copy when the reason is null or missing (legacy stale analyses)', () => {
@@ -12,6 +12,24 @@ describe('staleReasonCopy (FR-043)', () => {
   it('returns reason-specific copy', () => {
     expect(staleReasonCopy('document_added')).toMatch(/document was added/);
     expect(staleReasonCopy('document_removed')).toMatch(/document was removed/);
+  });
+});
+
+describe('stale banner copy per reason (FR-043)', () => {
+  it('opens with the spec wording for every reason', () => {
+    expect(staleReasonCopy('corrigendum')).toBe('A corrigendum changed this bid after it was analysed. The score below may be outdated.');
+    expect(staleReasonCopy('profile_changed')).toBe('Your company profile changed since this analysis. Re-score to update the score.');
+    expect(staleReasonCopy('vault_changed')).toBe('Your document vault changed since this analysis. Re-score to update the score.');
+    expect(staleReasonCopy('weights_changed')).toMatch(/^Scoring weights changed/);
+  });
+
+  it('says when it became stale, relative to now', () => {
+    const now = new Date('2026-11-05T12:00:00Z');
+    expect(staleSinceCopy('2026-11-05T10:00:00Z', now)).toBe('since 2 hours ago');
+    expect(staleSinceCopy('2026-11-05T11:59:50Z', now)).toBe('since just now');
+    expect(staleSinceCopy('2026-11-05T12:05:00Z', now)).toBe('since just now'); // clock skew: never "since in 5 minutes"
+    expect(staleSinceCopy(null, now)).toBeNull();
+    expect(staleSinceCopy('garbage', now)).toBeNull();
   });
 });
 

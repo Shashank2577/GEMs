@@ -3,12 +3,13 @@
  * Run: TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_analyse pnpm exec vitest run test/analyse.test.ts
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
-import { activityLog, analyses, companyProfiles, pastContracts, tenderDocuments, tenders, vaultDocuments } from '@tp/db';
+import { and, asc, eq, isNull } from 'drizzle-orm';
+import { activityLog, analyses, companyProfiles, pastContracts, tenderDocuments, tenderEvents, tenders, vaultDocuments } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { createApp } from '../src/app';
 import { ANALYSIS_RUNNING_TIMEOUT_MS, ANALYSIS_TIMED_OUT, analyseTender } from '../src/services/analyse';
 import { markStale } from '../src/services/staleness';
+import { HttpError } from '../src/lib/errors';
 import type { LlmClient } from '../src/deps';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -16,11 +17,14 @@ let ctx: TestContext;
 let roles: Awaited<ReturnType<typeof seedOrgWithRoles>>;
 const pdfs: Record<string, Uint8Array> = {};
 const gemCalls: string[] = [];
+/** Test seam: runs inside a GeM document request (e.g. to commit a change while analyse is fetching). */
+let onGemFetch: ((url: string) => Promise<void>) | null = null;
 
 /** Fake GeM: /showbidDocument/:id serves the matching sample bid PDF. */
 const gemFetch: typeof fetch = async (input) => {
   const url = String(input instanceof Request ? input.url : input);
   gemCalls.push(url);
+  if (onGemFetch) await onGemFetch(url);
   const m = url.match(/\/showbidDocument\/(.+)$/);
   if (m?.[1] === 'oversize') {
     // Advertises 26 MB; the client must refuse it without buffering the body (FR-008).
@@ -212,6 +216,196 @@ describe('GeM document fetch', () => {
     expect(r.status).toBe(502);
     expect(r.body.error.code).toBe('gem_unavailable');
   });
+
+describe('corrigendum re-fetch of the GeM document (004/FR-046)', () => {
+  const NEW_URL = 'http://127.0.0.1:4010/showbidDocument/corr-new';
+  const fetchDocs = (t: { id: string }, qs = '', cookie = roles.analyst.cookie) =>
+    request(ctx.app, 'POST', `/tenders/${t.id}/fetch-documents${qs}`, { cookie });
+  const gemDocs = (t: { id: string }) => ctx.db.select().from(tenderDocuments).where(and(eq(tenderDocuments.tenderId, t.id), isNull(tenderDocuments.orgId))).orderBy(asc(tenderDocuments.createdAt));
+  /** A corrigendum that moved the document to NEW_URL, seen a minute after the first copy. */
+  async function corrigendum(t: { id: string }, changes: Record<string, { from: unknown; to: unknown }> = { documentUrl: { from: null, to: NEW_URL } }) {
+    ctx.clock.advance(60_000);
+    await ctx.db.update(tenders).set({ documentUrl: NEW_URL }).where(eq(tenders.id, t.id));
+    await ctx.db.insert(tenderEvents).values({ tenderId: t.id, kind: 'corrigendum', changes, createdAt: ctx.clock.now() });
+  }
+  beforeAll(() => { pdfs['corr-new'] = pdfs['nogo-experience']!; });
+
+  it('a corrigendum that changed documentUrl: fetch downloads the new document as kind corrigendum and keeps the old', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460001', contentHash: 'c46-1', gemBidId: 'go-it-services' });
+    expect((await fetchDocs(t)).body.fetched).toBe(1);
+    expect((await fetchDocs(t)).body.fetched).toBe(0); // nothing changed: reused
+    await corrigendum(t);
+    gemCalls.length = 0;
+    const r = await fetchDocs(t);
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({ fetched: 1, total: 2 });
+    expect(r.body.items.map((d: any) => d.kind)).toEqual(['bid', 'corrigendum']);
+    expect(gemCalls).toEqual([NEW_URL]);
+    expect((await gemDocs(t)).map((d) => [d.kind, d.sourceUrl])).toEqual([['bid', 'http://127.0.0.1:4010/showbidDocument/go-it-services'], ['corrigendum', NEW_URL]]);
+    // The new copy is newer than the corrigendum, so the next call reuses both.
+    ctx.clock.advance(1000);
+    expect((await fetchDocs(t)).body.fetched).toBe(0);
+  });
+
+  it('a corrigendum that changed only the end date does not re-fetch', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460002', contentHash: 'c46-2', gemBidId: 'go-it-services' });
+    await fetchDocs(t);
+    ctx.clock.advance(60_000);
+    await ctx.db.insert(tenderEvents).values({ tenderId: t.id, kind: 'corrigendum', changes: { endAt: { from: 'a', to: 'b' } }, createdAt: ctx.clock.now() });
+    gemCalls.length = 0;
+    expect((await fetchDocs(t)).body.fetched).toBe(0);
+    expect(gemCalls).toEqual([]);
+  });
+
+  it('analyse picks up the new document automatically after such a corrigendum', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460003', contentHash: 'c46-3', gemBidId: 'go-it-services' });
+    expect((await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie })).status).toBe(201);
+    await corrigendum(t);
+    ctx.clock.advance(60_000);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(201);
+    expect(r.body.documents.map((d: any) => d.kind)).toEqual(['bid', 'corrigendum']);
+  });
+
+  it('?refresh=1 forces a re-fetch (analyst+, not viewer); identical content is not stored twice', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460004', contentHash: 'c46-4', gemBidId: 'go-it-services' });
+    await fetchDocs(t);
+    expect((await fetchDocs(t, '?refresh=1', roles.viewer.cookie)).status).toBe(403);
+    const same = await fetchDocs(t, '?refresh=1');
+    expect(same.body.fetched).toBe(0);
+    expect(await gemDocs(t)).toHaveLength(1);
+    // GeM now serves a different document at the same place.
+    pdfs['go-it-services-v2'] = pdfs['nogo-experience']!;
+    await ctx.db.update(tenders).set({ documentUrl: 'http://127.0.0.1:4010/showbidDocument/go-it-services-v2' }).where(eq(tenders.id, t.id));
+    const changed = await fetchDocs(t, '?refresh=1', roles.bidManager.cookie);
+    expect(changed.status).toBe(201);
+    expect(changed.body.items.map((d: any) => d.kind)).toEqual(['bid', 'corrigendum']);
+  });
+
+  it('keeps the page cap: a 200-page corrigendum document stores 150 pages and its real total', async () => {
+    pdfs['corr-long'] = await longPdf(200);
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460005', contentHash: 'c46-5', gemBidId: 'go-it-services' });
+    await fetchDocs(t);
+    await corrigendum(t);
+    await ctx.db.update(tenders).set({ documentUrl: 'http://127.0.0.1:4010/showbidDocument/corr-long' }).where(eq(tenders.id, t.id));
+    const r = await fetchDocs(t);
+    expect(r.status).toBe(201);
+    expect(r.body.items[1]).toMatchObject({ kind: 'corrigendum', pageCount: 150 });
+    const [, row] = await gemDocs(t);
+    expect(row).toMatchObject({ pageCount: 150, totalPages: 200 });
+  });
+
+  const analyse = (t: { id: string }) => request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+  const fetchFailures = (t: { id: string }) => ctx.db.select().from(activityLog)
+    .where(and(eq(activityLog.entityId, t.id), eq(activityLog.action, 'tender.document_fetch_failed')));
+
+  it('S3: a failed re-fetch (404) falls back to the stored copy, is recorded, and is retried only after a newer corrigendum', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460010', contentHash: 'c46-10', gemBidId: 'go-it-services' });
+    expect((await analyse(t)).status).toBe(201);
+    await corrigendum(t, { documentUrl: { from: null, to: 'http://127.0.0.1:4010/showbidDocument/gone' } });
+    await ctx.db.update(tenders).set({ documentUrl: 'http://127.0.0.1:4010/showbidDocument/gone' }).where(eq(tenders.id, t.id));
+    gemCalls.length = 0;
+    ctx.clock.advance(1000);
+    const first = await analyse(t);
+    expect(first.status).toBe(201);
+    expect(first.body.documents.map((d: any) => d.kind)).toEqual(['bid']);
+    expect(gemCalls).toEqual(['http://127.0.0.1:4010/showbidDocument/gone']);
+    expect(await fetchFailures(t)).toHaveLength(1);
+    // The next analyse does not hit GeM again for the same corrigendum.
+    ctx.clock.advance(1000);
+    expect((await analyse(t)).status).toBe(201);
+    expect(gemCalls).toHaveLength(1);
+    // A newer corrigendum (the document moved again) is tried.
+    await corrigendum(t);
+    gemCalls.length = 0;
+    const later = await analyse(t);
+    expect(later.status).toBe(201);
+    expect(gemCalls).toEqual([NEW_URL]);
+    expect(later.body.documents.map((d: any) => d.kind)).toEqual(['bid', 'corrigendum']);
+  });
+
+  it('S3: a re-fetched document over the page limit does not block analyse; a busy GeM falls back without being recorded', async () => {
+    pdfs['corr-huge'] ??= await longPdf(301);
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460011', contentHash: 'c46-11', gemBidId: 'go-it-services' });
+    expect((await analyse(t)).status).toBe(201);
+    await corrigendum(t);
+    // GeM busy: falls back to the stored copy, nothing recorded, so the next analyse tries again.
+    const busy = { ...ctx.deps, gemLease: { acquire: async () => { throw new HttpError(503, 'gem_busy', 'GeM is busy'); } } };
+    ctx.clock.advance(1000);
+    const r1 = await analyseTender(busy, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: t.id, viewer: {} });
+    expect(r1.documents.map((d) => d.kind)).toEqual(['bid']);
+    expect(await fetchFailures(t)).toHaveLength(0);
+    // Now GeM serves a 301-page document there: 422 for an explicit fetch, but analyse uses the stored copy.
+    await ctx.db.update(tenders).set({ documentUrl: 'http://127.0.0.1:4010/showbidDocument/corr-huge' }).where(eq(tenders.id, t.id));
+    ctx.clock.advance(1000);
+    const r2 = await analyse(t);
+    expect(r2.status).toBe(201);
+    expect(r2.body.documents.map((d: any) => d.kind)).toEqual(['bid']);
+    expect(await fetchFailures(t)).toMatchObject([{ meta: { code: 'document_too_long' } }]);
+  });
+
+  it('S5: a forced refresh that stores a changed document marks every org\'s analyses stale (corrigendum); same text is not stored again', async () => {
+    const { PDFDocument } = await import('pdf-lib');
+    const resaved = await PDFDocument.load(pdfs['go-it-services']!);
+    resaved.setTitle('Re-exported by GeM');
+    pdfs['go-it-services-resaved'] = await resaved.save();
+    expect(pdfs['go-it-services-resaved']!.length).not.toBe(pdfs['go-it-services']!.length);
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460012', contentHash: 'c46-12', gemBidId: 'go-it-services' });
+    await fetchDocs(t);
+    const other = await signup(ctx.app, { orgName: 'Other refresh org' });
+    const ids = (await ctx.db.insert(analyses).values([
+      { orgId: roles.orgId, tenderId: t.id, status: 'done' }, { orgId: other.me.org.id, tenderId: t.id, status: 'done' },
+    ]).returning()).map((a) => a.id);
+    const staleOf = async () => (await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id))).filter((a) => ids.includes(a.id)).map((a) => [a.stale, a.staleReason]);
+    // Same text in a re-exported file (different bytes and size): nothing stored, nothing flagged.
+    await ctx.db.update(tenders).set({ documentUrl: 'http://127.0.0.1:4010/showbidDocument/go-it-services-resaved' }).where(eq(tenders.id, t.id));
+    expect((await fetchDocs(t, '?refresh=1')).body.fetched).toBe(0);
+    expect(await gemDocs(t)).toHaveLength(1);
+    expect(await staleOf()).toEqual([[false, null], [false, null]]);
+    // A changed document: stored and every org's analysis is stale.
+    await ctx.db.update(tenders).set({ documentUrl: NEW_URL }).where(eq(tenders.id, t.id));
+    ctx.clock.advance(1000);
+    expect((await fetchDocs(t, '?refresh=1')).body.fetched).toBe(1);
+    expect(await staleOf()).toEqual([[true, 'corrigendum'], [true, 'corrigendum']]);
+  });
+
+  it('S5: two concurrent forced refreshes of a changed document store one copy', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460013', contentHash: 'c46-13', gemBidId: 'go-it-services' });
+    await fetchDocs(t);
+    await ctx.db.update(tenders).set({ documentUrl: NEW_URL }).where(eq(tenders.id, t.id));
+    const rs = await Promise.all([fetchDocs(t, '?refresh=1'), fetchDocs(t, '?refresh=1', roles.bidManager.cookie)]);
+    expect(rs.map((r) => r.body.fetched).sort()).toEqual([0, 1]);
+    expect((await gemDocs(t)).map((d) => d.kind)).toEqual(['bid', 'corrigendum']);
+  });
+
+  it('S4: a document uploaded after analyse read its inputs but before the run started is analysed', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460014', contentHash: 'c46-14', gemBidId: 'go-it-services' });
+    // The upload commits while analyse is auto-fetching the GeM document, i.e. before the running row exists.
+    onGemFetch = async () => {
+      onGemFetch = null;
+      const up = await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.bidManager.cookie, form: { file: pdfFile('nogo-experience', 'ATC.pdf'), kind: 'atc' } });
+      expect(up.status).toBe(201);
+    };
+    try {
+      const r = await analyse(t);
+      expect(r.status).toBe(201);
+      expect(r.body.documents.map((d: any) => d.fileName).sort()).toEqual(['ATC.pdf', 'GEM-2026-B-9460014.pdf']);
+      expect(r.body.stale).toBe(false);
+    } finally { onGemFetch = null; }
+  });
+
+  it('a corrigendum document over 300 pages → 422 document_too_long; the old copy stays', async () => {
+    pdfs['corr-huge'] = await longPdf(301);
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460006', contentHash: 'c46-6', gemBidId: 'go-it-services' });
+    await fetchDocs(t);
+    await corrigendum(t);
+    await ctx.db.update(tenders).set({ documentUrl: 'http://127.0.0.1:4010/showbidDocument/corr-huge' }).where(eq(tenders.id, t.id));
+    const r = await fetchDocs(t);
+    expect(r.status).toBe(422);
+    expect(r.body.error.code).toBe('document_too_long');
+    expect(await gemDocs(t)).toHaveLength(1);
+  });
+});
 });
 
 describe('override (FR-016)', () => {
