@@ -1,0 +1,20 @@
+{
+  "analyst": {
+    "status": 403,
+    "body": {
+      "error": {
+        "code": "forbidden",
+        "message": "You need to be at least a Bid Manager to do that"
+      }
+    }
+  },
+  "viewer": {
+    "status": 403,
+    "body": {
+      "error": {
+        "code": "forbidden",
+        "message": "You need to be at least a Bid Manager to do that"
+      }
+    }
+  }
+}

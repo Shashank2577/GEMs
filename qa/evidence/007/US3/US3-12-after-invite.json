@@ -1,0 +1,47 @@
+{
+  "setupComplete": true,
+  "setup": [
+    {
+      "key": "company",
+      "label": "Add company basics",
+      "description": "Legal name and GSTIN power annexures and eligibility checks.",
+      "done": true,
+      "href": "/profile"
+    },
+    {
+      "key": "categories",
+      "label": "Tell us what you sell",
+      "description": "Categories and HSN codes sharpen your matches.",
+      "done": true,
+      "href": "/profile"
+    },
+    {
+      "key": "watchlist",
+      "label": "Create a watchlist",
+      "description": "Get alerts the moment a matching bid is published.",
+      "done": true,
+      "href": "/watchlists?new=1"
+    },
+    {
+      "key": "documents",
+      "label": "Upload key documents",
+      "description": "GST, PAN and Udyam — the basics every bid asks for.",
+      "done": true,
+      "href": "/vault?upload=1"
+    },
+    {
+      "key": "analysis",
+      "label": "Check eligibility on a tender",
+      "description": "Get a Go/No-Go score with the reasons behind it.",
+      "done": true,
+      "href": "/tenders?matched=1"
+    },
+    {
+      "key": "team",
+      "label": "Invite a teammate",
+      "description": "Bid managers, analysts and compliance can work together.",
+      "done": true,
+      "href": "/settings/team"
+    }
+  ]
+}
