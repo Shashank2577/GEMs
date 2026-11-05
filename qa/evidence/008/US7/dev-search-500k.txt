@@ -1,0 +1,19 @@
+$ PERF=1 TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7_500k pnpm --filter @tp/api exec vitest run -c vitest.perf.config.ts test/perf/search.perf.ts
+# fixture: 500,000 bulk tenders (30,000 open), bid numbers GEM/2026/B/<n>, 5,000 titled 'Solar street light — …' (header of search.perf.ts)
+ RUN  v2.1.9 /home/user/GEMs-us7/apps/api
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > GET /api/tenders?q=solar street light × 200: p95 < 300 ms
+{"query":"q=solar street light","runs":200,"total":300,"p50_ms":31.9,"p95_ms":38.4,"max_ms":57.1}
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > EXPLAIN: every tenders query of the search request uses tenders_search_gin
+{"query":"select \"id\", \"source\", \"bid_number\", \"gem_bid_id\", \"bid_type\", \"title\", \"items\", \"category","indexes":["tenders_search_gin","tenders_bid_number_prefix_idx","tender_matches_org_idx"],"nodeTypes":["Limit","Sort","Nested Loop","Bitmap Heap Scan","BitmapOr","Bitmap Index Scan"],"ms":21.008}
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > EXPLAIN: every tenders query of the search request uses tenders_search_gin
+{"query":"select g, v, n from (\n      select grouping(\"tenders\".\"state\", \"tenders\".\"ministry\", \"tend","indexes":["tenders_search_gin","tenders_bid_number_prefix_idx","tender_matches_org_idx"],"nodeTypes":["Incremental Sort","Subquery Scan","WindowAgg","Sort","Aggregate","Nested Loop","Bitmap Heap Scan","BitmapOr","Bitmap Index Scan"],"ms":19.595}
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > q=GEM/2026/B/12 matches by bid-number prefix (index-backed)
+{"query":"status=all&q=GEM/2026/B/12","total":11111,"indexes":["tenders_bid_number_prefix_idx","tender_matches_org_idx"],"ms":22.842}
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > the plain feed (no q) still uses the US4 open-tender partial indexes
+{"query":"GET /tenders (no q)","indexes":["tenders_open_created_idx","tender_matches_uq"]}
+ ✓ test/perf/search.perf.ts (4 tests) 7077ms
+   ✓ feed full-text search at 500k tenders (US7 scenario 3) > GET /api/tenders?q=solar street light × 200: p95 < 300 ms 6694ms
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  08:59:02
+   Duration  9.32s (transform 1.19s, setup 0ms, collect 1.96s, tests 7.08s, environment 0ms, prepare 78ms)

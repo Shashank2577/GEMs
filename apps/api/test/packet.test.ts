@@ -171,6 +171,17 @@ describe('packets', () => {
     expect((await ctx.app.request(`http://tp.test/api/packets/${packetId}/download`, { headers: { cookie: other.cookie } })).status).toBe(404);
   });
 
+  it('review N4: a packet whose R2 object is gone (expired by a lifecycle rule) downloads as 404, never 500', async () => {
+    const r = await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, { cookie: s.org.analyst.cookie, json: {} });
+    expect(r.status).toBe(201);
+    const [row] = await ctx.db.select({ blobKey: packets.blobKey }).from(packets).where(eq(packets.id, r.body.id));
+    await ctx.deps.blobs.delete(row!.blobKey!);
+    const res = await request(ctx.app, 'GET', `/packets/${r.body.id}/download`, { cookie: s.org.viewer.cookie });
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('not_found');
+    await ctx.db.delete(packets).where(eq(packets.id, r.body.id)); // keep the history counts below unchanged
+  });
+
   it('viewers cannot build packets', async () => {
     expect((await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, { cookie: s.org.viewer.cookie, json: {} })).status).toBe(403);
   });

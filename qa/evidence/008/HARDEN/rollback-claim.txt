@@ -1,0 +1,3 @@
+$ grep rollback docs/runbook.md
+159:4. Started right after a deploy: `wrangler rollback` (never roll back migrations; roll forward).
+349:Rollback: remove the `[[hyperdrive]]` table (or deploy the previous version with `wrangler rollback`); the Worker then

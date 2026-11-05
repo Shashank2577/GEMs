@@ -1,11 +1,13 @@
 /**
  * Scheduled pipeline shared by the Worker `scheduled()` handler and the Node in-process cron:
- * ingestion → alerts → reminders, each isolated so one failure does not stop the others.
+ * ingestion → alerts → reminders → cleanups → housekeeping (once per IST day after 02:00, 008/FR-070), each isolated
+ * so one failure does not stop the others.
  */
 import type { AppDeps } from '../deps';
 import { IngestionBusyError, runIngestion } from '../services/ingest';
 import { dispatchNotifications } from '../services/alerts';
 import { runExpiryReminders } from '../services/reminders';
+import { runHousekeeping } from '../services/housekeeping';
 import { pruneAuthState } from './rate-limit';
 import { pruneRateLimits } from './rate-limiter';
 
@@ -26,6 +28,7 @@ export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' |
     ['reminders', () => runExpiryReminders(deps)],
     ['auth-cleanup', () => pruneAuthState(deps.db, deps.clock.now())],
     ['rate-limit-cleanup', () => pruneRateLimits(deps.db, deps.clock.now())],
+    ['housekeeping', () => runHousekeeping(deps)],
   ];
   const report: ScheduledReport[] = [];
   for (const [step, fn] of steps) {

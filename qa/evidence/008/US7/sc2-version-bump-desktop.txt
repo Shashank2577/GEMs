@@ -1,0 +1,23 @@
+# sc2-version-bump — project desktop — 2026-11-05T10:30:13.567Z
+current extractor_version on the cache row(s): llm-extract-2026-11-v1
+$ update tender_documents set extractor_version='qa-older-version' where tender_id='04ae8c61-c377-4ce2-9299-3b981fbc6866'
+### org C analyses (stale cache)
+> POST /api/tenders/04ae8c61-c377-4ce2-9299-3b981fbc6866/analyse
+< 201
+{"id":"c823ccc3-e81c-4906-adbd-f1a1681959f9","orgId":"3cc93521-320d-4e71-a54c-555ab0eec62f","tenderId":"04ae8c61-c377-4ce2-9299-3b981fbc6866","status":"done","method":"rules+llm","requirements":[{"key":"bid_published_at","label":"Bid published on","value":"2026-11-09T00:00:00+05:30","method":"RULE",
+
+fake LLM calls: 1 (documents on the tender: 1)
+cache row after: version|method|fresh = llm-extract-2026-11-v1|LLM|true
+second analysis after the re-extraction: fake LLM calls 0 (served from the updated cache)
+
+$ TEST_DATABASE_URL=… pnpm --filter @tp/api exec vitest run test/extraction-cache.test.ts   # bumps CURRENT_EXTRACTOR_VERSION in-process
+ ✓ test/extraction-cache.test.ts > shared extraction cache for GeM documents (US7 scenario 1) > org A analyses → 1 LLM call; org B analyses the same tender → 0 new calls, same requirements with provenance 437ms
+ ✓ test/extraction-cache.test.ts > shared extraction cache for GeM documents (US7 scenario 1) > bumping the extractor version re-extracts the document once and updates the cache row (US7 scenario 2)
+ ✓ test/extraction-cache.test.ts > shared extraction cache for GeM documents (US7 scenario 1) > a rules-only deployment (no LLM) neither writes nor needs the cache
+ ✓ test/extraction-cache.test.ts > what is (not) cached, and who gets a cache hit (review S1, S7) > an empty or malformed LLM reply is used for this analysis but never cached for every org 468ms
+ ✓ test/extraction-cache.test.ts > what is (not) cached, and who gets a cache hit (review S1, S7) > a cache hit is free: an org with no LLM access (no client / quota exhausted) still receives the cached requirements
+ ✓ test/extraction-cache.test.ts > cache hits and the monthly AI quota (008/FR-037 × FR-072, review R2-B1) > quota used up: no llm_quota_reached warning when every document came from the cache; the warning stays when one did not 372ms
+ ✓ test/extraction-cache.test.ts > tenant isolation of the extraction cache (FR-072, 008/FR-016) > an org's own upload is never cached: each org's analysis of its own document calls the LLM, and B never sees A's requirements
+ ✓ test/extraction-cache.test.ts > tenant isolation of the extraction cache (FR-072, 008/FR-016) > cachedExtraction() serves only org-null rows at the current version with method LLM
+ Test Files  1 passed (1)
+      Tests  8 passed (8)

@@ -1,6 +1,7 @@
 /**
  * Notification dispatcher (T035; FR-005). The `notifications` table is the outbox:
- *  - instant users: each pending email / WhatsApp row is sent on its own;
+ *  - instant users: pending emails go out in batches of ≤ 100 per provider call (Resend /emails/batch, 008/FR-074);
+ *    each WhatsApp row is sent on its own;
  *  - daily users: pending rows are held and sent as one digest per org per IST day, from 08:00 IST;
  *  - every row ends `sent`, `skipped` (channel not configured / no phone) or `failed` (+ error);
  *  - held daily rows are released until the next 08:00 IST, so they never crowd instant rows out of a batch;
@@ -16,8 +17,11 @@
  */
 import { and, eq, inArray, lte, sql } from 'drizzle-orm';
 import { notificationPrefs, notifications, organizations, tenders, users } from '@tp/db';
-import { isTransientSendError } from '../adapters/provider-error';
-import type { AppDeps } from '../deps';
+import { istDay, istHour } from '@tp/core/time';
+import { isTransientSendError, ProviderError } from '../adapters/provider-error';
+import { RESEND_CONCURRENT_IDEMPOTENT } from '../adapters/mailer';
+import type { AppDeps, EmailMessage, SendResult } from '../deps';
+import { sha256Hex } from '../lib/crypto';
 import { unsubscribeHeaders } from '../lib/unsubscribe';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -47,8 +51,6 @@ export const DIGEST_HOUR_IST = 8;
 export const WHATSAPP_TEMPLATE = 'tender_alert';
 
 const IST_MS = 330 * 60_000;
-const istDay = (d: Date) => new Date(d.getTime() + IST_MS).toISOString().slice(0, 10);
-const istHour = (d: Date) => new Date(d.getTime() + IST_MS).getUTCHours();
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500);
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -278,10 +280,11 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
     return !stopped;
   };
 
-  // Group: instant → one message per row; daily → one digest per (user, org, channel).
+  // Group: instant WhatsApp → one message per row; instant email → batched below; daily → one digest per (user, org, channel).
   const digestGroups = new Map<string, Claimed[]>();
   const digestDue = istHour(now) >= DIGEST_HOUR_IST;
   const toHold: string[] = [];
+  const instantEmails: Claimed[] = [];
   for (const p of pending) {
     if (stopped) { deferred.push(p.n.id); continue; }
     if (switchedOff(p)) {
@@ -289,11 +292,13 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
       continue;
     }
     const daily = p.frequency === 'daily' && (p.n.kind === 'tender_match' || p.n.kind === 'corrigendum');
+    // 008/FR-074: instant emails are sent together below via Mailer.sendMany (Resend /emails/batch, ≤ 100 per call).
+    if (!daily && p.n.channel === 'email') { instantEmails.push(p); continue; }
     if (!daily) {
       if (!leaseHeld()) { deferred.push(p.n.id); continue; }
       let r: Awaited<ReturnType<typeof sendOne>>;
       try {
-        r = await sendOne(deps, p, tenderById, now);
+        r = await sendOne(deps, p, tenderById);
       } catch (e) {
         logger.warn('notification send failed', { id: p.n.id, channel: p.n.channel, attempt: p.n.attempts + 1, transient: isTransientSendError(e), error: errMsg(e) });
         await record('send failure', [p.n.id], () => fail([p.n.id], e));
@@ -309,6 +314,56 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   }
   // Held rows are not due again before the digest hour, so they never crowd instant rows out of the batch.
   if (toHold.length) await release(toHold, nextDigestAt(now));
+
+  // Instant emails: ≤ EMAIL_BATCH_SIZE per provider call via Mailer.sendMany. A failed call fails (or schedules a retry
+  // for) exactly the rows of that call, with the same transient/permanent rules as a single send; the next batch still
+  // goes. A mailer without sendMany (test doubles) keeps the one-send-per-row path, lease check before every send.
+  //  - Idempotency (review S2): every call carries a key derived from its notification ids (`tp-batch-<sha256>` /
+  //    `tp-notif-<id>`), stable across retries, so a retry of a call Resend accepted but whose response was lost
+  //    (timeout → transient → retried) is not delivered again. Resend answers 409 when it holds that key: still in flight
+  //    (`concurrent_idempotent_requests`) → transient, retried later; already settled → the rows are settled as sent.
+  //    Each message is rendered from the row alone (`now` = the row's created_at), so a retry sends the same payload.
+  //  - Resend validates a batch as a whole: one invalid recipient makes the call 400/422. Then the chunk is retried one
+  //    message per call, so only the bad row(s) fail.
+  const sendSingly = async (rows: Claimed[]) => {
+    for (const p of rows) {
+      if (!leaseHeld()) { deferred.push(p.n.id); continue; }
+      let r: SendResult;
+      try {
+        const msg = await instantEmail(deps, p, tenderById);
+        r = await mailer.send(msg, { idempotencyKey: `tp-notif-${p.n.id}` });
+      } catch (e) {
+        if (isIdempotentReplay(e)) { await record('send outcome', [p.n.id], () => settle([p.n.id], 'sent')); continue; }
+        logger.warn('notification send failed', { id: p.n.id, channel: 'email', attempt: p.n.attempts + 1, transient: isTransientSendError(e), error: errMsg(e) });
+        await record('send failure', [p.n.id], () => fail([p.n.id], e));
+        continue;
+      }
+      await record('send outcome', [p.n.id], () => settle([p.n.id], r.skipped ? 'skipped' : 'sent', r.skipped ? EMAIL_NOT_CONFIGURED : null));
+    }
+  };
+  for (let i = 0; i < instantEmails.length; i += EMAIL_BATCH_SIZE) {
+    const chunk = instantEmails.slice(i, i + EMAIL_BATCH_SIZE);
+    if (!mailer.sendMany) { await sendSingly(chunk); continue; }
+    const ids = chunk.map((p) => p.n.id);
+    if (!leaseHeld()) { deferred.push(...ids); continue; }
+    let results: SendResult[];
+    try {
+      const msgs = await Promise.all(chunk.map((p) => instantEmail(deps, p, tenderById)));
+      results = await mailer.sendMany(msgs, { idempotencyKey: `tp-batch-${await sha256Hex([...ids].sort().join(','))}` });
+    } catch (e) {
+      if (isIdempotentReplay(e)) { await record('email batch outcome', ids, () => settle(ids, 'sent')); continue; }
+      logger.warn('email batch send failed', { count: ids.length, transient: isTransientSendError(e), error: errMsg(e) });
+      if (chunk.length > 1 && isBatchValidationError(e)) { await sendSingly(chunk); continue; }
+      await record('email batch failure', ids, () => fail(ids, e));
+      continue;
+    }
+    const skippedIds = ids.filter((_, j) => results[j]?.skipped);
+    const sentIds = ids.filter((_, j) => !results[j]?.skipped);
+    await record('email batch outcome', ids, async () => {
+      await settle(sentIds, 'sent');
+      await settle(skippedIds, 'skipped', EMAIL_NOT_CONFIGURED);
+    });
+  }
 
   for (const [key, group] of digestGroups) {
     const [userId, orgId, channel] = key.split('|') as [string, string, 'email' | 'whatsapp'];
@@ -387,28 +442,49 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   return report;
 }
 
+/** Most messages one `Mailer.sendMany` call is given (= Resend's batch limit, adapters/mailer.ts). */
+export const EMAIL_BATCH_SIZE = 100;
+
+/**
+ * Resend 409 other than `concurrent_idempotent_requests` (which the adapter marks transient: the first request is still
+ * in flight and may yet fail, so the rows are retried later): the idempotency key was already used by a settled request
+ * (`invalid_idempotent_request`), so these rows were accepted then and are settled as sent. Retries render the same
+ * payload (see `instantEmail`), so a mismatch means an earlier attempt with this key, not a different message.
+ */
+const isIdempotentReplay = (e: unknown) => e instanceof ProviderError && e.status === 409 && e.code !== RESEND_CONCURRENT_IDEMPOTENT;
+/** Resend 400/422: the request (for a batch: any one of its messages) failed validation — permanent for that message. */
+const isBatchValidationError = (e: unknown) => e instanceof ProviderError && (e.status === 400 || e.status === 422);
+const EMAIL_NOT_CONFIGURED = 'Email is not configured (RESEND_API_KEY)';
+
+/**
+ * The email for one instant (non-digest) notification row. Rendered as of the row's `created_at` (not the dispatch
+ * time), so every retry of a row sends the same payload under the same idempotency key (review R2-N1).
+ */
+async function instantEmail(deps: AppDeps, p: { n: NotificationRow; email: string; orgName: string }, tenderById: Map<string, TenderRow>): Promise<EmailMessage> {
+  const { config } = deps;
+  const now = p.n.createdAt;
+  const tender = tenderById.get(tenderIdFromLink(p.n.link) ?? '');
+  const heading = p.n.kind === 'tender_match' ? 'A new GeM tender matches your watchlist'
+    : p.n.kind === 'corrigendum' ? 'A tracked GeM bid was amended' : p.n.title;
+  return {
+    to: p.email,
+    subject: p.n.title,
+    headers: await unsubscribeHeaders(config, p.n.userId, p.n.orgId),
+    html: renderAlertEmail({ heading, intro: p.n.kind === 'tender_match' ? 'Act early — the best bids are prepared well before the deadline.'
+      : p.n.kind === 'corrigendum' ? 'The buyer changed this bid on GeM. Re-check your eligibility analysis before you bid.' : p.n.body, rows: [{ n: p.n, tender }], appUrl: config.appUrl, orgName: p.orgName, now }),
+    text: textVersion([p], config.appUrl),
+  };
+}
+
+/** One WhatsApp message (instant emails are batched by the dispatcher). */
 async function sendOne(
   deps: AppDeps,
-  p: { n: NotificationRow; email: string; phone: string | null; orgName: string },
+  p: { n: NotificationRow; phone: string | null },
   tenderById: Map<string, TenderRow>,
-  now: Date,
 ): Promise<{ skipped: boolean; reason?: string }> {
-  const { mailer, whatsapp, config } = deps;
+  const { whatsapp, config } = deps;
   const tender = tenderById.get(tenderIdFromLink(p.n.link) ?? '');
   const url = `${config.appUrl}${p.n.link ?? ''}`;
-  if (p.n.channel === 'email') {
-    const heading = p.n.kind === 'tender_match' ? 'A new GeM tender matches your watchlist'
-      : p.n.kind === 'corrigendum' ? 'A tracked GeM bid was amended' : p.n.title;
-    const r = await mailer.send({
-      to: p.email,
-      subject: p.n.title,
-      headers: await unsubscribeHeaders(config, p.n.userId, p.n.orgId),
-      html: renderAlertEmail({ heading, intro: p.n.kind === 'tender_match' ? 'Act early — the best bids are prepared well before the deadline.'
-        : p.n.kind === 'corrigendum' ? 'The buyer changed this bid on GeM. Re-check your eligibility analysis before you bid.' : p.n.body, rows: [{ n: p.n, tender }], appUrl: config.appUrl, orgName: p.orgName, now }),
-      text: textVersion([p], config.appUrl),
-    });
-    return r.skipped ? { skipped: true, reason: 'Email is not configured (RESEND_API_KEY)' } : { skipped: false };
-  }
   if (!p.phone) return { skipped: true, reason: 'No mobile number on the account' };
   const closes = tender?.endAt ? istDate(tender.endAt) : '';
   const r = await whatsapp.send({

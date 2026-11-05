@@ -1,0 +1,25 @@
+$ every repo path cited in README/runbook launch checklist/requirements exists
+ok docs/runbook.md
+ok docs/delivery/TEAM_PLAYBOOK.md
+ok docs/runbook.md
+ok specs/008-operations-scale/spec.md
+ok specs/001-gem-tender-copilot/plan.md
+ok CONVENTIONS.md
+ok docs/delivery/TEAM_PLAYBOOK.md
+ok qa/evidence/008/US3/VERDICT.md
+ok qa/evidence/008/US7/VERDICT.md
+ok qa/evidence/008/US4/VERDICT.md
+ok qa/evidence/008/US5/VERDICT.md
+ok qa/evidence/008/US6/VERDICT.md
+ok qa/evidence/002/US1/VERDICT.md
+ok apps/api/src/lib/rate-limit-rules.ts
+ok packages/core/src/security/headers.ts
+ok packages/core/src/contracts/plans.ts
+ok apps/api/test/isolation-contract.test.ts
+ok apps/api/test/isolation.test.ts
+ok docs/adr/0012-data-retention-and-housekeeping.md
+$ port 5433
+/bin/bash: line 9: ss: command not found
+db:migrate target:
+12:    "migrate": "tsx src/migrate.ts",
+ok packages/db/src/migrate.ts

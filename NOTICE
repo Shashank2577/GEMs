@@ -33,6 +33,8 @@ listed here with its licence.
      packages/core/src/gem/client.ts for the bid-document byte cap, an optional beforeAttempt hook (cluster-wide
      GeM lease), status/url on the result.
    - packages/core/src/gem/http.test.ts — cases adapted from src/http.test.ts (node:test → vitest).
+   Spec 008 Operations & Scale (US7, 2026-11-05): apps/api/src/services/housekeeping.ts — pattern only (named,
+   test-pinned retention/bounds constants, cf. RETENTION_DAYS in src/monitoring.ts); no code copied.
    - Planned (spec 008 US1, not yet in this repository): .github/workflows/ci.yml and dod.yml will adapt the
      structure of .github/workflows/ci.yml (minimal permissions, timeouts, production-dependency audit step).
    Spec 004 Analyse US2 extraction (ported at commit 46925c6, 2026-11-05), packages/core/src/analyse/rules.ts:
