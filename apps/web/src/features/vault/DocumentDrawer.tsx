@@ -66,12 +66,12 @@ function Versions({ docId }: { docId: string }) {
 
 function Meta({ icon: Icon, label, children }: { icon: typeof Calendar; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 py-2">
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <dt className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
-        <dd className="mt-0.5 break-words text-sm">{children}</dd>
-      </div>
+    // A <dl> group may only hold <dt>/<dd> (axe definition-list / dlitem): the icon lives inside the <dt>.
+    <div className="relative min-w-0 py-2 pl-[26px]">
+      <dt className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Icon className="absolute left-0 top-2.5 size-4 text-muted-foreground" aria-hidden />{label}
+      </dt>
+      <dd className="mt-0.5 break-words text-sm">{children}</dd>
     </div>
   );
 }

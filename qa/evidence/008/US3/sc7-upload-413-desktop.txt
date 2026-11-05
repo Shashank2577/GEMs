@@ -1,0 +1,20 @@
+# sc7-upload-413 — project desktop — 2026-11-05T04:32:08.307Z
+### POST /api/vault with a 30 MB (31457280 bytes) body
+> content-length: 31457280
+< 413  (48 ms)
+< content-type: application/json
+{"error":{"code":"payload_too_large","message":"Files can be at most 20 MB. Compress the scan or split it and try again.","details":{"maxBytes":21037056}}}
+
+### PUT /api/vault/:id/file with a 30 MB (31457280 bytes) body
+> content-length: 31457280
+< 413  (30 ms)
+< content-type: application/json
+{"error":{"code":"payload_too_large","message":"Files can be at most 20 MB. Compress the scan or split it and try again.","details":{"maxBytes":21037056}}}
+
+### POST /api/tenders/:id/documents with a 30 MB (31457280 bytes) body
+> content-length: 31457280
+< 413  (30 ms)
+< content-type: application/json
+{"error":{"code":"payload_too_large","message":"The file is larger than 25 MB","details":{"maxBytes":26279936}}}
+
+control: 14-byte multipart POST /api/vault -> 422 (not 413)

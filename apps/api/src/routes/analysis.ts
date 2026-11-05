@@ -19,6 +19,8 @@ import { overrideFactorInputSchema, scoringWeightsSchema, tenderDocKindSchema } 
 import { HttpError, badRequest, notFound } from '../lib/errors';
 import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { TENDER_DOC_TOO_LARGE, TENDER_DOC_UPLOAD_MAX_BYTES, bodyLimit } from '../middleware/body-limit';
+import { rateLimit } from '../middleware/rate-limit';
 import {
   analyseTender, fetchGemDocuments, getTender, getTenderDocument, lastAttemptOf, latestAnalysis, latestDoneAnalysis, listTenderDocuments, overrideFactor,
   removeTenderDocument, saveWeights, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
@@ -35,12 +37,12 @@ const tenderIdOf = (id: string) => {
 
 analysisRoutes.get('/tenders/:id/documents', requireAuth, async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
-  const tender = await getTender(c.var.deps, tenderId);
+  const tender = await getTender(c.var.deps, tenderId, c.var.org);
   const docs = await listTenderDocuments(c.var.deps, tenderId, orgId(c));
   return c.json({ items: docs.map((d) => toDocumentDto(d, tender.bidNumber)), total: docs.length });
 });
 
-analysisRoutes.post('/tenders/:id/documents', requireRole('analyst'), async (c) => {
+analysisRoutes.post('/tenders/:id/documents', bodyLimit(TENDER_DOC_UPLOAD_MAX_BYTES, TENDER_DOC_TOO_LARGE), requireRole('analyst'), rateLimit('upload.org'), async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
   let body: Record<string, string | File>;
   try {
@@ -53,15 +55,15 @@ analysisRoutes.post('/tenders/:id/documents', requireRole('analyst'), async (c) 
   const kind = parseWith(z.object({ kind: tenderDocKindSchema.default('bid') }), { kind: typeof body.kind === 'string' && body.kind ? body.kind : undefined }, 'form').kind;
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { doc, tender, totalPages } = await uploadTenderDocument(c.var.deps, {
-    orgId: orgId(c), userId: userId(c), tenderId, kind, file: { name: file.name, type: file.type, bytes },
+    orgId: orgId(c), userId: userId(c), tenderId, kind, file: { name: file.name, type: file.type, bytes }, viewer: c.var.org,
   });
   const dto = toDocumentDto(doc, tender.bidNumber);
   return c.json({ ...dto, warnings: uploadWarnings(dto, totalPages) }, 201);
 });
 
-analysisRoutes.post('/tenders/:id/fetch-documents', requireRole('analyst'), async (c) => {
+analysisRoutes.post('/tenders/:id/fetch-documents', requireRole('analyst'), rateLimit('gem.fetch.org'), async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
-  const r = await fetchGemDocuments(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId });
+  const r = await fetchGemDocuments(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, viewer: c.var.org });
   return c.json({ items: r.documents.map((d) => toDocumentDto(d, r.tender.bidNumber)), total: r.documents.length, fetched: r.fetched }, r.fetched ? 201 : 200);
 });
 
@@ -69,7 +71,7 @@ analysisRoutes.delete('/tenders/:id/documents/:docId', requireRole('analyst'), a
   const tenderId = tenderIdOf(c.req.param('id'));
   const docId = uuidSchema.safeParse(c.req.param('docId'));
   if (!docId.success) throw notFound('Document');
-  await removeTenderDocument(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, docId: docId.data });
+  await removeTenderDocument(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, docId: docId.data, viewer: c.var.org });
   return c.body(null, 204);
 });
 
@@ -77,6 +79,7 @@ analysisRoutes.get('/tenders/:id/documents/:docId/download', requireAuth, async 
   const tenderId = tenderIdOf(c.req.param('id'));
   const docId = uuidSchema.safeParse(c.req.param('docId'));
   if (!docId.success) throw notFound('Document');
+  await getTender(c.var.deps, tenderId, c.var.org);
   const doc = await getTenderDocument(c.var.deps, tenderId, docId.data, orgId(c));
   const obj = await c.var.deps.blobs.get(doc.blobKey);
   if (!obj) throw notFound('Document file');
@@ -93,14 +96,15 @@ analysisRoutes.get('/tenders/:id/documents/:docId/download', requireAuth, async 
   });
 });
 
-analysisRoutes.post('/tenders/:id/analyse', requireRole('analyst'), async (c) => {
+analysisRoutes.post('/tenders/:id/analyse', requireRole('analyst'), rateLimit('analyse.user'), async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
-  const { analysis, documents } = await analyseTender(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId });
+  const { analysis, documents } = await analyseTender(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, viewer: c.var.org });
   return c.json(toAnalysisDto(analysis, documents), 201);
 });
 
 analysisRoutes.get('/tenders/:id/analysis', requireAuth, async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
+  await getTender(c.var.deps, tenderId, c.var.org);
   const [latest, done] = await Promise.all([
     latestAnalysis(c.var.deps, tenderId, orgId(c)), latestDoneAnalysis(c.var.deps, tenderId, orgId(c)),
   ]);

@@ -15,8 +15,10 @@ import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, notFound, validationError } from '../lib/errors';
+import { visibleTenderSource } from '../lib/tender-scope';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { rateLimit } from '../middleware/rate-limit';
 import type { AppEnv } from '../types';
 import { decorateTenders } from './tenders';
 
@@ -68,9 +70,10 @@ export const byPreviewOrder = (a: Candidate, b: Candidate) =>
  * Scans keyset pages ordered by `id` until exhausted (FR-028) and keeps only `{id, relevance, reasons, endAt,
  * createdAt}` per match (NFR-003).
  */
-export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteriaDto): Promise<Candidate[]> {
+export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteriaDto, scope: SQL): Promise<Candidate[]> {
   const now = deps.clock.now();
-  const conds: SQL[] = [eq(tenders.status, 'open'), or(isNull(tenders.endAt), gte(tenders.endAt, now))!];
+  // `scope`: the tenders the org may see (lib/tender-scope.ts; demo tenders only for demo orgs, 008/FR-016).
+  const conds: SQL[] = [scope, eq(tenders.status, 'open'), or(isNull(tenders.endAt), gte(tenders.endAt, now))!];
   // Stored states are canonical (parser), so canonicalise the criteria and keep the exact, indexed comparison.
   const states = [...new Set(clean(criteria.states).map((x) => canonicalState(x) ?? x))];
   if (states.length) conds.push(inArray(tenders.state, states));
@@ -127,20 +130,26 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
  * Re-evaluate a watchlist's matches (FR-025): drop ones that no longer match (closed tenders are kept), then insert
  * the matches computed by `candidateTenders` directly, in batches — never notifying.
  */
-async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect): Promise<number> {
+/**
+ * `scope` is the owning org's visible tenders (lib/tender-scope.ts, 008/FR-016): a demo org's saved watchlist matches
+ * the demo tenders its preview showed (silently — refreshes never alert); other orgs only ever match real tenders,
+ * and an existing match on a tender outside the scope is dropped.
+ */
+async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect, scope: SQL): Promise<number> {
   const now = deps.clock.now();
   const existing = await deps.db.select({ id: tenderMatches.id, tenderId: tenderMatches.tenderId }).from(tenderMatches)
     .where(eq(tenderMatches.watchlistId, w.id));
   const stale: string[] = [];
   for (let i = 0; i < existing.length; i += BATCH) {
     const chunk = existing.slice(i, i + BATCH);
-    const rows = await deps.db.select(MATCH_COLUMNS).from(tenders).where(inArray(tenders.id, chunk.map((e) => e.tenderId)));
+    const rows = await deps.db.select(MATCH_COLUMNS).from(tenders).where(and(scope, inArray(tenders.id, chunk.map((e) => e.tenderId))));
     const keep = new Set(rows.filter((t) => t.status !== 'open' || matchTender(t, w.criteria, { now: new Date(0) }).matched).map((t) => t.id));
     for (const e of chunk) if (!keep.has(e.tenderId)) stale.push(e.id);
   }
   for (let i = 0; i < stale.length; i += BATCH) await deps.db.delete(tenderMatches).where(inArray(tenderMatches.id, stale.slice(i, i + BATCH)));
   if (!w.active) return 0;
-  const cands = await candidateTenders(deps, w.criteria as WatchlistCriteriaDto);
+  // Candidates are already limited to `scope`, so the direct insert below never pairs this org with a hidden tender.
+  const cands = await candidateTenders(deps, w.criteria as WatchlistCriteriaDto, scope);
   let created = 0;
   for (let i = 0; i < cands.length; i += BATCH) {
     const ins = await deps.db.insert(tenderMatches)
@@ -205,11 +214,11 @@ watchlistsRoutes.get('/watchlists', requireAuth, async (c) => {
   return c.json({ items, total: items.length });
 });
 
-watchlistsRoutes.post('/watchlists/preview', requireAuth, async (c) => {
+watchlistsRoutes.post('/watchlists/preview', requireAuth, rateLimit('watchlist.preview.user'), async (c) => {
   const deps = c.var.deps;
   const { criteria } = await parseJson(c, watchlistPreviewSchema);
   if (criteriaIsEmpty(criteria)) return c.json({ count: 0, sample: [] });
-  const cands = await candidateTenders(deps, criteria);
+  const cands = await candidateTenders(deps, criteria, visibleTenderSource(c.var.org));
   cands.sort(byPreviewOrder);
   const top = cands.slice(0, 5);
   // Full rows only for the sample.
@@ -240,7 +249,7 @@ watchlistsRoutes.post('/watchlists', requireRole('analyst'), async (c) => {
     }).returning();
     return row;
   });
-  const matched = await refreshMatches(deps, w);
+  const matched = await refreshMatches(deps, w, visibleTenderSource(c.var.org));
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'watchlist.created', entityType: 'watchlist', entityId: w.id, meta: { name: w.name, matched } });
   const [dto] = await serialize(deps, org, [w]);
   return c.json(dto, 201);
@@ -258,7 +267,7 @@ watchlistsRoutes.patch('/watchlists/:id', requireRole('analyst'), async (c) => {
     ...(body.active !== undefined ? { active: body.active } : {}),
     updatedAt: deps.clock.now(),
   }).where(and(eq(watchlists.id, w.id), eq(watchlists.orgId, org))).returning();
-  if (body.criteria || (body.active === true && !w.active)) await refreshMatches(deps, updated);
+  if (body.criteria || (body.active === true && !w.active)) await refreshMatches(deps, updated, visibleTenderSource(c.var.org));
   const action = body.active === false ? 'watchlist.paused' : body.active === true && !w.active ? 'watchlist.resumed' : 'watchlist.updated';
   await logActivity(deps.db, { orgId: org, userId: userId(c), action, entityType: 'watchlist', entityId: w.id, meta: { name: updated.name } });
   const [dto] = await serialize(deps, org, [updated]);

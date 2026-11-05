@@ -27,6 +27,10 @@ APP_URL = "https://tenderpilot.workers.dev"
 GEM_BASE_URL = "https://bidplus.gem.gov.in"
 LLM_MODEL = "claude-sonnet-5-5"
 MAIL_FROM = "TenderPilot <alerts@tenderpilot.in>"
+# Client-IP source for the per-IP auth rate limits (002/FR-010). The Worker default is "cloudflare"
+# (cf-connecting-ip, which Cloudflare always overwrites), so this only needs setting to change it
+# ("xff" | "none"). Behind another proxy in front of Cloudflare, keep "cloudflare" unless you know why not.
+TRUST_PROXY = "cloudflare"
 
 [observability]
 enabled = true

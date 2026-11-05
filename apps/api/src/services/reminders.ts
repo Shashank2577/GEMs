@@ -57,7 +57,7 @@ export async function runExpiryReminders(deps: AppDeps, opts: { orgId?: string }
       const inserted = await deps.db.insert(notifications).values(rows).onConflictDoNothing().returning({ id: notifications.id });
       report.notifications += inserted.length;
     }
-    await deps.db.update(vaultDocuments).set({ lastReminderDays: threshold }).where(eq(vaultDocuments.id, d.id));
+    await deps.db.update(vaultDocuments).set({ lastReminderDays: threshold }).where(and(eq(vaultDocuments.orgId, d.orgId), eq(vaultDocuments.id, d.id)));
     report.documents++;
   }
   deps.logger.info('expiry reminders', { ...report });

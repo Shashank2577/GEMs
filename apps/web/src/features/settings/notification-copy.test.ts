@@ -29,6 +29,10 @@ describe('testAlertToast (002/FR-034, T067)', () => {
     expect(t.kind).toBe('warning');
     expect(t.lines).toEqual(['In-app sent', 'Email failed to send', 'WhatsApp needs a mobile number']);
   });
+  it('prefers the server skip reason over guessing from the profile', () => {
+    expect(testAlertToast({ inApp: 'sent', email: 'off', whatsapp: 'skipped', skipReasons: { whatsapp: 'not_configured' } }, false).lines[2]).toBe('WhatsApp not configured on this server');
+    expect(testAlertToast({ inApp: 'sent', email: 'off', whatsapp: 'skipped', skipReasons: { whatsapp: 'no_phone' } }, true).lines[2]).toBe('WhatsApp needs a mobile number');
+  });
   it('is a plain success when email and WhatsApp are off', () => {
     expect(testAlertToast({ inApp: 'sent', email: 'off', whatsapp: 'off' }, true)).toMatchObject({ kind: 'success', title: 'Test alert sent' });
   });
