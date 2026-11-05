@@ -326,7 +326,9 @@ authRoutes.post('/me/password', requireSession, async (c) => {
   await limiter.succeed();
   await db.update(users).set({ passwordHash: await hashPassword(body.newPassword) }).where(eq(users.id, userId(c)));
   // Sign out other sessions.
-  await db.delete(sessions).where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!)));
+  const others = await db.delete(sessions).where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!))).returning({ id: sessions.id });
+  // Activity (002/FR-042): never any password material; only how many other sessions were signed out.
+  await logActivity(db, { orgId: orgId(c), userId: userId(c), action: 'auth.password_changed', entityType: 'user', entityId: userId(c), meta: { otherSessionsRevoked: others.length } });
   return c.json({ ok: true as const });
 });
 

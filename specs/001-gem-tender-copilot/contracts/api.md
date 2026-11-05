@@ -41,7 +41,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member; 409 `last_owner` when it would leave no owner (FR-021) |
 | DELETE (S) | /org/members/me | – | `{ok:true,nextOrgId}`: leave the active org (FR-027); 409 `last_owner` |
 | PATCH (M) | /org | `{name?, onboardingState?, scoringWeights?}` | org |
-| GET | /activity | `entityType?, entityId?, userId?, page?, pageSize?` | `{items:[{id,user:{id,name}\|null,action,entityType,entityId,meta,createdAt}], total}`; `user` is null when the actor no longer exists; newest first, paginated by `page`/`pageSize` |
+| GET | /activity | `entityType?, entityId?, userId?, page?, pageSize?` | `{items:[{id,user:{id,name}\|null,action,entityType,entityId,meta,createdAt}], total}`; `user` is null when the actor no longer exists; newest first, paginated by `page`/`pageSize`. Includes `auth.password_changed` (`POST /me/password`, meta `{otherSessionsRevoked}`) and `auth.sessions_revoked` (`POST /me/sessions/revoke-others` when ≥1 revoked, `DELETE /me/sessions/:id`; meta `{scope:'others'\|'one'\|'current',count}`), both `entityType:'user'` in the active org (002/FR-042) |
 | GET | /health | – | `{ok, db, version}` (no auth) |
 
 ### Platform error codes
