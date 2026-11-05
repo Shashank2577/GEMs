@@ -95,7 +95,7 @@ export function createAnthropicClient(opts: AnthropicOptions): LlmClient {
         stopReason: data.stop_reason ?? null,
         usage: { inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 },
       };
-      opts.logger?.info('llm: call', { model: result.model, stopReason: result.stopReason, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens });
+      opts.logger?.info('llm: call', { model: result.model, stopReason: result.stopReason, usageIn: result.usage.inputTokens, usageOut: result.usage.outputTokens });
       return result;
     } catch (e) {
       if (e instanceof LlmError) throw e;

@@ -416,7 +416,7 @@ test('15 scanned PDF: accepted (hasText:false), toast "no text found; it may be 
   expect(res.status()).toBe(201);
   expect(await res.json()).toMatchObject({ hasText: false, pageCount: 2 });
   await expect(toastText(page, '2 pages read — no text found; it may be a scan')).toBeVisible();
-  await expect(page.locator('li:not([data-sonner-toast])').filter({ hasText: 'scan.pdf' })).toContainText('No text — scanned?');
+  await expect(page.locator('li:not([data-sonner-toast], [data-testid="unreadable-notice"] li)').filter({ hasText: 'scan.pdf' })).toContainText('No text — scanned?');
   await ev(page, '15-scanned-pdf');
 });
 
@@ -431,7 +431,7 @@ test('16 (gap) bid-number mismatch: warnings, warning toast, "Different bid?" ba
   const body = (await res.json()) as { warnings: { code: string; found: string }[] };
   expect(body.warnings).toEqual([{ code: 'bid_number_mismatch', found: 'GEM/2026/B/6133872' }]);
   await expect(toastText(page, `This PDF looks like GEM/2026/B/6133872, not ${t.bidNumber}`)).toBeVisible();
-  await expect(page.locator('li:not([data-sonner-toast])').filter({ hasText: 'go-it-services.pdf' })).toContainText('Different bid?');
+  await expect(page.locator('li:not([data-sonner-toast], [data-testid="unreadable-notice"] li)').filter({ hasText: 'go-it-services.pdf' })).toContainText('Different bid?');
   await ev(page, '16-bid-number-mismatch');
   const docs = (await (await page.request.get(`/api/tenders/${t.id}/documents`)).json()) as { total: number };
   expect(docs.total).toBe(1);

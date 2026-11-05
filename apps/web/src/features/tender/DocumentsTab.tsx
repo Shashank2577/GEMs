@@ -164,7 +164,7 @@ function DocRow({ doc, tenderId, bidNumber, onRemove, ocrState, ocrBusy, onOcr }
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">
         {ocrState !== 'hidden' && (
-          <Button size="sm" variant="secondary" onClick={onOcr} disabled={ocrBusy} aria-label={ocrState === 'running' ? `Reading ${doc.fileName} with AI` : `Read ${doc.fileName} with AI (OCR)`}>
+          <Button size="sm" variant="secondary" onClick={onOcr} disabled={ocrBusy} aria-label={ocrState === 'running' ? `Reading… ${doc.fileName}` : `Read with AI (OCR): ${doc.fileName}`}>
             {ocrState === 'running' ? <Loader2 className="animate-spin" aria-hidden /> : <ScanText aria-hidden />} {ocrState === 'running' ? 'Reading…' : 'Read with AI (OCR)'}
           </Button>
         )}

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { createAnthropicClient, LlmError, MAX_NON_STREAMING_TOKENS } from '../src/adapters/llm';
 import { LLM_REQUIREMENTS_JSON_SCHEMA } from '@tp/core/analyse/llm';
-import type { Logger } from '../src/deps';
+import { createJsonLogger } from '../src/adapters/logger';
 
 interface Sent { url: string; headers: Record<string, string>; body: Record<string, unknown> }
 
@@ -45,15 +45,16 @@ describe('createAnthropicClient', () => {
 
   it('reports model and usage, and logs model / stop_reason / usage without the key or the text', async () => {
     const { f } = fakeFetch(message());
-    const lines: { msg: string; meta?: Record<string, unknown> }[] = [];
-    const logger: Logger = { info: (msg, meta) => lines.push({ msg, meta }), warn() {}, error() {} };
+    // The REAL logger, so key redaction (/token/i etc.) is exercised on the usage fields.
+    const out: string[] = [];
+    const logger = createJsonLogger({ write: (l) => out.push(l) });
     const llm = createAnthropicClient({ apiKey: 'sk-secret', model: 'm', fetch: f, logger });
     const seen: unknown[] = [];
     await llm.completeJson({ prompt: 'SECRET PROMPT', jsonSchema: {} }, { onUsage: (r) => seen.push(r) });
     expect(seen).toEqual([{ model: 'claude-sonnet-5-5', usage: { inputTokens: 120, outputTokens: 7 } }]);
-    expect(lines).toHaveLength(1);
-    expect(lines[0].meta).toEqual({ model: 'claude-sonnet-5-5', stopReason: 'end_turn', inputTokens: 120, outputTokens: 7 });
-    expect(JSON.stringify(lines)).not.toMatch(/sk-secret|SECRET PROMPT/);
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0])).toMatchObject({ msg: 'llm: call', model: 'claude-sonnet-5-5', stopReason: 'end_turn', usageIn: 120, usageOut: 7 });
+    expect(out[0]).not.toMatch(/redacted|sk-secret|SECRET PROMPT/);
   });
 
   it('complete() returns text, model, stopReason and usage', async () => {
