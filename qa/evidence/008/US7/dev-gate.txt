@@ -1,4 +1,4 @@
-# Gate on story/GEM-362-efficiency after merging origin/main (37984db) — 2026-11-05T09:00:38Z
+# Gate after merging origin/main (dca373e) — 2026-11-05T09:07:14Z
 $ pnpm -r typecheck
 packages/core typecheck: Done
 tools/mock-gem typecheck: Done
@@ -10,23 +10,12 @@ $ pnpm --filter @tp/core exec vitest run
  Test Files  26 passed (26)
       Tests  486 passed (486)
 $ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run
-   × PATCH /org onboarding state (007 US3) > logs onboarding.completed once with durationSec 182ms
 stdout | test/match-batch.test.ts > batched matching (US7 scenario 4) > 1,000 watchlists × 500 tenders: < 5 s, 10,000 matches, every INSERT carries ≤ 500 rows
-   ✓ batched matching (US7 scenario 4) > 1,000 watchlists × 500 tenders: < 5 s, 10,000 matches, every INSERT carries ≤ 500 rows 2707ms
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
- FAIL  test/foundation.test.ts > PATCH /org onboarding state (007 US3) > logs onboarding.completed once with durationSec
- Test Files  1 failed | 43 passed | 2 skipped (46)
-      Tests  1 failed | 794 passed | 2 skipped (797)
- ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run
-$ pnpm --filter @tp/web exec vitest run
- Test Files  41 passed (41)
-      Tests  290 passed (290)
-$ cd packages/db && pnpm exec drizzle-kit check
-Everything's fine 🐶🔥
-
-# Re-run of the API suite (the single failure above, foundation.test.ts 'logs onboarding.completed once with durationSec' (007/US3, untouched by this story), passed alone (24/24) and passes below; it also passed in the two earlier full runs — a timing flake, not hidden)
-$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run
-stdout | test/match-batch.test.ts > batched matching (US7 scenario 4) > 1,000 watchlists × 500 tenders: < 5 s, 10,000 matches, every INSERT carries ≤ 500 rows
-   ✓ batched matching (US7 scenario 4) > 1,000 watchlists × 500 tenders: < 5 s, 10,000 matches, every INSERT carries ≤ 500 rows 1703ms
+   ✓ batched matching (US7 scenario 4) > 1,000 watchlists × 500 tenders: < 5 s, 10,000 matches, every INSERT carries ≤ 500 rows 1906ms
  Test Files  44 passed | 2 skipped (46)
       Tests  795 passed | 2 skipped (797)
+$ pnpm --filter @tp/web exec vitest run
+ Test Files  42 passed (42)
+      Tests  295 passed (295)
+$ cd packages/db && pnpm exec drizzle-kit check
+Everything's fine 🐶🔥
