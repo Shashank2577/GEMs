@@ -44,7 +44,7 @@ describe('packet build performance (NFR-002)', () => {
   let ctx: TestContext;
   let s: Awaited<ReturnType<typeof seedApply>>;
   let wsId: string;
-  let items: { kind: 'vault'; refId: string; title: string }[] = [];
+  const items: { kind: 'vault'; refId: string; title: string }[] = [];
   let inputBytes = 0;
 
   beforeAll(async () => {
@@ -66,13 +66,28 @@ describe('packet build performance (NFR-002)', () => {
   it('builds a 30-document / 120-page / ~25 MB packet in < 15 s', async () => {
     expect(inputBytes).toBeGreaterThan(TARGET_BYTES * 0.9);
     expect(inputBytes).toBeLessThan(TARGET_BYTES * 1.1);
+    // NFR-003: sample heap + ArrayBuffer memory while the build runs; the peak must stay under the 128 MB isolate.
+    global.gc?.();
+    const mem = () => { const m = process.memoryUsage(); return m.heapUsed + m.arrayBuffers; };
+    const baseline = mem();
+    let peak = baseline;
+    const sampler = setInterval(() => { peak = Math.max(peak, mem()); }, 5);
     const t0 = performance.now();
     const r = await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, {
       cookie: s.org.analyst.cookie, json: { items: [{ kind: 'cover', title: 'Cover page & index' }, ...items] },
     });
     const took = ms(t0);
-    const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-    console.log(`[perf] packet build: ${took} ms, input ${(inputBytes / 1048576).toFixed(1)} MB, output ${((r.body.sizeBytes ?? 0) / 1048576).toFixed(1)} MB, ${r.body.pageCount} pages, heapUsed after ${heapMB} MB`);
+    clearInterval(sampler);
+    peak = Math.max(peak, mem());
+    const peakMB = peak / 1024 / 1024;
+    console.log(`[perf] packet build: ${took} ms, input ${(inputBytes / 1048576).toFixed(1)} MB, output ${((r.body.sizeBytes ?? 0) / 1048576).toFixed(1)} MB, ${r.body.pageCount} pages, peak heapUsed+arrayBuffers ${peakMB.toFixed(1)} MB (baseline before build ${(baseline / 1048576).toFixed(1)} MB)`);
+    // The absolute peak includes the test process's own baseline (vitest, pg pool, seed data: ~33 MB) that a Worker
+    // isolate does not carry per request, so the budget is asserted on what the build itself adds. The sampler runs
+    // between event-loop turns, so this is a lower bound. Measured 2026-11-05: ~97 MB added for 24.8 MB input
+    // (≈ 3.9× input) — see the T065 report: the 60 MB default cap does NOT keep a build under 128 MB.
+    const addedMB = (peak - baseline) / 1048576;
+    console.log(`[perf] build added ${addedMB.toFixed(1)} MB (${((peak - baseline) / inputBytes).toFixed(1)}× input)`);
+    expect(addedMB).toBeLessThan(128);
     expect(r.status).toBe(201);
     expect(r.body.pageCount).toBe(PAGES + 3); // cover + 2 index pages (30 rows > 26)
     expect(took).toBeLessThan(15_000);

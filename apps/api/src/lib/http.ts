@@ -1,5 +1,11 @@
 /** Small HTTP helpers shared by download routes. */
 
+/** `String.prototype.toWellFormed` (ES2024) with a regex fallback for older runtimes. */
+function wellFormed(s: string): string {
+  const native = (s as string & { toWellFormed?: () => string }).toWellFormed;
+  return native ? native.call(s) : s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+}
+
 export type DispositionKind = 'inline' | 'attachment';
 
 /**
@@ -17,6 +23,7 @@ export function contentDisposition(kind: DispositionKind, fileName: string): str
   const stem = ascii.lastIndexOf('.') > 0 ? ascii.slice(0, ascii.lastIndexOf('.')) : ascii;
   if (!/[A-Za-z0-9]/.test(stem)) ascii = `document.${ext}`;
   // encodeURIComponent leaves !'()* unescaped; RFC 5987 attr-char excludes ' ( ) * so escape them too.
-  const star = encodeURIComponent(name).replace(/[!'()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  // Lone surrogates would make encodeURIComponent throw (URIError): replace them with U+FFFD first.
+  const star = encodeURIComponent(wellFormed(name)).replace(/[!'()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
   return `${kind}; filename="${ascii}"; filename*=UTF-8''${star}`;
 }

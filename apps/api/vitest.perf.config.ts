@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'node',
     fileParallelism: false,
     pool: 'forks',
+    // --expose-gc lets the memory check start from a collected heap (global.gc in packet.perf.ts).
+    poolOptions: { forks: { execArgv: ['--expose-gc'] } },
     testTimeout: 120_000,
     hookTimeout: 300_000,
     env: {

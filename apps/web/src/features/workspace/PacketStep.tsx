@@ -50,22 +50,33 @@ function allRows(data: WorkspaceDetail): { rows: Row[]; proposed: string[]; comp
 
 const sameOrder = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
+interface PacketDraft { basePacketId: string | null; order: string[] }
+
 /**
- * Per-browser packet order kept only as an unsaved draft (006/FR-055): `null` means "use the server's proposed order".
- * Stored under `tp:packet-order:<workspaceId>`; removed when cleared (after a successful build or a reset).
+ * Per-browser packet order kept only as an unsaved draft (006/FR-055), stored under `tp:packet-order:<workspaceId>` as
+ * `{ basePacketId, order }` where `basePacketId` is the latest ready build the draft was made on. `null` means "use the
+ * server's proposed order". A draft made on an older build (a newer ready build now exists — ours or a teammate's) is
+ * dropped; this also clears the draft after our own successful build, once the refreshed workspace arrives, so the
+ * list never flashes back to the previous order in between.
  */
-function usePacketDraft(workspaceId: string) {
+function usePacketDraft(workspaceId: string, basePacketId: string | null) {
   const key = `tp:packet-order:${workspaceId}`;
-  const read = (): string[] | null => {
-    try { const v = JSON.parse(localStorage.getItem(key) ?? 'null'); return Array.isArray(v) ? v.map(String) : null; } catch { return null; }
+  const read = (): PacketDraft | null => {
+    try {
+      const v = JSON.parse(localStorage.getItem(key) ?? 'null') as PacketDraft | null;
+      return v && Array.isArray(v.order) ? { basePacketId: v.basePacketId ?? null, order: v.order.map(String) } : null;
+    } catch { return null; }
   };
-  const [draft, setDraftState] = useState<string[] | null>(read);
+  const [draft, setDraftState] = useState<PacketDraft | null>(read);
   useEffect(() => { setDraftState(read()); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
-  const setDraft = useCallback((v: string[] | null) => {
+  const write = useCallback((v: PacketDraft | null) => {
     setDraftState(v);
     try { if (v) localStorage.setItem(key, JSON.stringify(v)); else localStorage.removeItem(key); } catch { /* storage unavailable */ }
   }, [key]);
-  return [draft, setDraft] as const;
+  const stale = !!draft && draft.basePacketId !== basePacketId;
+  useEffect(() => { if (stale) write(null); }, [stale, write]);
+  const setDraft = useCallback((order: string[] | null) => write(order ? { basePacketId, order } : null), [write, basePacketId]);
+  return [stale ? null : draft?.order ?? null, setDraft] as const;
 }
 
 const KIND_ICON = { cover: BookOpen, annexure: FileSignature, vault: FileText, tender_doc: FileStack } as const;
@@ -74,11 +85,14 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
   const canWrite = useCan('analyst');
   const { rows, proposed, computed } = useMemo(() => allRows(data), [data]);
   const byUid = useMemo(() => new Map(rows.map((r) => [r.uid, r])), [rows]);
-  const [order, setOrder] = usePacketDraft(data.workspace.id);
-  const included = (order ?? proposed).filter((u) => byUid.has(u));
+  const latestReadyId = data.packets.find((p) => p.status === 'ready')?.id ?? null;
+  const [order, setOrder] = usePacketDraft(data.workspace.id, latestReadyId);
+  const shared = proposed.filter((u) => byUid.has(u));
+  const included = (order ?? shared).filter((u) => byUid.has(u));
   const isComputed = sameOrder(included, computed);
-  const fromLastBuild = !order && !sameOrder(proposed, computed);
-  const resetOrder = () => setOrder(sameOrder(proposed, computed) ? null : computed);
+  const isDraft = !!order && !sameOrder(included, shared);
+  const fromLastBuild = !order && !sameOrder(shared, computed);
+  const resetOrder = () => setOrder(sameOrder(shared, computed) ? null : computed);
   const available = rows.filter((r) => !included.includes(r.uid));
   const build = useBuildPacket(data.workspace.id);
   const [phase, setPhase] = useState(0);
@@ -112,8 +126,7 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
 
   const doBuild = () => build.mutate(items.map(({ kind, refId, title, pages: p }) => ({ kind, refId, title, pages: p })), {
     onSuccess: (p) => {
-      // The build is now the team's shared order; drop the local draft.
-      if (p.status === 'ready') setOrder(null);
+      // The draft is dropped by usePacketDraft once the refreshed workspace shows this build as the latest ready one.
       toast.success(`Packet ready — ${p.pageCount} pages`, { description: p.warnings.length ? `${pluralize(p.warnings.length, 'warning')} to review` : 'Download it and check every page before uploading on GeM.' });
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -127,7 +140,7 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-semibold">Packet contents</h3>
               <p className="text-xs text-muted-foreground">Drag to reorder (or use the arrows). The index page lists every document with its page number.</p>
-              {order && !sameOrder(order, proposed) && canWrite && <p className="mt-1 text-2xs text-muted-foreground">Unsaved order on this device — build the packet to share it with your team.</p>}
+              {isDraft && canWrite && <p className="mt-1 text-2xs text-muted-foreground">Unsaved order on this device — build the packet to share it with your team.</p>}
               {fromLastBuild && <p className="mt-1 text-2xs text-muted-foreground">Order from the last successful build.</p>}
             </div>
             {canWrite && !isComputed && <Button size="xs" variant="ghost" onClick={resetOrder}><RotateCcw /> Default order</Button>}
@@ -177,7 +190,8 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
           </div>
           <div className="mt-4">
             <div className="mb-1.5 flex justify-between text-xs"><span className="text-muted-foreground">Estimated size</span><span className={cn('tabular font-medium', size > LIMIT && 'text-danger')}>{formatBytes(size)} / 20 MB</span></div>
-            <Progress value={(size / LIMIT) * 100} tone={size > LIMIT ? 'danger' : size > LIMIT * 0.75 ? 'warning' : 'success'} size="sm" />
+            <Progress value={(size / LIMIT) * 100} tone={size > LIMIT ? 'danger' : size > LIMIT * 0.75 ? 'warning' : 'success'} size="sm"
+              aria-label="Estimated packet size" aria-valuetext={`${(size / (1024 * 1024)).toFixed(1)} MB of 20 MB`} />
             {size > LIMIT && <p className="mt-2 text-xs text-danger">Above GeM’s typical per-file limit — remove large scans or compress them in the vault.</p>}
           </div>
           {canWrite && (
@@ -187,7 +201,7 @@ export function PacketStep({ data, onNext }: { data: WorkspaceDetail; onNext: ()
           )}
           {build.isPending && (
             <div className="mt-3 space-y-2" role="status" aria-live="polite">
-              <Progress value={20 + phase * 25} size="sm" />
+              <Progress value={20 + phase * 25} size="sm" aria-label="Packet build progress" />
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="size-3.5 animate-spin" aria-hidden />{['Rendering annexures…', 'Merging documents…', 'Writing index & bookmarks…', 'Saving the packet…'][phase]}</p>
             </div>
           )}

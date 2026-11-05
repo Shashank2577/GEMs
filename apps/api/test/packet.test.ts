@@ -1,8 +1,8 @@
 /** Annexures & packet API (T061–T063, T067; FR-024, FR-025, US4 acceptance 2–4). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
-import { packets, vaultDocuments } from '@tp/db';
+import { analyses, packets, vaultDocuments } from '@tp/db';
 import { loadConfig } from '../src/env';
 import { contentDisposition } from '../src/lib/http';
 import { extractPages } from '@tp/core/analyse/pdf-text';
@@ -170,23 +170,41 @@ describe('packets', () => {
 
 describe('packet order, input cap, recovery and download names (US5 gaps)', () => {
   const titles = (items: { title: string }[]) => items.map((i) => i.title);
-  const COMPUTED_REST = [
-    'Covering Letter for Technical Bid', 'Undertaking regarding Non-Blacklisting / Non-Debarment', 'Self-Certificate of Local Content (Make in India)',
-    'GST registration certificate', 'Audited balance sheets — last 3 financial years', 'OEM authorisation certificate (MAF) for this bid',
-  ];
 
-  it('proposes the last ready build\'s order to every member, appending newly required items (FR-055)', async () => {
-    // The last ready build is the custom one: Cover, PAN, EMD exemption.
+  it('proposes the last ready build\'s order to every member and POST {} builds it (FR-055, FR-046)', async () => {
+    // The last ready build is the custom one: Cover, PAN, EMD exemption. Items it left out stay out.
     const r = await request(ctx.app, 'GET', `/workspaces/${wsId}`, { cookie: s.org.bidManager.cookie });
     expect(r.status).toBe(200);
-    expect(titles(r.body.defaultPacketItems)).toEqual(['Cover', 'PAN', 'EMD exemption', ...COMPUTED_REST]);
+    expect(titles(r.body.defaultPacketItems)).toEqual(['Cover', 'PAN', 'EMD exemption']);
     expect(r.body.defaultPacketItems[1]).toMatchObject({ kind: 'vault', refId: s.docs.pan.id });
     expect(titles(r.body.computedPacketItems)).toEqual([
       'Cover page & index', 'Covering Letter for Technical Bid', 'Undertaking regarding Non-Blacklisting / Non-Debarment',
       'Self-Certificate of Local Content (Make in India)', 'GST registration certificate', 'PAN card of the firm',
       'Audited balance sheets — last 3 financial years', 'OEM authorisation certificate (MAF) for this bid',
     ]);
-    // POST {} still builds the computed default (FR-046), not the proposed order.
+    const [snap] = await ctx.db.select().from(packets).where(eq(packets.status, 'ready')).orderBy(desc(packets.createdAt)).limit(1);
+    expect(snap.defaultUids).toEqual(r.body.computedPacketItems.map((i: any) => `${i.kind}:${i.refId ?? ''}`));
+
+    // POST {} builds exactly the proposed order the Packet step shows.
+    const built = await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, { cookie: s.org.analyst.cookie, json: {} });
+    expect(built.status).toBe(201);
+    expect(built.body.items.map((i: any) => [i.title, i.startPage])).toEqual([['Cover', 1], ['PAN', 3], ['EMD exemption', 4]]);
+    expect(built.body.pageCount).toBe(4);
+  });
+
+  it('appends a newly required annexure to the proposed order, never items the build removed (FR-055)', async () => {
+    const original = s.analysis.checklist;
+    await ctx.db.update(analyses).set({
+      checklist: [...original, { id: 'mse', label: 'MSE declaration', docType: null, mandatory: true, reason: 'MSE', generated: 'mse_declaration' }],
+    }).where(eq(analyses.id, s.analysis.id));
+    try {
+      const r = await request(ctx.app, 'GET', `/workspaces/${wsId}`, { cookie: s.org.analyst.cookie });
+      const mse = r.body.computedPacketItems.find((i: any) => i.refId === 'mse_declaration');
+      expect(mse).toBeTruthy();
+      expect(titles(r.body.defaultPacketItems)).toEqual(['Cover', 'PAN', 'EMD exemption', mse.title]);
+    } finally {
+      await ctx.db.update(analyses).set({ checklist: original }).where(eq(analyses.id, s.analysis.id));
+    }
   });
 
   it('drops stale references from the last ready build and ignores newer failed builds (FR-055)', async () => {
@@ -194,7 +212,8 @@ describe('packet order, input cap, recovery and download names (US5 gaps)', () =
     const later = new Date(Date.now() + 60_000);
     const inserted = await ctx.db.insert(packets).values([
       {
-        orgId: s.org.orgId, workspaceId: wsId, status: 'ready', createdAt: later, blobKey: 'org/x/packets/y/z.pdf', pageCount: 3,
+        // A row without a defaultUids snapshot (built before FR-055) appends nothing.
+        orgId: s.org.orgId, workspaceId: wsId, status: 'ready', createdAt: later, blobKey: 'org/x/packets/y/z.pdf', pageCount: 3, defaultUids: null,
         items: [
           { kind: 'vault', refId: ghost, title: 'Deleted doc' }, { kind: 'annexure', refId: 'retired_template', title: 'Retired annexure' },
           { kind: 'tender_doc', refId: ghost, title: 'Removed bid doc' }, { kind: 'annexure', refId: 'emd_exemption', title: 'EMD' },
@@ -205,12 +224,8 @@ describe('packet order, input cap, recovery and download names (US5 gaps)', () =
     ]).returning();
     try {
       const r = await request(ctx.app, 'GET', `/workspaces/${wsId}`, { cookie: s.org.analyst.cookie });
-      // No cover in that build → a removed cover stays removed; the rest of the computed default is appended.
-      expect(titles(r.body.defaultPacketItems)).toEqual([
-        'EMD', 'GST first', 'Covering Letter for Technical Bid', 'Undertaking regarding Non-Blacklisting / Non-Debarment',
-        'Self-Certificate of Local Content (Make in India)', 'PAN card of the firm', 'Audited balance sheets — last 3 financial years',
-        'OEM authorisation certificate (MAF) for this bid',
-      ]);
+      // Stale refs dropped; no cover in that build → it stays out; the newer failed build is ignored.
+      expect(titles(r.body.defaultPacketItems)).toEqual(['EMD', 'GST first']);
     } finally {
       for (const p of inserted) await ctx.db.delete(packets).where(eq(packets.id, p.id));
     }
@@ -242,7 +257,7 @@ describe('packet order, input cap, recovery and download names (US5 gaps)', () =
         json: { items: ['non_blacklisting', 'mii_self_cert', 'emd_exemption'].map((k) => ({ kind: 'annexure', refId: k, title: k })) },
       });
       expect(ann.status).toBe(413);
-      expect(ann.body.error.message).toBe('These documents add up to 0.1 MB — remove or compress some before building (limit 0.1 MB).');
+      expect(ann.body.error.message).toBe('These documents add up to 0.15 MB — remove or compress some before building (limit 0.10 MB).');
       expect(ann.body.error.details.totalBytes).toBe(3 * 50 * 1024);
     } finally {
       ctx.deps.blobs.get = realGet;
@@ -259,7 +274,8 @@ describe('packet order, input cap, recovery and download names (US5 gaps)', () =
   });
 
   it('marks builds stuck in "building" for more than 10 minutes as failed when read (FR-057)', async () => {
-    const at = (min: number) => new Date(NOW.getTime() - min * 60_000);
+    // The cutoff is evaluated in database time (now() - 10 minutes), like created_at itself.
+    const at = (min: number) => new Date(Date.now() - min * 60_000);
     const [stale, fresh, stale2] = await ctx.db.insert(packets).values([
       { orgId: s.org.orgId, workspaceId: wsId, status: 'building', createdAt: at(11), createdBy: s.org.analyst.me.user.id },
       { orgId: s.org.orgId, workspaceId: wsId, status: 'building', createdAt: at(2), createdBy: s.org.analyst.me.user.id },

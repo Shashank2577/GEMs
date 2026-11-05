@@ -216,7 +216,6 @@ export interface WorkspaceDetail {
   vaultDocs: WorkspaceVaultDoc[];
   tenderDocs: WorkspaceTenderDoc[];
   members: WorkspaceMember[];
-  /** Default packet order (cover → cover letter → annexures → documents). */
   /** Proposed order (006/FR-055): the last ready build's items (still-valid refs, newly required items appended), else the computed default. */
   defaultPacketItems: PacketItemInput[];
   /** The computed default order (006/FR-045) — what "Default order" resets to. */
