@@ -5,7 +5,7 @@
  * reported as an amendment) is adapted from erenmyeager15/india-government-tenders-scraper `src/monitoring.ts`
  * (Apache-2.0; see NOTICE). The IST/₹ formatting is TenderPilot's own.
  */
-import { CORRIGENDUM_FIELDS } from './parse';
+import { CORRIGENDUM_FIELDS, sameValue } from './parse';
 
 export type FieldChange = { from: unknown; to: unknown };
 
@@ -43,21 +43,20 @@ export function formatInrShort(n: number): string {
 }
 
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-const normStr = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+
+function itemText(i: unknown): string {
+  if (i == null || typeof i !== 'object') return String(i);
+  const o = i as { name?: unknown; quantity?: unknown; unit?: unknown };
+  const name = typeof o.name === 'string' ? o.name.trim() : '';
+  const qty = o.quantity != null && o.quantity !== '' ? ` ×${o.quantity}${o.unit ? ` ${o.unit}` : ''}` : o.unit ? ` ${o.unit}` : '';
+  return `${name}${qty}`.trim() || JSON.stringify(i);
+}
 
 function scalar(v: unknown): string {
   if (v == null || v === '') return 'none';
   if (typeof v === 'string') return clip(v.trim());
-  if (Array.isArray(v)) return clip(v.join(', '));
+  if (Array.isArray(v)) return clip(v.map(itemText).join(', '));
   return clip(String(v));
-}
-
-/** True when both sides are the same value for alerting purposes. */
-function sameValue(a: unknown, b: unknown): boolean {
-  const da = toDate(a), db = toDate(b);
-  if (da && db) return da.getTime() === db.getTime();
-  if (typeof a === 'string' && typeof b === 'string') return normStr(a) === normStr(b);
-  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
 
 function formatPair(field: string, c: FieldChange): string {

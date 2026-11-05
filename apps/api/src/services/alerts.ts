@@ -250,7 +250,7 @@ async function sendOne(
   const closes = tender?.endAt ? istDate(tender.endAt) : '';
   const r = await whatsapp.send({
     to: p.phone,
-    template: { name: WHATSAPP_TEMPLATE, language: 'en', params: [tender?.title ?? p.n.title, tender?.bidNumber ?? '', closes, url] },
+    template: { name: WHATSAPP_TEMPLATE, language: 'en', params: [p.n.kind === 'tender_match' ? (tender?.title ?? p.n.title) : p.n.title, tender?.bidNumber ?? '', closes, url] },
     text: `${p.n.title}\n${p.n.body}\n${url}`,
   });
   return r.skipped ? { skipped: true, reason: 'WhatsApp is not configured (WHATSAPP_TOKEN)' } : { skipped: false };

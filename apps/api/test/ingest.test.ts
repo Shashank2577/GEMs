@@ -225,7 +225,7 @@ describe('runIngestion', () => {
 
   it('FR-054: cancelling a tracked tender on GeM alerts tracking orgs on every channel, once', async () => {
     const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber, title: tenders.title }).from(tenderMatches)
-      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(sql`${tenders.bidNumber} <> 'GEM/2026/B/6421001'`).limit(1);
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), sql`${tenders.bidNumber} <> 'GEM/2026/B/6421001'`)).limit(1);
     const r = await admin(`/__admin/cancel/${encodeURIComponent(m.bid)}`);
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ ok: true, cancelled: true });
@@ -247,6 +247,60 @@ describe('runIngestion', () => {
     const d = await request(ctx.app, 'GET', `/tenders/${m.id}`, { cookie: team.analyst.cookie });
     expect(d.body).toMatchObject({ status: 'cancelled' });
     expect(d.body.events[0]).toMatchObject({ kind: 'cancelled' });
+  });
+
+  it('B2: a re-cased title is not a corrigendum: no event, no stale analysis, no alerts', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    await ctx.db.update(analyses).set({ stale: false, staleReason: null }).where(eq(analyses.tenderId, t.id));
+    // Stored copy differs from GeM only by case/whitespace (hash forced stale so the diff path runs).
+    await ctx.db.update(tenders).set({ title: `  ${t.title.toUpperCase()}  `, contentHash: 'stale-hash' }).where(eq(tenders.id, t.id));
+    const events = await count(tenderEvents, eq(tenderEvents.tenderId, t.id));
+    const notes = await count(notifications, sql`true`);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(tenderEvents, eq(tenderEvents.tenderId, t.id))).toBe(events);
+    expect(await count(notifications, sql`true`)).toBe(notes);
+    const stale = await ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, t.id), eq(analyses.stale, true)));
+    expect(stale).toHaveLength(0);
+  });
+
+  it('B3: corrigendum and cancellation WhatsApp payloads lead with the notification title', async () => {
+    await ctx.db.update(users).set({ phone: '+919812345678' }).where(eq(users.email, team.analyst.email));
+    await ctx.db.update(notificationPrefs).set({ whatsapp: true }).where(eq(notificationPrefs.userId, team.analyst.me.user.id));
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber, title: tenders.title }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), sql`${tenders.status} <> 'cancelled' and ${tenders.bidNumber} <> 'GEM/2026/B/6421001'`)).limit(1);
+    await admin(`/__admin/corrigendum/${encodeURIComponent(m.bid)}`, { days: 2, quantity: 111 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    await admin(`/__admin/cancel/${encodeURIComponent(m.bid)}`);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    const sent = ctx.whatsapp as unknown as { sent: { to: string; template?: { name: string; params?: string[] } }[] };
+    sent.sent.length = 0;
+    await dispatchNotifications(ctx.deps);
+    const params = sent.sent.filter((x) => x.to === '+919812345678').map((x) => x.template?.params ?? []);
+    expect(params).toEqual(expect.arrayContaining([
+      [`Corrigendum: ${m.title}`, m.bid, expect.any(String), expect.stringContaining(`/tenders/${m.id}`)],
+      [`Cancelled on GeM: ${m.title}`, m.bid, expect.any(String), expect.stringContaining(`/tenders/${m.id}`)],
+    ]));
+  });
+
+  it('N3: tracking alerts skip orgs with no match or only dismissed matches', async () => {
+    const other = await seedOrgWithRoles(ctx.app, 'Other Org');
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), eq(tenders.status, 'open'))).limit(1);
+    // other org: a dismissed match on this tender; team org: dismiss too, so nobody tracks it.
+    const [w] = await ctx.db.insert(watchlists).values({ orgId: other.orgId, name: 'w', criteria: {}, active: false } as never).returning();
+    await ctx.db.insert(tenderMatches).values({ orgId: other.orgId, tenderId: m.id, watchlistId: w!.id, reasons: [], relevance: 1, dismissed: true } as never);
+    await ctx.db.update(tenderMatches).set({ dismissed: true }).where(and(eq(tenderMatches.tenderId, m.id), eq(tenderMatches.orgId, team.orgId)));
+    const onTender = and(eq(notifications.kind, 'corrigendum'), eq(notifications.link, `/tenders/${m.id}`))!;
+    const before = await count(notifications, onTender);
+    await admin(`/__admin/corrigendum/${encodeURIComponent(m.bid)}`, { days: 3 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(notifications, onTender)).toBe(before);
+    expect(await count(tenderEvents, and(eq(tenderEvents.tenderId, m.id), eq(tenderEvents.kind, 'corrigendum'))!)).toBeGreaterThan(0);
   });
 
   it('GeM down → run failed with error, nothing lost; HTML → failed too', async () => {

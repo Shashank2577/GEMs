@@ -61,7 +61,7 @@ export function TenderHero({
       <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/10 blur-3xl" aria-hidden />
       <div className="relative grid gap-5 p-5 sm:p-6">
         {tender.status === 'cancelled' && (
-          <div role="alert" data-testid="cancelled-banner" className="flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+          <div role="status" data-testid="cancelled-banner" className="flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
             <Ban className="mt-0.5 size-4 shrink-0" aria-hidden />
             <div><span className="font-semibold">Cancelled on GeM</span>
               <span className="text-foreground/80"> — the buyer withdrew this bid. Stop work on it unless it is re-issued.</span></div>

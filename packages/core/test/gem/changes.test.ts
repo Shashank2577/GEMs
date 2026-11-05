@@ -52,6 +52,14 @@ describe('summariseChanges (FR-052)', () => {
     expect(out).toContain('…');
   });
 
+  it('formats item objects readably, not [object Object]', () => {
+    const out = summariseChanges({ items: {
+      from: [{ name: 'Cement', quantity: 50, unit: 'bag' }, { name: 'Sand' }],
+      to: [{ name: 'Cement', quantity: 80, unit: 'bag' }, { name: 'Sand' }],
+    } });
+    expect(out).toBe('Items: Cement ×50 bag, Sand → Cement ×80 bag, Sand');
+  });
+
   it('formats rupees compactly', () => {
     expect(formatInrShort(45000)).toBe('₹45,000');
     expect(formatInrShort(150000)).toBe('₹1.5 L');

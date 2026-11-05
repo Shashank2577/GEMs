@@ -495,9 +495,9 @@ async function notifyTracking(
 ): Promise<void> {
   const { db } = deps;
   const tracked = await db.selectDistinct({ orgId: tenderMatches.orgId, tenderId: tenderMatches.tenderId })
-    .from(tenderMatches).where(inArray(tenderMatches.tenderId, tenderIds));
+    .from(tenderMatches).where(and(inArray(tenderMatches.tenderId, tenderIds), eq(tenderMatches.dismissed, false)));
   if (!tracked.length) return;
-  const rows = await db.select().from(tenders).where(inArray(tenders.id, [...new Set(tracked.map((t) => t.tenderId))]));
+  const rows = await db.select().from(tenders).where(and(REAL_ONLY, inArray(tenders.id, [...new Set(tracked.map((t) => t.tenderId))])));
   const byId = new Map(rows.map((r) => [r.id, r]));
   const recipients = await orgRecipients(deps, [...new Set(tracked.map((t) => t.orgId))]);
   const values: (typeof notifications.$inferInsert)[] = [];
@@ -523,10 +523,12 @@ async function notifyTracking(
 async function notifyCorrigenda(deps: AppDeps, changesById: Map<string, Record<string, { from: unknown; to: unknown }>>, now: Date): Promise<void> {
   await notifyTracking(deps, [...changesById.keys()], now, (t, orgId) => {
     const summary = summariseChanges(changesById.get(t.id) ?? {});
+    if (!summary) return null; // nothing material in substance: no alert
     return {
       kind: 'corrigendum',
       title: `Corrigendum: ${t.title}`,
       body: `${t.bidNumber} was amended on GeM — now closes ${fmtIstDate(t.endAt)} IST.${summary ? ` Changed: ${summary}.` : ''} Re-check the analysis before you bid.`,
+      // Edge: keyed on the content hash, so an A→B→A revert re-uses A's hash and is deduped against the earlier alert.
       dedupeKey: `corrigendum:${t.id}:${t.contentHash}:${orgId}`,
     };
   });
@@ -538,6 +540,7 @@ async function notifyCancelled(deps: AppDeps, tenderIds: string[], now: Date): P
     kind: 'system',
     title: `Cancelled on GeM: ${t.title}`,
     body: `${t.bidNumber} was cancelled by the buyer on GeM. Stop work on this bid unless it is re-issued.`,
+    // Edge: dedupe is per (tender, org), so a re-cancel after A→B→A (cancelled, re-issued, cancelled again) does not re-alert.
     dedupeKey: `cancelled:${t.id}:${orgId}`,
   }));
 }
