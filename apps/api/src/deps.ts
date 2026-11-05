@@ -38,6 +38,8 @@ export interface LlmRequest {
   prompt: string;
   /** Default 2048. */
   maxTokens?: number;
+  /** JSON Schema of the reply: sent as `output_config.format` (structured output, 004/FR-049) by `completeJson`. */
+  jsonSchema?: Record<string, unknown>;
   /** Aborts the provider request (008/FR-031: a timed-out call stops spending tokens and isolate time). */
   signal?: AbortSignal;
 }
@@ -59,7 +61,8 @@ export interface LlmClient {
   complete(req: LlmRequest): Promise<LlmResult>;
   /**
    * Ask for JSON and parse it (tolerates ```json fences and leading prose).
-   * Throws `LlmError` when the reply is not valid JSON. Validate the result with zod.
+   * Throws `LlmError` when the reply is not valid JSON, the model refused or the reply hit `max_tokens`.
+   * Validate the result with zod.
    */
   completeJson<T = unknown>(req: LlmRequest, opts?: LlmCallOptions): Promise<T>;
 }

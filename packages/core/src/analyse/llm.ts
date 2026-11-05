@@ -9,7 +9,7 @@ import type { Requirement } from './types';
 import { MULTI_KEYS, requirementId } from './rules';
 
 /** Matches `LlmClient.completeJson` in apps/api (`deps.llm`). */
-export type CompleteJson = (req: { system?: string; prompt: string; maxTokens?: number }) => Promise<unknown>;
+export type CompleteJson = (req: { system?: string; prompt: string; maxTokens?: number; jsonSchema?: Record<string, unknown> }) => Promise<unknown>;
 
 /** The LLM's confidence is capped so a clean RULE match (0.95) is never displaced. */
 export const LLM_MAX_CONFIDENCE = 0.9;
@@ -27,7 +27,37 @@ a bidder must upload. Be literal: only report what the text states. Amounts are 
 1 crore = 10000000). Years, days and percentages are plain numbers. Never invent requirements. Pages are marked
 "=== Page N ===". Ignore financial price bids.`;
 
-export interface LlmPrompt { system: string; prompt: string; maxTokens: number }
+export interface LlmPrompt { system: string; prompt: string; maxTokens: number; jsonSchema: Record<string, unknown> }
+
+/**
+ * JSON Schema of the reply (`output_config.format`, FR-049), mirroring `llmItemSchema`. Structured outputs accept no
+ * numeric/length bounds, so ranges stay in zod, which still validates every item.
+ */
+export const LLM_REQUIREMENTS_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['requirements'],
+  properties: {
+    requirements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['key', 'label', 'value', 'numeric', 'mandatory', 'page', 'quote', 'confidence'],
+        properties: {
+          key: { type: 'string', enum: [...LLM_REQUIREMENT_KEYS] },
+          label: { type: 'string' },
+          value: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] },
+          numeric: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+          mandatory: { type: 'boolean' },
+          page: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+          quote: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          confidence: { type: 'number' },
+        },
+      },
+    },
+  },
+};
 
 /**
  * `maxChars` caps the document text included (default 60,000); an analysis passes what is left of its overall
@@ -58,7 +88,7 @@ non-blacklisting or other undertakings, delivery or completion period, and anyth
 
 Document text:
 ${parts.join('\n\n')}`;
-  return { system: SYSTEM, prompt, maxTokens: 4096 };
+  return { system: SYSTEM, prompt, maxTokens: 4096, jsonSchema: LLM_REQUIREMENTS_JSON_SCHEMA };
 }
 
 const llmItemSchema = z.object({
