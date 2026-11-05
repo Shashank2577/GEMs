@@ -105,8 +105,8 @@ export function TenderHero({
             )}
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               {place && <span className="inline-flex items-center gap-1 text-muted-foreground"><MapPin className="size-4" aria-hidden /> {place}</span>}
-              <Countdown to={tender.endAt} className="text-sm" />
-              {tender.endAt && <span className="text-xs text-muted-foreground">{formatDateIST(tender.endAt, { time: true })}</span>}
+              {tender.status !== 'cancelled' && <Countdown to={tender.endAt} className="text-sm" />}
+              {tender.status !== 'cancelled' && tender.endAt && <span className="text-xs text-muted-foreground">{formatDateIST(tender.endAt, { time: true })}</span>}
             </div>
           </div>
 
