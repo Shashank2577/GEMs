@@ -756,7 +756,8 @@ anywhere and never used to fill GeM.
 - **FR-068**: The popup MUST validate URL and token format, request host permission, verify with `GET /api/auth/me`, store
   `apiBase`, `token`, `workspaceId` in `chrome.storage.local`, and list workspaces in go/preparing/ready/submitted.
 - **FR-069**: The content script MUST do nothing until the popup sends `tp:scan`, `tp:fill` or `tp:clear`; it MUST collect only
-  visible text-like inputs, textareas and selects.
+  visible text-like inputs, textareas and selects, plus radio/checkbox questions, which are reported as left for the user
+  and never written (FR-077).
 - **FR-070**: `plan` MUST classify each control as fillable / forbidden / unmatched / no_value / disabled; `fillOne` MUST re-check
   `forbiddenReason` immediately before writing; `fillAll` MUST not overwrite non-empty fields unless asked and MUST report
   filled, skipped (with reason), forbidden and unmatched counts.

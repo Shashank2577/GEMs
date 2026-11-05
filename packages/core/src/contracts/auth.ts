@@ -169,8 +169,18 @@ export type ApiTokenExpiryDays = (typeof API_TOKEN_EXPIRY_DAYS)[number];
 export const API_TOKEN_DEFAULT_EXPIRY_DAYS: ApiTokenExpiryDays = 90;
 /** Max active (non-expired) tokens per user per organization (002/FR-037). */
 export const API_TOKEN_LIMIT = 10;
+/**
+ * 006/FR-074: `full` = every route the member's role allows; `read` = "Extension (read-only)": GET only, any write is
+ * 403 `read_only_token` "This API token is read-only". Chosen at creation (by a cookie session) and never changeable.
+ */
+export const API_TOKEN_SCOPES = ['full', 'read'] as const;
+export type ApiTokenScope = (typeof API_TOKEN_SCOPES)[number];
+export const apiTokenScopeSchema = z.enum(API_TOKEN_SCOPES);
+export const API_TOKEN_READ_ONLY_MESSAGE = 'This API token is read-only';
 export const createApiTokenInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
+  /** Defaults to `full` so existing clients keep their behaviour. */
+  scope: apiTokenScopeSchema.default('full'),
   expiresInDays: z.union(
     API_TOKEN_EXPIRY_DAYS.map((d) => z.literal(d)) as unknown as [z.ZodLiteral<ApiTokenExpiryDays>, z.ZodLiteral<ApiTokenExpiryDays>, ...z.ZodLiteral<ApiTokenExpiryDays>[]],
   ).nullable().default(API_TOKEN_DEFAULT_EXPIRY_DAYS),
@@ -185,6 +195,8 @@ export interface ApiTokenSummary {
   expiresAt: string | null;
   /** Last 4 characters of the secret (`tp_…<hint>`); null for tokens created before hints existed. */
   hint: string | null;
+  /** 006/FR-074. */
+  scope: ApiTokenScope;
 }
 /** Returned once on creation; `token` is never retrievable again. */
 export interface CreatedApiToken extends ApiTokenSummary { token: string }
