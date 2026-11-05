@@ -1,0 +1,40 @@
+[
+  {
+    "label": "PUT assist-values (UI save)",
+    "request": "PUT /api/workspaces/208a635c-9a01-4026-8d62-a9e6a6dc0c02/assist-values {\"model\":\"Latitude 5450\",\"warranty_months\":\"36\"}",
+    "status": 200,
+    "response": {
+      "assistValues": {
+        "model": "Latitude 5450",
+        "warranty_months": "36"
+      }
+    }
+  },
+  {
+    "label": "annexure text contains the saved Model",
+    "request": "GET /api/workspaces/208a635c-9a01-4026-8d62-a9e6a6dc0c02/annexures/technical_compliance.pdf | pdftotext",
+    "status": 200,
+    "response": {
+      "annexure": "Technical Compliance Statement",
+      "containsLatitude5450": true
+    }
+  },
+  {
+    "label": "after clearing make",
+    "request": "GET /api/assist/208a635c-9a01-4026-8d62-a9e6a6dc0c02",
+    "status": 200,
+    "response": {
+      "key": "make",
+      "label": "Make",
+      "group": "product",
+      "help": "Manufacturer of the offered product.",
+      "input": "text",
+      "selectorHints": [
+        "\\bmake\\b",
+        "\\bmanufacturer\\b"
+      ],
+      "value": "Dell",
+      "source": "profile"
+    }
+  }
+]

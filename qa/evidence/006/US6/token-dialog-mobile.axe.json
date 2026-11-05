@@ -1,0 +1,310 @@
+{
+  "url": "http://localhost:8788/settings/api-tokens?scope=read",
+  "timestamp": "2026-11-05T05:58:43.963Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Open navigation\">",
+                  "target": [
+                    ".-ml-1\\.5"
+                  ]
+                },
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" class=\"md:hidden\" href=\"/dashboard\">",
+                  "target": [
+                    ".md\\:hidden[aria-label=\"TenderPilot home\"][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Search\">",
+                  "target": [
+                    "button[aria-label=\"Search\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/organization\">",
+                  "target": [
+                    "a[href$=\"organization\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/account\">",
+                  "target": [
+                    "a[href$=\"account\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/team\">",
+                  "target": [
+                    "a[href$=\"team\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/notifications\">",
+                  "target": [
+                    ".py-2.gap-2\\.5[href$=\"notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/scoring\">",
+                  "target": [
+                    "a[href$=\"scoring\"]"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring bg-primary-soft text-primary\" href=\"/settings/api-tokens\">",
+                  "target": [
+                    "a[href$=\"api-tokens\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/sync\">",
+                  "target": [
+                    "a[href$=\"sync\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".shrink-0 > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\].bg-primary"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/dashboard\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/tenders\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"tenders\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/vault\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"vault\"]"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-14 w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium text-muted-foreground focus-ring\">",
+                  "target": [
+                    "li:nth-child(5) > .text-\\[10\\.5px\\].h-14.gap-1"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"min-h-dvh bg-background\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".bg-background"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p id=\"radix-:r26:\" class=\"text-sm text-muted-foreground\">Give it a name you’ll recognise, like the device it’s for.</p>",
+          "target": [
+            "#radix-\\:r26\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p id=\":r2b:-hint\" class=\"text-xs text-muted-foreground\">Can only read. The browser extension needs nothing more, and a leaked token cannot change or delete anything.</p>",
+          "target": [
+            "#\\:r2b\\:-hint"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p id=\":r2d:-hint\" class=\"text-xs text-muted-foreground\">Expired tokens stop working. You can hold up to 10 active tokens.</p>",
+          "target": [
+            "#\\:r2d\\:-hint"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
+        }
+      ]
+    }
+  ],
+  "passes": 22
+}

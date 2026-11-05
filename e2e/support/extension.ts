@@ -64,7 +64,7 @@ export async function seedSettings(popup: Page, settings: { apiBase?: string; to
   await popup.evaluate((s) => chrome.storage.local.set(s), settings);
 }
 
-export async function launchWithExtension(opts: { fixture?: string } = {}): Promise<ExtensionHarness> {
+export async function launchWithExtension(opts: { fixture?: string; videoDir?: string; extraArgs?: string[] } = {}): Promise<ExtensionHarness> {
   buildExtension();
   const html = readFileSync(opts.fixture ?? FIXTURE_HTML);
   const server: Server = createServer((req, res) => {
@@ -80,7 +80,8 @@ export async function launchWithExtension(opts: { fixture?: string } = {}): Prom
     headless: true,
     channel: 'chromium',
     viewport: { width: 1280, height: 900 },
-    args: [`--disable-extensions-except=${EXTENSION_DIST}`, `--load-extension=${EXTENSION_DIST}`],
+    args: [`--disable-extensions-except=${EXTENSION_DIST}`, `--load-extension=${EXTENSION_DIST}`, ...(opts.extraArgs ?? [])],
+    ...(opts.videoDir ? { recordVideo: { dir: opts.videoDir, size: { width: 1280, height: 900 } } } : {}),
   });
   for (const p of context.pages()) await p.close();
   const extensionId = extensionIdFor();
