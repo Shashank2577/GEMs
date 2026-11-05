@@ -1,0 +1,214 @@
+# CI gate for every PR into main and every push to main (spec 008 US1: FR-001, FR-002, FR-006, NFR-007).
+# Structure (minimal permissions, per-job timeouts, prod dependency audit) adapted from erenmyeager15 ci.yml (Apache-2.0).
+#
+#   typecheck ─────────────────────────────── always
+#   changes ─┬─ unit ── api ── e2e            skipped for docs-only PRs (skipped = success for required checks)
+#            └─ migrations-additive
+#
+# Branch protection on main requires: typecheck, unit, api, e2e, migrations-additive, dod (see docs/runbook.md § CI).
+# deploy.yml (US2) listens for this workflow ("ci") completing successfully on main.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Superseded PR runs are cancelled; every push to main gets its own group so no main run is dropped.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Docs-only path filter (specs/**, docs/**, *.md outside qa/evidence)
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"; echo "push: run everything"; exit 0
+          fi
+          git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
+          cat "$RUNNER_TEMP/changed.txt"
+          if [ "$(scripts/docs-only.sh < "$RUNNER_TEMP/changed.txt")" = "true" ]; then
+            echo "code=false" >> "$GITHUB_OUTPUT"; echo "docs-only PR: only typecheck runs"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Typecheck scripts/ and e2e/
+        run: pnpm typecheck:scripts
+      - name: Audit production dependencies (high+)
+        # Advisory until the existing high/critical findings on main are resolved (17 open when this gate was added).
+        continue-on-error: true
+        run: pnpm audit --prod --audit-level high
+
+  unit:
+    name: unit
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Unit tests (packages/*, web, extension; API needs Postgres and runs in the api job)
+        run: pnpm -r --filter '!@tp/api' run test
+      - name: Repo tooling tests (scripts/*.test.ts)
+        run: pnpm test:scripts
+
+  api:
+    name: api
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tp
+          POSTGRES_PASSWORD: tp
+          POSTGRES_DB: tenderpilot_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U tp -d tenderpilot_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://tp:tp@localhost:5433/tenderpilot_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Ensure tenderpilot_test exists
+        run: psql postgres://tp:tp@localhost:5433/postgres -tc "select 1 from pg_database where datname='tenderpilot_test'" | grep -q 1 || psql postgres://tp:tp@localhost:5433/postgres -c "create database tenderpilot_test"
+      - name: API integration tests
+        run: pnpm --filter @tp/api test
+
+  e2e:
+    name: e2e
+    needs: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tp
+          POSTGRES_PASSWORD: tp
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U tp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CI: '1'
+      # start-api.sh drops/recreates this database via psql (no scripts/local-pg.sh in CI).
+      E2E_DATABASE_URL: postgres://tp:tp@localhost:5433/tenderpilot_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: E2E (Playwright, real API + SPA + mock-gem)
+        run: CI=1 pnpm e2e
+      - name: E2E job summary (total/passed/failed/flaky)
+        if: always()
+        run: pnpm exec tsx scripts/e2e-summary.ts qa/.runs/8788/results.json
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-evidence-${{ github.run_id }}
+          path: |
+            qa/evidence/**
+            qa/.runs/**
+          # qa/.runs is a dot-directory: upload-artifact@v4 drops hidden files unless told otherwise.
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
+
+  migrations-additive:
+    name: migrations-additive
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Destructive SQL in new/changed migrations
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then BASE="$PR_BASE"; else BASE="$PUSH_BEFORE"; fi
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then BASE="HEAD~1"; fi
+          pnpm exec tsx scripts/check-migrations.ts --base "$BASE"
+      - name: Schema drift (drizzle-kit generate must produce nothing)
+        run: |
+          pnpm --filter @tp/db generate
+          if [ -n "$(git status --porcelain -- packages/db)" ]; then
+            git status --porcelain -- packages/db
+            git diff -- packages/db
+            echo "::error title=schema drift::packages/db/src/schema.ts differs from the committed migrations; run 'cd packages/db && pnpm exec drizzle-kit generate' and commit the result"
+            exit 1
+          fi

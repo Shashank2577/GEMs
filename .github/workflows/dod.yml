@@ -1,0 +1,66 @@
+# Definition-of-Done gate for story PRs (spec 008 US1 FR-004): QA verdict exists and is approved, no criterion
+# "not met", screenshot + video evidence present and linked, commit trailers present. Pattern adapted from ai-sdlc
+# dod-check.yml (MIT, NOTICE §3); the check itself is scripts/dod-check.ts (no remote script fetch).
+# Docs-only PRs skip the `dod` job (a skipped job satisfies the required check).
+name: dod
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, edited, labeled, unlabeled, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dod-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Docs-only path filter
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "code=$([ "$(git diff --name-only "$BASE_SHA...$HEAD_SHA" | scripts/docs-only.sh)" = "true" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+
+  dod:
+    name: dod
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Definition-of-Done check
+        env:
+          # Event data via env (never interpolated into the script); refreshed from the API with the read-only token.
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec tsx scripts/dod-check.ts

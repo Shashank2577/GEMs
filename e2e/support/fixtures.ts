@@ -1,5 +1,5 @@
 import { test as base, expect, type Page, type APIRequestContext } from '@playwright/test';
-import { mkdirSync, copyFileSync } from 'node:fs';
+import { mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const GEM_URL = `http://127.0.0.1:${process.env.E2E_GEM_PORT || 4011}`;
@@ -60,6 +60,41 @@ export async function collectRunArtifacts(spec: string, story: string, page: Pag
   const video = page.video();
   await page.close();
   if (video) { try { copyFileSync(await video.path(), join(dir, `${slug}-${info.project.name}.webm`)); } catch { /* no video */ } }
+}
+
+/** Spec 008 shorthand for `evidence(page, '008', story, name)`. */
+export function evidence008(page: Page, story: string, name: string) {
+  return evidence(page, '008', story, name);
+}
+
+/**
+ * API-only evidence (curl transcripts, EXPLAIN output, CI log excerpts) for spec 008:
+ * a string is written as qa/evidence/008/<story>/<name>.txt, anything else as pretty-printed <name>.json.
+ */
+export function saveTranscript(story: string, name: string, content: unknown) {
+  const dir = join('qa', 'evidence', '008', story);
+  mkdirSync(dir, { recursive: true });
+  const isText = typeof content === 'string';
+  const file = join(dir, `${name.replace(/\.(txt|json)$/i, '')}.${isText ? 'txt' : 'json'}`);
+  writeFileSync(file, isText ? content : `${JSON.stringify(content, null, 2)}\n`);
+  try {
+    void base.info().attach(name, { path: file, contentType: isText ? 'text/plain' : 'application/json' });
+  } catch { /* called outside a running test: file only */ }
+  return file;
+}
+
+/** Phone viewport (375×812, iPhone X class) for layout checks. */
+export async function atPhone(page: Page) {
+  await page.setViewportSize({ width: 375, height: 812 });
+}
+
+/** Asserts the current page does not scroll horizontally (no element wider than the viewport). */
+export async function noHorizontalOverflow(page: Page) {
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth, `page scrolls horizontally: scrollWidth ${scrollWidth} > clientWidth ${clientWidth}`).toBeLessThanOrEqual(clientWidth);
 }
 
 export const test = base;

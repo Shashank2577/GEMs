@@ -1,0 +1,53 @@
+{
+  "config": { "version": "1.63.0" },
+  "suites": [
+    {
+      "title": "000-smoke/smoke.e2e.ts",
+      "file": "000-smoke/smoke.e2e.ts",
+      "specs": [],
+      "suites": [
+        {
+          "title": "smoke",
+          "file": "000-smoke/smoke.e2e.ts",
+          "specs": [
+            {
+              "title": "health, signup and dashboard",
+              "ok": true,
+              "tests": [
+                { "projectName": "desktop", "status": "expected", "results": [{ "status": "passed", "retry": 0 }] },
+                { "projectName": "mobile", "status": "expected", "results": [{ "status": "passed", "retry": 0 }] }
+              ]
+            },
+            {
+              "title": "feed loads",
+              "ok": true,
+              "tests": [
+                { "projectName": "desktop", "status": "flaky", "results": [{ "status": "failed", "retry": 0 }, { "status": "passed", "retry": 1 }] }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "008-operations-scale/US1-ci-evidence.e2e.ts",
+      "file": "008-operations-scale/US1-ci-evidence.e2e.ts",
+      "specs": [
+        {
+          "title": "summary parses its own results",
+          "ok": false,
+          "tests": [
+            { "projectName": "desktop", "status": "unexpected", "results": [{ "status": "failed", "retry": 0 }, { "status": "timedOut", "retry": 1 }] }
+          ]
+        },
+        {
+          "title": "skipped on desktop",
+          "ok": true,
+          "tests": [{ "projectName": "desktop", "status": "skipped", "results": [{ "status": "skipped", "retry": 0 }] }]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": { "expected": 2, "unexpected": 1, "flaky": 1, "skipped": 1 }
+}
