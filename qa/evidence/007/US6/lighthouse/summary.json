@@ -3,11 +3,11 @@
   "formFactor": "mobile",
   "lighthouseVersion": "13.6.0",
   "runs": 3,
-  "generatedAt": "2026-11-05T07:03:47.931Z",
+  "generatedAt": "2026-11-05T07:15:41.023Z",
   "pass": true,
   "checks": {
     "performance": {
-      "median": 94,
+      "median": 93,
       "min": 85,
       "pass": true
     },
@@ -29,7 +29,7 @@
   },
   "metricChecks": {
     "lcpMs": {
-      "median": 906,
+      "median": 905,
       "max": 2500,
       "pass": true
     },
@@ -43,21 +43,22 @@
     {
       "run": 1,
       "scores": {
-        "performance": 94,
+        "performance": 93,
         "accessibility": 100,
         "best-practices": 96,
         "seo": 100
       },
       "metrics": {
-        "lcpMs": 906,
-        "tbtMs": 275,
+        "lcpMs": 903,
+        "tbtMs": 308,
         "cls": 0,
-        "fcpMs": 906
+        "fcpMs": 903
       },
       "failedAudits": [
-        "total-blocking-time: 0.81",
-        "max-potential-fid: 0.7",
+        "total-blocking-time: 0.78",
+        "max-potential-fid: 0.47",
         "errors-in-console: 0",
+        "mainthread-work-breakdown: 0",
         "unused-css-rules: 0",
         "unused-javascript: 0.5",
         "forced-reflow-insight: 0",
@@ -68,20 +69,20 @@
     {
       "run": 2,
       "scores": {
-        "performance": 96,
+        "performance": 95,
         "accessibility": 100,
         "best-practices": 96,
         "seo": 100
       },
       "metrics": {
-        "lcpMs": 907,
-        "tbtMs": 222,
+        "lcpMs": 905,
+        "tbtMs": 259,
         "cls": 0,
-        "fcpMs": 907
+        "fcpMs": 905
       },
       "failedAudits": [
-        "total-blocking-time: 0.87",
-        "max-potential-fid: 0.82",
+        "total-blocking-time: 0.83",
+        "max-potential-fid: 0.78",
         "errors-in-console: 0",
         "unused-css-rules: 0",
         "unused-javascript: 0.5",
@@ -93,20 +94,20 @@
     {
       "run": 3,
       "scores": {
-        "performance": 93,
+        "performance": 91,
         "accessibility": 100,
         "best-practices": 96,
         "seo": 100
       },
       "metrics": {
-        "lcpMs": 906,
-        "tbtMs": 316,
+        "lcpMs": 912,
+        "tbtMs": 366,
         "cls": 0,
-        "fcpMs": 906
+        "fcpMs": 912
       },
       "failedAudits": [
-        "total-blocking-time: 0.77",
-        "max-potential-fid: 0.79",
+        "total-blocking-time: 0.71",
+        "max-potential-fid: 0.68",
         "errors-in-console: 0",
         "mainthread-work-breakdown: 0",
         "unused-css-rules: 0",
