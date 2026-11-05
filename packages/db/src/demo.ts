@@ -35,7 +35,12 @@ export interface SeedDemoOptions {
   /** When given, each vault document gets a small generated one-page PDF. */
   blobs?: DemoBlobSink | null;
   now?: Date;
+  /** Runs inside the seed transaction, after the rows are written (e.g. to set `onboardingState.demo = true`). */
+  afterSeed?: (tx: DemoTx, result: SeedDemoResult) => Promise<void>;
 }
+
+/** The transaction handle `seedDemo` / `removeDemo` pass to their `afterSeed` / `afterRemove` hooks. */
+export type DemoTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export interface SeedDemoResult {
   tenders: number;
@@ -52,6 +57,31 @@ export interface SeedDemoResult {
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const DEMO_MARK = 'demo';
+/** Seeded watchlists are back-dated by exactly this much (created_at = seed time − 16 d, updated_at = seed time). */
+const DEMO_WATCHLIST_AGE_MS = 16 * DAY;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The watchlist ids a `demo.seeded` entry records, or null for an entry written before ids were recorded. */
+function recordedWatchlistIds(meta: unknown): string[] | null {
+  const ids = (meta as { watchlistIds?: unknown } | null)?.watchlistIds;
+  return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string' && UUID_RE.test(x)) : null;
+}
+
+/**
+ * Legacy rule, only for orgs seeded before `demo.seeded` recorded watchlist ids: a `DEMO_WATCHLISTS` name, created by
+ * a user who seeded the demo here, AND the seeder's exact back-dating (updated_at − created_at = 16 days to the
+ * microsecond). A watchlist made through the API has created_at = updated_at (or a later edit time), so it never
+ * matches; a demo watchlist the user later edited stops matching too (kept: the safe direction).
+ */
+async function legacyDemoWatchlistIds(db: DemoTx, orgId: string): Promise<string[]> {
+  const seeders = (await db.selectDistinct({ u: activityLog.userId }).from(activityLog)
+    .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')))).map((r) => r.u).filter((u): u is string => !!u);
+  if (!seeders.length) return [];
+  return (await db.select({ id: watchlists.id }).from(watchlists).where(and(
+    eq(watchlists.orgId, orgId), inArray(watchlists.name, DEMO_WATCHLISTS.map((w) => w.name)), inArray(watchlists.createdBy, seeders),
+    sql`${watchlists.updatedAt} - ${watchlists.createdAt} = ${`${DEMO_WATCHLIST_AGE_MS} milliseconds`}::interval`,
+  ))).map((r) => r.id);
+}
 
 // ───────────── Company ─────────────
 
@@ -381,7 +411,21 @@ const EXTRA_ANALYSES: { idx: number; kind: Profile }[] = [{ idx: 7, kind: 'stron
 
 // ───────────── Seed ─────────────
 
+/**
+ * Seed the demo into one org. Runs in one transaction that first locks the org row — the same lock `removeDemo`
+ * takes — so a seed and a removal never interleave (no demo rows left behind with `onboardingState.demo = false`),
+ * and a failed seed leaves nothing half-written (in particular no watchlist missing from the `demo.seeded` record).
+ */
 export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoResult> {
+  return db.transaction(async (tx) => {
+    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, opts.orgId)).for('update');
+    const result = await seedInTx(tx, opts);
+    await opts.afterSeed?.(tx, result);
+    return result;
+  });
+}
+
+async function seedInTx(db: DemoTx, opts: SeedDemoOptions): Promise<SeedDemoResult> {
   const now = opts.now ?? new Date();
   const { orgId, userId } = opts;
 
@@ -429,7 +473,7 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
   const tid = (idx: number) => tenderId.get(demoBidNumber(idx))!;
 
   // Has this org seen the demo before? (activity marker) — org-scoped rows below are created once.
-  const [marker] = await db.select({ id: activityLog.id }).from(activityLog)
+  const [marker] = await db.select({ id: activityLog.id, meta: activityLog.meta }).from(activityLog)
     .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded'))).limit(1);
   const firstTime = !marker;
 
@@ -505,14 +549,25 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
     await db.update(companyProfiles).set({ oemAuthorizations }).where(eq(companyProfiles.orgId, orgId));
   }
 
-  // Watchlists (natural key: name within org).
+  // Watchlists (natural key: name within org). A name the org already has is skipped — that row may be the user's
+  // own, so only the ids inserted here are recorded as demo (`demo.seeded` meta.watchlistIds; see removeDemo).
   const existingWl = await db.select({ id: watchlists.id, name: watchlists.name }).from(watchlists).where(eq(watchlists.orgId, orgId));
   const wlId = new Map(existingWl.map((w) => [w.name, w.id]));
+  const insertedWlIds: string[] = [];
   for (const w of DEMO_WATCHLISTS) {
     if (wlId.has(w.name)) continue;
-    const [row] = await db.insert(watchlists).values({ orgId, name: w.name, criteria: w.criteria, active: true, createdBy: userId, createdAt: new Date(now.getTime() - 16 * DAY), updatedAt: now })
+    const [row] = await db.insert(watchlists).values({ orgId, name: w.name, criteria: w.criteria, active: true, createdBy: userId, createdAt: new Date(now.getTime() - DEMO_WATCHLIST_AGE_MS), updatedAt: now })
       .returning({ id: watchlists.id });
     wlId.set(w.name, row!.id);
+    insertedWlIds.push(row!.id);
+  }
+  if (marker && insertedWlIds.length) {
+    // A repeat seed re-created a demo watchlist the user had deleted: add it to the existing record. A marker written
+    // before ids were recorded is backfilled first from the legacy fingerprint, so it is complete from now on.
+    const recorded = recordedWatchlistIds(marker.meta) ?? await legacyDemoWatchlistIds(db, orgId);
+    await db.update(activityLog)
+      .set({ meta: sql`jsonb_set(${activityLog.meta}, '{watchlistIds}', ${JSON.stringify([...new Set([...recorded, ...insertedWlIds])])}::jsonb)` })
+      .where(eq(activityLog.id, marker.id));
   }
 
   // Matches — spread across the last 14 days so the trend chart has a shape; unique index makes this idempotent.
@@ -620,7 +675,7 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
       act('workspace.stage_changed', 'workspace', ws('ready')?.id ?? null, 7, { from: 'preparing', to: 'ready', tenderId: tid(6), title: plan[6]!.item.title }),
       act('workspace.submitted', 'workspace', ws('submitted')?.id ?? null, 4, { tenderId: tid(5), title: plan[5]!.item.title }),
       act('workspace.commented', 'workspace', prep?.id ?? null, 3, { tenderId: tid(9), excerpt: 'Technical compliance sheet is done. Price sign-off pending with Ananya.' }),
-      act('demo.seeded', 'organization', orgId, 0.02, { tenders: plan.length }),
+      act('demo.seeded', 'organization', orgId, 0.02, { tenders: plan.length, watchlistIds: insertedWlIds }),
     ];
     await db.insert(activityLog).values(rows);
   }
@@ -652,6 +707,13 @@ export interface RemoveDemoOptions {
   blobs?: DemoBlobDeleter | null;
   /** Called for a blob that could not be deleted (the rows are already gone; the file is only orphaned). */
   onBlobError?: (key: string, error: unknown) => void;
+  /** Runs inside the removal transaction, after the deletes (org flag, audit entry) — a failure rolls everything back. */
+  afterRemove?: (tx: DemoTx, result: RemoveDemoResult) => Promise<void>;
+}
+
+/** True when `removeDemo` found nothing to remove. */
+export function nothingRemoved(r: RemoveDemoResult): boolean {
+  return !r.profileReset && Object.values(r).every((v) => v === 0 || v === false);
 }
 
 /** Rows removed per kind; all zeros (and `profileReset: false`) when the org has no demo data left. */
@@ -681,20 +743,25 @@ export interface RemoveDemoResult {
  *     their comments and packets, analyses, matches, and bid documents the org uploaded to those tenders. Demo tenders
  *     are visible only to demo orgs, so anything a user did on them (a moved card, a comment) is demo data too
  *     (spec edge case "demo removal after the user edited demo rows");
- *   - watchlists: a `DEMO_WATCHLISTS` name AND created by a user who seeded the demo in this org (`demo.seeded`
- *     activity); matches of those watchlists go with them;
+ *   - watchlists: exactly the ids the seeder inserted, recorded in the org's `demo.seeded` activity entry
+ *     (`meta.watchlistIds`; a repeat seed that re-creates a deleted demo watchlist appends its id). A watchlist the
+ *     user made — even one with a demo name, before seeding (the seed skips that name) or re-created after deleting
+ *     the demo one — is never in that list. Orgs seeded before ids were recorded fall back to the legacy fingerprint
+ *     (`legacyDemoWatchlistIds`). Matches of the removed watchlists go with them;
  *   - vault documents: a seeded title AND a seeder marker (the `demo` tag or the `org/<org>/vault/demo-` blob key) —
- *     a user upload has neither; their file versions go with them;
+ *     a user upload has neither; their file versions go with them. A demo document whose file the user replaced (new
+ *     key without the `demo-` prefix) AND whose `demo` tag the user removed survives removal — accepted, it errs on
+ *     the side of keeping a row;
  *   - past contracts: a seeded GeM contract number (`GEMC-5116877…`, the seed's natural key);
  *   - notifications: `dedupe_key LIKE 'demo:%'`, or a link to a demo tender / demo workspace;
  *   - activity: `meta.demo = true`, or an entry about a demo workspace / demo tender;
  *   - company profile: deleted (= reset to empty) only while legal name AND GSTIN still equal `DEMO_COMPANY`;
  *     a profile the user edited is kept, with links to removed demo documents cleared.
- * If review finds these rules brittle, the fallback is a nullable `demo` column on the org tables, set by the seeder.
  *
- * Everything is deleted in one transaction that first locks the org row (concurrent removals serialise; the second
- * one finds nothing and returns zeros). Blobs are deleted only after commit, so a rollback never loses a file.
- * `onboardingState.demo` and the `demo.removed` activity entry are the caller's job (DELETE /api/demo).
+ * Everything is deleted in one transaction that first locks the org row (concurrent removals — and `seedDemo`, which
+ * takes the same lock — serialise; a second removal finds nothing and returns zeros). Blobs are deleted only after
+ * commit, so a rollback never loses a file. `onboardingState.demo` and the `demo.removed` activity entry are the
+ * caller's job, done in `afterRemove` so they commit (or roll back) with the deletes (DELETE /api/demo).
  */
 export async function removeDemo(db: Db, opts: RemoveDemoOptions): Promise<RemoveDemoResult> {
   const { orgId } = opts;
@@ -712,13 +779,20 @@ export async function removeDemo(db: Db, opts: RemoveDemoOptions): Promise<Remov
     ))).map((r) => r.id);
     const demoWsIds = (await tx.select({ id: bidWorkspaces.id }).from(bidWorkspaces)
       .where(and(eq(bidWorkspaces.orgId, orgId), anyOf(bidWorkspaces.tenderId, demoTenderIds)))).map((r) => r.id);
-    const seeders = (await tx.selectDistinct({ u: activityLog.userId }).from(activityLog)
-      .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')))).map((r) => r.u).filter((u): u is string => !!u);
-    const demoWlIds = (await tx.select({ id: watchlists.id }).from(watchlists).where(and(
-      eq(watchlists.orgId, orgId), inArray(watchlists.name, DEMO_WATCHLISTS.map((w) => w.name)), anyOf(watchlists.createdBy, seeders),
-    ))).map((r) => r.id);
+    // Read before the activity delete below removes the `demo.seeded` entries (they carry meta.demo).
+    const markers = await tx.select({ meta: activityLog.meta }).from(activityLog)
+      .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')));
+    const recordedWl = markers.map((m) => recordedWatchlistIds(m.meta));
+    const candidateWl = [...new Set([
+      ...recordedWl.flatMap((ids) => ids ?? []),
+      ...(recordedWl.some((ids) => ids === null) ? await legacyDemoWatchlistIds(tx, orgId) : []),
+    ])];
+    const demoWlIds = (await tx.select({ id: watchlists.id }).from(watchlists)
+      .where(and(eq(watchlists.orgId, orgId), anyOf(watchlists.id, candidateWl)))).map((r) => r.id);
     const demoDocIds = (await tx.select({ id: vaultDocuments.id }).from(vaultDocuments).where(and(
       eq(vaultDocuments.orgId, orgId), inArray(vaultDocuments.title, demoDocTitles),
+      // Either marker suffices. If the user replaced the file (new key, no `demo-` prefix) AND removed the `demo` tag,
+      // neither is left and the document is kept: we cannot tell it from the user's own, so we err on keeping it.
       or(sql`${vaultDocuments.tags} @> ${JSON.stringify([DEMO_MARK])}::jsonb`, like(vaultDocuments.blobKey, `org/${orgId}/vault/demo-%`)),
     ))).map((r) => r.id);
     const keys: string[] = [];
@@ -775,14 +849,13 @@ export async function removeDemo(db: Db, opts: RemoveDemoOptions): Promise<Remov
       .where(and(eq(vaultDocuments.orgId, orgId), anyOf(vaultDocuments.id, demoDocIds))).returning({ blobKey: vaultDocuments.blobKey });
     keys.push(...removedDocs.map((d) => d.blobKey), ...removedVersions.map((v) => v.blobKey));
 
-    return {
-      blobKeys: keys,
-      result: {
-        workspaces: removedWs.length, analyses: removedAnalyses.length, matches: removedMatches.length, comments: removedComments.length,
-        notifications: removedNotes.length, activity: removedActivity.length, pastContracts: removedPcs.length,
-        vaultDocuments: removedDocs.length, watchlists: removedWl.length, profileReset: resetProfile.length > 0,
-      } satisfies RemoveDemoResult,
+    const result: RemoveDemoResult = {
+      workspaces: removedWs.length, analyses: removedAnalyses.length, matches: removedMatches.length, comments: removedComments.length,
+      notifications: removedNotes.length, activity: removedActivity.length, pastContracts: removedPcs.length,
+      vaultDocuments: removedDocs.length, watchlists: removedWl.length, profileReset: resetProfile.length > 0,
     };
+    await opts.afterRemove?.(tx, result);
+    return { blobKeys: keys, result };
   });
 
   // After commit only: a failed delete orphans a file, it never loses one that a row still points at.

@@ -530,6 +530,8 @@ describe('DELETE /api/demo (US4 scenarios 10, 11, 14)', () => {
     });
     expect(deletedBlobs).toEqual([]);
     expect((await orgCounts(o.orgId)).watchlists).toEqual(['My laptops']);
+    // NB-2: a removal that removed nothing logs nothing — still exactly one audit entry.
+    expect(await ctx.db.select({ id: activityLog.id }).from(activityLog).where(and(eq(activityLog.orgId, o.orgId), eq(activityLog.action, 'demo.removed')))).toHaveLength(1);
   });
 
   it('the demo can be loaded again after removal', async () => {
@@ -537,6 +539,85 @@ describe('DELETE /api/demo (US4 scenarios 10, 11, 14)', () => {
     expect(r.status).toBe(201);
     expect(r.body).toMatchObject({ created: true, workspaces: 17, vaultDocuments: 16 });
     expect((await orgCounts(o.orgId)).watchlists).toEqual([...DEMO_WATCHLISTS.map((w) => w.name), 'My laptops'].sort());
+  });
+});
+
+describe('DELETE /api/demo — watchlist provenance (FR-065: user watchlists with a demo name survive)', () => {
+  const [W0, W1, W2] = DEMO_WATCHLISTS.map((w) => w.name) as [string, string, string];
+  const wlOf = async (orgId: string) => ctx.db.select({ id: watchlists.id, name: watchlists.name }).from(watchlists).where(eq(watchlists.orgId, orgId));
+  const create = async (cookie: string, name: string) => {
+    const r = await request(ctx.app, 'POST', '/watchlists', { cookie, json: { name, criteria: { keywords: ['laptop'] } } });
+    expect(r.status).toBe(201);
+    return r.body.id as string;
+  };
+
+  it('removes only the watchlists the seed inserted — across a repeat seed and a second seed → remove cycle', async () => {
+    const owner = await signup(ctx.app, { orgName: 'Watchlist Provenance Org' });
+    const orgId = owner.me.org.id;
+    // 1. Before seeding, the user makes a watchlist with a demo name: the seed skips that name.
+    const userW0 = await create(owner.cookie, W0);
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: owner.cookie })).status).toBe(201);
+    const seeded = await wlOf(orgId);
+    expect(seeded.map((w) => w.name).sort()).toEqual([W0, W1, W2].sort());
+    expect(seeded.find((w) => w.name === W0)!.id).toBe(userW0);
+    // 2. The user deletes the demo W1 and re-creates one with the same name.
+    const demoW1 = seeded.find((w) => w.name === W1)!.id;
+    expect((await request(ctx.app, 'DELETE', `/watchlists/${demoW1}`, { cookie: owner.cookie })).status).toBeLessThan(300);
+    const userW1 = await create(owner.cookie, W1);
+    // 3. The user deletes the demo W2; a repeat seed re-creates it (recorded) and skips the user's W0 / W1.
+    const demoW2 = seeded.find((w) => w.name === W2)!.id;
+    expect((await request(ctx.app, 'DELETE', `/watchlists/${demoW2}`, { cookie: owner.cookie })).status).toBeLessThan(300);
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: owner.cookie })).status).toBe(200); // repeat seed
+    const reseededW2 = (await wlOf(orgId)).find((w) => w.name === W2)!.id;
+    expect(reseededW2).not.toBe(demoW2);
+    const [marker] = await ctx.db.select({ meta: activityLog.meta }).from(activityLog).where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')));
+    expect([...((marker!.meta as { watchlistIds: string[] }).watchlistIds)].sort()).toEqual([demoW1, demoW2, reseededW2].sort());
+
+    const r = await request(ctx.app, 'DELETE', '/demo', { cookie: owner.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body.removed.watchlists).toBe(1);
+    expect((await wlOf(orgId)).map((w) => w.id).sort()).toEqual([userW0, userW1].sort());
+
+    // 4. Second cycle: the seed adds only W2 (W0/W1 are the user's names); removal takes only that one again.
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: owner.cookie })).status).toBe(201);
+    expect((await wlOf(orgId)).map((w) => w.name).sort()).toEqual([W0, W1, W2].sort());
+    const r2 = await request(ctx.app, 'DELETE', '/demo', { cookie: owner.cookie });
+    expect(r2.body.removed.watchlists).toBe(1);
+    expect((await wlOf(orgId)).map((w) => w.id).sort()).toEqual([userW0, userW1].sort());
+    const r3 = await request(ctx.app, 'DELETE', '/demo', { cookie: owner.cookie });
+    expect(r3.body.removed.watchlists).toBe(0);
+    expect((await wlOf(orgId)).map((w) => w.id).sort()).toEqual([userW0, userW1].sort());
+  });
+
+  it('legacy orgs (demo.seeded without recorded ids) fall back to the seeder fingerprint and still keep a re-created user watchlist', async () => {
+    const owner = await signup(ctx.app, { orgName: 'Legacy Watchlist Org' });
+    const orgId = owner.me.org.id;
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: owner.cookie })).status).toBe(201);
+    // Simulate a seed by the previous code: the marker has no watchlistIds.
+    await ctx.db.update(activityLog).set({ meta: sql`${activityLog.meta} - 'watchlistIds'` })
+      .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')));
+    const demoW0 = (await wlOf(orgId)).find((w) => w.name === W0)!.id;
+    expect((await request(ctx.app, 'DELETE', `/watchlists/${demoW0}`, { cookie: owner.cookie })).status).toBeLessThan(300);
+    const userW0 = await create(owner.cookie, W0); // same creator as the seeder, same name — but no 16-day back-dating
+    const r = await request(ctx.app, 'DELETE', '/demo', { cookie: owner.cookie });
+    expect(r.body.removed.watchlists).toBe(2);
+    expect((await wlOf(orgId)).map((w) => w.id)).toEqual([userW0]);
+  });
+
+  it('a repeat seed on a legacy marker backfills its ids before appending', async () => {
+    const owner = await signup(ctx.app, { orgName: 'Legacy Backfill Org' });
+    const orgId = owner.me.org.id;
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: owner.cookie })).status).toBe(201);
+    await ctx.db.update(activityLog).set({ meta: sql`${activityLog.meta} - 'watchlistIds'` })
+      .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')));
+    const before = await wlOf(orgId);
+    const demoW2 = before.find((w) => w.name === W2)!.id;
+    expect((await request(ctx.app, 'DELETE', `/watchlists/${demoW2}`, { cookie: owner.cookie })).status).toBeLessThan(300);
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: owner.cookie })).status).toBe(200); // repeat seed
+    const after = await wlOf(orgId);
+    const [marker] = await ctx.db.select({ meta: activityLog.meta }).from(activityLog).where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')));
+    expect([...((marker!.meta as { watchlistIds: string[] }).watchlistIds)].sort()).toEqual(after.map((w) => w.id).sort());
+    expect((await request(ctx.app, 'DELETE', '/demo', { cookie: owner.cookie })).body.removed.watchlists).toBe(3);
   });
 });
 
