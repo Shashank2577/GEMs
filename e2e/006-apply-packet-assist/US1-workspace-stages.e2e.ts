@@ -57,10 +57,16 @@ test('S1-S3 API: create workspace 201 / repeat+race 200 / Viewer 403 / unknown t
   expect(w.owner.id).toBe(fx.users.analyst.id);
   expect(new Date(w.dueAt).getTime()).toBe(new Date(fx.tender.endAt).getTime());
   expect(w.assignees).toEqual([]);
-  expect(Object.keys(w.mapping).sort()).toEqual(['balance_sheets', 'gst', 'oem_authorization', 'pan']);
-  expect(w.mapping.udyam).toBeUndefined();
-  expect(w.mapping.balance_sheets).toBe(fx.docs.bsNew);
-  expect(w.mapping.oem_authorization).toBe(fx.docs.oem);
+  // Amended scenario 1 (FR-002, d976969): nothing is stored; automatic picks are resolved at read time in readiness.items.
+  expect(w.mapping).toEqual({});
+  const detail = await (await analyst.get(`/api/workspaces/${wsId}`)).json();
+  const pick = (id: string) => detail.readiness.items.find((i: any) => i.item.id === id);
+  expect(pick('gst')).toMatchObject({ docId: fx.docs.gst, auto: true });
+  expect(pick('pan')).toMatchObject({ docId: fx.docs.pan, auto: true });
+  expect(pick('balance_sheets')).toMatchObject({ docId: fx.docs.bsNew, auto: true });
+  expect(pick('oem_authorization')).toMatchObject({ docId: fx.docs.oem, auto: true });
+  expect(pick('udyam').docId).toBeNull();
+  expect(detail.readiness.items.filter((i: any) => i.docId && i.auto)).toHaveLength(4);
   const wAct = await activityOf('analyst', 'workspace', wsId);
   const tAct = await activityOf('analyst', 'tender', fx.tender.id);
   expect(wAct.some((a) => a.action === 'workspace.created')).toBe(true);

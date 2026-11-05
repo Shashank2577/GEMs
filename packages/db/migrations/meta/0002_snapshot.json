@@ -1,5 +1,5 @@
 {
-  "id": "96e93607-cc3a-4850-a5ac-689b0b0c7600",
+  "id": "d5654a64-334b-443e-8800-7790e232a07e",
   "prevId": "509eb29b-7228-4adb-b904-e9493fffb983",
   "version": "7",
   "dialect": "postgresql",
@@ -1060,6 +1060,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "listing_stop": {
+          "name": "listing_stop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "error": {
           "name": "error",
@@ -2722,12 +2728,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "last_org_id": {
-          "name": "last_org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2753,21 +2753,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "users_last_org_id_organizations_id_fk": {
-          "name": "users_last_org_id_organizations_id_fk",
-          "tableFrom": "users",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "last_org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

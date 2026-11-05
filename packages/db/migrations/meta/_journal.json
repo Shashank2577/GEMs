@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1793849001194,
-      "tag": "0002_brave_nightshade",
+      "when": 1793848419196,
+      "tag": "0002_magenta_ikaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793849309017,
+      "tag": "0003_jittery_domino",
       "breakpoints": true
     }
   ]

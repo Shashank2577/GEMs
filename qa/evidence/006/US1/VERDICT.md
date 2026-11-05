@@ -8,7 +8,7 @@ Run: `pnpm exec playwright test e2e/006-apply-packet-assist/US1*` -> 15 passed, 
 
 | # | Criterion | Verdict | Evidence |
 |---|---|---|---|
-| 1 | POST workspace as Analyst -> 201 created:true, stage go, owner = caller, dueAt = endAt, mapping 4 keys (udyam absent) | met | test S1-S3 (API assertions) |
+| 1 | POST workspace as Analyst -> 201 created:true, stage go, owner = caller, dueAt = endAt, mapping `{}`; GET readiness picks gst/pan/balance_sheets/oem auto:true, udyam null (FR-002 amended) | met | test S1-S3 (API assertions); re-run after the amendment: 15/15 passed |
 | 2 | activity workspace.created (workspace and tender) | met | test S1-S3, /api/activity for both entities |
 | 3 | Repeat/racing create -> 200 created:false, same id, single row | met | S1-S3 (repeat by Analyst + Bid Manager; 3 parallel calls -> 201,200,200, one id, one list row) |
 | 4 | Viewer -> 403 "You need to be at least an Analyst to do that"; unknown tender -> 404 "Tender not found" | met | S1-S3 |

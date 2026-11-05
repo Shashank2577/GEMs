@@ -141,7 +141,7 @@ export const companyProfiles = pgTable('company_profiles', {
   categories: jsonb('categories').$type<string[]>().notNull().default([]),
   hsnCodes: jsonb('hsn_codes').$type<string[]>().notNull().default([]),
   operatingStates: jsonb('operating_states').$type<string[]>().notNull().default([]),
-  oemAuthorizations: jsonb('oem_authorizations').$type<{ oem: string; products: string; validTill?: string; documentId?: string }[]>().notNull().default([]),
+  oemAuthorizations: jsonb('oem_authorizations').$type<{ oem: string; products: string; validTill?: string | null; documentId?: string | null }[]>().notNull().default([]),
   certifications: jsonb('certifications').$type<string[]>().notNull().default([]), // e.g. ISO 9001, BIS
   maxEmdCapacity: bigint('max_emd_capacity', { mode: 'number' }),
   updatedAt: updatedAt(),
@@ -263,6 +263,11 @@ export const ingestionRuns = pgTable('ingestion_runs', {
   tendersCreated: integer('tenders_created').notNull().default(0),
   tendersUpdated: integer('tenders_updated').notNull().default(0),
   matchesCreated: integer('matches_created').notNull().default(0),
+  /**
+   * Why the listing phase stopped (003/FR-011): `all_known` page reached, `end` of results, page `cap` used up,
+   * `explicit` page count fetched, or `error`. Null for runs that never got that far (or predate the column).
+   */
+  listingStop: text('listing_stop').$type<'all_known' | 'end' | 'cap' | 'explicit' | 'error'>(),
   error: text('error'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),

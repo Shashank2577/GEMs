@@ -1,0 +1,56 @@
+{
+  "headerBefore": {
+    "x": 280,
+    "y": 88,
+    "width": 1128,
+    "height": 82.5
+  },
+  "headerAfter": {
+    "x": 280,
+    "y": 88,
+    "width": 1128,
+    "height": 81.5
+  },
+  "h1Before": {
+    "x": 280,
+    "y": 111.5,
+    "width": 288,
+    "height": 32
+  },
+  "h1After": {
+    "x": 280,
+    "y": 111.5,
+    "width": 431.25,
+    "height": 32
+  },
+  "actionsBefore": [
+    {
+      "x": 12,
+      "y": 266.25,
+      "width": 223,
+      "height": 36
+    },
+    {
+      "x": 1242.96875,
+      "y": 134.5,
+      "width": 165.03125,
+      "height": 36
+    }
+  ],
+  "actionsAfter": [
+    {
+      "x": 12,
+      "y": 266.25,
+      "width": 223,
+      "height": 36
+    },
+    {
+      "x": 1242.96875,
+      "y": 133.5,
+      "width": 165.03125,
+      "height": 36
+    }
+  ],
+  "headerNodesMoved": [],
+  "pageWideLayoutShiftScore": 0.09990077589163236
+}
