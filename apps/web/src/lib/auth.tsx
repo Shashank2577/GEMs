@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useLocation } from 'react-router-dom';
-import { api, ApiError } from './api';
+import { api, ApiError, ME_KEY } from './api';
 import type { Me, Role } from './types';
 
 export type { Me, Role } from './types';
@@ -14,7 +14,7 @@ export function can(role: Role | null | undefined, min: Role): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[min];
 }
 
-export const ME_KEY = ['auth', 'me'] as const;
+export { ME_KEY };
 
 /** GET /api/auth/me. `data` is null when signed out (401). */
 export function useMe() {
@@ -53,9 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setMe = useCallback((m: Me | null) => qc.setQueryData(ME_KEY, m), [qc]);
 
-  const loginM = useMutation({ mutationFn: (b: { email: string; password: string }) => api.post<Me>('/auth/login', b) });
-  const signupM = useMutation({ mutationFn: (b: { name: string; email: string; password: string; orgName: string }) => api.post<Me>('/auth/signup', b) });
-  const inviteM = useMutation({ mutationFn: (b: { token: string; name?: string; password?: string }) => api.post<Me>('/auth/accept-invite', b) });
+  // `authFlow`: a 401 here is a form error, not a session end (002/FR-013).
+  const meta = { authFlow: true };
+  const loginM = useMutation({ meta, mutationFn: (b: { email: string; password: string }) => api.post<Me>('/auth/login', b) });
+  const signupM = useMutation({ meta, mutationFn: (b: { name: string; email: string; password: string; orgName: string }) => api.post<Me>('/auth/signup', b) });
+  const inviteM = useMutation({ meta, mutationFn: (b: { token: string; name?: string; password?: string }) => api.post<Me>('/auth/accept-invite', b) });
 
   const value = useMemo<AuthContextValue>(() => ({
     me,
