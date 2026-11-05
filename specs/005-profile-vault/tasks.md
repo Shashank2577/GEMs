@@ -83,7 +83,7 @@ task is sized at ≤ 1 day.
 - [x] T019 [US1] In-app navigation guard: `useBlocker(dirty)` + `ConfirmDialog` "Discard unsaved changes?" with **Stay** / **Discard and leave** in `apps/web/src/features/profile/ProfilePage.tsx` FR-013 (#127)
 - [x] T020 [US1] Optimistic concurrency: accept optional `expectedUpdatedAt` in `profileInputSchema` (`packages/core/src/contracts/vault.ts`), return 409 `conflict` "Someone else saved the profile at <time IST>. Reload to see their changes." when it differs from the stored `updated_at` in `apps/api/src/routes/profile.ts`; API test for both match and mismatch in `apps/api/test/vault.test.ts` FR-014 (#128)
 - [x] T021 [US1] Web: send `expectedUpdatedAt` from `profile.data.profile.updatedAt` on save and show the 409 message with a **Reload** action (keeps the draft until reload) in `apps/web/src/features/profile/ProfilePage.tsx`, `apps/web/src/features/profile/api.ts` FR-014 (#129)
-- [ ] T022 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in `qa/evidence/005/US1/` — scenarios 1–14 (desktop + `@mobile` 375 px: pill nav, save bar above tab bar, no horizontal scroll), viewer read-only, axe scan; spec `e2e/005-profile-vault/US1-profile.e2e.ts`; `VERDICT.md` FR-001…FR-015, NFR-005, NFR-006 (#130)
+- [x] T022 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in `qa/evidence/005/US1/` — scenarios 1–14 (desktop + `@mobile` 375 px: pill nav, save bar above tab bar, no horizontal scroll), viewer read-only, axe scan; spec `e2e/005-profile-vault/US1-profile.e2e.ts`; `VERDICT.md` FR-001…FR-015, NFR-005, NFR-006 (#130)
 
 **Checkpoint**: Profile editing is fully functional and testable independently
 
@@ -98,7 +98,7 @@ task is sized at ≤ 1 day.
 ### Tests for User Story 2
 
 - [x] T023 [P] [US2] Unit tests: empty profile < 10% errors first, complete profile 100% no issues, missing FYs named, expired docs flagged, startup needs DPIIT in `packages/core/test/vault/completeness.test.ts` FR-016, FR-017
-- [ ] T024 [P] [US2] Pin the exact weights with golden tests at `NOW = 2026-11-05T04:30Z`: empty → 0% with 17 issues (first four errors in spec order), legal name + GSTIN + PAN → 27%, + `gst` doc → 32%, demo-like profile with 5 contracts → 96% with the 3 warnings of US2 scenario 10; and `averageTurnoverLastN` de-dup / ≤ 3 years / ignores negatives in `packages/core/test/vault/completeness.test.ts`, `packages/core/test/vault/validators.test.ts` FR-016, FR-017, FR-019 (#131)
+- [x] T024 [P] [US2] Pin the exact weights with golden tests at `NOW = 2026-11-05T04:30Z`: empty → 0% with 17 issues (first four errors in spec order), legal name + GSTIN + PAN → 27%, + `gst` doc → 32%, demo-like profile with 5 contracts → 96% with the 3 warnings of US2 scenario 10 followed by the D-Link India "Link …" info suggestion; and `averageTurnoverLastN` de-dup / ≤ 3 years / ignores negatives in `packages/core/test/vault/completeness.test.ts`, `packages/core/test/vault/validators.test.ts` FR-016, FR-017, FR-019 (#131)
 
 ### Implementation for User Story 2
 
@@ -106,8 +106,8 @@ task is sized at ≤ 1 day.
 - [x] T026 [P] [US2] FY helpers (`fyLabelForDate`, `fyStartYear`, `normalizeFy`, `lastCompletedFys`, `averageTurnoverLastN`) in `packages/core/src/vault/validators.ts` and `averageTurnover` in `buildProfileResponse` in `apps/api/src/routes/profile.ts` FR-019
 - [x] T027 [P] [US2] Completeness card (ring, band headings, 6 issues + "+N more", jump to field / vault upload preset) in `apps/web/src/features/profile/CompletenessCard.tsx` and `jump()` in `apps/web/src/features/profile/ProfilePage.tsx` FR-018
 - [x] T028 [P] [US2] Financials editor (FY picker without duplicates, turnover/net worth/audited, bar chart with average line, "Add FY <next missing>") in `apps/web/src/features/profile/FinancialsEditor.tsx`, `apps/web/src/features/profile/RupeeInput.tsx` FR-019
-- [ ] T029 [US2] OEM info issues without weight change: "OEM authorisation from <OEM> expires in N days — ask for a renewed MAF." (0–30 days) and "Link the <OEM> authorisation letter from the vault so packets can attach it." (no `documentId`) in `packages/core/src/vault/completeness.ts` (extend `CompletenessProfile.oemAuthorizations` with `documentId`); unit tests in `packages/core/test/vault/completeness.test.ts` FR-020 (#132)
-- [ ] T030 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in `qa/evidence/005/US2/` — scenarios 1–11: percentages 0 → 27 → 32, suggestion click focuses GSTIN / opens upload dialog preset "GST registration", FY editor and average, demo org 96%; desktop + `@mobile`; spec `e2e/005-profile-vault/US2-completeness.e2e.ts`; `VERDICT.md` FR-016…FR-020 (#133)
+- [x] T029 [US2] OEM info issues without weight change: "OEM authorisation from <OEM> expires in N days — ask for a renewed MAF." (0–30 days) and "Link the <OEM> authorisation letter from the vault so packets can attach it." (no `documentId`) in `packages/core/src/vault/completeness.ts` (extend `CompletenessProfile.oemAuthorizations` with `documentId`); unit tests in `packages/core/test/vault/completeness.test.ts` FR-020 (#132)
+- [x] T030 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in `qa/evidence/005/US2/` — scenarios 1–11: percentages 0 → 27 → 32, suggestion click focuses GSTIN / opens upload dialog preset "GST registration", FY editor and average, demo org 96% (3 warnings + the D-Link India "Link …" info suggestion); desktop + `@mobile`; spec `e2e/005-profile-vault/US2-completeness.e2e.ts`; `VERDICT.md` FR-016…FR-020 (#133)
 
 **Checkpoint**: Completeness and financials work independently on top of US1
 

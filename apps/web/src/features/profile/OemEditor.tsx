@@ -36,7 +36,7 @@ export function OemEditor({ value, onChange, errors, disabled }: {
               <Input value={r.products} disabled={disabled} onChange={(e) => update(i, { products: e.target.value })} placeholder="e.g. Latitude laptops, OptiPlex desktops" />
             </Field>
             <Field
-              label="Valid till" error={errors[`oemAuthorizations.${i}.validTill`]}
+              label="Valid till" id={`f-oemAuthorizations.${i}.validTill`} error={errors[`oemAuthorizations.${i}.validTill`]}
               hint={st || offerDocExpiry ? (
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   {st && <ExpiryBadge status={st.status} days={st.daysToExpiry} />}
@@ -50,7 +50,7 @@ export function OemEditor({ value, onChange, errors, disabled }: {
             >
               <Input type="date" value={r.validTill ?? ''} placeholder={docExpiry ?? undefined} disabled={disabled} onChange={(e) => update(i, { validTill: e.target.value || null })} />
             </Field>
-            <Field label="Vault document" error={errors[`oemAuthorizations.${i}.documentId`]}>
+            <Field label="Vault document" id={`f-oemAuthorizations.${i}.documentId`} error={errors[`oemAuthorizations.${i}.documentId`]}>
               <Select value={r.documentId ?? '__none'} disabled={disabled} onValueChange={(v) => update(i, { documentId: v === '__none' ? null : v })} options={options} />
             </Field>
             <div className="flex justify-end lg:pb-0.5">
