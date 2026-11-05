@@ -461,6 +461,10 @@ export const packets = pgTable('packets', {
   blobKey: text('blob_key'),
   sizeBytes: integer('size_bytes'),
   pageCount: integer('page_count'),
+  /** Snapshot of the computed default item uids (`kind:refId`) at build time (006/FR-055): items of a later
+   *  computed default whose uid is not in here are "newly required" and appended to the proposed order.
+   *  NULL = built before FR-055: append nothing. Never backfill with [] (that would re-append every item). */
+  defaultUids: jsonb('default_uids').$type<string[]>(),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
 }, (t) => ({ wsIdx: index('packets_ws_idx').on(t.workspaceId) }));

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   ApiTokenSummary, CreateApiTokenInput, CreatedApiToken, CreatedInvitation, Me, MembersResponse, NotificationPrefs,
-  RevokeOtherSessionsResponse, SessionsResponse,
+  RevokeOtherSessionsResponse, SessionsResponse, TestAlertResult,
 } from '@tp/core/contracts/auth';
 import type { ScoringWeights } from '@tp/core/contracts/analyse';
 import type { IngestionRunsResponse } from '@tp/core/contracts/identify';
@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/toaster';
 import { api, type Paged } from '@/lib/api';
 import { ME_KEY, useAuth } from '@/lib/auth';
+import { notificationKeys } from '@/features/notifications/api';
 
 export const settingsKeys = {
   members: ['org', 'members'] as const,
@@ -99,6 +100,14 @@ export function usePrefs() {
 export function useSavePrefs() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (b: NotificationPrefs) => api.put<NotificationPrefs>('/me/notification-prefs', b), onSuccess: (p) => qc.setQueryData(settingsKeys.prefs, p) });
+}
+/** "Send a test alert" across the enabled channels (002/FR-034); 429 when sent within the last minute. */
+export function useSendTestAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<TestAlertResult>('/me/notifications/test'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
+  });
 }
 
 // ── Scoring weights ──

@@ -1,0 +1,7 @@
+{
+  "sizeBytes": 22804009,
+  "warnings": [
+    "The packet is 21.7 MB, above the 20.0 MB upload limit. Compress large scans in the vault or split the packet before uploading on GeM.",
+    "OEM authorisation certificate (MAF) for this bid: the vault document has expired — replace it or ask a Bid Manager to override."
+  ]
+}

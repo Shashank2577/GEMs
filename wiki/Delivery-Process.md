@@ -47,4 +47,4 @@ Only PRs whose story carries `qa:approved` (and no open blocking review finding)
 `qa:rejected` sends the story back to the developer (max 3 rounds, then `needs-human`).
 
 ## Models
-Fable — whole-system architecture reviews. Opus — specs, implementation, code review. Sonnet — QA execution, ticket filing.
+Fable — whole-system architecture reviews. Opus — code review (merge gate) and complex tasks only (schema, security, tenancy, concurrency, escalations). Sonnet — development, QA, ticket filing and chores.

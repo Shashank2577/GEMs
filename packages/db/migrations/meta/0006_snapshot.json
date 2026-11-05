@@ -1,5 +1,5 @@
 {
-  "id": "bb2ab810-3e22-4073-b30e-34b83c5fd678",
+  "id": "61cc3232-f656-4349-a6bc-12f5143b051c",
   "prevId": "1e2ea001-0693-42fd-aef6-604f87e57eca",
   "version": "7",
   "dialect": "postgresql",
@@ -429,20 +429,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "token_hint": {
-          "name": "token_hint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "last_used_at": {
           "name": "last_used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -467,27 +455,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "api_tokens_org_user_idx": {
-          "name": "api_tokens_org_user_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1727,6 +1694,12 @@
         "page_count": {
           "name": "page_count",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_uids": {
+          "name": "default_uids",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
