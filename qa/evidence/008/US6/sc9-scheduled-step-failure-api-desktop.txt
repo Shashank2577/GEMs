@@ -1,0 +1,10 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90m/home/user/GEMs-us6/apps/api[39m
+
+ [32m✓[39m test/health.test.ts[2m > [22merror reporter (FR-046)[2m > [22mrunScheduledJobs reports each failed step with its job name
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[2m | [22m[33m32 skipped[39m[90m (33)[39m
+[2m   Start at [22m 05:55:44
+[2m   Duration [22m 2.44s[2m (transform 1.08s, setup 0ms, collect 1.95s, tests 231ms, environment 0ms, prepare 82ms)[22m
+
