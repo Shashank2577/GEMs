@@ -11,6 +11,13 @@ import { MULTI_KEYS, requirementId } from './rules';
 /** Matches `LlmClient.completeJson` in apps/api (`deps.llm`). */
 export type CompleteJson = (req: { system?: string; prompt: string; maxTokens?: number }) => Promise<unknown>;
 
+/**
+ * Version of the LLM extraction (prompt, model choice, parser). 008/FR-072: GeM-public documents keep the requirements
+ * extracted at this version in `tender_documents` and every org's analysis reuses them; bumping this constant makes
+ * the next analysis of each document re-extract it once. A test pins the value so a change is always deliberate.
+ */
+export const CURRENT_EXTRACTOR_VERSION = 'llm-extract-2026-11-v1';
+
 /** The LLM's confidence is capped so a clean RULE match (0.95) is never displaced. */
 export const LLM_MAX_CONFIDENCE = 0.9;
 const MAX_CHARS = 60_000;
@@ -72,10 +79,16 @@ const llmItemSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
 });
 
+/** The reply's requirement array (a bare array or `{ requirements: [...] }`), or null when it has none. */
+const replyArray = (reply: unknown): unknown[] | null => {
+  const arr = Array.isArray(reply) ? reply : (reply as { requirements?: unknown } | null)?.requirements;
+  return Array.isArray(arr) ? arr : null;
+};
+
 /** Validate and normalise an LLM reply. Invalid items are dropped, never thrown. */
 export function parseLlmRequirements(reply: unknown, src: { documentId?: string; fileName?: string } = {}): Requirement[] {
-  const arr = Array.isArray(reply) ? reply : (reply as { requirements?: unknown } | null)?.requirements;
-  if (!Array.isArray(arr)) return [];
+  const arr = replyArray(reply);
+  if (!arr) return [];
   const known = new Set<string>(LLM_REQUIREMENT_KEYS);
   const out: Requirement[] = [];
   for (const raw of arr) {
@@ -144,7 +157,15 @@ export interface LlmExtractResult {
   error?: string;
   /** Characters sent to the LLM (0 when not called). */
   inputChars: number;
+  /** The LLM's own requirements before the merge (set when `used`), what the shared extraction cache stores. */
+  llm?: Requirement[];
+  /**
+   * True only when the reply carried a valid `requirements` array with at least one valid item: an empty or malformed
+   * reply is used for this analysis (rules only) but must never be cached and served to every org (008/FR-072).
+   */
+  cacheable?: boolean;
 }
+
 
 /** Run the LLM extractor and merge; on any failure, fall back to the rule results. */
 export async function enrichWithLlm(
@@ -160,7 +181,8 @@ export async function enrichWithLlm(
   try {
     const reply = await completeJson(prompt);
     const llm = parseLlmRequirements(reply, src);
-    return { requirements: mergeRequirements(rules, llm), used: true, inputChars };
+    const cacheable = replyArray(reply) !== null && llm.length > 0;
+    return { requirements: mergeRequirements(rules, llm), used: true, inputChars, llm, cacheable };
   } catch (e) {
     return { requirements: rules, used: false, error: (e as Error).message, inputChars };
   }

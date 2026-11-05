@@ -1,5 +1,7 @@
 # TenderPilot — one Worker serves the API (/api/*) and the SPA (static assets), runs the cron
-# pipeline, and stores files in R2. Database: Neon Postgres (DATABASE_URL secret).
+# pipeline, and stores files in R2. Database: Neon Postgres with one `pg` driver (008/FR-075) — through Cloudflare
+# Hyperdrive (binding HYPERDRIVE) once enabled below, else the DATABASE_URL secret (Neon pooled `-pooler` URL), which
+# is also what `pnpm db:migrate` uses and stays the break-glass fallback.
 #
 # Secrets (wrangler secret put <NAME>): DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY,
 #   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, SENTRY_DSN, UNSUBSCRIBE_SECRET (HMAC key for one-click unsubscribe links;
@@ -22,6 +24,16 @@ run_worker_first = ["/api/*"]
 [[r2_buckets]]
 binding = "BLOBS"
 bucket_name = "tenderpilot-blobs"
+
+# 008/FR-075, ADR-0002: Postgres via Hyperdrive. NOT ENABLED YET — the binding needs a real config id, which only an
+# operator can create (docs/runbook.md § Hyperdrive → "Enable Hyperdrive"). Until then the Worker connects with the
+# DATABASE_URL secret (Neon pooled URL, same `pg` driver), so `wrangler deploy` works as is. To enable, run
+#   wrangler hyperdrive create tenderpilot-db --connection-string="$NEON_POOLED_URL" --caching-disabled
+# and uncomment the table below with that id (caching must stay disabled: its query cache serves stale reads).
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "<id from wrangler hyperdrive create>"
+# localConnectionString = "postgres://tp:tp@localhost:5433/tenderpilot"
 
 [triggers]
 crons = ["*/30 * * * *"]

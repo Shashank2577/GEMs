@@ -1,0 +1,90 @@
+# Review round 1 rework (B1): 500k scratch DB tenderpilot_test_us7_500k, search column rebuilt with the fixed 0023 expression
+$ psql … -c 'drop index tenders_search_gin' -c 'alter table tenders drop column search' -f packages/db/migrations/0023_tenders_search.sql   # 43.7 s
+
+$ PERF=1 TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7_500k pnpm --filter @tp/api exec vitest run -c vitest.perf.config.ts test/perf/search.perf.ts
+# re-measured after review B1 (column + query translate all ASCII punctuation; keyword queries via plainto_tsquery); column rebuilt on the 500k fixture in 43.7 s
+
+ RUN  v2.1.9 /home/user/GEMs-us7/apps/api
+
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > GET /api/tenders?q=solar street light × 200: p95 < 300 ms
+{"query":"q=solar street light","runs":200,"total":300,"p50_ms":36.4,"p95_ms":47.9,"max_ms":59.1}
+
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > EXPLAIN: every tenders query of the search request uses tenders_search_gin
+{"query":"select \"id\", \"source\", \"bid_number\", \"gem_bid_id\", \"bid_type\", \"title\", \"items\", \"category","indexes":["tenders_search_gin","tenders_bid_number_prefix_idx","tender_matches_org_idx"],"nodeTypes":["Limit","Sort","Nested Loop","Bitmap Heap Scan","BitmapOr","Bitmap Index Scan"],"ms":28.13}
+
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > EXPLAIN: every tenders query of the search request uses tenders_search_gin
+{"query":"select g, v, n from (\n      select grouping(\"tenders\".\"state\", \"tenders\".\"ministry\", \"tend","indexes":["tenders_search_gin","tenders_bid_number_prefix_idx","tender_matches_org_idx"],"nodeTypes":["Incremental Sort","Subquery Scan","WindowAgg","Sort","Aggregate","Nested Loop","Bitmap Heap Scan","BitmapOr","Bitmap Index Scan"],"ms":28.543}
+
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > q=GEM/2026/B/12 matches by bid-number prefix (index-backed)
+{"query":"status=all&q=GEM/2026/B/12","total":11111,"indexes":["tenders_bid_number_prefix_idx","tender_matches_org_idx"],"ms":30.794}
+
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > the plain feed (no q) still uses the US4 open-tender partial indexes
+{"query":"GET /tenders (no q)","indexes":["tenders_open_created_idx","tender_matches_uq"]}
+
+ ✓ test/perf/search.perf.ts (4 tests) 8408ms
+   ✓ feed full-text search at 500k tenders (US7 scenario 3) > GET /api/tenders?q=solar street light × 200: p95 < 300 ms 7828ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  09:36:29
+   Duration  10.80s (transform 1.20s, setup 0ms, collect 2.10s, tests 8.41s, environment 0ms, prepare 72ms)
+
+
+$ EXPLAIN (ANALYZE, BUFFERS) feed q='IS-2062 solar' after review B1 (JS turns the intra-word "-" into a space; feed translate keeps " and leading -)
+                                                                            QUERY PLAN                                                                             
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=68.27..68.28 rows=3 width=24) (actual time=2.959..2.962 rows=0 loops=1)
+   Buffers: shared hit=17 read=3
+   ->  Sort  (cost=68.27..68.28 rows=3 width=24) (actual time=2.957..2.959 rows=0 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=17 read=3
+         ->  Bitmap Heap Scan on tenders  (cost=64.23..68.25 rows=3 width=24) (actual time=2.879..2.881 rows=0 loops=1)
+               Recheck Cond: ((search @@ '''is'':* & ''2062'':* & ''solar'':*'::tsquery) OR (lower(bid_number) ~~ 'is-2062 solar%'::text))
+               Filter: ((status = 'open'::text) AND ((search @@ '''is'':* & ''2062'':* & ''solar'':*'::tsquery) OR (lower(bid_number) ~~ 'is-2062 solar%'::text)))
+               Buffers: shared hit=14 read=3
+               ->  BitmapOr  (cost=64.23..64.23 rows=1 width=0) (actual time=2.874..2.876 rows=0 loops=1)
+                     Buffers: shared hit=14 read=3
+                     ->  Bitmap Index Scan on tenders_search_gin  (cost=0.00..59.79 rows=1 width=0) (actual time=2.851..2.852 rows=0 loops=1)
+                           Index Cond: (search @@ '''is'':* & ''2062'':* & ''solar'':*'::tsquery)
+                           Buffers: shared hit=11 read=3
+                     ->  Bitmap Index Scan on tenders_bid_number_prefix_idx  (cost=0.00..4.43 rows=1 width=0) (actual time=0.021..0.021 rows=0 loops=1)
+                           Index Cond: ((lower(bid_number) ~>=~ 'is-2062 solar'::text) AND (lower(bid_number) ~<~ 'is-2062 solas'::text))
+                           Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=400 read=5
+ Planning Time: 3.181 ms
+ Execution Time: 3.229 ms
+(22 rows)
+
+$ EXPLAIN (ANALYZE, BUFFERS) watchlist keyword pre-filter anyKeywordCondition(['solar street-light', '<cctv>'])
+                                                                            QUERY PLAN                                                                            
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=6183.99..6185.24 rows=500 width=16) (actual time=39.648..39.705 rows=500 loops=1)
+   Buffers: shared hit=1722 read=148
+   ->  Sort  (cost=6183.99..6187.80 rows=1525 width=16) (actual time=39.647..39.669 rows=500 loops=1)
+         Sort Key: id
+         Sort Method: top-N heapsort  Memory: 44kB
+         Buffers: shared hit=1722 read=148
+         ->  Bitmap Heap Scan on tenders  (cost=518.06..6108.00 rows=1525 width=16) (actual time=32.449..39.041 rows=1800 loops=1)
+               Recheck Cond: (((search @@ '''solar'':* & ''street'':* & ''light'':*'::tsquery) OR (search @@ '''cctv'':*'::tsquery)) AND (status = 'open'::text))
+               Heap Blocks: exact=1800
+               Buffers: shared hit=1719 read=148
+               ->  BitmapAnd  (cost=518.06..518.06 rows=1525 width=0) (actual time=31.995..31.997 rows=0 loops=1)
+                     Buffers: shared hit=31 read=36
+                     ->  BitmapOr  (cost=246.16..246.16 rows=24601 width=0) (actual time=29.395..29.396 rows=0 loops=1)
+                           Buffers: shared hit=31 read=8
+                           ->  Bitmap Index Scan on tenders_search_gin  (cost=0.00..59.81 rows=3 width=0) (actual time=15.584..15.585 rows=5000 loops=1)
+                                 Index Cond: (search @@ '''solar'':* & ''street'':* & ''light'':*'::tsquery)
+                                 Buffers: shared hit=27
+                           ->  Bitmap Index Scan on tenders_search_gin  (cost=0.00..185.59 rows=24598 width=0) (actual time=13.809..13.809 rows=25000 loops=1)
+                                 Index Cond: (search @@ '''cctv'':*'::tsquery)
+                                 Buffers: shared hit=4 read=8
+                     ->  Bitmap Index Scan on tenders_open_closing_idx  (cost=0.00..271.27 rows=30997 width=0) (actual time=1.405..1.405 rows=30000 loops=1)
+                           Buffers: shared read=28
+ Planning:
+   Buffers: shared hit=6
+ Planning Time: 0.264 ms
+ Execution Time: 40.160 ms
+(26 rows)
+

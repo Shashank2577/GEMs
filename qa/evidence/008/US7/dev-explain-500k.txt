@@ -1,0 +1,59 @@
+# 500k scratch DB tenderpilot_test_us7_500k — representative feed predicates (lib/tender-search.ts)
+$ EXPLAIN (ANALYZE, BUFFERS) <q=solar street light, open feed>
+                                                                                                                                 QUERY PLAN                                                                                                                                 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=84.79..84.79 rows=1 width=71) (actual time=25.396..25.402 rows=20 loops=1)
+   Buffers: shared hit=5039
+   ->  Sort  (cost=84.79..84.79 rows=1 width=71) (actual time=25.394..25.397 rows=20 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=5039
+         ->  Bitmap Heap Scan on tenders  (cost=76.74..84.78 rows=1 width=71) (actual time=16.193..25.279 rows=300 loops=1)
+               Recheck Cond: ((search @@ '''solar'':* & ''street'':* & ''light'':*'::tsquery) OR (lower(bid_number) ~~ 'solar street light%'::text))
+               Filter: ((status = 'open'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= (now() - '400 days'::interval)) AND ((search @@ '''solar'':* & ''street'':* & ''light'':*'::tsquery) OR (lower(bid_number) ~~ 'solar street light%'::text)))
+               Rows Removed by Filter: 4700
+               Heap Blocks: exact=5000
+               Buffers: shared hit=5036
+               ->  BitmapOr  (cost=76.74..76.74 rows=2 width=0) (actual time=15.575..15.577 rows=0 loops=1)
+                     Buffers: shared hit=36
+                     ->  Bitmap Index Scan on tenders_search_gin  (cost=0.00..72.30 rows=2 width=0) (actual time=15.551..15.551 rows=5000 loops=1)
+                           Index Cond: (search @@ '''solar'':* & ''street'':* & ''light'':*'::tsquery)
+                           Buffers: shared hit=33
+                     ->  Bitmap Index Scan on tenders_bid_number_prefix_idx  (cost=0.00..4.43 rows=1 width=0) (actual time=0.022..0.023 rows=0 loops=1)
+                           Index Cond: ((lower(bid_number) ~>=~ 'solar street light'::text) AND (lower(bid_number) ~<~ 'solar street lighu'::text))
+                           Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=414
+ Planning Time: 1.709 ms
+ Execution Time: 25.641 ms
+(24 rows)
+
+$ EXPLAIN (ANALYZE, BUFFERS) <q=GEM/2026/B/12, status=all>
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=34315.90..34315.95 rows=20 width=41) (actual time=16.821..16.826 rows=20 loops=1)
+   Buffers: shared hit=2885
+   ->  Sort  (cost=34315.90..34341.16 rows=10105 width=41) (actual time=16.819..16.821 rows=20 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: top-N heapsort  Memory: 26kB
+         Buffers: shared hit=2885
+         ->  Bitmap Heap Scan on tenders  (cost=790.00..34047.01 rows=10105 width=41) (actual time=1.288..15.244 rows=11111 loops=1)
+               Filter: (lower(bid_number) ~~ 'gem/2026/b/12%'::text)
+               Heap Blocks: exact=2783
+               Buffers: shared hit=2882
+               ->  Bitmap Index Scan on tenders_bid_number_prefix_idx  (cost=0.00..787.47 rows=9905 width=0) (actual time=0.890..0.891 rows=11111 loops=1)
+                     Index Cond: ((lower(bid_number) ~>=~ 'gem/2026/b/12'::text) AND (lower(bid_number) ~<~ 'gem/2026/b/13'::text))
+                     Buffers: shared hit=99
+ Planning:
+   Buffers: shared hit=307
+ Planning Time: 0.891 ms
+ Execution Time: 16.921 ms
+(17 rows)
+
+$ \di+ tenders_search_gin / tenders_bid_number_prefix_idx
+         indexrelname          | size  
+-------------------------------+-------
+ tenders_search_gin            | 73 MB
+ tenders_bid_number_prefix_idx | 68 MB
+(2 rows)
+

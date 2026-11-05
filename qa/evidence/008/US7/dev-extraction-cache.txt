@@ -1,0 +1,34 @@
+$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run test/extraction-cache.test.ts test/isolation-contract.test.ts --reporter=verbose
+ RUN  v2.1.9 /home/user/GEMs-us7/apps/api
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > the contract parser finds the routes
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > every parameterised route in the contract is covered (foreign → 404, or global with a reason)
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > every parameterised route registered on the app is covered too (S5)
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > positive controls: org A gets 2xx for every id the sweep uses
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > B2: demo tenders do not exist for a non-demo org on any /tenders/:id* route, and GeM is never called
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > org B gets 404 for every org-A id and org A’s rows are unchanged
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > routes on public ids only ever touch org B
+ ✓ test/isolation-contract.test.ts > cross-org isolation sweep (contracts/api.md) > 008/US7 FR-072: the shared extraction cache never holds an org-owned document (invariant after the sweep)
+ ✓ test/extraction-cache.test.ts > shared extraction cache for GeM documents (US7 scenario 1) > org A analyses → 1 LLM call; org B analyses the same tender → 0 new calls, same requirements with provenance
+ ✓ test/extraction-cache.test.ts > shared extraction cache for GeM documents (US7 scenario 1) > bumping the extractor version re-extracts the document once and updates the cache row (US7 scenario 2)
+ ✓ test/extraction-cache.test.ts > shared extraction cache for GeM documents (US7 scenario 1) > a rules-only deployment (no LLM) neither writes nor needs the cache
+ ✓ test/extraction-cache.test.ts > tenant isolation of the extraction cache (FR-072, 008/FR-016) > an org's own upload is never cached: each org's analysis of its own document calls the LLM, and B never sees A's requirements
+ ✓ test/extraction-cache.test.ts > tenant isolation of the extraction cache (FR-072, 008/FR-016) > cachedExtraction() serves only org-null rows at the current version with method LLM
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  08:59:29
+   Duration  6.15s (transform 1.08s, setup 0ms, collect 2.76s, tests 2.88s, environment 0ms, prepare 170ms)
+
+$ pnpm --filter @tp/core exec vitest run test/analyse/llm.test.ts --reporter=verbose
+ RUN  v2.1.9 /home/user/GEMs-us7/packages/core
+ ✓ test/analyse/llm.test.ts > LLM extractor (T043) > builds a prompt with page markers and the rule results
+ ✓ test/analyse/llm.test.ts > LLM extractor (T043) > validates replies, drops junk, caps confidence and maps unknown keys to other
+ ✓ test/analyse/llm.test.ts > LLM extractor (T043) > merge: never replaces a RULE with lower confidence; adds missing and multi-valued items
+ ✓ test/analyse/llm.test.ts > LLM extractor (T043) > enrichWithLlm uses the injected completion and falls back on errors
+ ✓ test/analyse/llm.test.ts > LLM prompt character cap (008/FR-031) > includes at most maxChars of document text
+ ✓ test/analyse/llm.test.ts > LLM prompt character cap (008/FR-031) > never exceeds the 60k per-document default and reports the characters sent
+ ✓ test/analyse/llm.test.ts > shared extraction cache version (008/FR-072) > CURRENT_EXTRACTOR_VERSION is pinned — changing it re-extracts every cached GeM document once; update this test only on purpose
+ ✓ test/analyse/llm.test.ts > shared extraction cache version (008/FR-072) > enrichWithLlm returns the LLM-only requirements (what the cache stores) next to the merged list
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  08:59:36
+   Duration  508ms (transform 133ms, setup 0ms, collect 172ms, tests 19ms, environment 0ms, prepare 74ms)

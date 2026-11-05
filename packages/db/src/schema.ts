@@ -279,6 +279,10 @@ export const tenders = pgTable('tenders', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({
+  // 008/FR-073: `tenders.search` (generated tsvector) + GIN `tenders_search_gin` and `tenders_bid_number_prefix_idx`
+  // exist in the database but are deliberately NOT declared here: a declared column would be read by every
+  // `select().from(tenders)` and leak into API responses. They are created by the hand-written non-transactional
+  // migration `*_tenders_search.sql`; queries reach them through `lib/tender-search.ts`.
   bidUq: uniqueIndex('tenders_source_bid_uq').on(t.source, t.bidNumber),
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
@@ -324,6 +328,15 @@ export const tenderDocuments = pgTable('tender_documents', {
   text: text('text'), // extracted text, pages separated by \f
   sourceUrl: text('source_url'),
   textSource: text('text_source').$type<'pdf' | 'ocr'>().notNull().default('pdf'), // FR-052
+  /**
+   * 008/FR-072 shared extraction cache. Written and read ONLY for GeM-fetched documents (`org_id IS NULL`, public
+   * data): one LLM extraction serves every org. An org's own upload never gets these columns set, so nothing derived
+   * from one tenant's document can reach another (services/analyse.ts#cachedExtraction).
+   */
+  requirements: jsonb('requirements').$type<Requirement[]>(),
+  extractorVersion: text('extractor_version'),
+  extractedAt: timestamp('extracted_at', { withTimezone: true }),
+  extractedMethod: text('extracted_method').$type<'LLM'>(),
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_docs_tender_idx').on(t.tenderId) }));
 
@@ -357,6 +370,18 @@ export const gemThrottle = pgTable('gem_throttle', {
   id: text('id').primaryKey(),
   nextSlotAt: timestamp('next_slot_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Once-per-day job claims (008/FR-070): the first scheduled tick after 02:00 IST inserts `(job, day)`; every other
+ * tick that day — on any isolate — conflicts and skips. A failed run deletes its claim so the next tick retries.
+ */
+export const jobRuns = pgTable('job_runs', {
+  job: text('job').notNull(),
+  day: date('day').notNull(), // IST calendar day
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  summary: jsonb('summary').$type<Record<string, unknown>>(),
+}, (t) => ({ pk: primaryKey({ columns: [t.job, t.day] }) }));
 
 // ───────────── Identify: watchlists & matches ─────────────
 

@@ -1,0 +1,34 @@
+# sc3-search — project desktop — 2026-11-05T10:30:21.686Z
+GET /api/tenders?q=solar street light → 200, total 2: GEM/2026/B/7731001, GEM/2026/B/6421017
+GET /api/tenders?q=IS 2062 → 200, total 1: GEM/2026/B/7731002
+GET /api/tenders?q=GEM/2026/B/77310 → 200, total 3: GEM/2026/B/7731003, GEM/2026/B/7731002, GEM/2026/B/7731001
+
+$ select count(*) from tenders  (500k DB) → 500000
+$ PERF=1 TEST_DATABASE_URL=…/tenderpilot_test_us7_500k pnpm --filter @tp/api exec vitest run -c vitest.perf.config.ts test/perf/search.perf.ts
+stdout | test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > GET /api/tenders?q=solar street light × 200: p95 < 300 ms
+{"query":"q=solar street light","runs":200,"total":300,"p50_ms":36.1,"p95_ms":69.6,"max_ms":83.2}
+ ✓ test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > GET /api/tenders?q=solar street light × 200: p95 < 300 ms 8323ms
+{"query":"select \"id\", \"source\", \"bid_number\", \"gem_bid_id\", \"bid_type\", \"title\", \"items\", \"category","indexes":["tenders_open_closing_idx","tenders_search_gin","tenders_bid_number_prefix_idx","tender_matches_org_idx"],"nodeTypes":["Limit","Sort","Nested Loop","Bitmap Heap Scan","BitmapAnd","Bitmap Index Scan","BitmapOr","Materialize"],"ms":18.299}
+{"query":"select g, v, n from (\n      select grouping(\"tenders\".\"state\", \"tenders\".\"ministry\", \"tend","indexes":["tenders_open_closing_idx","tenders_search_gin","tenders_bid_number_prefix_idx","tender_matches_org_idx"],"nodeTypes":["Incremental Sort","Subquery Scan","WindowAgg","Sort","Aggregate","Nested Loop","Bitmap Heap Scan","BitmapAnd","Bitmap Index Scan","BitmapOr","Materialize"],"ms":17.371}
+ ✓ test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > EXPLAIN: every tenders query of the search request uses tenders_search_gin
+{"query":"status=all&q=GEM/2026/B/12","total":11111,"indexes":["tenders_bid_number_prefix_idx","tender_matches_org_idx"],"ms":20.932}
+ ✓ test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > q=GEM/2026/B/12 matches by bid-number prefix (index-backed)
+{"query":"GET /tenders (no q)","indexes":["tenders_open_created_idx","tender_matches_uq"]}
+ ✓ test/perf/search.perf.ts > feed full-text search at 500k tenders (US7 scenario 3) > the plain feed (no q) still uses the US4 open-tender partial indexes
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+$ EXPLAIN (ANALYZE) feed page query, q=solar street light (500k DB):
+Limit (actual time=59.959..59.966 rows=20 loops=1)
+  ->  Sort (actual time=59.957..59.960 rows=20 loops=1)
+        Sort Key: created_at DESC
+        Sort Method: top-N heapsort  Memory: 27kB
+        ->  Bitmap Heap Scan on tenders (actual time=19.292..59.766 rows=300 loops=1)
+              Recheck Cond: (search @@ '''solar'':* & ''street'':* & ''light'':*'::tsquery)
+              Filter: (status = 'open'::text)
+              Rows Removed by Filter: 4700
+              Heap Blocks: exact=5000
+              ->  Bitmap Index Scan on tenders_search_gin (actual time=18.465..18.466 rows=5000 loops=1)
+                    Index Cond: (search @@ '''solar'':* & ''street'':* & ''light'':*'::tsquery)
+Planning Time: 1.692 ms
+Execution Time: 60.445 ms
