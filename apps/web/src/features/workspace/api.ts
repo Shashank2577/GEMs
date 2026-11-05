@@ -92,6 +92,17 @@ export function useComment(id: string) {
   });
 }
 
+export function useDeleteComment(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => api.delete<void>(`/workspaces/${id}/comments/${commentId}`),
+    onSuccess: (_r, commentId) => {
+      qc.setQueryData<WorkspaceDetail>(wsKeys.detail(id), (d) => (d ? { ...d, comments: d.comments.filter((c) => c.id !== commentId) } : d));
+      qc.invalidateQueries({ queryKey: wsKeys.detail(id) });
+    },
+  });
+}
+
 export function useBuildPacket(id: string) {
   const refresh = useRefresh(id);
   return useMutation({

@@ -61,7 +61,7 @@ beforeAll(async () => {
   ids.analysis = A.analysis.id;
   ids.vault = A.docs.gst.id;
   ids.workspace = ok(await request(ctx.app, 'POST', `/tenders/${ids.tender}/workspace`, { cookie: a.analyst.cookie }), 'workspace').id;
-  ok(await request(ctx.app, 'POST', `/workspaces/${ids.workspace}/comments`, { cookie: a.analyst.cookie, json: { body: 'Org A only' } }), 'comment');
+  ids.comment = ok(await request(ctx.app, 'POST', `/workspaces/${ids.workspace}/comments`, { cookie: a.analyst.cookie, json: { body: 'Org A only' } }), 'comment').id;
   ok(await request(ctx.app, 'POST', `/workspaces/${ids.workspace}/overrides`, { cookie: a.bidManager.cookie, json: { itemId: 'oem_authorization', reason: 'Renewed MAF arriving tomorrow' } }), 'override');
   ids.packet = ok(await request(ctx.app, 'POST', `/workspaces/${ids.workspace}/packets`, { cookie: a.analyst.cookie, json: {} }), 'packet').id;
   ids.watchlist = ok(await request(ctx.app, 'POST', '/watchlists', { cookie: a.analyst.cookie, json: { name: 'A laptops', criteria: { keywords: ['laptop'] } } }), 'watchlist').id;
@@ -122,6 +122,7 @@ const FOREIGN: Record<string, () => Call> = {
   'POST /workspaces/:id/overrides': () => asB('POST', `/workspaces/${ids.workspace}/overrides`, { itemId: 'gst', reason: 'Hijack attempt' }),
   'GET /workspaces/:id/comments': () => asB('GET', `/workspaces/${ids.workspace}/comments`),
   'POST /workspaces/:id/comments': () => asB('POST', `/workspaces/${ids.workspace}/comments`, { body: 'Hijack' }),
+  'DELETE /workspaces/:id/comments/:commentId': () => asB('DELETE', `/workspaces/${ids.workspace}/comments/${ids.comment}`),
   'GET /workspaces/:id/annexures/:key.pdf': () => asB('GET', `/workspaces/${ids.workspace}/annexures/non_blacklisting.pdf`),
   'POST /workspaces/:id/packets': () => asB('POST', `/workspaces/${ids.workspace}/packets`, {}),
   'GET /packets/:id/download': () => asB('GET', `/packets/${ids.packet}/download`),
@@ -182,6 +183,7 @@ const CONTROLS: Record<string, (id: string) => Promise<{ status: number; found: 
   watchlist: listed('/watchlists'),
   pastContract: listed('/past-contracts'),
   notification: listed('/notifications'),
+  comment: async (id) => { const r = await asA(`/workspaces/${ids.workspace}/comments`); return { status: r.status, found: r.body.items.some((c: { id: string }) => c.id === id) }; },
   analysis: async (id) => { const r = await asA(`/tenders/${ids.tender}/analysis`); return { status: r.status, found: r.body.id === id }; },
   vault: async (id) => { const r = await asA(`/vault/${id}`); return { status: r.status, found: r.body.id === id }; },
   vaultReplaced: async (id) => { const r = await asA(`/vault/${id}/versions`); return { status: r.status, found: r.body.items.length > 0 }; },

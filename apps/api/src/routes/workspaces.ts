@@ -9,7 +9,8 @@
  *   POST  /workspaces/:id/overrides       { itemId, reason }                                            bid_manager+
  *   DELETE /workspaces/:id/overrides/:itemId                                                            bid_manager+
  *   GET   /workspaces/:id/comments        CommentDto[]                                                  viewer+
- *   POST  /workspaces/:id/comments        { body }                                                      analyst+
+ *   POST  /workspaces/:id/comments        { body }  (@mentions notify members)                          analyst+
+ *   DELETE /workspaces/:id/comments/:commentId   → 204; the author or bid_manager+, else 403                 viewer+
  *   PUT   /workspaces/:id/assist-values   allow-listed non-financial values only (price-like → 400)    analyst+
  *   POST  /workspaces/:id/submitted       human confirms they submitted on GeM                          analyst+
  *   GET   /tenders/:id/result-hint        optional L1 hint from GeM's public result page (007/FR-030)    analyst+
@@ -26,16 +27,17 @@ import {
 } from '@tp/core/contracts/apply';
 import { validateAssistValues, isForbiddenKey } from '@tp/core/assist/allowlist';
 import { autoMap } from '@tp/core/packet/mapping';
+import { parseMentions } from '@tp/core/packet/mentions';
 import { parseBidResult, type BidResultHint } from '@tp/core/gem/award';
 import { GemClient } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
-import { HttpError, conflict, notFound, validationError } from '../lib/errors';
+import { HttpError, conflict, forbidden, notFound, validationError } from '../lib/errors';
 import { hit, rateLimited, release, type LimitOptions } from '../lib/rate-limit';
 import { parseJson, parseWith } from '../lib/validate';
-import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { orgId, requireAuth, requireRole, roleAtLeast, userId } from '../middleware/auth';
 import {
-  asMappable, getTenderRow, getWorkspace, latestAnalysis, listComments, listWorkspaceCards, readinessFor, vaultRows, workspaceDetail,
+  asMappable, orgMembers, getTenderRow, getWorkspace, latestAnalysis, listComments, listWorkspaceCards, readinessFor, vaultRows, workspaceDetail,
   workspaceDto, type WorkspaceRow,
 } from '../services/packet';
 import type { AppEnv } from '../types';
@@ -280,6 +282,9 @@ workspacesRoutes.post('/workspaces/:id/overrides', requireRole('bid_manager'), a
   const { analysis, docs } = await readinessOf(deps, org, w);
   const item = (analysis?.checklist ?? []).find((i) => i.id === body.itemId);
   if (!item) throw validationError('itemId: Not an item of this bid’s checklist', { fields: { itemId: 'Not an item of this bid’s checklist' } });
+  // FR-027: only a missing or expired item can be overridden (an already-overridden one may have its reason updated).
+  const base = readinessFor({ ...w, overrides: [] }, analysis, docs, deps.clock.now()).items.find((i) => i.item.id === item.id);
+  if (!base || (base.state !== 'missing' && base.state !== 'expired')) throw new HttpError(409, 'nothing_to_override', 'Only a missing or expired item can be overridden.', { itemId: item.id, state: base?.state ?? null });
   const overrides = [...(w.overrides ?? []).filter((o) => o.itemId !== body.itemId), { itemId: body.itemId, reason: body.reason, by: userId(c), at: deps.clock.now().toISOString() }];
   const updated = await touch(deps, org, w.id, { overrides });
   await log(c, w, 'workspace.item_overridden', { itemId: item.id, label: item.label, reason: body.reason });
@@ -317,12 +322,34 @@ workspacesRoutes.post('/workspaces/:id/comments', requireRole('analyst'), async 
   await touch(deps, org, w.id, {});
   await log(c, w, 'workspace.commented', { commentId: row.id, excerpt: body.slice(0, 140) });
   const t = await getTenderRow(deps, w.tenderId);
-  const watchers = [...new Set([w.ownerId, ...(w.assigneeIds ?? [])].filter((u): u is string => !!u && u !== userId(c)))];
+  const members = await orgMembers(deps, org);
+  const mentioned = parseMentions(body, members).filter((u) => u !== userId(c));
+  const watchers = [...new Set([w.ownerId, ...(w.assigneeIds ?? [])].filter((u): u is string => !!u && u !== userId(c) && !mentioned.includes(u)))];
+  const link = `/workspaces/${w.id}`;
   await notify(deps, org, watchers, {
-    kind: 'mention', title: `New comment on ${t.bidNumber}`, body: `${c.var.user.name}: ${body.slice(0, 160)}`,
-    link: `/workspaces/${w.id}`, dedupeKey: `comment:${row.id}`,
+    kind: 'mention', title: `New comment on ${t.bidNumber}`, body: `${c.var.user.name}: ${body.slice(0, 160)}`, link, dedupeKey: `comment:${row.id}`,
+  });
+  // FR-032: mentioned members get one notification each (even when they are also the owner/an assignee).
+  await notify(deps, org, mentioned, {
+    kind: 'mention', title: `${c.var.user.name} mentioned you on ${t.bidNumber}`, body: `${c.var.user.name}: ${body.slice(0, 160)}`, link, dedupeKey: `comment:${row.id}`,
   });
   return c.json({ id: row.id, body: row.body, user: { id: c.var.user.id, name: c.var.user.name, email: c.var.user.email }, createdAt: row.createdAt.toISOString() }, 201);
+});
+
+workspacesRoutes.delete('/workspaces/:id/comments/:commentId', requireAuth, async (c) => {
+  const { deps } = c.var;
+  const org = orgId(c);
+  const w = await getWorkspace(deps, org, c.req.param('id'));
+  const id = c.req.param('commentId');
+  const [row] = z.string().uuid().safeParse(id).success
+    ? await deps.db.select().from(comments).where(and(eq(comments.orgId, org), eq(comments.workspaceId, w.id), eq(comments.id, id)))
+    : [];
+  if (!row) throw notFound('Comment');
+  if (row.userId !== userId(c) && !roleAtLeast(c.var.role, 'bid_manager')) throw forbidden('Only the author or a Bid Manager can delete a comment.');
+  await deps.db.delete(comments).where(and(eq(comments.orgId, org), eq(comments.id, row.id)));
+  await touch(deps, org, w.id, {});
+  await log(c, w, 'workspace.comment_deleted', { commentId: row.id, authorId: row.userId });
+  return c.body(null, 204);
 });
 
 // ───────────── assist values & submitted ─────────────
