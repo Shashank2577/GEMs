@@ -19,6 +19,8 @@ import { overrideFactorInputSchema, scoringWeightsSchema, tenderDocKindSchema } 
 import { HttpError, badRequest, notFound } from '../lib/errors';
 import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { TENDER_DOC_TOO_LARGE, TENDER_DOC_UPLOAD_MAX_BYTES, bodyLimit } from '../middleware/body-limit';
+import { rateLimit } from '../middleware/rate-limit';
 import {
   analyseTender, fetchGemDocuments, getTender, getTenderDocument, latestAnalysis, listTenderDocuments, overrideFactor,
   removeTenderDocument, saveWeights, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
@@ -40,7 +42,7 @@ analysisRoutes.get('/tenders/:id/documents', requireAuth, async (c) => {
   return c.json({ items: docs.map((d) => toDocumentDto(d, tender.bidNumber)), total: docs.length });
 });
 
-analysisRoutes.post('/tenders/:id/documents', requireRole('analyst'), async (c) => {
+analysisRoutes.post('/tenders/:id/documents', bodyLimit(TENDER_DOC_UPLOAD_MAX_BYTES, TENDER_DOC_TOO_LARGE), requireRole('analyst'), rateLimit('upload.org'), async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
   let body: Record<string, string | File>;
   try {
@@ -59,7 +61,7 @@ analysisRoutes.post('/tenders/:id/documents', requireRole('analyst'), async (c) 
   return c.json({ ...dto, warnings: uploadWarnings(dto) }, 201);
 });
 
-analysisRoutes.post('/tenders/:id/fetch-documents', requireRole('analyst'), async (c) => {
+analysisRoutes.post('/tenders/:id/fetch-documents', requireRole('analyst'), rateLimit('gem.fetch.org'), async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
   const r = await fetchGemDocuments(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId });
   return c.json({ items: r.documents.map((d) => toDocumentDto(d, r.tender.bidNumber)), total: r.documents.length, fetched: r.fetched }, r.fetched ? 201 : 200);
@@ -93,7 +95,7 @@ analysisRoutes.get('/tenders/:id/documents/:docId/download', requireAuth, async 
   });
 });
 
-analysisRoutes.post('/tenders/:id/analyse', requireRole('analyst'), async (c) => {
+analysisRoutes.post('/tenders/:id/analyse', requireRole('analyst'), rateLimit('analyse.user'), async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
   const { analysis, documents } = await analyseTender(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId });
   return c.json(toAnalysisDto(analysis, documents), 201);

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TenderListItem, WatchlistCreateInput, WatchlistCriteriaInput, WatchlistDto, WatchlistUpdateInput } from '@tp/core/contracts/identify';
-import { api } from '@/lib/api';
+import { api, ApiError, formatRetryAfter } from '@/lib/api';
 
 export const watchlistKeys = {
   all: ['watchlists'] as const,
@@ -12,6 +12,12 @@ export function useWatchlists() {
 }
 
 export type PreviewItem = TenderListItem & { previewReasons: string[] };
+
+/** "Preview paused — try again in N s" for a 429 `watchlist.preview.user` (008/US3 scenario 6); null otherwise. */
+export function previewPausedMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError) || !err.isRateLimited) return null;
+  return `Preview paused — try again in ${formatRetryAfter(err.retryAfter ?? 60)}`;
+}
 
 export function useWatchlistPreview(criteria: WatchlistCriteriaInput, enabled: boolean) {
   return useQuery({

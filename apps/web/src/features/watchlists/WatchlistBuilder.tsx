@@ -16,7 +16,7 @@ import { api, ApiError } from '@/lib/api';
 import { formatINR, formatNumberIN } from '@/lib/format';
 import { useIsMobile } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { useCreateWatchlist, useUpdateWatchlist, useWatchlistPreview } from './api';
+import { previewPausedMessage, useCreateWatchlist, useUpdateWatchlist, useWatchlistPreview } from './api';
 import { ChipInput, MultiSelect } from './ChipInput';
 
 export interface Draft {
@@ -88,6 +88,8 @@ function Preview({ draft }: { draft: Draft }) {
       <div className="mt-3 rounded-xl border bg-card p-4 shadow-xs" aria-live="polite">
         {!ready ? (
           <p className="text-sm text-muted-foreground">Add a keyword, state or buyer to see matching open bids.</p>
+        ) : q.isError && previewPausedMessage(q.error) ? (
+          <p className="text-sm text-muted-foreground" role="status">{previewPausedMessage(q.error)}</p>
         ) : q.isError ? (
           <p className="text-sm text-danger">Preview unavailable — {(q.error as Error).message}</p>
         ) : (

@@ -18,19 +18,26 @@ import { roleAtLeast } from '@tp/core/contracts/common';
 import type { Role } from '@tp/db';
 import { HttpError, forbidden, unauthorized } from '../lib/errors';
 import { resolveAuth } from '../lib/session';
+import { limitAuthenticated } from './rate-limit';
 import type { AppEnv } from '../types';
 
 async function authenticate(c: Context<AppEnv>) {
   if (c.var.user && c.var.org) return;
   const auth = await resolveAuth(c);
-  if (!auth) throw unauthorized();
-  if (!auth.org || !auth.role) throw new HttpError(403, 'no_organization', 'You are not a member of any organization. Ask an owner to invite you.');
+  if (!auth || !auth.org || !auth.role) {
+    // 008/FR-019: requests whose credentials do not authenticate count against the client IP (`api.ip`).
+    await limitAuthenticated(c, false);
+    if (!auth) throw unauthorized();
+    throw new HttpError(403, 'no_organization', 'You are not a member of any organization. Ask an owner to invite you.');
+  }
   c.set('user', auth.user);
   c.set('org', auth.org);
   c.set('role', auth.role);
   c.set('authKind', auth.kind);
   c.set('sessionId', auth.sessionId);
   c.set('apiTokenId', auth.apiTokenId);
+  // 008/FR-019 `api.user`: once per request, per user (or per API token).
+  await limitAuthenticated(c, true);
 }
 
 export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
