@@ -1,0 +1,12 @@
+# sc7-unhandled-error — project desktop — 2026-11-05T05:55:42.791Z
+### Route throws (tenders table unavailable → driver error)
+> GET /api/tenders (x-request-id: us6-mw34t852-500)
+< 500
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: us6-mw34t852-500
+{"error":{"code":"internal_error","message":"Something went wrong on our side. Please try again.","details":{"requestId":"us6-mw34t852-500"}}}
+
+--- the stdout ERROR line ---
+{"rid":"us6-mw34t852-500","orgId":"7cc349cd-d71a-434c-8a3f-a746ef81e7aa","userId":"25130074-59c8-403d-9577-e7f7046cd9ef","path":"/api/tenders","error":"relation \"tenders\" does not exist","stack":"error: relation \"tenders\" does not exist |     at /home/user/GEMs-us6/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11 |     at process.processTicksAndRejections (node:internal/process/task_queues:103:5) |     at async <anonymous> (/home/user/GEMs-us6/node_modules/.pnpm/drizzle-orm@0.36.4_@cloudflare+workers-types@4.20260702.1_@neondatabase+serverless@0.10_ee0f495d95b3684289a4dc8598df24ca/node_modules/src/node-postgres/session.ts:104:19) |     at async facet (/home/user/GEMs-us6/apps/api/src/routes/tenders.ts:159:16) |     at async Promise.all (index 2)","ts":"2026-11-05T05:55:42.848Z","level":"error","msg":"unhandled error"}
+Reporter: server runs without SENTRY_DSN → noop reporter; deps.errors.capture() called-once-with-same-rid is asserted by apps/api/test/health.test.ts ("captures unhandled errors with rid/orgId/userId/route…").
