@@ -196,7 +196,7 @@ test.describe('US3 feed', () => {
     expect(shown, 'spec: first 25 cards').toBe(25);
     await expect(loadMore).toContainText('Load more (11 left)');
     await loadMore.scrollIntoViewIfNeeded();
-    await loadMore.click();
+    await loadMore.click({ timeout: 3000 }).catch(() => undefined); // scrolling the button into view may already have auto-loaded the rest (sentinel)
     await expect(cards(page)).toHaveCount(36);
     await expect(page.getByText('That’s all 36 tenders.')).toBeVisible();
     await shot(page, 'S1c-all-loaded-footer');
@@ -822,7 +822,7 @@ test.describe('US3 feed', () => {
     await page.getByRole('button', { name: 'Save view' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await shot(page, 'A11y-dark-save-view-dialog');
-    await checkA11y(page, { exclude: ['[aria-label="Sort tenders"]'] }); // the sort trigger is audited (and reported) in the dark test above
+    await checkA11y(page);
   });
 
   for (const scheme of ['light', 'dark'] as const) {

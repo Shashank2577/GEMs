@@ -20,8 +20,9 @@ export function UserMenu({ compact, className }: { compact?: boolean; className?
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn('flex items-center gap-2 rounded-full focus-ring', !compact && 'rounded-lg p-1 pr-2 hover:bg-muted', className)}
-        aria-label="Account menu"
       >
+        {/* Name comes from content (sr-only label + initials + first name) so it contains the visible text (WCAG 2.5.3). */}
+        <span className="sr-only">Account menu</span>
         <Avatar name={me.user.name} size="sm" />
         {!compact && <span className="hidden max-w-[8rem] truncate text-sm font-medium lg:block">{me.user.name.split(' ')[0]}</span>}
       </DropdownMenuTrigger>

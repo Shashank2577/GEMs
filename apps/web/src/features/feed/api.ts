@@ -11,7 +11,7 @@ export const feedKeys = {
   runs: ['ingestion', 'runs'] as const,
 };
 
-export const PAGE_SIZE = 20;
+export const PAGE_SIZE = 25;
 
 /** Infinite feed (load-more / auto-load on scroll). */
 export function useTenderFeed(filters: FeedFilters) {

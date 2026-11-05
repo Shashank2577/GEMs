@@ -23,6 +23,7 @@
     --primary: 243 75% 52%;
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 90% 96.5%;
+    --primary-ink: 243 75% 52%; /* text on primary-soft surfaces */
     --accent: 33 96% 50%;
     --accent-foreground: 26 90% 14%;
     --accent-soft: 40 100% 95%;
@@ -35,7 +36,7 @@
     --danger: 350 74% 50%;
     --danger-foreground: 0 0% 100%;
     --danger-soft: 352 100% 96.5%;
-    --info: 205 85% 45%;
+    --info: 205 85% 38%;
     --info-soft: 205 100% 96%;
     --sidebar: 230 30% 98.4%;
     --sidebar-foreground: 232 18% 30%;
@@ -67,6 +68,7 @@
     --primary: 243 82% 66%;
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 45% 18%;
+    --primary-ink: 243 90% 78%;
     --accent: 36 98% 58%;
     --accent-foreground: 26 90% 10%;
     --accent-soft: 34 60% 15%;

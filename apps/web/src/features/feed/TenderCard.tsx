@@ -24,7 +24,7 @@ export function locationLine(t: Pick<TenderListItem, 'city' | 'state'>) {
 }
 
 /** Up to N unique match-reason chips across all watchlists. */
-export function reasonChips(t: TenderListItem, max = 4) {
+export function reasonChips(t: TenderListItem, max = 3) {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of t.matches) for (const r of m.reasons) if (!seen.has(r)) { seen.add(r); out.push(r); }

@@ -315,6 +315,7 @@ export default function FeedPage() {
               <div className="min-w-[12rem] flex-1">
                 <Input
                   ref={searchRef}
+                  data-page-search
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={onSearchKeyDown}
@@ -357,7 +358,7 @@ export default function FeedPage() {
                   value={filters.sort}
                   onValueChange={(v) => update({ sort: v as FeedFilters['sort'] })}
                   options={SORT_OPTIONS}
-                  aria-label="Sort tenders"
+                  aria-label={`${SORT_OPTIONS.find((o) => o.value === filters.sort)?.label ?? ''}, sort tenders`}
                   className="h-8 w-[10.5rem] text-[13px]"
                 />
                 {!isMobile && (
