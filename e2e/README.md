@@ -14,6 +14,7 @@ every context opened by `inviteAs()` after each test, pass or fail.
 | Helper | Use |
 |---|---|
 | `signupViaApi`, `uniqueUser`, `loginViaUi`, `seedDemo`, `mockGem` | Account setup, demo seed (`POST /api/demo/seed`) and mock-gem control (all specs) |
+| `gemAward(request, bidNumber, status?)` | 003 US6. Awards (default) or evaluates (`tech_evaluated` / `fin_evaluated`) a mock-gem bid via `POST /__admin/award/<bidNumber>`: the bid closes now, lists under `bidrastatus`/`byStatus`, and its result view serves the recorded awarded page (or "not yet published") |
 | `evidence(page, spec, story, name)` | Full-page screenshot to `qa/evidence/<spec>/<story>/<name>.png` |
 | `evidence007(page, story, name)` | 007 shortcut: `qa/evidence/007/<US1…US7>/<name>.png` (`evidence005` is the 005 equivalent) |
 | `inviteAs(request, role)` | 007. Invites a new member (`bid_manager`, `analyst` or `viewer`) into the org of an Owner/Bid Manager session and accepts the invite. Returns `{user, role, api, storageState, newContext(browser), newPage(browser)}` for role-gated checks |

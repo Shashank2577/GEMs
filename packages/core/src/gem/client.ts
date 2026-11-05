@@ -12,7 +12,8 @@
  * The session is re-bootstrapped once on 403/419 (expired CSRF).
  *
  * Request shape adapted from erenmyeager15/india-government-tenders-scraper (Apache-2.0) and
- * arush15june/gem-search (MIT) — see NOTICE.
+ * arush15june/gem-search (MIT) — see NOTICE. fetchSubmittedPage / fetchBidResult (spec 003 US6) are adapted from
+ * gem-search `search_bids` (bidStatusType "bidrastatus" + filter.byStatus) and `get_bid_result`.
  */
 import { bidResultPath } from './award';
 import { isPdfBody, readBoundedBody, SourceBodyLimitError } from './http';
@@ -49,6 +50,17 @@ export interface FetchPageOptions {
   /** 'ongoing' (default) or 'closed' bids. */
   status?: 'ongoing' | 'closed';
   sort?: 'Bid-End-Date-Latest' | 'Bid-End-Date-Oldest' | 'Bid-Start-Date-Latest';
+}
+
+/** GeM `filter.byStatus` values for submitted (closed) bids: awarded / technically evaluated / financially evaluated. */
+export type SubmittedBidStatus = 'bid_awarded' | 'tech_evaluated' | 'fin_evaluated';
+
+export interface FetchSubmittedPageOptions {
+  page?: number;
+  /** Free-text search (bid number or keywords). */
+  search?: string;
+  /** Restrict to one evaluation stage; omitted = every submitted bid. */
+  byStatus?: SubmittedBidStatus;
 }
 
 /** Machine-readable GemError causes callers branch on (status covers plain HTTP failures). */
@@ -140,8 +152,7 @@ export class GemClient {
 
   /** Fetch one listing page (raw docs + paging info). */
   async fetchPage(opts: FetchPageOptions = {}): Promise<BidPlusPage> {
-    await this.ensureSession();
-    const payload = {
+    return this.postListing({
       page: opts.page ?? 1,
       param: { searchBid: opts.search ?? '', searchType: 'fullText' },
       filter: {
@@ -151,7 +162,39 @@ export class GemClient {
         byEndDate: { from: '', to: '' },
         sort: opts.sort ?? 'Bid-Start-Date-Latest',
       },
-    };
+    });
+  }
+
+  /**
+   * Search submitted (closed) bids by evaluation stage: `bidStatusType: "bidrastatus"` plus `filter.byStatus`
+   * (`bid_awarded` | `tech_evaluated` | `fin_evaluated`). Read-only; same throttle, retry and CSRF handling as
+   * fetchPage. Adapted from gem-search `search_bids` (MIT) — see NOTICE.
+   */
+  async fetchSubmittedPage(opts: FetchSubmittedPageOptions = {}): Promise<BidPlusPage> {
+    return this.postListing({
+      page: opts.page ?? 1,
+      param: { searchBid: opts.search ?? '', searchType: 'fullText' },
+      filter: {
+        bidStatusType: 'bidrastatus',
+        byType: 'all',
+        highBidValue: '',
+        byEndDate: { from: '', to: '' },
+        sort: 'Bid-End-Date-Latest',
+        ...(opts.byStatus ? { byStatus: opts.byStatus } : {}),
+      },
+    });
+  }
+
+  /**
+   * Public bid-result view for a BidPlus `b_id` (`/bidding/bid/getBidResultView/<id>`), adapted from gem-search
+   * `get_bid_result` (MIT). Returns the raw HTML for `parseBidResultHtml`; 404 → `null`.
+   */
+  fetchBidResult(gemBidId: string): Promise<{ html: string; url: string } | null> {
+    return this.fetchBidResultHtml(gemBidId);
+  }
+
+  private async postListing(payload: object): Promise<BidPlusPage> {
+    await this.ensureSession();
     const send = () => this.request('/all-bids-data', {
       method: 'POST',
       headers: {

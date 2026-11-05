@@ -59,6 +59,10 @@ listed here with its licence.
    gem.py: the bid-result view route /bidding/bid/getBidResultView/<b_id> and the bidder-row / categories
    regular expressions), with the test fixture packages/core/test/fixtures/gem/bid-result.html built to the
    same markup (spec 007, T004/T032).
+   Spec 003 US6 (2026-11-05): packages/core/src/gem/client.ts fetchSubmittedPage (search_bids: bidStatusType
+   "bidrastatus" + filter.byStatus) and fetchBidResult (get_bid_result route), and packages/core/src/gem/result.ts
+   parseBidResultHtml (same result-view markup: bidder rows, bid_price span, L-level cell, categoris variable;
+   re-implemented), with fixtures in packages/core/test/fixtures/gem/results/ built to that markup.
    Licence text: https://opensource.org/license/mit
 
 3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
@@ -76,6 +80,10 @@ PranavTamada/Tender_Scraper, Mujahid-Alam/gem-tender-pdf-extractor,
 Giri-Aayush/gem, rounittxx/gem-bid-scraper, IshanMaheshwari-777/GEM-SCRAPER) were consulted for portal behaviour but no code or text from
 the consulted repositories is present in the current tree as of 2026-11-05. An earlier GEM-SCRAPER port was removed in #537 and remains in
 git history. Add an entry above before copying from any of them.
+
+IshanMaheshwari-777/GEM-SCRAPER (no licence) is also used for one idea only, no code or text copied: flagging an
+award where the winner is not the lowest price (packages/core/src/gem/result.ts detectAnomalies, spec 003 FR-064),
+re-implemented from the requirement.
 
 Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
 copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for our own label table

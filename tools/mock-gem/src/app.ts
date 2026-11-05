@@ -11,6 +11,11 @@
  *   POST /__admin/corrigendum/:bidNumber {days?, endAt?, quantity?, emd?}   amend a bid: extend its end date (default
  *                                      +7 days), and optionally set its quantity and EMD in ₹ (bid number URL-encoded, or ?bidNumber=)
  *   POST /__admin/cancel/:bidNumber    mark a bid cancelled on GeM (`b_is_cancelled`); reset restores it (bid number URL-encoded, or ?bidNumber=)
+ *   POST /__admin/award/:bidNumber {status?: 'awarded'|'tech_evaluated'|'fin_evaluated'}   evaluate a bid (spec 003 T070): the bid
+ *                                      closes now if still open, `b_buyer_status` becomes 3/1/2, it appears in
+ *                                      `bidStatusType:"bidrastatus"` (+ `filter.byStatus` bid_awarded/tech_evaluated/fin_evaluated)
+ *                                      listings, and its result view serves the recorded awarded page (awarded) or the
+ *                                      "not yet published" page (tech/fin evaluated). Other bids keep the generic result page.
  *   POST /__admin/fail {mode:'down'|'html'|'off'}  simulate GeM outages
  *   POST /__admin/document-mode {mode:'normal'|'404'|'html'|'scanned'|'oversize'}  how /showbidDocument answers
  *                                      (404 page, HTML login page, PDF without text layer, > 25 MB stream)
@@ -32,6 +37,11 @@ import { oversizePdfStream, renderBidPdf, renderScannedPdf } from './pdf';
 
 const FIXTURE_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../packages/core/test/fixtures/gem');
 const PAGE_SIZE = 10;
+const RESULT_FIXTURE_DIR = join(FIXTURE_DIR, 'results');
+
+/** `filter.byStatus` value -> GeM `b_buyer_status`. */
+const BY_STATUS: Record<string, number> = { tech_evaluated: 1, fin_evaluated: 2, bid_awarded: 3 };
+const AWARD_STATUS: Record<string, number> = { awarded: 3, tech_evaluated: 1, fin_evaluated: 2 };
 
 export const DOCUMENT_MODES = ['normal', '404', 'html', 'scanned', 'oversize'] as const;
 export type DocumentMode = (typeof DOCUMENT_MODES)[number];
@@ -81,6 +91,10 @@ export function createMockGem(opts: MockGemOptions = {}) {
     nextSyntheticId: 7429001,
     failMode: 'off' as 'off' | 'down' | 'html',
     documentMode: 'normal' as DocumentMode,
+    /** b_id values awarded via /__admin/award (result view serves the recorded awarded page). */
+    awarded: new Set<string>(),
+    /** b_id values evaluated but not awarded (result view says "not yet published"). */
+    unpublished: new Set<string>(),
     requests: { listing: 0, documents: 0, bootstrap: 0, results: 0 },
     /** Arrival log (ms since epoch, real clock) of the last REQUEST_LOG_MAX non-admin requests. */
     requestLog: [] as { at: number; method: string; path: string }[],
@@ -95,6 +109,8 @@ export function createMockGem(opts: MockGemOptions = {}) {
     state.nextSyntheticId = 7429001;
     state.failMode = 'off';
     state.documentMode = 'normal';
+    state.awarded.clear();
+    state.unpublished.clear();
     state.requests = { listing: 0, documents: 0, bootstrap: 0, results: 0 };
     state.requestLog = [];
   };
@@ -159,7 +175,7 @@ export function createMockGem(opts: MockGemOptions = {}) {
     if (!token || token !== state.token || (cookie !== undefined && cookie !== state.token)) {
       return c.json({ code: 403, status: 0, message: 'Invalid CSRF token' }, 403);
     }
-    let payload: { page?: number; param?: { searchBid?: string }; filter?: { sort?: string; bidStatusType?: string } } = {};
+    let payload: { page?: number; param?: { searchBid?: string }; filter?: { sort?: string; bidStatusType?: string; byStatus?: string } } = {};
     try { payload = JSON.parse(String(form.payload ?? '{}')); } catch { return c.json({ code: 400, message: 'Bad payload' }, 400); }
     const page = Math.max(1, Number(payload.page ?? 1) || 1);
     const q = (payload.param?.searchBid ?? '').trim().toLowerCase();
@@ -169,6 +185,12 @@ export function createMockGem(opts: MockGemOptions = {}) {
       const end = parseGemDate(d.final_end_date_sort)?.getTime() ?? 0;
       return closedWanted ? end < nowMs : end >= nowMs;
     });
+    // Submitted-bid search: filter.byStatus narrows closed bids to one evaluation stage (spec 003 FR-060).
+    const byStatus = closedWanted ? payload.filter?.byStatus : undefined;
+    if (byStatus) {
+      const wanted = BY_STATUS[byStatus];
+      list = list.filter((d) => wanted !== undefined && Number(((d.b_buyer_status as number[] | undefined) ?? [])[0] ?? 0) === wanted);
+    }
     if (q) {
       const words = q.split(/\s+/);
       list = list.filter((d) => {
@@ -227,6 +249,16 @@ export function createMockGem(opts: MockGemOptions = {}) {
     if (state.failMode === 'down') return c.text('Service Unavailable', 503);
     const id = c.req.param('id');
     if (!/^\d+$/.test(id)) return c.html('<html><body>Bid not found</body></html>', 404);
+    if (state.awarded.has(id)) {
+      const doc = findById(id);
+      const html = readFileSync(join(RESULT_FIXTURE_DIR, 'bid-result-awarded.html'), 'utf8')
+        .replace(/var bid_id = "\d+"/, `var bid_id = "${id}"`)
+        .replace(/GEM\/\d{4}\/B\/\d+/, String(doc?.b_bid_number[0] ?? 'GEM/2026/B/0'));
+      return c.html(html);
+    }
+    if (state.unpublished.has(id)) {
+      return c.html(readFileSync(join(RESULT_FIXTURE_DIR, 'bid-result-not-published.html'), 'utf8').replace(/var bid_id = "\d+"/, `var bid_id = "${id}"`));
+    }
     return c.html(renderBidResultHtml(id));
   });
 
@@ -269,6 +301,27 @@ export function createMockGem(opts: MockGemOptions = {}) {
     if (!doc) return c.json({ ok: false, error: `Unknown bid ${bidNumber}` }, 404);
     doc.b_is_cancelled = [1];
     return c.json({ ok: true, bidNumber, cancelled: true });
+  });
+
+  app.post('/__admin/award/*', async (c) => {
+    const body = await readJson(c);
+    const fromPath = decodeURIComponent(c.req.path.replace(/^\/__admin\/award\/?/, ''));
+    const bidNumber = String(body.bidNumber ?? c.req.query('bidNumber') ?? fromPath);
+    const doc = findByBidNumber(bidNumber);
+    if (!doc) return c.json({ ok: false, error: `Unknown bid ${bidNumber}` }, 404);
+    const status = String(body.status ?? c.req.query('status') ?? 'awarded');
+    const code = AWARD_STATUS[status];
+    if (code === undefined) return c.json({ ok: false, error: `status must be one of ${Object.keys(AWARD_STATUS).join(', ')}` }, 400);
+    // Only closed bids are evaluated: close an open one an hour ago so it shows up in bidrastatus listings.
+    if ((parseGemDate(doc.final_end_date_sort)?.getTime() ?? 0) >= now().getTime()) {
+      doc.final_end_date_sort = [toGemSolrDate(new Date(Math.floor((now().getTime() - 3_600_000) / 60_000) * 60_000))];
+    }
+    doc.b_buyer_status = [code];
+    const id = String(doc.b_id[0]);
+    state.awarded.delete(id);
+    state.unpublished.delete(id);
+    (code === 3 ? state.awarded : state.unpublished).add(id);
+    return c.json({ ok: true, bidNumber, id, status, buyerStatus: code });
   });
 
   app.post('/__admin/fail', async (c) => {
