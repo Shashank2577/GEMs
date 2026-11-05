@@ -138,6 +138,36 @@ describe('GET /tenders', () => {
     expect((await get('/tenders?status=all')).body.total).toBe(36);
   });
 
+  it('status selector: closed / awarded / cancelled / all (FR-036)', async () => {
+    const closing = await tenderId('GEM/2026/B/6421001');
+    const awarding = await tenderId('GEM/2026/B/6421013');
+    try {
+      await ctx.db.update(tenders).set({ status: 'closed' }).where(eq(tenders.id, closing));
+      await ctx.db.update(tenders).set({ status: 'awarded' }).where(eq(tenders.id, awarding));
+      expect((await get('/tenders?status=closed')).body.items.map((t: { id: string }) => t.id)).toEqual([closing]);
+      expect((await get('/tenders?status=awarded')).body.items.map((t: { id: string }) => t.id)).toEqual([awarding]);
+      expect((await get('/tenders')).body.total).toBe(34);
+      expect((await get('/tenders?status=open')).body.total).toBe(34);
+      expect((await get('/tenders?status=all')).body.total).toBe(36);
+      expect((await get('/tenders?status=cancelled')).body.total).toBe(0);
+      expect((await get('/tenders?status=bogus')).status).toBe(400);
+    } finally {
+      await ctx.db.update(tenders).set({ status: 'open' }).where(sql`${tenders.id} in (${closing}, ${awarding})`);
+    }
+  });
+
+  it('status=closed also lists open-status tenders whose deadline has passed (FR-036)', async () => {
+    const lapsed = await tenderId('GEM/2026/B/6421001');
+    const [orig] = await ctx.db.select({ endAt: tenders.endAt }).from(tenders).where(eq(tenders.id, lapsed));
+    try {
+      await ctx.db.update(tenders).set({ endAt: new Date(REF.getTime() - 3_600_000) }).where(eq(tenders.id, lapsed));
+      expect((await get('/tenders?status=closed')).body.items.map((t: { id: string }) => t.id)).toEqual([lapsed]);
+      expect((await get('/tenders?status=open')).body.total).toBe(35);
+    } finally {
+      await ctx.db.update(tenders).set({ endAt: orig.endAt }).where(eq(tenders.id, lapsed));
+    }
+  });
+
   it('rejects bad query values with 400', async () => {
     expect((await get('/tenders?sort=bogus')).status).toBe(400);
     expect((await get('/tenders?pageSize=1000')).status).toBe(400);

@@ -385,10 +385,12 @@ workspacesRoutes.post('/workspaces/:id/submitted', requireRole('analyst'), async
   if (w.stage === 'won' || w.stage === 'lost') throw conflict('This bid already has an outcome recorded.');
   if (w.stage === 'dropped') throw conflict('This bid was dropped. Move it back to the pipeline first.');
   const at = body.submittedAt ? new Date(body.submittedAt) : deps.clock.now();
+  // FR-084: the checklist items still open (missing/expired, not overridden) when the human says they submitted — informational only.
+  const openBlockers = (await readinessOf(deps, org, w)).readiness.blockers.length;
   const updated = await touch(deps, org, w.id, {
     stage: 'submitted', submittedAt: at, ...(w.stage !== 'submitted' ? { position: await nextPosition(deps, org, 'submitted') } : {}),
   });
-  await log(c, w, 'workspace.submitted', { from: w.stage, submittedAt: at.toISOString(), note: body.note ?? null });
+  await log(c, w, 'workspace.submitted', { from: w.stage, submittedAt: at.toISOString(), note: body.note ?? null, openBlockers });
   return c.json(await workspaceDto(deps, updated));
 });
 

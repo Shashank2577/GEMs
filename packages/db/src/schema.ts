@@ -280,11 +280,11 @@ export const tenders = pgTable('tenders', {
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
   // 008/FR-027: ~6 % of tenders are open and every feed/dashboard query filters on it. Built CONCURRENTLY by the
-  // hand-edited non-transactional migration 0016 (`-- tp:non-transactional`, see migrate.ts).
+  // hand-edited non-transactional migration 0017 (`-- tp:non-transactional`, see migrate.ts).
   openCreatedIdx: index('tenders_open_created_idx').on(t.createdAt.desc().nullsFirst()).where(sql`status = 'open'`),
   // Closing-date sort (review S5): the feed's "still open" filter is `coalesce(end_at, 'infinity') >= now`, so the index
   // is on that expression — expired-but-not-yet-closed rows are skipped by the range, not read and filtered.
-  // Replaces tenders_open_end_idx (end_at); built CONCURRENTLY by the hand-edited non-transactional migration 0017.
+  // Replaces tenders_open_end_idx (end_at); built CONCURRENTLY by the hand-edited non-transactional migration 0018.
   openClosingIdx: index('tenders_open_closing_idx').on(sql`coalesce(${t.endAt}, 'infinity'::timestamptz)`).where(sql`status = 'open'`),
   // DESC NULLS LAST = the feed's "highest value" sort; also serves minValue/maxValue ranges.
   openValueIdx: index('tenders_open_value_idx').on(t.estimatedValue.desc().nullsLast()).where(sql`status = 'open'`),
@@ -293,7 +293,7 @@ export const tenders = pgTable('tenders', {
   // >= now` are both Index Conds, no sort, LIMIT stops early) and the count/facet queries as a single bitmap scan.
   // With only (state) the planner preferred tenders_open_created_idx + filter for the page and a BitmapAnd of the
   // non-partial tenders_state_idx and tenders_open_closing_idx for count/facets (it estimates "still open" at the
-  // default 1/3 because partial-index expression stats are not used). Rebuilt by migration 0018.
+  // default 1/3 because partial-index expression stats are not used). Rebuilt by migration 0019.
   openStateIdx: index('tenders_open_state_idx').on(t.state, t.createdAt.desc().nullsFirst(), sql`coalesce(${t.endAt}, 'infinity'::timestamptz)`).where(sql`status = 'open'`),
   openMinistryIdx: index('tenders_open_ministry_idx').on(t.ministry).where(sql`status = 'open'`),
   openCategoryIdx: index('tenders_open_category_idx').on(t.category).where(sql`status = 'open'`),
@@ -380,6 +380,18 @@ export const watchlists = pgTable('watchlists', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({ orgIdx: index('watchlists_org_idx').on(t.orgId) }));
+
+/** Personal saved feed views (003/FR-035): URL-style params, scoped to (org, user). */
+export const savedViews = pgTable('saved_views', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  params: jsonb('params').$type<Record<string, string[]>>().notNull(),
+  position: integer('position').notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => ({ nameUq: uniqueIndex('saved_views_name_uq').on(t.orgId, t.userId, t.name) }));
 
 export const tenderMatches = pgTable('tender_matches', {
   id: id(),
@@ -567,7 +579,7 @@ export const notifications = pgTable('notifications', {
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
-  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0016).
+  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0017).
   pendingIdx: index('notifications_pending_idx').on(t.createdAt).where(sql`status = 'pending' AND channel IN ('email','whatsapp')`),
 }));
 

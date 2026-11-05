@@ -217,6 +217,24 @@ describe('002/FR-050 security headers', () => {
       expect(https.headers.get('strict-transport-security')).toMatch(/^max-age=/);
     });
 
+    it('gzips the static SPA (HTML + assets) but leaves /api/* responses uncompressed (007/NFR-003)', async () => {
+      await writeFile(join(dir, 'assets', 'big-abc.js'), 'export const x = "' + 'tenderpilot '.repeat(2000) + '";');
+      const gz = { 'accept-encoding': 'gzip' };
+      // hono/compress skips bodies under 1 KiB, so pad the fixture page like a real index.html (restored below).
+      await writeFile(join(dir, 'index.html'), INDEX_HTML.replace('</head>', `<!-- ${'pad '.repeat(600)} --></head>`));
+      for (const path of ['/', '/assets/big-abc.js']) {
+        const r = await node.server.request(`http://localhost${path}`, { headers: gz });
+        expect(r.status, path).toBe(200);
+        expect(r.headers.get('content-encoding'), path).toBe('gzip');
+      }
+      const plain = await node.server.request('http://localhost/assets/big-abc.js');
+      expect(plain.headers.get('content-encoding')).toBeNull();
+      const api = await node.server.request('http://localhost/api/health', { headers: gz });
+      expect(api.status).toBe(200);
+      expect(api.headers.get('content-encoding')).toBeNull();
+      await writeFile(join(dir, 'index.html'), INDEX_HTML);
+    });
+
     it('a rebuilt index.html (changed theme script) gets a new hash without a restart', async () => {
       const changed = INDEX_HTML.replace("'tp-theme'", "'tp-theme-v2'");
       await writeFile(join(dir, 'index.html'), changed);

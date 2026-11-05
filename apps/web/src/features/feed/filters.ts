@@ -1,6 +1,15 @@
 /** Feed filter state ⇄ URL search params ⇄ API query ⇄ watchlist criteria. */
 import type { TenderSort, WatchlistCriteriaInput } from '@tp/core/contracts/identify';
 
+export type FeedStatus = 'open' | 'closed' | 'awarded' | 'all';
+export const STATUS_OPTIONS: { value: FeedStatus; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'awarded', label: 'Awarded' },
+  { value: 'all', label: 'All' },
+];
+const STATUSES = STATUS_OPTIONS.map((o) => o.value);
+
 export interface FeedFilters {
   q: string;
   states: string[];
@@ -15,7 +24,7 @@ export interface FeedFilters {
   bidTypes: string[];
   watchlistId: string | null;
   sort: TenderSort;
-  status: 'open' | 'all';
+  status: FeedStatus;
 }
 
 export const DEFAULT_FILTERS: FeedFilters = {
@@ -51,7 +60,7 @@ export function filtersFromParams(p: URLSearchParams): FeedFilters {
     bidTypes: p.getAll('type'),
     watchlistId: p.get('watchlistId'),
     sort: sort && SORTS.includes(sort) ? sort : DEFAULT_FILTERS.sort,
-    status: p.get('status') === 'all' ? 'all' : 'open',
+    status: STATUSES.includes(p.get('status') as FeedStatus) ? (p.get('status') as FeedStatus) : 'open',
   };
 }
 
@@ -98,7 +107,8 @@ export function toApiQuery(f: FeedFilters) {
 /** Number of user-set refinements (excluding sort / view toggles), for the "Filters (n)" badge. */
 export function activeFilterCount(f: FeedFilters): number {
   return f.states.length + f.ministries.length + f.categories.length + f.verdicts.length + f.bidTypes.length
-    + (f.closingWithin != null ? 1 : 0) + (f.minValue != null || f.maxValue != null ? 1 : 0) + (f.watchlistId ? 1 : 0);
+    + (f.closingWithin != null ? 1 : 0) + (f.minValue != null || f.maxValue != null ? 1 : 0) + (f.watchlistId ? 1 : 0)
+    + (f.status !== 'open' ? 1 : 0);
 }
 
 export function isPristine(f: FeedFilters): boolean {
@@ -121,7 +131,31 @@ export function filtersToCriteria(f: FeedFilters): WatchlistCriteriaInput {
   };
 }
 
-/** Saved views shown as quick tabs above the feed. */
+// ───────────── Personal saved views (FR-035) ─────────────
+
+export type ViewParams = Record<string, string[]>;
+
+/** Canonical params for the current filters (no `view` key), as stored in a saved view. */
+export function filtersToViewParams(f: FeedFilters): ViewParams {
+  const out: ViewParams = {};
+  filtersToParams(f).forEach((v, k) => { (out[k] ??= []).push(v); });
+  return out;
+}
+
+/** Saved params → filters (unknown / junk keys are ignored by `filtersFromParams`). */
+export function viewParamsToFilters(v: ViewParams): FeedFilters {
+  const p = new URLSearchParams();
+  for (const [k, vals] of Object.entries(v)) vals.forEach((x) => p.append(k, x));
+  return filtersFromParams(p);
+}
+
+/** Order-insensitive equality of two filter sets, via their canonical params. */
+export function sameFilters(a: FeedFilters, b: FeedFilters): boolean {
+  const norm = (f: FeedFilters) => JSON.stringify(Object.entries(filtersToViewParams(f)).map(([k, v]) => [k, [...v].sort()]).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)));
+  return norm(a) === norm(b);
+}
+
+/** Built-in views shown as quick tabs above the feed. */
 export const VIEWS: { key: string; label: string; apply: (f: FeedFilters) => FeedFilters; match: (f: FeedFilters) => boolean }[] = [
   {
     key: 'matched', label: 'My matches',

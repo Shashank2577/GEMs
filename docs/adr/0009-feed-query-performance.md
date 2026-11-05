@@ -26,18 +26,18 @@ rows), `matchAndNotify`, `refreshMatches`, `decorateTenders` callers.
    ```sql
    CREATE INDEX tenders_open_created_idx ON tenders (created_at DESC) WHERE status = 'open';
    CREATE INDEX tenders_open_closing_idx ON tenders (coalesce(end_at, 'infinity')) WHERE status = 'open';
-   -- (was tenders_open_end_idx ON (end_at); 008 migration 0017 indexes the feed's "still open" expression instead)
+   -- (was tenders_open_end_idx ON (end_at); 008 migration 0018 indexes the feed's "still open" expression instead)
    CREATE INDEX tenders_open_value_idx   ON tenders (estimated_value) WHERE status = 'open';
    CREATE INDEX tenders_open_state_idx   ON tenders (state, created_at DESC, coalesce(end_at, 'infinity'))
                                                                         WHERE status = 'open';
-   -- (008 migration 0018, PR #515 QA round 1: on (state) alone the planner never chose it for ?state=X)
+   -- (008 migration 0019, PR #515 QA round 1: on (state) alone the planner never chose it for ?state=X)
    CREATE INDEX tenders_open_ministry_idx ON tenders (ministry)       WHERE status = 'open';
    CREATE INDEX tenders_open_category_idx ON tenders (category)       WHERE status = 'open';
    ```
    The open subset is small, so facets and sorts become index-range scans. Keep `tenders_end_idx` for the
    cron's "close expired" update; drop `tenders_state_idx` (superseded).
 
-   **State filter (amended 2026-11-05, 0015).** PostgreSQL does not use expression statistics of a *partial* index, so
+   **State filter (amended 2026-11-05, 0019).** PostgreSQL does not use expression statistics of a *partial* index, so
    it estimates the feed's "still open" condition (`coalesce(end_at, 'infinity') >= $now`) at the default 1/3. With
    `tenders_open_state_idx (state)` that made it prefer, at 500k rows, `tenders_open_created_idx` + filter for the
    `?state=X` page and `BitmapAnd(tenders_open_closing_idx, tenders_state_idx)` (non-partial) for count/facets. The

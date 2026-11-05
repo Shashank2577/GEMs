@@ -53,7 +53,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout
+    <AuthLayout canonical="/login"
       docTitle="Sign in"
       title="Welcome back"
       subtitle="Sign in to see today’s GeM matches and your bid pipeline."

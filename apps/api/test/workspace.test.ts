@@ -235,6 +235,76 @@ describe('POST /workspaces/:id/submitted & outcome', () => {
   });
 });
 
+describe('POST /workspaces/:id/submitted logs the open blockers (T091; 006/FR-084)', () => {
+  it('records openBlockers = the checklist items still missing/expired, and does not block the submission', async () => {
+    const t = await seedTender(ctx, 9);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const created = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    const id = created.body.id as string;
+    const detail = await request(ctx.app, 'GET', `/workspaces/${id}`, { cookie: s.org.analyst.cookie });
+    const blockers = detail.body.readiness.blockers.length as number;
+    expect(blockers).toBeGreaterThan(0); // the seeded vault has no document for one mandatory item
+    const r = await request(ctx.app, 'POST', `/workspaces/${id}/submitted`, { cookie: s.org.analyst.cookie, json: { note: 'Done' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('submitted');
+    const [act] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, id), eq(activityLog.action, 'workspace.submitted')));
+    expect(act.meta).toMatchObject({ note: 'Done', openBlockers: blockers });
+  });
+});
+
+describe('outcome price validation, dropped guard and override-aware blockers (006/FR-081, FR-084)', () => {
+  let id: string;
+  let n = 0;
+  const fresh = async () => {
+    const t = await seedTender(ctx, 40 + n++);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const created = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    return created.body.id as string;
+  };
+  const blockersOf = async (wid: string) => (await request(ctx.app, 'GET', `/workspaces/${wid}`, { cookie: s.org.analyst.cookie })).body.readiness.blockers as { id?: string; itemId?: string; item?: { id: string } }[];
+  const idOf = (b: { id?: string; itemId?: string; item?: { id: string } }) => (b.item?.id ?? b.itemId ?? b.id)!;
+  const openedBlockers = async (wid: string) => {
+    const [act] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, wid), eq(activityLog.action, 'workspace.submitted')));
+    return (act.meta as { openBlockers: number }).openBlockers;
+  };
+
+  it('rejects a negative, fractional or > 1e13 L1 price with 400', async () => {
+    id = await fresh();
+    expect((await request(ctx.app, 'POST', `/workspaces/${id}/submitted`, { cookie: s.org.analyst.cookie })).status).toBe(200);
+    for (const l1Price of [-5, 1.5, 1e13 + 1]) {
+      const r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.bidManager.cookie, json: { outcome: { result: 'won', l1Price } } });
+      expect(r.status).toBe(400);
+    }
+  });
+
+  it('POST submitted on a dropped bid → 409 with the move-back message', async () => {
+    const wid = await fresh();
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${wid}`, { cookie: s.org.analyst.cookie, json: { stage: 'dropped' } })).status).toBe(200);
+    const r = await request(ctx.app, 'POST', `/workspaces/${wid}/submitted`, { cookie: s.org.analyst.cookie });
+    expect(r.status).toBe(409);
+    expect(r.body.error.message).toBe('This bid was dropped. Move it back to the pipeline first.');
+  });
+
+  it('openBlockers is 0 when nothing is open, and an overridden item does not count as open', async () => {
+    const wid = await fresh();
+    const open = await blockersOf(wid);
+    expect(open.length).toBeGreaterThan(0);
+    const first = idOf(open[0]!);
+    expect((await request(ctx.app, 'POST', `/workspaces/${wid}/overrides`, { cookie: s.org.bidManager.cookie, json: { itemId: first, reason: 'Waived by the bid manager' } })).status).toBe(201);
+    expect((await blockersOf(wid)).length).toBe(open.length - 1);
+    expect((await request(ctx.app, 'POST', `/workspaces/${wid}/submitted`, { cookie: s.org.analyst.cookie })).status).toBe(200);
+    expect(await openedBlockers(wid)).toBe(open.length - 1);
+
+    const zero = await fresh();
+    for (const b of await blockersOf(zero)) {
+      expect((await request(ctx.app, 'POST', `/workspaces/${zero}/overrides`, { cookie: s.org.bidManager.cookie, json: { itemId: idOf(b), reason: 'Waived by the bid manager' } })).status).toBe(201);
+    }
+    expect(await blockersOf(zero)).toHaveLength(0);
+    expect((await request(ctx.app, 'POST', `/workspaces/${zero}/submitted`, { cookie: s.org.analyst.cookie })).status).toBe(200);
+    expect(await openedBlockers(zero)).toBe(0);
+  });
+});
+
 describe('PATCH /workspaces/:id — won/lost only after submission (T020; 006/FR-008)', () => {
   let goId: string;
   beforeAll(async () => {

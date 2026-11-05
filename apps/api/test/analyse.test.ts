@@ -2,12 +2,13 @@
  * Analyse flow (T047, US2): upload → analyse → verdict, override, weights, GeM fetch, isolation.
  * Run: TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_analyse pnpm exec vitest run test/analyse.test.ts
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { activityLog, analyses, companyProfiles, pastContracts, tenderDocuments, tenders, vaultDocuments } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { createApp } from '../src/app';
-import { analyseTender } from '../src/services/analyse';
+import { ANALYSIS_RUNNING_TIMEOUT_MS, ANALYSIS_TIMED_OUT, analyseTender } from '../src/services/analyse';
+import { markStale } from '../src/services/staleness';
 import type { LlmClient } from '../src/deps';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -276,6 +277,172 @@ describe('scoring weights', () => {
     expect(a.body.factors.find((f: any) => f.key === 'certificates').weight).toBe(50);
     const reset = await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} });
     expect(reset.body.custom).toBe(false);
+  });
+});
+
+describe('re-score (FR-037, FR-043)', () => {
+  let tenderId: string;
+  let analysisId: string;
+  beforeAll(async () => {
+    tenderId = (await insertTender('nogo-experience', { bidNumber: 'GEM/2026/B/8100001', contentHash: 'rs' })).id;
+    await request(ctx.app, 'POST', `/tenders/${tenderId}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('nogo-experience') } });
+    analysisId = (await request(ctx.app, 'POST', `/tenders/${tenderId}/analyse`, { cookie: roles.analyst.cookie })).body.id;
+    await request(ctx.app, 'POST', `/analyses/${analysisId}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'experience', status: 'pass', reason: 'Consortium partner' } });
+  });
+
+  it('a weights change marks the analysis stale; re-score applies them, keeps overrides, clears stale, audits', async () => {
+    expect((await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.bidManager.cookie, json: { certificates: 50 } })).status).toBe(200);
+    const stale = await request(ctx.app, 'GET', `/tenders/${tenderId}/analysis`, { cookie: roles.viewer.cookie });
+    expect(stale.body).toMatchObject({ stale: true, staleReason: 'weights_changed' });
+    expect(stale.body.factors.find((f: any) => f.key === 'certificates').weight).not.toBe(50);
+
+    expect((await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.viewer.cookie })).status).toBe(403);
+    ctx.clock.advance(1000);
+    const r = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ id: analysisId, status: 'done', stale: false, staleReason: null, staleAt: null });
+    expect(r.body.documents).toHaveLength(1);
+    expect(r.body.factors.find((f: any) => f.key === 'certificates').weight).toBe(50);
+    expect(r.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'Consortium partner' });
+    expect(r.body.requirements).toEqual(stale.body.requirements);
+    const log = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, roles.orgId), eq(activityLog.action, 'analysis.rescored')));
+    expect(log).toHaveLength(1);
+    expect(log[0].meta).toMatchObject({ analysisId, score: r.body.score, reason: 'weights_changed' });
+    await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} });
+  });
+
+  it('refuses while a newer run is in progress or after a newer analysis replaced it; 404 for other orgs', async () => {
+    const [base] = await ctx.db.select().from(analyses).where(eq(analyses.id, analysisId));
+    const later = new Date(base.createdAt.getTime() + 1000);
+    const [running] = await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId, status: 'running', method: 'rules', createdAt: later, updatedAt: later }).returning();
+    const busy = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(busy.status).toBe(409);
+    expect(busy.body.error.code).toBe('analysis_running');
+    // Only a done analysis can be re-scored.
+    const notDone = await request(ctx.app, 'POST', `/analyses/${running.id}/rescore`, { cookie: roles.analyst.cookie });
+    expect(notDone.status).toBe(409);
+    await ctx.db.update(analyses).set({ status: 'done' }).where(eq(analyses.id, running.id));
+    const replaced = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(replaced.status).toBe(409);
+    expect(replaced.body.error.code).toBe('analysis_replaced');
+    const other = await signup(ctx.app, { orgName: 'Rescore Other Co' });
+    expect((await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: other.cookie })).status).toBe(404);
+  });
+});
+
+describe('re-score only fixes company-side staleness (FR-037, FR-044)', () => {
+  const GET = (id: string) => request(ctx.app, 'GET', `/tenders/${id}/analysis`, { cookie: roles.viewer.cookie });
+  const RESCORE = (id: string) => request(ctx.app, 'POST', `/analyses/${id}/rescore`, { cookie: roles.analyst.cookie });
+  const SAVE = (json: Record<string, number>) => request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.bidManager.cookie, json });
+  async function analysed(tag: string, over: Partial<typeof tenders.$inferInsert> = {}, file = pdfFile('go-it-services')) {
+    const t = await insertTender('go-it-services', { contentHash: `rs2-${tag}`, source: `rs2-${tag}`, ...over });
+    await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file } });
+    ctx.clock.advance(1000);
+    const a = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(a.body).toMatchObject({ status: 'done', stale: false });
+    ctx.clock.advance(1000);
+    return { tenderId: t.id, analysisId: a.body.id as string };
+  }
+  afterEach(async () => { await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} }); });
+
+  it('A: stale for document_added, then a weights save → still needs re-analysis; re-score answers 409 reanalysis_required', async () => {
+    const { tenderId, analysisId } = await analysed('a');
+    await request(ctx.app, 'POST', `/tenders/${tenderId}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services', 'ATC.pdf'), kind: 'atc' } });
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'document_added' });
+    ctx.clock.advance(1000);
+    expect((await SAVE({ emd: 30 })).status).toBe(200);
+    const after = await GET(tenderId);
+    expect(after.body).toMatchObject({ stale: true, staleReason: 'document_added', staleAt: ctx.clock.now().toISOString() });
+    const r = await RESCORE(analysisId);
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('reanalysis_required');
+    expect(r.body.error.message).toMatch(/document was added.*re-analyse/i);
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'document_added', score: after.body.score });
+    expect(await ctx.db.select().from(activityLog).where(and(eq(activityLog.action, 'analysis.rescored'), eq(activityLog.entityId, tenderId)))).toHaveLength(0);
+  });
+
+  it('B: weights_changed, then a corrigendum → the corrigendum wins and re-score answers 409', async () => {
+    const { tenderId, analysisId } = await analysed('b');
+    await SAVE({ emd: 30 });
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'weights_changed' });
+    await markStale(ctx.db, { tenderIds: [tenderId] }, 'corrigendum', ctx.clock.now());
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: 'corrigendum' });
+    const r = await RESCORE(analysisId);
+    expect(r.status).toBe(409);
+    expect(r.body.error).toMatchObject({ code: 'reanalysis_required', message: expect.stringMatching(/corrigendum/) });
+    // A later profile change does not downgrade it either.
+    await markStale(ctx.db, { orgId: roles.orgId, tenderIds: [tenderId] }, 'profile_changed', ctx.clock.now());
+    expect((await GET(tenderId)).body.staleReason).toBe('corrigendum');
+  });
+
+  it('stale with no recorded reason (legacy corrigendum) and document_removed also need a re-analysis', async () => {
+    const { tenderId, analysisId } = await analysed('legacy');
+    await ctx.db.update(analyses).set({ stale: true, staleReason: null, staleAt: null }).where(eq(analyses.id, analysisId));
+    await markStale(ctx.db, { orgId: roles.orgId, tenderIds: [tenderId] }, 'vault_changed', ctx.clock.now());
+    expect((await GET(tenderId)).body).toMatchObject({ stale: true, staleReason: null });
+    expect((await RESCORE(analysisId)).body.error.code).toBe('reanalysis_required');
+    await ctx.db.update(analyses).set({ staleReason: 'document_removed' }).where(eq(analyses.id, analysisId));
+    expect((await RESCORE(analysisId)).status).toBe(409);
+    // A re-analysis-needing reason can still be replaced by another one (newest explains the banner).
+    await markStale(ctx.db, { tenderIds: [tenderId] }, 'corrigendum', ctx.clock.now());
+    expect((await GET(tenderId)).body.staleReason).toBe('corrigendum');
+  });
+
+  it('only a CURRENT stale reason counts: after a fresh analysis (or a leftover reason on a non-stale row), a weights save is re-scorable', async () => {
+    const { tenderId } = await analysed('leftover');
+    await markStale(ctx.db, { tenderIds: [tenderId] }, 'corrigendum', ctx.clock.now());
+    ctx.clock.advance(1000);
+    const fresh = await request(ctx.app, 'POST', `/tenders/${tenderId}/analyse`, { cookie: roles.analyst.cookie });
+    ctx.clock.advance(1000);
+    await ctx.db.update(analyses).set({ stale: false, staleReason: 'corrigendum' }).where(eq(analyses.id, fresh.body.id));
+    await SAVE({ emd: 30 });
+    expect((await GET(tenderId)).body).toMatchObject({ id: fresh.body.id, stale: true, staleReason: 'weights_changed' });
+    expect((await RESCORE(fresh.body.id)).status).toBe(200);
+  });
+
+  it('a weights save leaves analyses of closed tenders untouched; a no-op save marks nothing', async () => {
+    const open = await analysed('open');
+    const closed = await analysed('closed');
+    const past = await analysed('past');
+    await ctx.db.update(tenders).set({ status: 'closed' }).where(eq(tenders.id, closed.tenderId));
+    await ctx.db.update(tenders).set({ endAt: new Date(ctx.clock.now().getTime() - 60_000) }).where(eq(tenders.id, past.tenderId));
+    expect((await SAVE({ emd: 30 })).status).toBe(200);
+    expect((await GET(open.tenderId)).body).toMatchObject({ stale: true, staleReason: 'weights_changed' });
+    expect((await GET(closed.tenderId)).body).toMatchObject({ stale: false, staleReason: null });
+    expect((await GET(past.tenderId)).body).toMatchObject({ stale: false, staleReason: null });
+
+    const ok = await RESCORE(open.analysisId);
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ stale: false, staleReason: null });
+    // Same effective weights again (explicitly, then as the default values) → nothing marked stale.
+    expect((await SAVE({ emd: 30 })).status).toBe(200);
+    expect((await GET(open.tenderId)).body.stale).toBe(false);
+    await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} });
+    await RESCORE(open.analysisId);
+    const defaults = (await request(ctx.app, 'GET', '/scoring-weights', { cookie: roles.viewer.cookie })).body.defaults;
+    expect((await SAVE(defaults)).status).toBe(200);
+    expect((await GET(open.tenderId)).body.stale).toBe(false);
+  });
+
+  it('re-score keeps the "Check documents:" prefix', async () => {
+    const { tenderId, analysisId } = await analysed('prefix', { bidNumber: 'GEM/2026/B/6133872' }); // the PDF prints GEM/2026/B/6120451
+    expect((await GET(tenderId)).body.summary).toMatch(/^Check documents: go-it-services\.pdf is for GEM\/2026\/B\/6120451\. /);
+    await SAVE({ emd: 30 });
+    const r = await RESCORE(analysisId);
+    expect(r.status).toBe(200);
+    expect(r.body.summary).toMatch(/^Check documents: go-it-services\.pdf is for GEM\/2026\/B\/6120451\. (Go|Review|No-Go) — \d+\/100/);
+    expect(r.body.summary.match(/Check documents/g)).toHaveLength(1);
+  });
+
+  it('an expired running row does not block a re-score: it is marked failed "timed out" under the lock', async () => {
+    const { tenderId, analysisId } = await analysed('timeout');
+    const [base] = await ctx.db.select().from(analyses).where(eq(analyses.id, analysisId));
+    const later = new Date(base.createdAt.getTime() + 1);
+    const [running] = await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId, status: 'running', method: 'rules', createdAt: later, updatedAt: later }).returning();
+    ctx.clock.advance(ANALYSIS_RUNNING_TIMEOUT_MS + 1000);
+    expect((await RESCORE(analysisId)).status).toBe(200);
+    const [row] = await ctx.db.select().from(analyses).where(eq(analyses.id, running.id));
+    expect(row).toMatchObject({ status: 'failed', error: ANALYSIS_TIMED_OUT });
   });
 });
 

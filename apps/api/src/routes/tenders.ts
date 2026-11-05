@@ -3,7 +3,7 @@
  * Tenders are global public GeM data; everything org-specific (matches, analyses, workspaces,
  * seen/dismissed) is joined and filtered by the caller's org (Constitution IV).
  */
-import { and, asc, desc, eq, getTableColumns, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   analyses, bidWorkspaces, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, watchlists,
@@ -62,9 +62,10 @@ const NEW_WINDOW_MS = 7 * 86_400_000;
 function buildFilters(q: TenderQuery, org: string, now: Date, scope: SQL, omit?: 'state' | 'ministry' | 'category'): SQL[] {
   const conds: SQL[] = [scope];
   const status = q.status ?? 'open';
+  if (status === 'closed') conds.push(or(eq(tenders.status, 'closed'), and(eq(tenders.status, 'open'), lt(tenders.endAt, now)))!);
   // `status = 'open'` as a literal, exactly the open-tender partial indexes' predicate, so the planner can prove the
   // index applies even under a generic (parameter-agnostic) plan, e.g. behind a statement-caching pooler (008/FR-027).
-  if (status === 'open') conds.push(sql`${tenders.status} = 'open'`);
+  else if (status === 'open') conds.push(sql`${tenders.status} = 'open'`);
   else if (status !== 'all') conds.push(eq(tenders.status, status));
   // Same as `end_at IS NULL OR end_at >= now`, written so the planner does not treat "open" and "still open" as
   // independent (it would then over-trust a closing-date index); it is also tenders_open_closing_idx's expression, so
