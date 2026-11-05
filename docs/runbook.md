@@ -189,3 +189,147 @@ Filled in by the operator (T099). Story #361 stays open until this table and the
 | Fire drill date | n/a | _TBD_ |
 | Drill method | n/a | _TBD (stop cron, or point `GEM_BASE_URL` at a dead host)_ |
 | Measured detection time (failure to notification) | n/a | _TBD (SC-009: at most 15 min)_ |
+
+## Data retention and housekeeping
+
+Spec 008 US7, FR-070, ADR-0012. The single source of truth is `RETENTION` in
+[`apps/api/src/services/housekeeping.ts`](../apps/api/src/services/housekeeping.ts) (pinned by
+`apps/api/test/housekeeping.test.ts`); change both together, and this table.
+
+| Data | Rule |
+|---|---|
+| `sessions` | deleted 7 days after `expires_at` |
+| `invitations` | deleted 30 days after acceptance, or 30 days after expiry when never accepted |
+| `notifications` | `read` / `sent` / `skipped`: deleted 180 days after creation; `failed`: after 30 days; `pending` never |
+| `tender_events` | deleted after 365 days, only for tenders that are no longer `open` |
+| `tenders.raw` | set to `NULL` 90 days after the tender closed (`coalesce(end_at, updated_at)`), real tenders only; rows are kept |
+| `rate_limits` | windows older than 1 day (the `rate-limit-cleanup` step also prunes every 30 min) |
+| `packets` | the newest 5 per workspace are kept; older ones (not `building`) lose their R2 object first, then the row |
+| `gem_throttle`, `activity_log`, `llm_usage` | never touched by housekeeping |
+
+How it runs: the `housekeeping` step of `runScheduledJobs` (after `rate-limit-cleanup`) runs on the first cron tick at
+or after **02:00 IST** each IST day. It claims the day in `job_runs (job='housekeeping', day)` — every other tick and
+isolate that day skips. Deletes run in batches of 1,000 rows, at most 50 batches per rule per run (the rest is picked
+up the next day). A failed R2 delete keeps that packet row for the next run (no orphaned objects); a run that throws
+deletes its claim, so the next tick retries. Every rule is idempotent (a second run deletes 0).
+
+Check it ran (one JSON line per day in Workers Logs / `wrangler tail`):
+
+```sh
+wrangler tail --format json | grep '"housekeeping finished"'
+# {"level":"info","msg":"housekeeping finished","job":"housekeeping","day":"2026-11-06",
+#  "deleted":{"sessions":12,"invitations":0,"notifications":311,"tenderEvents":0,"tenderRaw":845,"rateLimits":0,"packets":3,"packetBlobs":3},"ms":412}
+psql "$DATABASE_URL" -c "select day, started_at, finished_at, summary from job_runs where job='housekeeping' order by day desc limit 7"
+```
+
+A claim with `finished_at IS NULL` older than an hour means the run died mid-way (Worker CPU limit or eviction): delete
+that row and the next cron tick re-runs it. To re-run a day on purpose, do the same — there is no manual endpoint.
+
+## R2 lifecycle for packets
+
+FR-071 asks for an R2 lifecycle rule expiring packet PDFs after 365 days as defence in depth for the packet rule
+above. **Constraint (spec conflict, raised on the US7 PR):** R2 lifecycle rules match a literal key **prefix** only;
+packet keys are `org/<orgId>/packets/<packetId>/<file>.pdf` (pinned by spec 006 tests), so `org/*/packets/` cannot be
+expressed, and a rule on `org/` would also expire **vault** files (customer data, never lifecycle-expired). Until the
+architect decides between (a) moving new packets under a top-level `packets/` prefix (offboarding then purges both
+prefixes) or (b) one rule per org, the DB-driven housekeeping is the only packet expiry. Per-org rule (b), at most
+1,000 rules per bucket:
+
+```sh
+wrangler r2 bucket lifecycle add tenderpilot-blobs "packets-<orgId>" "org/<orgId>/packets/" --expire-days 365
+wrangler r2 bucket lifecycle add tenderpilot-blobs-staging "packets-<orgId>" "org/<orgId>/packets/" --expire-days 365
+wrangler r2 bucket lifecycle list tenderpilot-blobs      # verify
+```
+
+With option (a) the single rule would be
+`wrangler r2 bucket lifecycle add tenderpilot-blobs packets-365d "packets/" --expire-days 365`.
+
+## Offboarding
+
+Deleting an organisation on a confirmed request (ADR-0012 §3; FR-048, FR-071). Tenant data is deleted within 30 days
+of the confirmed request; public tender data (`tenders`, GeM-fetched `tender_documents`) is kept.
+
+1. Export first if the customer asked for it: vault files (`org/<orgId>/vault/…` in R2) and a JSON of profile,
+   analyses and workspaces (`GET /api/org`, `/api/profile`, `/api/vault`, … with an owner token).
+2. Record the request (who asked, when, ticket) in the incident/ops log.
+3. Delete the org — every org-owned table cascades on `organizations.id`:
+
+   ```sh
+   psql "$DATABASE_URL" -c "begin; select id, name from organizations where id = '<orgId>';
+     delete from organizations where id = '<orgId>'; commit;"
+   ```
+
+   Users who belonged only to this org keep their `users` row (they can sign in and create or join another org);
+   delete them separately on request (`delete from users where id = …` cascades their sessions).
+4. Purge the org's R2 prefix (vault files, packets, uploaded tender documents live under `org/<orgId>/` and
+   `tenders/<tenderId>/<orgId>/`):
+
+   ```sh
+   # list, then delete every object under the org prefix (rclone with the R2 S3 endpoint, or the dashboard)
+   rclone ls  r2:tenderpilot-blobs/org/<orgId>/
+   rclone purge r2:tenderpilot-blobs/org/<orgId>/
+   # uploaded tender documents: keys tenders/<tenderId>/<orgId>/<docId>.pdf
+   rclone lsf -R r2:tenderpilot-blobs/tenders/ --include "*/<orgId>/*" | xargs -I{} rclone deletefile r2:tenderpilot-blobs/tenders/{}
+   ```
+
+5. Verify: `select count(*) from memberships where org_id = '<orgId>'` is 0 and `rclone ls …/org/<orgId>/` is empty.
+   Neon point-in-time history still holds the data until it ages out of the retention window (≥ 7 days, ADR-0013).
+
+## Hyperdrive
+
+FR-075, ADR-0002. The Worker connects with one driver (`pg`) through the `HYPERDRIVE` binding:
+`createNodeDb(env.HYPERDRIVE.connectionString, { max: 5 })`. `DATABASE_URL` (Neon pooled `-pooler` URL) stays as the
+secret `pnpm db:migrate` uses, and the Worker falls back to it only when no binding is configured (break-glass).
+
+Setup (once per environment; needs a Cloudflare API token with Hyperdrive edit):
+
+```sh
+wrangler hyperdrive create tenderpilot-db --connection-string="$NEON_POOLED_URL" --caching-disabled
+wrangler hyperdrive create tenderpilot-db-staging --connection-string="$NEON_STAGING_POOLED_URL" --caching-disabled
+# paste the ids into wrangler.toml ([[hyperdrive]] and [[env.staging.hyperdrive]]), deploy staging first
+wrangler hyperdrive get <id>            # caching.disabled must be true
+```
+
+Caching stays **disabled**: Hyperdrive's query cache would serve stale reads right after writes (correctness first).
+
+### Staging verification (T111, operator — not runnable from CI)
+
+Proves FR-075 / NFR-003 on staging after the binding is deployed. Record the transcript in
+`qa/evidence/008/US7/hyperdrive-staging.txt`.
+
+```sh
+# 1. The deployed Worker uses the binding (the bindings table lists env.HYPERDRIVE)
+wrangler deploy --env staging --dry-run | grep HYPERDRIVE
+# 2. 50 concurrent feed requests → 0 non-2xx / 0 connection errors
+N=200 C=50 P95_BUDGET_MS=300 scripts/load/feed.sh https://staging.tenderpilot.in | tee -a qa/evidence/008/US7/hyperdrive-staging.txt
+wrangler tail --env staging --format json | grep -iE 'too many connections|ECONNRESET|connection terminated' # expect nothing
+# 3. Health latency: p50 < 150 ms, p95 < 400 ms (NFR-003)
+for i in $(seq 100); do curl -s -o /dev/null -w '%{time_total}\n' https://staging.tenderpilot.in/api/health; done \
+  | sort -n | awk '{a[NR]=$1} END {print "p50", a[int(NR*0.5)]*1000, "ms  p95", a[int(NR*0.95)]*1000, "ms"}' | tee -a qa/evidence/008/US7/hyperdrive-staging.txt
+```
+
+Rollback: remove the `[[hyperdrive]]` table (or deploy the previous version with `wrangler rollback`); the Worker then
+uses `DATABASE_URL`.
+
+## Full-text search migration
+
+FR-073 adds the generated column `tenders.search` and the indexes `tenders_search_gin` / `tenders_bid_number_prefix_idx`
+(`packages/db/migrations/*_tenders_search.sql`, `-- tp:non-transactional`). Adding a STORED generated column
+**rewrites `tenders` under an ACCESS EXCLUSIVE lock** (≈ 1 minute at 500k rows): reads and ingestion block meanwhile.
+Run `pnpm db:migrate` for this release **off-peak** (before 07:00 IST), then deploy. The indexes are built
+`CONCURRENTLY` (no write lock). The column and indexes are deliberately not in the Drizzle schema (they would leak into
+`select *` rows); `drizzle-kit` never drops them because it diffs its own snapshots, not the database — never run
+`drizzle-kit push` against production.
+
+## LATER triggers
+
+Deferred decisions, each with the measurable trigger that reopens it (FR-076). Check these at the monthly ops review.
+
+| Item | Trigger (any one) | Decision record |
+|---|---|---|
+| Cloudflare Queues for analysis / packet builds | analysis p95 > 60 s over a week (`tender.analysed` `total_ms` in `activity_log`); an "analyse all new matches" batch feature is scheduled; a customer needs > 300-page documents | [ADR-0007 §5](adr/0007-synchronous-analysis-and-packet-with-caps.md) |
+| Postgres row-level security | a second code path to the database (reporting, admin tools, BI) is planned; or a customer security questionnaire requires RLS | [ADR-0004 §3](adr/0004-tenant-isolation-application-level.md) |
+| Razorpay subscriptions + webhook | ≥ 5 paying orgs (`select count(*) from organizations where plan <> 'trial'`) | [ADR-0010 §6](adr/0010-plan-limits-and-billing-readiness.md) |
+| Workers Analytics Engine request metrics | a customer asks for per-org request/usage metrics that `activity_log` + `llm_usage` cannot answer | [ADR-0011 §5](adr/0011-observability.md) |
+| Weekly `pg_dump` to R2 | a customer requires off-provider backups (contract / security questionnaire) | [ADR-0013 §3](adr/0013-deployment-migrations-backups-secrets.md) |
+| Revisit keeping closed tenders | `tenders` reaches 5M rows | [ADR-0012](adr/0012-data-retention-and-housekeeping.md) |
