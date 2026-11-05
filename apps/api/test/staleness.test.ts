@@ -5,16 +5,18 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { PDFDocument } from 'pdf-lib';
 import { analyses, tenderDocuments, tenders } from '@tp/db';
 import type { LlmClient } from '../src/deps';
 import { keepStaleOnCompletion, markStale } from '../src/services/staleness';
 import { analyseTender, toAnalysisDto } from '../src/services/analyse';
-import { createTestContext, seedOrgWithRoles, type TestContext } from './helpers';
+import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
 
 let ctx: TestContext;
 let orgA: string;
 let orgB: string;
 let userA: string;
+let rolesA: Awaited<ReturnType<typeof seedOrgWithRoles>>;
 let openT: string;
 let closedT: string;
 let pastT: string;
@@ -41,7 +43,7 @@ beforeAll(async () => {
   ctx = await createTestContext({ now });
   const a = await seedOrgWithRoles(ctx.app, 'Stale A');
   const b = await seedOrgWithRoles(ctx.app, 'Stale B');
-  orgA = a.orgId; orgB = b.orgId; userA = a.analyst.me.user.id;
+  rolesA = a; orgA = a.orgId; orgB = b.orgId; userA = a.analyst.me.user.id;
   openT = await tender(1);
   // A public (GeM) document both orgs can analyse.
   const page = 'Bid document. The bidder shall have an average annual turnover of Rs 50 lakh in the last three financial years. '
@@ -175,5 +177,92 @@ describe('run completion keeps a flag set while it ran (FR-045, T074)', () => {
     }).returning();
     await ctx.db.update(analyses).set({ status: 'done', ...keepStaleOnCompletion() }).where(eq(analyses.id, a.id));
     expect(await row(a.id)).toMatchObject({ status: 'done', stale: false, staleReason: null, staleAt: null });
+  });
+});
+
+// T075-T077 (FR-044): each org-level change flags that org's analyses of open tenders, with the right reason.
+describe('mutations flag open analyses', () => {
+  const as = (r: { cookie: string }) => ({ cookie: r.cookie });
+  let id: string;       // org A's analysis of the open tender
+  let closedId: string; // ... and of the closed one
+  let otherId: string;  // org B's analysis of the open tender
+  beforeEach(async () => {
+    id = await analysis(orgA, openT); closedId = await analysis(orgA, closedT); otherId = await analysis(orgB, openT);
+  });
+  const expectFlagged = async (reason: string) => {
+    expect(await row(id)).toMatchObject({ stale: true, staleReason: reason, staleAt: ctx.clock.now() });
+    expect((await row(closedId)).stale).toBe(false); // closed tenders keep their historical result
+    expect((await row(otherId)).stale).toBe(false);  // another org is untouched
+  };
+  const unflag = () => ctx.db.update(analyses).set({ stale: false, staleReason: null, staleAt: null });
+  const pdf = async (title: string) => {
+    const d = await PDFDocument.create(); d.addPage().drawText(title);
+    return new File([await d.save() as Uint8Array<ArrayBuffer>], `${title}.pdf`, { type: 'application/pdf' });
+  };
+
+  it('PUT /profile -> profile_changed; a body that changes nothing flags nothing; a viewer is refused', async () => {
+    expect((await request(ctx.app, 'PUT', '/profile', { ...as(rolesA.viewer), json: { legalName: 'X' } })).status).toBe(403);
+    expect((await row(id)).stale).toBe(false);
+    expect((await request(ctx.app, 'PUT', '/profile', { ...as(rolesA.analyst), json: {} })).status).toBe(200);
+    expect((await row(id)).stale).toBe(false);
+    expect((await request(ctx.app, 'PUT', '/profile', { ...as(rolesA.analyst), json: { legalName: 'Stale Traders' } })).status).toBe(200);
+    await expectFlagged('profile_changed');
+  });
+
+  it('past contracts: POST, PATCH and DELETE -> profile_changed; a failed one flags nothing', async () => {
+    const bad = await request(ctx.app, 'POST', '/past-contracts', { ...as(rolesA.analyst), json: { buyer: 'IOCL' } });
+    expect(bad.status).toBe(400);
+    expect((await row(id)).stale).toBe(false);
+    const post = await request(ctx.app, 'POST', '/past-contracts', { ...as(rolesA.analyst), json: { buyer: 'IOCL', title: 'Laptops', value: 100 } });
+    expect(post.status).toBe(201);
+    await expectFlagged('profile_changed');
+    await unflag();
+    expect((await request(ctx.app, 'PATCH', `/past-contracts/${post.body.id}`, { ...as(rolesA.analyst), json: { title: 'Laptops 2' } })).status).toBe(200);
+    await expectFlagged('profile_changed');
+    await unflag();
+    expect((await request(ctx.app, 'DELETE', `/past-contracts/${post.body.id}`, as(rolesA.analyst))).status).toBe(200);
+    await expectFlagged('profile_changed');
+  });
+
+  it('vault: POST, PATCH, PUT file and DELETE -> vault_changed', async () => {
+    const up = await request(ctx.app, 'POST', '/vault', { ...as(rolesA.analyst), form: { file: await pdf('GST'), type: 'gst', title: 'GST' } });
+    expect(up.status).toBe(201);
+    await expectFlagged('vault_changed');
+    await unflag();
+    expect((await request(ctx.app, 'PATCH', `/vault/${up.body.id}`, { ...as(rolesA.analyst), json: { title: 'GST certificate' } })).status).toBe(200);
+    await expectFlagged('vault_changed');
+    await unflag();
+    expect((await request(ctx.app, 'PUT', `/vault/${up.body.id}/file`, { ...as(rolesA.analyst), form: { file: await pdf('GST v2') } })).status).toBe(200);
+    await expectFlagged('vault_changed');
+    await unflag();
+    expect((await request(ctx.app, 'DELETE', `/vault/${up.body.id}`, as(rolesA.analyst))).status).toBe(200);
+    await expectFlagged('vault_changed');
+  });
+
+  it('a refused vault write (viewer) and an empty PATCH flag nothing', async () => {
+    const up = await request(ctx.app, 'POST', '/vault', { ...as(rolesA.analyst), form: { file: await pdf('PAN'), type: 'pan', title: 'PAN' } });
+    await unflag();
+    expect((await request(ctx.app, 'PATCH', `/vault/${up.body.id}`, { ...as(rolesA.viewer), json: { title: 'x' } })).status).toBe(403);
+    expect((await request(ctx.app, 'PATCH', `/vault/${up.body.id}`, { ...as(rolesA.analyst), json: {} })).status).toBe(200);
+    expect((await row(id)).stale).toBe(false);
+  });
+
+  it('PUT /scoring-weights -> weights_changed only when the weights change', async () => {
+    const put = (json: object) => request(ctx.app, 'PUT', '/scoring-weights', { ...as(rolesA.bidManager), json });
+    expect((await put({ turnover: 30 })).status).toBe(200);
+    await expectFlagged('weights_changed');
+    await unflag();
+    expect((await put({ turnover: 30 })).status).toBe(200); // same weights again
+    expect((await row(id)).stale).toBe(false);
+  });
+
+  it('document upload and delete -> document_added / document_removed', async () => {
+    const up = await request(ctx.app, 'POST', `/tenders/${openT}/documents`, { ...as(rolesA.analyst), form: { file: await pdf('Addendum'), kind: 'bid' } });
+    expect(up.status).toBe(201);
+    expect(await row(id)).toMatchObject({ stale: true, staleReason: 'document_added' });
+    expect((await row(otherId)).stale).toBe(false);
+    await unflag();
+    expect((await request(ctx.app, 'DELETE', `/tenders/${openT}/documents/${up.body.id}`, as(rolesA.analyst))).status).toBe(204);
+    expect(await row(id)).toMatchObject({ stale: true, staleReason: 'document_removed' });
   });
 });

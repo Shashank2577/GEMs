@@ -24,6 +24,7 @@ import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { conflict, notFound, validationError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
+import { markStale } from '../services/staleness';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
@@ -148,6 +149,8 @@ profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
     }
   });
   await logActivity(db, { orgId: org, userId: userId(c), action: 'profile.updated', entityType: 'profile', entityId: org, meta: { fields: Object.keys(patch) } });
+  // The company profile feeds eligibility and scoring (FR-044): open tenders' results are now out of date.
+  if (Object.keys(patch).length) await markStale(db, { orgId: org, openOnly: true }, 'profile_changed', now);
   return c.json(await buildProfileResponse(c.var.deps, org));
 });
 
@@ -180,6 +183,7 @@ profileRoutes.post('/past-contracts', requireRole('analyst'), async (c) => {
     startDate: input.startDate ?? null, endDate: input.endDate ?? null, gemContractNo: input.gemContractNo ?? null, cracDocumentId: input.cracDocumentId ?? null,
   }).returning();
   await logActivity(c.var.deps.db, { orgId: org, userId: userId(c), action: 'profile.past_contract_added', entityType: 'past_contract', entityId: row!.id, meta: { buyer: row!.buyer, value: row!.value } });
+  await markStale(c.var.deps.db, { orgId: org, openOnly: true }, 'profile_changed', c.var.deps.clock.now());
   return c.json(toPastContractDto(row!), 201);
 });
 
@@ -198,6 +202,7 @@ profileRoutes.patch('/past-contracts/:id', requireRole('analyst'), async (c) => 
     ? await c.var.deps.db.update(pastContracts).set(patch).where(and(eq(pastContracts.orgId, org), eq(pastContracts.id, id))).returning()
     : [existing];
   await logActivity(c.var.deps.db, { orgId: org, userId: userId(c), action: 'profile.past_contract_updated', entityType: 'past_contract', entityId: id, meta: { fields: Object.keys(patch) } });
+  if (Object.keys(patch).length) await markStale(c.var.deps.db, { orgId: org, openOnly: true }, 'profile_changed', c.var.deps.clock.now());
   return c.json(toPastContractDto(row!));
 });
 
@@ -207,5 +212,6 @@ profileRoutes.delete('/past-contracts/:id', requireRole('analyst'), async (c) =>
   const [row] = await c.var.deps.db.delete(pastContracts).where(and(eq(pastContracts.orgId, org), eq(pastContracts.id, id))).returning({ id: pastContracts.id, buyer: pastContracts.buyer });
   if (!row) throw notFound('Past contract');
   await logActivity(c.var.deps.db, { orgId: org, userId: userId(c), action: 'profile.past_contract_deleted', entityType: 'past_contract', entityId: id, meta: { buyer: row.buyer } });
+  await markStale(c.var.deps.db, { orgId: org, openOnly: true }, 'profile_changed', c.var.deps.clock.now());
   return c.json({ ok: true as const });
 });

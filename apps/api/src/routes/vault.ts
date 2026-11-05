@@ -36,6 +36,7 @@ import { badRequest, HttpError, notFound, validationError } from '../lib/errors'
 import { parseQuery, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { VAULT_TOO_LARGE, VAULT_UPLOAD_MAX_BYTES, bodyLimit } from '../middleware/body-limit';
+import { markStale } from '../services/staleness';
 import { rateLimit } from '../middleware/rate-limit';
 import type { AppEnv } from '../types';
 
@@ -320,6 +321,7 @@ vaultRoutes.post('/vault', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_LARGE), r
     throw e;
   }
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.uploaded', entityType: 'vault_document', entityId: id, meta: { type: row.type, title: row.title, fileName } });
+  await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json(await dto(deps, row), 201);
 });
 
@@ -341,6 +343,7 @@ vaultRoutes.patch('/vault/:id', requireRole('analyst'), async (c) => {
   const [row] = await deps.db.update(vaultDocuments).set({ ...patch, updatedAt: deps.clock.now() })
     .where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id))).returning();
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.updated', entityType: 'vault_document', entityId: existing.id, meta: { fields: Object.keys(input) } });
+  if (Object.keys(patch).length) await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json(await dto(deps, row!));
 });
 
@@ -406,6 +409,7 @@ vaultRoutes.put('/vault/:id/file', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_L
   if (expiryChanged) {
     await logActivity(deps.db, { orgId: org, userId: uid, action: 'vault.renewed', entityType: 'vault_document', entityId: existing.id, meta: { fromExpiry: existing.expiryDate, toExpiry: row.expiryDate } });
   }
+  await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json(await dto(deps, row));
 });
 
@@ -435,6 +439,7 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
     await deps.blobs.delete(key).catch((e) => deps.logger.warn('vault blob delete failed', { key, error: String(e) }));
   }
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.deleted', entityType: 'vault_document', entityId: existing.id, meta: { type: existing.type, title: existing.title } });
+  await markStale(deps.db, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
   return c.json({ ok: true as const });
 });
 
