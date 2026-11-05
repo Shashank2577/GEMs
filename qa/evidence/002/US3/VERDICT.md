@@ -1,9 +1,20 @@
-## QA verdict — APPROVED
+## QA verdict — APPROVED (re-review round 2)
 
-**Work item:** #5 · **PR:** #495 · **Reviewer:** qa (claude-code/Sonnet 5.5) · **Session:** https://claude.ai/code/session_01BUi6mFdfjz9y1F3zKYmWQB
+**Work item:** #5 · **PR:** #495 · **Reviewer:** qa (claude-code/Sonnet 5.5) · **Reviewed HEAD:** `efcafaed417df40538fa1a0aa42924eee9f9d1d0` (fix commit; round 1 approved `1aba65d`) · **Session:** https://claude.ai/code/session_01BUi6mFdfjz9y1F3zKYmWQB
 
-Tests: `e2e/002/US3-roles-tenancy.e2e.ts` (desktop): **15 passed, 0 failed** (`E2E_PORT=8790 E2E_GEM_PORT=4013 E2E_DB_NAME=tenderpilot_e2e_us3 pnpm exec playwright test e2e/002/US3`). Multi-role org built via API (`POST /api/org/invitations` inviteUrl token + `accept-invite` in fresh contexts); the subject of each walkthrough is signed in on the `page` fixture.
-API suite: **360 passed, 1 skipped (pre-existing), 0 failed** across 20 files, incl. `roles-matrix` (60), `isolation` (4), `security` (6), `auth` (30), see [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/api-tests.txt).
+Round 2 re-ran everything against efcafae. Tests: `e2e/002/US3-roles-tenancy.e2e.ts`: **21 passed, 0 failed** (desktop 18 = 15 original + 3 `@mobile`-tagged tests that also run on desktop; mobile/Pixel 7 3), `E2E_PORT=8790 E2E_GEM_PORT=4013 E2E_DB_NAME=tenderpilot_e2e_us3 pnpm exec playwright test e2e/002/US3`.
+API suite: **365 passed, 1 skipped (pre-existing perf test), 0 failed** across 20 files (round 1: 360), incl. `roles-matrix` 60, `isolation` 4, `security` 8 (was 6), `auth` 33 (was 30); see [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/api-tests.txt).
+
+### What changed in round 2
+
+| # | Fix in efcafae | Re-verification | Evidence |
+|---|---|---|---|
+| R1 | Last-owner race lock (FR-024): `assertNotLastOwner` locks org row | API race tests pass (`auth.test.ts` "two owners leaving at the same time ...", demote-vs-remove); sc4 and sc10c e2e re-run green | api-tests.txt; sc4-sole-owner-intact.png; sc10c-last-owner-409-toast.png |
+| R2 | Leave-org writes (member.left, session org, `users.last_org_id`) in one transaction | sc10a re-run green; new mobile test also asserts `users.last_org_id` = next org via SQL | sc10a-switched-to-next-org.png; sc10-mobile-switched-mobile.png; sc10-mobile-non-last-member-leaves-via-the-dialog-and-lands--mobile.webm |
+| R3 | Origin check: loopback only if APP_URL loopback; OPTIONS not exempt; no Origin + `Sec-Fetch-Site: cross-site` -> 403 `bad_origin` | sc11 extended: cross-site with no Origin -> 403 bad_origin on PATCH and on POST with invalid body (before validation); handler never ran (org name unchanged); cookie OPTIONS with foreign Origin -> 403; `same-origin` / `none` with no Origin -> 200; GET cross-site -> 200; same-origin form-like POST (Origin = app, `Sec-Fetch-Site: same-origin`, urlencoded) not blocked by the origin check (it returns 400 from body validation, not 403); Bearer with foreign Origin still 200. A non-loopback foreign origin (https://evil.example) was used since APP_URL is loopback in e2e. | sc11-origin-check.txt; sc11-cookie-authenticated-mutation-with-foreign-origin-403-b-desktop.webm; sc11-origin-check-controls-pass.png; api-tests.txt (`security.test.ts` 8/8) |
+| R4 | Isolation test additions (tender_matches, seen/dismiss/undo, tender-document delete, watchlistId feed) | `isolation.test.ts` 4/4; sc7 e2e re-run green | api-tests.txt; sc7-cross-org-matrix.txt |
+| R5 | Web `leaveOrganization()` tolerant of `/auth/me` failure | Not exercised in e2e (needs a failing `/auth/me` after a successful DELETE); developer's web unit tests only, not run by QA this round | not verified, see Not checked |
+| R6 | Team/leave panel on mobile (new coverage) | 3 `@mobile` tests on Pixel 7: viewer Team page (no write actions, Leave reachable, no horizontal scroll), owner Team page (role selects, remove icons fit, no horizontal scroll), leave dialog fits viewport, leave flow lands on next org, last Owner refused with toast | sc8-mobile-viewer-team-mobile.png; sc8-mobile-owner-team-mobile.png; sc10-mobile-leave-panel-mobile.png; sc10-mobile-leave-dialog-mobile.png; sc10-mobile-switched-mobile.png; sc10-mobile-last-owner-mobile.png; sc8-mobile-viewer-team-page-no-write-actions-leave-organizat-mobile.webm; sc8-mobile-owner-team-page-role-selects-remove-icons-and-inv-mobile.webm |
 
 ### Acceptance criteria
 
@@ -41,7 +52,7 @@ API suite: **360 passed, 1 skipped (pre-existing), 0 failed** across 20 files, i
 | 11b | sc11: rejected before any handler runs | met | `POST /api/org/invitations` with an invalid body and foreign Origin is 403 bad_origin (not 400) and org name unchanged after the rejected PATCH; `security.test.ts` "before the handler runs" |
 | 11c | sc11: not over-blocking (same Origin, no Origin, GET, bearer pass) | met | same file: 200 for each; [sc11-origin-check-controls-pass.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc11-origin-check-controls-pass.png); `security.test.ts` 6/6 |
 
-Videos (one per test, desktop): `*.webm` in this folder. Total evidence about 8 MB. No traces committed.
+Videos (one per test per project): `*.webm` in this folder (21). Total evidence about 13.7 MB (< 15 MB). No traces committed. All rows below were re-run in round 2 (every desktop test green on efcafae); the row verdicts are unchanged, with 4a/4b/10d/11a/11b/11c now additionally covered by the round-2 evidence listed above.
 
 ### Findings
 
@@ -49,15 +60,17 @@ Videos (one per test, desktop): `*.webm` in this folder. Total evidence about 8 
    - Observed: toast "Asha Sharma is now Bid manager" (`TeamSection.tsx` builds `${m.name} is now ${ROLE_LABEL[role]}`; `ROLE_LABEL.bid_manager` = "Bid manager").
    - Expected (spec sc5): "Asha is now Bid Manager" (first name, capital M). Product-wide label casing is "Bid manager"; judged wording-equivalent, not blocking.
    - Where: `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/lib/types.ts`
-2. **observation** — Dev-only caveat: in `development` the Origin check also accepts any loopback origin (documented in `security.ts`, covered by test "in development, loopback origins ... in production they are not"). Not reachable in production configuration.
-3. **observation (environment, not product)** — `e2e/support/start-api.sh` calls `scripts/local-pg.sh`, which tries to start a per-worktree Postgres on :5433 and fails when another worktree's instance already owns the port. Worked around by creating the DB manually and passing `E2E_DATABASE_URL`.
+2. **resolved** — Round 1 observation (loopback origins accepted by NODE_ENV) is fixed: loopback is accepted only when APP_URL itself is loopback (`security.test.ts` "loopback origins are accepted only when APP_URL itself is loopback"). Residual: a deployment with a loopback APP_URL would accept any loopback origin (documented in Runbook: APP_URL must match the served origin).
+3. **observation (test note)** — a urlencoded form POST to a JSON endpoint returns 400 (body validation), so the "same-origin form-like POST still works" check proves only that the Origin check does not block it, not that the endpoint accepts forms.
+4. **observation (environment, not product)** — `e2e/support/start-api.sh` calls `scripts/local-pg.sh`, which tries to start a per-worktree Postgres on :5433 and fails when another worktree's instance already owns the port. Worked around by creating the DB manually and passing `E2E_DATABASE_URL`.
 
 ### Not checked
 
-- Mobile viewport (@mobile) for these screens: US3 criteria are role/tenancy behaviour; not exercised.
+- Mobile viewport: now covered for Team / leave panel only (round 2). Other settings screens (sc8 vault, scoring, sync, org, profile) remain desktop-only on mobile.
+- Web `leaveOrganization()` fallback when `/auth/me` fails after a successful DELETE: not run by QA (developer unit tests only).
 - Email-based or webhook paths for invites (US2 scope).
 - Every one of the ~60 role-matrix routes through the UI: covered at API level only (roles-matrix 60/60); the UI walkthroughs cover the actions named in the criteria.
-- Real multi-process/concurrency races (e.g. two Owners demoting each other simultaneously): not tested.
+- Concurrency races (last-owner lock): covered at API level only (`auth.test.ts` race tests, run and passing); no true multi-process/UI race in e2e.
 - Activity-log rendering of `member.left` in the dashboard (US6 scope); only the API log entry was asserted.
 
 An approval covers what is in the table above. It is not a statement that the change is free of defects.
@@ -68,4 +81,4 @@ None (nothing blocking; observations above are not filed).
 
 ### Verdict
 
-**qa:approved**: all 11 scenarios (including gap scenarios 9, 10, 11) are met with evidence.
+**qa:approved** (round 2, efcafae): all 11 scenarios (including gap scenarios 9, 10, 11) and the round-2 fixes are met with evidence.

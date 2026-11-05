@@ -1,16 +1,16 @@
-member role: PATCH /api/org/members/01d2c539-3b9d-4e43-9980-68fc9f7debfa -> 404 not_found
-member remove: DELETE /api/org/members/01d2c539-3b9d-4e43-9980-68fc9f7debfa -> 404 not_found
-invitation revoke: DELETE /api/org/invitations/aa994a85-564c-4ee6-906b-8f3e0efaa04f -> 404 not_found
-invitation resend: POST /api/org/invitations/aa994a85-564c-4ee6-906b-8f3e0efaa04f/resend -> 404 not_found
-watchlist update: PATCH /api/watchlists/6cb2dbba-8bd7-41e4-8f3f-632b45dc9d9b -> 404 not_found
-watchlist delete: DELETE /api/watchlists/6cb2dbba-8bd7-41e4-8f3f-632b45dc9d9b -> 404 not_found
-api token revoke: DELETE /api/me/api-tokens/30e2e671-7c9e-43b0-ab40-80afeec99e63 -> 404 not_found
-workspace read: GET /api/workspaces/e671d690-5cc3-443f-8d61-725fd52f69d0 -> 404 not_found
-workspace update: PATCH /api/workspaces/e671d690-5cc3-443f-8d61-725fd52f69d0 -> 404 not_found
-workspace comments: GET /api/workspaces/e671d690-5cc3-443f-8d61-725fd52f69d0/comments -> 404 not_found
-workspace packets: GET /api/workspaces/e671d690-5cc3-443f-8d61-725fd52f69d0/packets -> 404 not_found
-tender analysis: GET /api/tenders/d42cfe1f-c911-4010-851e-c49bd6ba5bc5/analysis -> 404 not_found
-assist payload: GET /api/assist/e671d690-5cc3-443f-8d61-725fd52f69d0 -> 404 not_found
-vault read: GET /api/vault/eac0bd04-d93e-4674-8146-cd7fa72852bc -> 404 not_found
-vault download: GET /api/vault/eac0bd04-d93e-4674-8146-cd7fa72852bc/download -> 404 not_found
-vault delete: DELETE /api/vault/eac0bd04-d93e-4674-8146-cd7fa72852bc -> 404 not_found
+member role: PATCH /api/org/members/52544ece-9f5f-41e7-926b-1bc781f5d249 -> 404 not_found
+member remove: DELETE /api/org/members/52544ece-9f5f-41e7-926b-1bc781f5d249 -> 404 not_found
+invitation revoke: DELETE /api/org/invitations/59fc1474-caff-475d-9796-3837d7ade63c -> 404 not_found
+invitation resend: POST /api/org/invitations/59fc1474-caff-475d-9796-3837d7ade63c/resend -> 404 not_found
+watchlist update: PATCH /api/watchlists/aafe91ef-b9b3-42f6-9616-05fc373ef5c8 -> 404 not_found
+watchlist delete: DELETE /api/watchlists/aafe91ef-b9b3-42f6-9616-05fc373ef5c8 -> 404 not_found
+api token revoke: DELETE /api/me/api-tokens/c872aa88-734a-4605-b8e9-f16a653a11b7 -> 404 not_found
+workspace read: GET /api/workspaces/a66c2015-7d0d-410a-a0a5-c97d69be2da3 -> 404 not_found
+workspace update: PATCH /api/workspaces/a66c2015-7d0d-410a-a0a5-c97d69be2da3 -> 404 not_found
+workspace comments: GET /api/workspaces/a66c2015-7d0d-410a-a0a5-c97d69be2da3/comments -> 404 not_found
+workspace packets: GET /api/workspaces/a66c2015-7d0d-410a-a0a5-c97d69be2da3/packets -> 404 not_found
+tender analysis: GET /api/tenders/02db76fb-80b5-4e5c-bd51-ccb8fe28db46/analysis -> 404 not_found
+assist payload: GET /api/assist/a66c2015-7d0d-410a-a0a5-c97d69be2da3 -> 404 not_found
+vault read: GET /api/vault/042ba6a6-1ba6-4426-9d3c-aa82cb5fd517 -> 404 not_found
+vault download: GET /api/vault/042ba6a6-1ba6-4426-9d3c-aa82cb5fd517/download -> 404 not_found
+vault delete: DELETE /api/vault/042ba6a6-1ba6-4426-9d3c-aa82cb5fd517 -> 404 not_found

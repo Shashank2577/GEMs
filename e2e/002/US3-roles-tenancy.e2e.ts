@@ -585,6 +585,30 @@ test.describe('sc11 origin check', () => {
     const evil3 = await errOf(await page.request.patch('/api/org', { data: { name: 'x' }, headers: { origin: `${baseURL}.evil.example` } }));
     expect(evil3.code).toBe('bad_origin');
 
+    // round 2: no Origin + Sec-Fetch-Site: cross-site (cookie) -> 403 bad_origin; handler never ran
+    const xsite = await page.request.patch('/api/org', { data: { name: 'Hacked cross-site' }, headers: { 'sec-fetch-site': 'cross-site' } });
+    const xs = await errOf(xsite);
+    expect(xs).toMatchObject({ status: 403, code: 'bad_origin' });
+    const xsitePost = await errOf(await page.request.post('/api/org/invitations', { data: {}, headers: { 'sec-fetch-site': 'cross-site' } }));
+    expect(xsitePost).toMatchObject({ status: 403, code: 'bad_origin' });
+    expect((await (await page.request.get('/api/org')).json()).name, 'handler never ran (cross-site)').toBe(before);
+    // OPTIONS is no longer exempt but carries no cookie in browsers; with a cookie + foreign origin it is rejected too
+    const opt = await page.request.fetch('/api/org', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } });
+    expect(opt.status(), 'OPTIONS with cookie + foreign Origin is not exempt').toBe(403);
+    // same-origin form-like POST (browser sends Origin on form POST; Sec-Fetch-Site same-origin) still works
+    const form = await page.request.post('/api/me/api-tokens', {
+      headers: { origin: baseURL!, 'sec-fetch-site': 'same-origin', 'content-type': 'application/x-www-form-urlencoded' }, data: 'name=form-token',
+    });
+    const formStatus = form.status();
+    expect(formStatus, 'same-origin form-like POST is not blocked by the Origin check').not.toBe(403);
+    // and same-origin with no Origin header at all (Sec-Fetch-Site: same-origin / same-site / none) passes
+    const sfSame = await page.request.patch('/api/org', { data: { name: 'Sec-Fetch same-origin' }, headers: { 'sec-fetch-site': 'same-origin' } });
+    expect(sfSame.status()).toBe(200);
+    const sfNone = await page.request.patch('/api/org', { data: { name: 'Sec-Fetch none' }, headers: { 'sec-fetch-site': 'none' } });
+    expect(sfNone.status()).toBe(200);
+    // GET with cross-site is not a state change
+    expect((await page.request.get('/api/org', { headers: { 'sec-fetch-site': 'cross-site' } })).status()).toBe(200);
+
     // controls
     const same = await page.request.patch('/api/org', { data: { name: 'Same origin rename' }, headers: { origin: baseURL! } });
     expect(same.status()).toBe(200);
@@ -613,8 +637,102 @@ test.describe('sc11 origin check', () => {
       `PATCH /api/org  Origin: ${baseURL}.evil.example -> ${evil3.status} ${evil3.code}`,
       `PATCH /api/org  Origin: ${baseURL} (cookie)       -> ${same.status()}`,
       `PATCH /api/org  no Origin (cookie)                -> ${none.status()}`,
-      `GET   /api/org  Origin: evil (cookie)             -> 200`,
+      `PATCH /api/org  no Origin, Sec-Fetch-Site: cross-site (cookie) -> ${xs.status} ${xs.code} "${xs.message}"`,
+      `POST  /api/org/invitations {} no Origin, cross-site -> ${xsitePost.status} ${xsitePost.code}`,
+      `OPTIONS /api/org Origin: evil (cookie)            -> ${opt.status()}`,
+      `POST  /api/me/api-tokens form-urlencoded, Origin: ${baseURL}, Sec-Fetch-Site: same-origin -> ${formStatus}`,
+      `PATCH /api/org  no Origin, Sec-Fetch-Site: same-origin -> ${sfSame.status()}; none -> ${sfNone.status()}`,
+      `GET   /api/org  Origin: evil (cookie)             -> 200; GET cross-site -> 200`,
       `PATCH /api/org  Origin: evil + Bearer tp_...      -> ${viaBearer.status()}`,
     ].join('\n') + '\n');
+  });
+});
+
+// ───────────────────────── @mobile: Team / leave panel layout (sc8, sc10) ─────────────────────────
+const noHScroll = async (page: Page) => {
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(over, 'no horizontal page scroll').toBeLessThanOrEqual(1);
+};
+
+test.describe('team and leave panel layout @mobile', () => {
+  test('sc8 @mobile Viewer Team page: no write actions, Leave organization reachable, no horizontal scroll', async ({ page, browser, baseURL }) => {
+    const proj = test.info().project.name;
+    const owner = await newOrg(browser, baseURL!);
+    await join(owner.api, page.context(), 'viewer', 'Vik Viewer');
+    await page.goto('/settings/team');
+    await expect(page.getByRole('heading', { name: 'Team & roles' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Invite teammate' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: /^Role for / })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Remove / })).toHaveCount(0);
+    const leave = page.getByRole('button', { name: 'Leave organization' });
+    await expect(leave).toBeVisible();
+    await leave.scrollIntoViewIfNeeded();
+    expect(await leave.boundingBox()).not.toBeNull();
+    await noHScroll(page);
+    await ev(page, `sc8-mobile-viewer-team-${proj}`);
+    await page.goto('/dashboard');
+    await expect(page.getByText('View-only access').first()).toBeAttached();
+  });
+
+  test('sc8 @mobile Owner Team page: role selects, remove icons and invite fit the viewport', async ({ page, browser, baseURL }) => {
+    const proj = test.info().project.name;
+    const owner = await newOrg(browser, baseURL!);
+    await page.context().addCookies(await owner.ctx.cookies());
+    const u = await join(owner.api, await newCtx(browser, baseURL!), 'analyst', 'Asha Sharma');
+    await page.goto('/settings/team');
+    await expect(page.getByRole('heading', { name: 'Team & roles' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: /^Role for / }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Remove / }).first()).toBeVisible();
+    await noHScroll(page);
+    await ev(page, `sc8-mobile-owner-team-${proj}`);
+    expect(u.userId).toBeTruthy();
+  });
+
+  test('sc10 @mobile non-last member leaves via the dialog and lands correctly; last Owner is refused', async ({ page, browser, baseURL }) => {
+    const proj = test.info().project.name;
+    const A = await newOrg(browser, baseURL!, 'orga');
+    const B = await newOrg(browser, baseURL!, 'orgb');
+    const priya = await join(A.api, page.context(), 'owner', 'Priya Owner');
+    const inv = await invite(B.api, priya.email, 'analyst');
+    expect((await page.request.post('/api/auth/accept-invite', { data: { token: tokenOf(inv.inviteUrl) } })).status()).toBe(200);
+    expect((await page.request.post('/api/auth/switch-org', { data: { orgId: A.me.org.id } })).status()).toBe(200);
+    await page.goto('/settings/team');
+    await expect(page.getByRole('heading', { name: 'Leave organization' })).toBeVisible();
+    await noHScroll(page);
+    await ev(page, `sc10-mobile-leave-panel-${proj}`);
+    await page.getByRole('button', { name: 'Leave organization' }).click();
+    const dlg = page.getByRole('dialog');
+    await expect(dlg.getByRole('heading', { name: `Leave ${A.me.org.name}?` })).toBeVisible();
+    const vp = page.viewportSize()!;
+    // the dialog animates in (zoom/slide); assert on the settled box
+    await expect.poll(async () => { const b = await dlg.boundingBox(); return !!b && b.x >= 0 && b.x + b.width <= vp.width + 1; }, { timeout: 5000 }).toBe(true);
+    await ev(page, `sc10-mobile-leave-dialog-${proj}`);
+    const [res] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/api/org/members/me') && r.request().method() === 'DELETE'),
+      dlg.getByRole('button', { name: 'Leave organization' }).click(),
+    ]);
+    expect(res.status()).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, nextOrgId: B.me.org.id });
+    await expect(page).toHaveURL(/\/dashboard$/);
+    expect((await (await page.request.get('/api/auth/me')).json()).org.id).toBe(B.me.org.id);
+    // users.last_org_id written in the same transaction (round-2 fix)
+    expect(sql(`select last_org_id from users where id='${priya.userId}'`)).toBe(B.me.org.id);
+    await ev(page, `sc10-mobile-switched-${proj}`);
+
+    // last Owner refused (sole owner of org A2)
+    const A2 = await newOrg(browser, baseURL!, 'orgc');
+    await page.context().clearCookies();
+    await page.context().addCookies(await A2.ctx.cookies());
+    await page.goto('/settings/team');
+    await page.getByRole('button', { name: 'Leave organization' }).click();
+    const [r2] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/api/org/members/me') && r.request().method() === 'DELETE'),
+      page.getByRole('dialog').getByRole('button', { name: 'Leave organization' }).click(),
+    ]);
+    expect(await errOf(r2)).toMatchObject({ status: 409, code: 'last_owner' });
+    await expect(page.getByText('You are the last Owner of this organization. Make someone else an Owner before you leave.').first()).toBeVisible();
+    await noHScroll(page);
+    await ev(page, `sc10-mobile-last-owner-${proj}`);
+    expect(Number(sql(`select count(*) from memberships where user_id='${A2.me.user.id}'`))).toBe(1);
   });
 });
