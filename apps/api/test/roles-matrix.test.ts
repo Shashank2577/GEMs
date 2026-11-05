@@ -10,6 +10,13 @@
  * Adding a route: add ONE line to MATRIX, e.g.
  *   { method: 'POST', path: '/api/org/invitations/:id/resend', min: 'bid_manager' },
  * `min` is a role (requireRole/requireAuth), 'session' (requireSession: cookie only, any role) or 'public' (no auth).
+ *
+ * Scope: this matrix tests the ROUTE GATE only (requireRole / requireAuth / requireSession). Checks made inside
+ * handlers (e.g. only an Owner may invite an Owner, last-owner protection, org scoping) are covered by auth.test.ts
+ * and isolation.test.ts.
+ * Minimums follow 002/FR-022. Two differ from the older 001 contracts/api.md table, which was updated to match:
+ * `POST /analyses/:id/override` is Bid Manager+ ("overrides" in FR-022), and `POST /workspaces/:id/comments` is
+ * Analyst+ (tender work).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Role } from '@tp/db';

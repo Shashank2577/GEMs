@@ -10,7 +10,7 @@ import { asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   activityLog, analyses, annexureTemplates, apiTokens, bidWorkspaces, comments, companyProfiles, invitations, memberships, notificationPrefs,
-  notifications, organizations, packets, pastContracts, sessions, tenderDocuments, vaultDocuments, watchlists,
+  notifications, organizations, packets, pastContracts, sessions, tenderDocuments, tenderMatches, vaultDocuments, watchlists,
 } from '@tp/db';
 import { createTestContext, request, seedOrgWithRoles, uniqueEmail, type TestContext } from './helpers';
 import { file, NOW, pdf, seedAnalysis, seedApply } from './workspace-fixtures';
@@ -38,6 +38,7 @@ async function snapshotA() {
     vault: await byOrg(vaultDocuments),
     tenderDocs: await byOrg(tenderDocuments),
     watchlists: await byOrg(watchlists),
+    matches: await byOrg(tenderMatches),
     analyses: await byOrg(analyses),
     workspaces: await byOrg(bidWorkspaces),
     comments: await byOrg(comments),
@@ -82,6 +83,11 @@ beforeAll(async () => {
   const wl = await request(ctx.app, 'POST', '/watchlists', { cookie: a.analyst.cookie, json: { name: 'A laptops', criteria: { keywords: ['laptop'] } } });
   expect(wl.status, json(wl)).toBe(201);
   ids.watchlist = wl.body.id;
+  // A's watchlist matched A's tender (unseen, not dismissed) — the feed filter below must not be vacuous.
+  await ctx.db.insert(tenderMatches).values({ orgId: a.orgId, tenderId: A.tender.id, watchlistId: ids.watchlist, reasons: ['keyword: laptop'], relevance: 0.9 })
+    .onConflictDoNothing();
+  const [match] = await ctx.db.select().from(tenderMatches).where(eq(tenderMatches.orgId, a.orgId));
+  expect(match).toMatchObject({ seen: false, dismissed: false });
 
   const pc = await request(ctx.app, 'POST', '/past-contracts', { cookie: a.analyst.cookie, json: { buyer: 'IOCL', title: 'Laptops 2025', value: 2_500_000, cracDocumentId: A.docs.gst.id } });
   expect(pc.status, json(pc)).toBe(201);
@@ -117,6 +123,7 @@ describe('org B cannot read, update or delete org A’s resources by id (404, ne
     ['GET analysis', () => ['GET', `/tenders/${ids.tender}/analysis`]],
     ['override analysis', () => ['POST', `/analyses/${ids.analysis}/override`, { json: { factorKey: 'turnover', status: 'pass', reason: 'B tampering' } }]],
     ['download A’s tender document', () => ['GET', `/tenders/${ids.tender}/documents/${ids.tenderDoc}/download`]],
+    ['delete A’s tender document', () => ['DELETE', `/tenders/${ids.tender}/documents/${ids.tenderDoc}`]],
     // watchlist
     ['update watchlist', () => ['PATCH', `/watchlists/${ids.watchlist}`, { json: { name: 'B renamed' } }]],
     ['delete watchlist', () => ['DELETE', `/watchlists/${ids.watchlist}`]],
@@ -170,6 +177,16 @@ describe('org B cannot read, update or delete org A’s resources by id (404, ne
       }
     }
     expect(failures).toEqual([]);
+
+    // Tenders are shared, so seen/dismiss on A's matched tender are legitimate calls for B — they must only touch
+    // B's own matches (none): seen is a no-op 200, dismiss is 409 "only matched tenders". A's match stays as it was.
+    const seen = await request(ctx.app, 'POST', `/tenders/${ids.tender}/seen`, { cookie: B.owner.cookie });
+    expect(seen.status, json(seen)).toBe(200);
+    const dismiss = await request(ctx.app, 'POST', `/tenders/${ids.tender}/dismiss`, { cookie: B.owner.cookie, json: {} });
+    expect(dismiss.status, json(dismiss)).toBe(409);
+    const undo = await request(ctx.app, 'POST', `/tenders/${ids.tender}/dismiss`, { cookie: B.owner.cookie, json: { undo: true } });
+    expect(undo.status, json(undo)).toBe(409);
+
     expect(await snapshotA()).toBe(before);
   });
 });
@@ -213,8 +230,13 @@ describe('org B’s lists and aggregates never include org A’s rows', () => {
     const dash = JSON.stringify((await get('/dashboard')).body);
     for (const id of [ids.workspace, ids.vault, ids.watchlist, ids.tender]) expect(dash).not.toContain(id);
 
-    const feed = JSON.stringify((await get(`/tenders?watchlistId=${ids.watchlist}`)).body.items ?? []);
-    expect(feed).not.toContain(ids.watchlist);
+    // A sees its match through the watchlist filter; B, passing A's watchlist id, sees nothing.
+    const feedA = await request(ctx.app, 'GET', `/tenders?watchlistId=${ids.watchlist}`, { cookie: A.org.viewer.cookie });
+    expect(feedA.body.items.map((t: any) => t.id)).toEqual([ids.tender]);
+    const feedB = await get(`/tenders?watchlistId=${ids.watchlist}`);
+    expect(feedB.status).toBe(200);
+    expect(feedB.body.items).toEqual([]);
+    expect(JSON.stringify((await get(`/tenders/${ids.tender}`)).body.matches ?? [])).not.toContain(ids.watchlist);
   });
 
   it('A’s API token stays bound to org A (it never acts in B’s org)', async () => {

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Navigate, useLocation } from 'react-router-dom';
-import { api, ApiError, ME_KEY, resetSessionCache } from './api';
+import { api, ApiError, ME_KEY, queryClient, resetSessionCache } from './api';
 import type { Me, Role } from './types';
 
 export type { Me, Role } from './types';
@@ -51,6 +51,29 @@ interface AuthContextValue {
   leaveOrg: () => Promise<{ orgName: string; nextOrgId: string | null }>;
 }
 
+/**
+ * 002/FR-027: leave the active org. The server moves the session to the next org (or none); then load the new `Me`,
+ * or sign out when no org is left. Once the DELETE succeeded this never rejects: a failing `/auth/me` falls back to
+ * dropping the org-scoped cache and refetching `ME_KEY`.
+ */
+export async function leaveOrganization(me: Me | null, setMe: (m: Me | null) => void): Promise<{ orgName: string; nextOrgId: string | null }> {
+  const orgName = me?.org.name ?? 'the organization';
+  const { nextOrgId } = await api.delete<{ ok: true; nextOrgId: string | null }>('/org/members/me');
+  if (nextOrgId) {
+    try {
+      setMe(await api.get<Me>('/auth/me'));
+    } catch {
+      // Keep the (now stale) user only to avoid a sign-out flash; drop every org-scoped query and refetch /auth/me.
+      resetSessionCache(me);
+      void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
+    }
+  } else {
+    try { await api.post('/auth/logout'); } catch { /* the membership is gone either way */ }
+    setMe(null);
+  }
+  return { orgName, nextOrgId };
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -85,17 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMe(m);
       return m;
     },
-    leaveOrg: async () => {
-      const orgName = me?.org.name ?? 'the organization';
-      const { nextOrgId } = await api.delete<{ ok: true; nextOrgId: string | null }>('/org/members/me');
-      if (nextOrgId) {
-        setMe(await api.get<Me>('/auth/me'));
-      } else {
-        try { await api.post('/auth/logout'); } catch { /* the membership is gone either way */ }
-        setMe(null);
-      }
-      return { orgName, nextOrgId };
-    },
+    leaveOrg: () => leaveOrganization(me, setMe),
   }), [me, meQuery.isLoading, loginM, signupM, inviteM, resetM, setMe]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

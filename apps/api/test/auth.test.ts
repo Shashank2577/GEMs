@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { and, eq } from 'drizzle-orm';
+import { memberships, users } from '@tp/db';
 import { createTestContext, request, seedOrgWithRoles, signup, uniqueEmail, TEST_APP_URL, type TestContext } from './helpers';
 
 let ctx: TestContext;
@@ -521,6 +523,42 @@ describe('DELETE /api/org/members/me — leave organization (002/FR-027)', () =>
     expect((await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: a.owner.cookie })).status).toBe(200);
     const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: a.bidManager.cookie });
     expect(members.body.items.filter((m: any) => m.role === 'owner').map((m: any) => m.userId)).toEqual([a.bidManager.me.user.id]);
+  });
+
+  it('two owners leaving at the same time cannot leave the org without an Owner (FR-024 race)', async () => {
+    for (let round = 0; round < 3; round++) {
+      const a = await seedOrgWithRoles(ctx.app);
+      await request(ctx.app, 'PATCH', `/api/org/members/${a.bidManager.me.user.id}`, { cookie: a.owner.cookie, json: { role: 'owner' } });
+      const res = await Promise.all([a.owner, a.bidManager].map((u) => request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: u.cookie })));
+      expect(res.map((r) => r.status).sort()).toEqual([200, 409]);
+      expect(res.find((r) => r.status === 409)!.body.error.code).toBe('last_owner');
+      const owners = await ctx.db.select().from(memberships).where(and(eq(memberships.orgId, a.orgId), eq(memberships.role, 'owner')));
+      expect(owners).toHaveLength(1);
+    }
+  });
+
+  it('two owners demoting / removing each other at the same time keep one Owner', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const [o1, o2] = [a.owner, a.bidManager];
+    await request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'owner' } });
+    const res = await Promise.all([
+      request(ctx.app, 'PATCH', `/api/org/members/${o2.me.user.id}`, { cookie: o1.cookie, json: { role: 'viewer' } }),
+      request(ctx.app, 'DELETE', `/api/org/members/${o1.me.user.id}`, { cookie: o2.cookie }),
+    ]);
+    const owners = await ctx.db.select().from(memberships).where(and(eq(memberships.orgId, a.orgId), eq(memberships.role, 'owner')));
+    expect(owners.length, res.map((r) => `${r.status} ${r.text}`).join(' | ')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('sets the remembered org to the next org, so the next sign-in does not resume the org that was left', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const home = await signup(ctx.app, { orgName: 'Remember Home' });
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: a.owner.cookie, json: { email: home.email, role: 'viewer' } });
+    await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: home.cookie, json: { token: inv.body.inviteUrl.split('/invite/')[1] } });
+    expect((await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: home.cookie })).body.nextOrgId).toBe(home.me.org.id);
+    const [u] = await ctx.db.select({ lastOrgId: users.lastOrgId }).from(users).where(eq(users.id, home.me.user.id));
+    expect(u.lastOrgId).toBe(home.me.org.id);
+    const login = await request(ctx.app, 'POST', '/api/auth/login', { json: { email: home.email, password: home.password } });
+    expect(login.body.org.id).toBe(home.me.org.id);
   });
 
   it('is session-only: an API token gets 403 and nothing changes', async () => {

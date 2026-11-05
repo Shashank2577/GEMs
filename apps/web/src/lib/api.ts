@@ -1,5 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { errorToastId } from '@/components/ui/toaster';
 
 /** Error envelope from the API: `{ error: { code, message, details? } }`. */
 export class ApiError extends Error {
@@ -157,7 +158,7 @@ export function handleForbidden(err: unknown): boolean {
   if (!(err instanceof ApiError) || err.status !== 403 || err.code !== 'forbidden') return false;
   if (!queryClient.getQueryData(ME_KEY)) return false;
   // Same id as `toast.error` from components/ui/toaster, so a call site toasting the same message shows one toast.
-  toast.error(err.message, { id: `error:${err.message}` });
+  toast.error(err.message, { id: errorToastId(err.message) });
   void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
   return true;
 }

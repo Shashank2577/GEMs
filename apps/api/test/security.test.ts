@@ -64,15 +64,42 @@ describe('Origin check middleware', () => {
     expect(r.status).toBe(401);
   });
 
-  it('in development, loopback origins (Vite dev server) are accepted; in production they are not', async () => {
+  it('loopback origins are accepted only when APP_URL itself is loopback (local dev with Vite), whatever NODE_ENV says', async () => {
     const a = await signup(ctx.app);
-    const build = (NODE_ENV: string) => createApp({ ...ctx.deps, config: loadConfig({ APP_URL: 'http://localhost:8787', NODE_ENV }) });
-    const dev = build('development');
-    const prod = build('production');
-    const viteOrigin = { origin: 'http://localhost:5173' };
-    expect((await request(dev, 'PATCH', '/api/org', { cookie: a.cookie, json: { name: 'Dev' }, headers: viteOrigin })).status).toBe(200);
-    expect((await request(prod, 'PATCH', '/api/org', { cookie: a.cookie, json: { name: 'Prod' }, headers: viteOrigin })).status).toBe(403);
-    expect((await request(prod, 'PATCH', '/api/org', { cookie: a.cookie, json: { name: 'Prod' }, headers: { origin: 'http://localhost:8787' } })).status).toBe(200);
-    expect((await request(dev, 'PATCH', '/api/org', { cookie: a.cookie, json: { name: 'Dev' }, headers: { origin: EVIL } })).status).toBe(403);
+    const build = (APP_URL: string, NODE_ENV: string) => createApp({ ...ctx.deps, config: loadConfig({ APP_URL, NODE_ENV }) });
+    const local = build('http://localhost:8787', 'production');
+    const deployed = build('https://app.tenderpilot.in', 'development');
+    const patch = (app: ReturnType<typeof build>, origin: string) => request(app, 'PATCH', '/api/org', { cookie: a.cookie, json: {}, headers: { origin } });
+    expect((await patch(local, 'http://localhost:5173')).status).toBe(200);
+    expect((await patch(local, 'http://127.0.0.1:4173')).status).toBe(200);
+    expect((await patch(local, EVIL)).status).toBe(403);
+    expect((await patch(local, 'http://localhost.evil.example')).status).toBe(403);
+    expect((await patch(deployed, 'https://app.tenderpilot.in')).status).toBe(200);
+    expect((await patch(deployed, 'http://localhost:5173')).status).toBe(403);
+    expect((await patch(deployed, 'http://localhost:8787')).status).toBe(403);
+  });
+
+  it('a cookie request without Origin is rejected when the browser marks it Sec-Fetch-Site: cross-site', async () => {
+    const a = await signup(ctx.app, { orgName: 'Fetch Site Co' });
+    const cross = await request(ctx.app, 'PATCH', '/api/org', { cookie: a.cookie, json: { name: 'Pwned' }, headers: { 'sec-fetch-site': 'cross-site' } });
+    expect(cross.status).toBe(403);
+    expect(cross.body.error.code).toBe('bad_origin');
+    for (const site of ['same-origin', 'same-site', 'none']) {
+      const r = await request(ctx.app, 'PATCH', '/api/org', { cookie: a.cookie, json: {}, headers: { 'sec-fetch-site': site } });
+      expect(r.status, site).toBe(200);
+    }
+    // bearer requests stay exempt
+    const token = (await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: a.cookie, json: { name: 'ext' } })).body.token;
+    expect((await request(ctx.app, 'PATCH', '/api/org', { bearer: token, json: {}, headers: { 'sec-fetch-site': 'cross-site' } })).status).toBe(200);
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: a.cookie })).body.org.name).toBe('Fetch Site Co');
+  });
+
+  it('OPTIONS is not treated as a safe method: a cookie OPTIONS from a foreign origin is refused', async () => {
+    const a = await signup(ctx.app);
+    const r = await request(ctx.app, 'OPTIONS', '/api/org', { cookie: a.cookie, headers: { origin: EVIL } });
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('bad_origin');
+    // a real CORS preflight carries no cookie and is unaffected (no CORS is granted: it simply 404s)
+    expect((await request(ctx.app, 'OPTIONS', '/api/org', { headers: { origin: EVIL } })).status).not.toBe(403);
   });
 });
