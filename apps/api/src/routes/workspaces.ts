@@ -79,9 +79,11 @@ workspacesRoutes.post('/tenders/:id/workspace', requireRole('analyst'), async (c
 
   const [a, docs] = await Promise.all([latestAnalysis(deps, org, t.id), vaultRows(deps, org)]);
   const now = deps.clock.now();
-  const auto = autoMap(a?.checklist ?? [], docs.map(asMappable), now);
-  // Store only real matches; absent keys stay "automatic" so documents uploaded later are picked up.
-  const docMapping = Object.fromEntries(Object.entries(auto).filter(([, v]) => v)) as Record<string, string>;
+  // Store NO mapping: absent keys mean "automatic" (FR-014), resolved at read time, so a document uploaded later
+  // is picked up and a deleted one falls back to the next best (FR-020, US2 #9). Snapshotting the auto picks here
+  // would turn them into explicit choices. The count is kept for the activity entry only.
+  const autoMatched = Object.values(autoMap(a?.checklist ?? [], docs.map(asMappable), now)).filter(Boolean).length;
+  const docMapping: Record<string, string> = {};
   const stage: StageName = a?.verdict === 'go' ? 'go' : a?.status === 'running' ? 'analysing' : 'identified';
   const [w] = await deps.db.insert(bidWorkspaces).values({
     orgId: org, tenderId: t.id, stage, ownerId: userId(c), assigneeIds: [], dueAt: t.endAt, docMapping,
@@ -92,7 +94,7 @@ workspacesRoutes.post('/tenders/:id/workspace', requireRole('analyst'), async (c
     const [again] = await deps.db.select().from(bidWorkspaces).where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.tenderId, t.id)));
     return c.json({ ...(await workspaceDto(deps, again)), created: false });
   }
-  await log(c, w, 'workspace.created', { stage, bidNumber: t.bidNumber, autoMatched: Object.keys(docMapping).length });
+  await log(c, w, 'workspace.created', { stage, bidNumber: t.bidNumber, autoMatched });
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'workspace.created', entityType: 'tender', entityId: t.id, meta: { workspaceId: w.id } });
   return c.json({ ...(await workspaceDto(deps, w)), created: true }, 201);
 });

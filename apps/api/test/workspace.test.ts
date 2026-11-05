@@ -1,8 +1,8 @@
 /** Bid workspace API (T063, T067; FR-023, FR-028, US4 acceptance 1–2, US6 activity). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { activityLog, analyses, notifications } from '@tp/db';
-import { createTestContext, request, signup, type TestContext } from './helpers';
+import { activityLog, analyses, notifications, type ChecklistItem } from '@tp/db';
+import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
 let ctx: TestContext;
@@ -21,14 +21,17 @@ describe('POST /tenders/:id/workspace', () => {
     expect(r.status).toBe(403);
   });
 
-  it('creates the workspace in "go" with auto-mapped vault documents (US4 #1)', async () => {
+  it('creates the workspace in "go" and stores an empty (all-automatic) mapping (US1 #1)', async () => {
     const r = await request(ctx.app, 'POST', `/tenders/${s.tender.id}/workspace`, { cookie: s.org.analyst.cookie });
     expect(r.status).toBe(201);
     expect(r.body.created).toBe(true);
     expect(r.body.stage).toBe('go');
     expect(r.body.owner.id).toBe(s.org.analyst.me.user.id);
     expect(r.body.dueAt).toBe('2026-11-20T09:30:00.000Z');
-    expect(r.body.mapping).toEqual({ gst: s.docs.gst.id, pan: s.docs.pan.id, balance_sheets: s.docs.bsNew.id, oem_authorization: s.docs.oem.id });
+    // Nothing is stored: every item stays "automatic" (absent key, FR-014) and is resolved at read time.
+    expect(r.body.mapping).toEqual({});
+    const [created] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.action, 'workspace.created'), eq(activityLog.entityId, r.body.id)));
+    expect(created.meta).toMatchObject({ autoMatched: 4, stage: 'go' });
     wsId = r.body.id;
   });
 
@@ -51,6 +54,10 @@ describe('GET /workspaces/:id', () => {
     expect(r.body.tender.bidNumber).toBe('GEM/2026/B/700001');
     expect(r.body.analysis.verdict).toBe('go');
     const states = Object.fromEntries(r.body.readiness.items.map((i: any) => [i.item.id, i.state]));
+    const picks = Object.fromEntries(r.body.readiness.items.filter((i: any) => i.docId).map((i: any) => [i.item.id, [i.docId, i.auto]]));
+    expect(picks).toEqual({
+      gst: [s.docs.gst.id, true], pan: [s.docs.pan.id, true], balance_sheets: [s.docs.bsNew.id, true], oem_authorization: [s.docs.oem.id, true],
+    });
     expect(states).toEqual({
       gst: 'ready', pan: 'ready', balance_sheets: 'ready', oem_authorization: 'expired', udyam: 'missing',
       non_blacklisting: 'generated', mii_self_cert: 'generated',
@@ -296,5 +303,104 @@ describe('readiness without an analysis (T021; 006/FR-009)', () => {
     const ready = await request(ctx.app, 'PATCH', `/workspaces/${c.body.id}`, { cookie: s.org.analyst.cookie, json: { stage: 'ready' } });
     expect(ready.status).toBe(409);
     expect(ready.body.error.details.reason).toBe('not_analysed');
+  });
+});
+
+describe('mapping & readiness edge cases (T028; 006/FR-013, FR-016, FR-017, FR-020)', () => {
+  const EDGE: ChecklistItem[] = [
+    { id: 'gst', label: 'GST registration certificate', docType: 'gst', mandatory: true, reason: 'Seller identity' },
+    { id: 'pan', label: 'PAN card of the firm', docType: 'pan', mandatory: true, reason: 'Seller identity' },
+    { id: 'oem_authorization', label: 'OEM authorisation certificate (MAF) for this bid', docType: 'oem_authorization', mandatory: true, reason: 'OEM' },
+    { id: 'fire_noc', label: 'Fire safety NOC from municipal authority', docType: 'other', mandatory: false, reason: 'ATC' },
+    { id: 'cert_iso_9001', label: 'ISO 9001 quality management certificate', docType: 'other', mandatory: false, reason: 'ATC' },
+  ];
+  let org: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  let id: string;
+  let d: Record<string, { id: string }>;
+  const item = (body: any, itemId: string) => body.readiness.items.find((i: any) => i.item.id === itemId);
+  const detail = async () => (await request(ctx.app, 'GET', `/workspaces/${id}`, { cookie: org.viewer.cookie })).body;
+
+  beforeAll(async () => {
+    org = await seedOrgWithRoles(ctx.app);
+    const t = await seedTender(ctx, 6);
+    await seedAnalysis(ctx, org.orgId, t.id, EDGE);
+    const up = (n: string, f: Record<string, string>) => upload(ctx, org.analyst.cookie, n, f);
+    d = {
+      gstNew: await up('e1', { type: 'gst', title: 'GST REG-06 amended', issueDate: '2025-06-01' }),
+      gstOld: await up('e2', { type: 'gst', title: 'GST REG-06 original', issueDate: '2019-04-01' }),
+      panBest: await up('e3', { type: 'pan', title: 'PAN card', issueDate: '2024-01-01' }),
+      panAlt: await up('e4', { type: 'pan', title: 'PAN card scan', issueDate: '2018-01-01' }),
+      // NOW is 4 Nov 2026 (IST) → expires in 12 days.
+      oem: await up('e5', { type: 'oem_authorization', title: 'Dell MAF', issueDate: '2026-05-16', expiryDate: '2026-11-16' }),
+      // Shares only 2 of 5 significant words ("fire", "noc") with fire_noc → relevance 0.4, must not map.
+      fireWeak: await up('e6', { type: 'other', title: 'Fire NOC Panipat' }),
+      // Shares 2 of 5 words ("iso", "9001") with cert_iso_9001 → 0.4, must not map.
+      isoWeak: await up('e7', { type: 'other', title: 'ISO 9001 audit summary' }),
+    };
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: org.analyst.cookie });
+    expect(r.status).toBe(201);
+    id = r.body.id;
+  });
+
+  it('auto picks the best document; an expiring mandatory doc is covered, warned, not a blocker (FR-016, FR-017)', async () => {
+    const b = await detail();
+    expect(item(b, 'gst')).toMatchObject({ docId: d.gstNew.id, auto: true, state: 'ready' });
+    expect(item(b, 'pan')).toMatchObject({ docId: d.panBest.id, auto: true, state: 'ready' });
+    expect(item(b, 'oem_authorization')).toMatchObject({
+      docId: d.oem.id, state: 'expiring', docStatus: 'expiring', daysToExpiry: 12, blocking: false, note: 'Expires in 12 day(s).',
+    });
+    expect(b.readiness).toMatchObject({ percent: 100, total: 3, covered: 3, blockers: [], canMarkReady: true });
+    expect(b.readiness.warnings).toContainEqual({ itemId: 'oem_authorization', label: EDGE[2].label, state: 'expiring' });
+  });
+
+  it('`other` items do not map below relevance 0.5 (FR-013)', async () => {
+    const b = await detail();
+    expect(item(b, 'fire_noc')).toMatchObject({ docId: null, auto: true, state: 'missing', note: 'No matching document in the vault.' });
+    expect(item(b, 'cert_iso_9001')).toMatchObject({ docId: null, auto: true, state: 'missing' });
+    // optional uncovered items are warnings, never blockers
+    expect(b.readiness.warnings.map((w: any) => w.itemId)).toEqual(expect.arrayContaining(['fire_noc', 'cert_iso_9001']));
+    expect(b.readiness.blockers).toEqual([]);
+  });
+
+  it('`other` items map at relevance ≥ 0.5 or by an exact item-id tag, on the next read (FR-013, FR-020)', async () => {
+    const fire = await upload(ctx, org.analyst.cookie, 'e8', { type: 'other', title: 'Fire safety NOC' }); // 3 of 5 words → 0.6
+    const iso = await upload(ctx, org.analyst.cookie, 'e9', { type: 'other', title: 'Scan 0042', tags: 'cert_iso_9001' });
+    const b = await detail();
+    expect(item(b, 'fire_noc')).toMatchObject({ docId: fire.id, auto: true, state: 'ready' });
+    expect(item(b, 'cert_iso_9001')).toMatchObject({ docId: iso.id, auto: true, state: 'ready' });
+  });
+
+  it('a deleted vault document: explicit mapping → missing, auto item → next best (FR-013, FR-016)', async () => {
+    const m = await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.analyst.cookie, json: { pan: d.panAlt.id } });
+    expect(m.status).toBe(200);
+    expect(item(m.body, 'pan')).toMatchObject({ docId: d.panAlt.id, auto: false, state: 'ready' });
+
+    expect((await request(ctx.app, 'DELETE', `/vault/${d.panAlt.id}`, { cookie: org.analyst.cookie })).status).toBeLessThan(300);
+    expect((await request(ctx.app, 'DELETE', `/vault/${d.gstNew.id}`, { cookie: org.analyst.cookie })).status).toBeLessThan(300);
+
+    const b = await detail();
+    // The dangling explicit id resolves to no document — it does NOT silently fall back to the other PAN.
+    expect(item(b, 'pan')).toMatchObject({ docId: null, auto: false, state: 'missing', blocking: true, note: 'No matching document in the vault.' });
+    expect(b.workspace.mapping.pan).toBe(d.panAlt.id);
+    // The untouched GST item falls back to the next best GST document.
+    expect(item(b, 'gst')).toMatchObject({ docId: d.gstOld.id, auto: true, state: 'ready' });
+    expect(b.readiness).toMatchObject({ percent: 67, covered: 2, total: 3, canMarkReady: false });
+    expect(b.readiness.blockers).toEqual([{ itemId: 'pan', label: EDGE[1].label, state: 'missing' }]);
+
+    // Re-mapping to the deleted id is refused; "auto" restores the remaining PAN.
+    const bad = await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.analyst.cookie, json: { pan: d.panAlt.id } });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.details.fields.pan).toBe('Document not found in your vault');
+    const auto = await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.analyst.cookie, json: { pan: 'auto' } });
+    expect(item(auto.body, 'pan')).toMatchObject({ docId: d.panBest.id, auto: true, state: 'ready' });
+    expect(auto.body.readiness.canMarkReady).toBe(true);
+  });
+
+  it('rejects unknown checklist items with the exact message; viewers cannot map', async () => {
+    const r = await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.analyst.cookie, json: { nope: null } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe('validation_error');
+    expect(r.body.error.details.fields.nope).toBe('Not an item of this bid’s checklist');
+    expect((await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.viewer.cookie, json: { pan: 'auto' } })).status).toBe(403);
   });
 });
