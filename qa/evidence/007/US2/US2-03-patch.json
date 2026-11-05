@@ -1,0 +1,18 @@
+{
+  "request": {
+    "stage": "analysing",
+    "position": 1.5
+  },
+  "status": 200,
+  "identifiedBefore": 3,
+  "byStageAfter": {
+    "won": 2,
+    "go": 2,
+    "submitted": 3,
+    "preparing": 2,
+    "lost": 1,
+    "ready": 1,
+    "analysing": 3,
+    "identified": 2
+  }
+}

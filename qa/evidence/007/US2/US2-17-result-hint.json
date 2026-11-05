@@ -1,0 +1,23 @@
+{
+  "bidders": [
+    {
+      "rank": 1,
+      "level": "L1",
+      "price": 1675000
+    },
+    {
+      "rank": 2,
+      "level": "L2",
+      "price": 1742000
+    },
+    {
+      "rank": 3,
+      "level": "L3",
+      "price": 1825750
+    }
+  ],
+  "l1Price": 1675000,
+  "available": true,
+  "fetchedAt": "2026-11-05T03:56:10.098Z",
+  "sourceUrl": "http://127.0.0.1:4011/bidding/bid/getBidResultView/8100111"
+}
