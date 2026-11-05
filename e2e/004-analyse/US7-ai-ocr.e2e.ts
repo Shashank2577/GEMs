@@ -416,7 +416,7 @@ test('7 (gap) scanned GeM document: "Read with AI (OCR)" → "Text via OCR", pag
   const row = page.locator('li.rounded-xl').filter({ hasText: scanned.fileName });
   await expect(row).toContainText('No text — scanned?');
   await expect(page.getByTestId('unreadable-notice')).toContainText(`We couldn't read text from ${scanned.fileName}.`);
-  const button = row.getByRole('button', { name: /Read .* with AI \(OCR\)/ });
+  const button = row.getByRole('button', { name: /Read with AI \(OCR\)/ });
   await expect(button).toBeVisible();
   await ev(page, '07a-scanned-row-ocr-action');
 
@@ -495,23 +495,24 @@ test('8 (gap) no OCR model: notice "We couldn\'t read text from <file>. Upload a
   await ev(page, '08b-ocr-503-no-llm-request');
 });
 
-test('8b (gap) no OCR model, scanned document is the only document: the analysis completes from listing data (criterion wording)', async ({ page }) => {
+test('8b (gap, spec scenario 8 as amended) no OCR model, scan is the only document: 422 scanned_document, notice with link on the Analysis tab and the Documents tab', async ({ page }) => {
   await keylessOrg(page);
   const t = await freshGemTender(page.request);
   const scanned = await fetchScannedGemDoc(page.request, t.id);
+  const notice = `We couldn't read text from ${scanned.fileName}. Upload a text PDF or ask your admin to enable AI OCR.`;
+  const api = await page.request.post(`/api/tenders/${t.id}/analyse`);
+  expect(api.status()).toBe(422);
+  expect(await api.json()).toMatchObject({ error: { code: 'scanned_document', details: { documents: [scanned.fileName] } } });
   await page.goto(`/tenders/${t.id}`);
   await analyseButton(page).click();
-  await page.waitForTimeout(2500);
-  await ev(page, '08c-analyse-click-scanned-only');
-  const res = await page.request.post(`/api/tenders/${t.id}/analyse`);
-  const text = await res.text();
-  test.info().annotations.push({ type: 'actual', description: `POST /analyse -> ${res.status()} ${text.slice(0, 300)}` });
-  await page.goto(`/tenders/${t.id}`);
-  const onAnalysisTab = await page.getByText(/We couldn't read text from/).count();
-  test.info().annotations.push({ type: 'analysis-tab-notice', description: `"We couldn't read text from" occurrences on the Analysis tab: ${onAnalysisTab}` });
-  await ev(page, '08d-analysis-tab-after-analyse');
-  void scanned;
-  expect(res.status(), `criterion 8: "the analysis completes from listing data" — actual: ${text.slice(0, 200)}`).toBe(201);
+  const box = page.getByTestId('scanned-analysis-notice');
+  await expect(box).toContainText(notice);
+  await expect(box.getByRole('button', { name: 'Open Documents' })).toBeVisible();
+  await ev(page, '08c-analysis-tab-scanned-notice');
+  await box.getByRole('button', { name: 'Open Documents' }).click();
+  await expect(page.getByTestId('unreadable-notice')).toContainText(notice);
+  await ev(page, '08d-documents-tab-notice-after-link');
+  expect(stub.calls).toHaveLength(0);
 });
 
 // ═════════════ 9 (gap) refusal / max_tokens = failure; model + usage logged ═════════════
@@ -547,8 +548,8 @@ test('9c (gap) token usage (input/output) and model id are logged for every answ
   await showLog(page, '9c — "llm: call" log line of one answered enrichment call (stub usage: input 1200, output 90)', calls);
   await ev(page, '09c-llm-call-log-usage');
   expect(calls[0]).toMatchObject({ model: 'claude-sonnet-5-5', stopReason: 'end_turn' });
-  expect(calls[0]!.inputTokens, 'input tokens logged').toBe(1200);
-  expect(calls[0]!.outputTokens, 'output tokens logged').toBe(90);
+  expect(calls[0]!.usageIn, 'input tokens logged').toBe(1200);
+  expect(calls[0]!.usageOut, 'output tokens logged').toBe(90);
 });
 
 // ═════════════ 10 (gap) text > 60,000 chars is chunked (≤ 4 per document), not truncated ═════════════
@@ -792,4 +793,29 @@ test('x4 a11y (axe, serious/critical): Documents tab with the OCR action, Requir
   await expect(page.locator('[data-testid=ocr-requirement]:visible').first()).toBeVisible();
   await checkA11y(page, { include: ['main'] });
   void scanned;
+});
+
+test('x5 a second manual OCR of a document that is already being read -> 409 conflict; the first run completes; one model call', async ({ page }) => {
+  await keyedOrg(page);
+  const t = await freshGemTender(page.request);
+  const d = await pdfLib().PDFDocument.create(); for (let i = 0; i < 2; i++) d.addPage([595, 842]);
+  const up = await page.request.post(`/api/tenders/${t.id}/documents`, { multipart: { kind: 'bid', file: { name: 'scan-claim.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await d.save()) } } });
+  const doc = (await up.json()) as TenderDocumentDto;
+  stub.ocrDelayMs = 4000;
+  const url = `/api/tenders/${t.id}/documents/${doc.id}/ocr`;
+  const first = page.request.post(url);
+  await expect.poll(() => stub.of('ocr').length, { timeout: 10_000 }).toBe(1); // the first run is inside its model call
+  const second = await page.request.post(url);
+  const body = await second.json();
+  expect(second.status()).toBe(409);
+  expect(body.error.code).toBe('conflict');
+  const ok = await first;
+  expect(ok.status()).toBe(200);
+  expect(stub.of('ocr'), 'the refused run made no model call').toHaveLength(1);
+  expect((await listDocs(page.request, t.id)).find((x) => x.id === doc.id)).toMatchObject({ textSource: 'ocr', needsOcr: false });
+  const usage = ((await (await page.request.get('/api/org/usage')).json()) as { usage: { llmAnalysesThisMonth: number } }).usage.llmAnalysesThisMonth;
+  expect(usage, 'the stored OCR text cost exactly one AI slot').toBe(1);
+  await page.goto(`/tenders/${t.id}?tab=documents`);
+  await showCalls(page, `x5 — concurrent manual OCR: first -> 200, second -> 409 ${JSON.stringify(body.error)}; model calls ${stub.of('ocr').length}; AI slots used ${usage}`, stub.calls);
+  await ev(page, 'x5-ocr-already-being-read-409');
 });

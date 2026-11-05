@@ -78,6 +78,8 @@ export interface LlmStub {
   itemsFor?: (call: LlmCall) => StubItem[];
   /** Delay before every enrichment answer (ms), for the "Analysing…" screenshot. */
   enrichDelayMs: number;
+  /** Delay before every OCR answer (ms), to hold a manual OCR run open. */
+  ocrDelayMs: number;
   /** How long a 'timeout' call is held before the stub answers anyway (the API aborts first). */
   holdMs: number;
   reset(): void;
@@ -89,8 +91,8 @@ const readBody = (req: IncomingMessage) => new Promise<string>((ok) => { let b =
 
 export async function startLlmStub(port = LLM_PORT): Promise<LlmStub> {
   const stub: LlmStub = {
-    port, calls: [], enrich: 'atc-item', ocr: 'ok', items: [], enrichDelayMs: 0, holdMs: 100_000,
-    reset() { stub.calls.length = 0; stub.enrich = 'atc-item'; stub.ocr = 'ok'; stub.items = []; stub.itemsFor = undefined; stub.enrichDelayMs = 0; stub.holdMs = 100_000; },
+    port, calls: [], enrich: 'atc-item', ocr: 'ok', items: [], enrichDelayMs: 0, ocrDelayMs: 0, holdMs: 100_000,
+    reset() { stub.calls.length = 0; stub.enrich = 'atc-item'; stub.ocr = 'ok'; stub.items = []; stub.itemsFor = undefined; stub.enrichDelayMs = 0; stub.ocrDelayMs = 0; stub.holdMs = 100_000; },
     of: (kind) => stub.calls.filter((c) => c.kind === kind),
     close: () => new Promise<void>((ok) => { server.closeAllConnections?.(); server.close(() => ok()); }),
   };
@@ -120,6 +122,7 @@ export async function startLlmStub(port = LLM_PORT): Promise<LlmStub> {
       const count = part.getPageCount();
       call.ocrPages = count;
       if (stub.ocr === 'http-error') return send(res, 500, JSON.stringify({ type: 'error', error: { type: 'api_error', message: 'stub: OCR down' } }));
+      if (stub.ocrDelayMs) await new Promise((ok) => setTimeout(ok, stub.ocrDelayMs));
       const texts = await ocrTexts();
       const pages = Array.from({ length: count }, (_, i) => ({ page: i + 1, text: texts[i % texts.length]! }));
       const reply = stub.ocr === 'omit-page' ? pages.filter((p) => p.page !== 2) : pages;
