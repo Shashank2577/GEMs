@@ -72,6 +72,8 @@ function useMembersMutation<V, R = unknown>(fn: (v: V) => Promise<R>) {
 }
 export const useInvite = () => useMembersMutation((b: { email: string; role: string }) => api.post<CreatedInvitation>('/org/invitations', b));
 export const useRevokeInvite = () => useMembersMutation((id: string) => api.delete(`/org/invitations/${id}`));
+/** New link + 7-day expiry, emailed again (002/FR-020). */
+export const useResendInvite = () => useMembersMutation((id: string) => api.post<CreatedInvitation>(`/org/invitations/${id}/resend`));
 export const useChangeRole = () => useMembersMutation(({ userId, role }: { userId: string; role: string }) => api.patch(`/org/members/${userId}`, { role }));
 export const useRemoveMember = () => useMembersMutation((userId: string) => api.delete(`/org/members/${userId}`));
 /**

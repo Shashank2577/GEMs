@@ -251,7 +251,7 @@ describe('org B cannot reference org A’s ids from its own resources', () => {
 
     const prof = await request(ctx.app, 'PUT', '/profile', { ...c, json: { oemAuthorizations: [{ oem: 'Dell', products: 'Laptops', documentId: ids.vault }] } });
     expect(prof.status, json(prof)).toBe(400);
-    expect(prof.body.error.details.fields).toEqual({ 'oemAuthorizations.0.documentId': 'That document is not in your vault' });
+    expect(prof.body.error.details.fields).toEqual({ 'oemAuthorizations.0.documentId': 'Pick an OEM authorisation from your vault' });
 
     expect(await snapshotA()).toBe(before);
   });

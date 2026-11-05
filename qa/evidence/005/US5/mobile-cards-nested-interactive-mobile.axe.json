@@ -1,0 +1,54 @@
+{
+  "url": "http://localhost:8805/profile",
+  "timestamp": "2026-11-05T03:30:12.442Z",
+  "violations": [
+    {
+      "id": "nested-interactive",
+      "impact": "serious",
+      "tags": [
+        "cat.keyboard",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-7.1.1"
+      ],
+      "description": "Ensure interactive controls are not nested as they are not always announced by screen readers or can cause focus problems for assistive technologies",
+      "help": "Interactive controls must not be nested",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/nested-interactive?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "no-focusable-content",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Actions for Supply o...\" id=\"radix-:r33:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r33\\:"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has focusable descendants. Move them outside of the element, or remove them."
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div role=\"button\" tabindex=\"0\" class=\"rounded-xl border bg-card p-4 shadow-xs cursor-pointer active:bg-muted/50 focus-ring\">",
+          "target": [
+            ".active\\:bg-muted\\/50"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has focusable descendants. Move them outside of the element, or remove them."
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "passes": 18
+}

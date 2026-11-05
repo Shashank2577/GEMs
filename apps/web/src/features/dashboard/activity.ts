@@ -23,6 +23,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'packet.built': return `built a ${typeof m.pages === 'number' ? `${m.pages}-page ` : ''}bid packet for`;
     case 'tender.analysed': return `checked eligibility${typeof m.score === 'number' ? ` (score ${m.score})` : ''} for`;
     case 'tender.document_uploaded': case 'tender.document_fetched': return 'added a bid document to';
+    case 'tender.document_removed': return 'removed a bid document from';
     case 'analysis.factor_overridden': return 'overrode a scoring factor on';
     case 'vault.uploaded': return 'uploaded';
     case 'vault.updated': return 'updated';
@@ -38,6 +39,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'annexure.template_updated': return 'customised an annexure template';
     case 'annexure.template_reset': return 'reset an annexure template to the default';
     case 'member.invited': return 'invited';
+    case 'member.invite_resent': return 'resent the invitation to';
     case 'member.invite_revoked': return 'cancelled the invitation for';
     case 'member.joined': return 'joined the team';
     case 'member.role_changed': return 'changed the role of';
@@ -63,11 +65,11 @@ export const KNOWN_ACTIONS = [
   'workspace.stage_changed', 'workspace.created', 'workspace.submitted', 'workspace.outcome_recorded', 'workspace.commented',
   'workspace.assigned', 'workspace.item_overridden', 'workspace.override_removed', 'workspace.mapping_changed', 'workspace.due_changed',
   'workspace.assist_values_saved', 'workspace.packet_built', 'workspace.packet_failed', 'packet.built',
-  'tender.analysed', 'tender.document_uploaded', 'tender.document_fetched', 'analysis.factor_overridden',
+  'tender.analysed', 'tender.document_uploaded', 'tender.document_fetched', 'tender.document_removed', 'analysis.factor_overridden',
   'vault.uploaded', 'vault.updated', 'vault.file_replaced', 'vault.deleted', 'vault.reminders_run',
   'watchlist.created', 'watchlist.deleted',
   'profile.updated', 'profile.past_contract_added', 'profile.past_contract_updated', 'profile.past_contract_deleted',
   'annexure.template_updated', 'annexure.template_reset',
-  'member.invited', 'member.invite_revoked', 'member.joined', 'member.role_changed', 'member.removed', 'member.left',
+  'member.invited', 'member.invite_revoked', 'member.invite_resent', 'member.joined', 'member.role_changed', 'member.removed', 'member.left',
   'org.created', 'org.updated', 'org.scoring_weights_updated', 'ingestion.run', 'api_token.created', 'api_token.revoked', 'demo.seeded',
 ] as const;

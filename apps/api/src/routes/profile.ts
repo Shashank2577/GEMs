@@ -75,6 +75,29 @@ const profileConflict = (stored: Date | null) =>
 /** `updated_at` truncated to whole milliseconds (JS Date precision) as epoch ms; Postgres keeps microseconds. */
 const updatedAtMs = sql<number>`floor(extract(epoch from ${companyProfiles.updatedAt}) * 1000)::float8`;
 
+const OEM_DOC_MESSAGE = 'Pick an OEM authorisation from your vault';
+
+/**
+ * FR-061: every OEM `documentId` that is new or changed must be an `oem_authorization` document of the org —
+ * one query for all ids. Ids already stored on the profile are accepted unchanged, so a stale link (document
+ * deleted or retyped since) never blocks an unrelated save. Ids arrive lowercased from `oemAuthorizationSchema`.
+ */
+async function assertOemDocsInOrg(
+  db: Pick<AppDeps['db'], 'select'>, org: string, rows: ProfileRow['oemAuthorizations'], stored: ProfileRow['oemAuthorizations'] = [],
+) {
+  const known = new Set(stored.flatMap((r) => (r.documentId ? [r.documentId.toLowerCase()] : [])));
+  const isNew = (id: string | null | undefined): id is string => !!id && !known.has(id.toLowerCase());
+  const ids = [...new Set(rows.map((r) => r.documentId).filter(isNew).map((id) => id.toLowerCase()))];
+  if (!ids.length) return;
+  const found = await db.select({ id: vaultDocuments.id, type: vaultDocuments.type }).from(vaultDocuments)
+    .where(and(eq(vaultDocuments.orgId, org), inArray(vaultDocuments.id, ids)));
+  const ok = new Set(found.filter((d) => d.type === 'oem_authorization').map((d) => d.id.toLowerCase()));
+  const fields: Record<string, string> = {};
+  rows.forEach((r, i) => { if (isNew(r.documentId) && !ok.has(r.documentId.toLowerCase())) fields[`oemAuthorizations.${i}.documentId`] = OEM_DOC_MESSAGE; });
+  const first = Object.keys(fields)[0];
+  if (first) throw validationError(`${first}: ${OEM_DOC_MESSAGE}`, { fields });
+}
+
 profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
   const { db } = c.var.deps;
   const org = orgId(c);
@@ -82,18 +105,6 @@ profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
   // Merge: keys absent from the body keep their stored value.
   const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) as Partial<ProfileRow>;
   const now = c.var.deps.clock.now();
-  // Constitution IV: an OEM authorisation may only link a document from this org's vault.
-  const oemDocIds = (input.oemAuthorizations ?? []).map((o) => o.documentId).filter((id): id is string => !!id);
-  if (oemDocIds.length) {
-    const own = new Set((await db.select({ id: vaultDocuments.id }).from(vaultDocuments)
-      .where(and(eq(vaultDocuments.orgId, org), inArray(vaultDocuments.id, oemDocIds)))).map((d) => d.id.toLowerCase()));
-    const i = (input.oemAuthorizations ?? []).findIndex((o) => o.documentId && !own.has(o.documentId.toLowerCase()));
-    if (i >= 0) {
-      throw validationError(`oemAuthorizations.${i}.documentId: That document is not in your vault`, {
-        fields: { [`oemAuthorizations.${i}.documentId`]: 'That document is not in your vault' },
-      });
-    }
-  }
 
   await db.transaction(async (tx) => {
     // Lock the org's row so the concurrency check and the write are atomic (FR-014).
@@ -114,6 +125,8 @@ profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
         fields: { [field]: field === 'gstin' ? `This GSTIN belongs to PAN ${merged.gstin.slice(2, 12)}, not ${merged.pan}` : `Your GSTIN is registered to PAN ${merged.gstin.slice(2, 12)}` },
       });
     }
+    // OEM documentIds must be oem_authorization documents in this org's vault (FR-061).
+    if (patch.oemAuthorizations) await assertOemDocsInOrg(tx, org, patch.oemAuthorizations, existing?.oemAuthorizations);
     const { orgId: _o, updatedAt: _u, ...values } = merged as ProfileRow;
     if (existing) {
       // updated_at is the version token: always move it forward, even for two saves in the same millisecond.
@@ -154,7 +167,7 @@ const contractId = (raw: string) => {
 
 profileRoutes.get('/past-contracts', requireAuth, async (c) => {
   const rows = await c.var.deps.db.select().from(pastContracts).where(eq(pastContracts.orgId, orgId(c)))
-    .orderBy(desc(pastContracts.endDate), desc(pastContracts.createdAt));
+    .orderBy(sql`${pastContracts.endDate} desc nulls last`, desc(pastContracts.createdAt));
   return c.json({ items: rows.map(toPastContractDto), total: rows.length });
 });
 

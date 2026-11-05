@@ -1,11 +1,11 @@
 /**
- * Organization routes (FR-031..033): /org, /org/members, /org/invitations, /activity.
+ * Organization routes (FR-031..033): /org, /org/members, /org/invitations (+ resend, 002/FR-020), /activity.
  * Mounted at /api.
  */
 import { and, asc, count, desc, eq, gt, isNull, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { Hono } from 'hono';
-import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db } from '@tp/db';
+import { Hono, type Context } from 'hono';
+import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db, type Role } from '@tp/db';
 import {
   activityQuerySchema, changeRoleInputSchema, inviteInputSchema, updateOrgInputSchema,
   type ActivityItem, type CreatedInvitation, type Member, type MembersResponse, type PendingInvitation,
@@ -25,6 +25,22 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+
+/** Email an invitation link (002/FR-015). A mail failure is logged, never fails the request; the link is not logged. */
+async function sendInviteEmail(c: Context<AppEnv>, to: string, roleName: Role, inviteUrl: string) {
+  const org = c.var.org.name, inviter = c.var.user.name, role = ROLE_LABELS[roleName];
+  try {
+    await c.var.deps.mailer.send({
+      to,
+      subject: `${inviter} invited you to ${org} on TenderPilot`,
+      text: `${inviter} invited you to join ${org} on TenderPilot as ${role}.\n\nAccept the invitation: ${inviteUrl}\n\nThis link expires in 7 days.`,
+      html: `<p>${escapeHtml(inviter)} invited you to join <strong>${escapeHtml(org)}</strong> on TenderPilot as <strong>${role}</strong>.</p>`
+        + `<p><a href="${inviteUrl}">Accept the invitation</a></p><p style="color:#666">This link expires in 7 days.</p>`,
+    });
+  } catch (e) {
+    c.var.deps.logger.warn('invitation email failed', { error: (e as Error).message });
+  }
+}
 
 async function getMember(db: Db, oid: string, uid: string): Promise<Member | null> {
   const [m] = await db.select({
@@ -97,13 +113,16 @@ orgRoutes.get('/org/members', requireAuth, async (c) => {
 
 orgRoutes.post('/org/invitations', requireRole('bid_manager'), async (c) => {
   const body = await parseJson(c, inviteInputSchema);
-  const { db, clock, config, mailer, logger } = c.var.deps;
+  const { db, clock, config } = c.var.deps;
   const oid = orgId(c);
   if (body.role === 'owner' && c.var.role !== 'owner') throw forbidden('Only an Owner can invite another Owner');
 
   const [already] = await db.select({ id: users.id }).from(memberships).innerJoin(users, eq(users.id, memberships.userId))
     .where(and(eq(memberships.orgId, oid), eq(users.email, body.email)));
-  if (already) throw conflict(`${body.email} is already a member of this organization`, { fields: { email: 'Already a member' } });
+  if (already) {
+    const msg = `${body.email} is already a member of this organization`;
+    throw conflict(msg, { fields: { email: msg } });
+  }
 
   // Re-inviting replaces any pending invitation for the same email.
   await db.delete(invitations).where(and(eq(invitations.orgId, oid), eq(invitations.email, body.email), isNull(invitations.acceptedAt)));
@@ -116,20 +135,37 @@ orgRoutes.post('/org/invitations', requireRole('bid_manager'), async (c) => {
 
   await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.invited', entityType: 'invitation', entityId: row.id, meta: { email: body.email, role: body.role } });
 
-  const org = c.var.org.name, inviter = c.var.user.name, role = ROLE_LABELS[body.role];
-  try {
-    await mailer.send({
-      to: body.email,
-      subject: `${inviter} invited you to ${org} on TenderPilot`,
-      text: `${inviter} invited you to join ${org} on TenderPilot as ${role}.\n\nAccept the invitation: ${inviteUrl}\n\nThis link expires in 7 days.`,
-      html: `<p>${escapeHtml(inviter)} invited you to join <strong>${escapeHtml(org)}</strong> on TenderPilot as <strong>${role}</strong>.</p>`
-        + `<p><a href="${inviteUrl}">Accept the invitation</a></p><p style="color:#666">This link expires in 7 days.</p>`,
-    });
-  } catch (e) {
-    logger.warn('invitation email failed', { error: (e as Error).message });
-  }
+  await sendInviteEmail(c, body.email, body.role, inviteUrl);
 
   const out: CreatedInvitation = { id: row.id, email: body.email, role: body.role, inviteUrl, expiresAt: expiresAt.toISOString() };
+  return c.json(out, 201);
+});
+
+/**
+ * Resend a pending invitation (002/FR-020): a fresh token (the old link stops working) and a new 7-day expiry,
+ * emailed again. Also revives an expired, unaccepted invitation. 404 for other orgs' or accepted invitations.
+ */
+orgRoutes.post('/org/invitations/:id/resend', requireRole('bid_manager'), async (c) => {
+  const id = c.req.param('id');
+  if (!UUID_RE.test(id)) throw notFound('Invitation');
+  const { db, clock, config } = c.var.deps;
+  const oid = orgId(c);
+  const pending = and(eq(invitations.id, id), eq(invitations.orgId, oid), isNull(invitations.acceptedAt));
+  const [found] = await db.select({ role: invitations.role }).from(invitations).where(pending);
+  if (!found) throw notFound('Invitation');
+  if (found.role === 'owner' && c.var.role !== 'owner') throw forbidden('Only an Owner can invite another Owner');
+
+  const token = randomToken();
+  const expiresAt = new Date(clock.now().getTime() + INVITE_TTL_MS);
+  const [row] = await db.update(invitations).set({ tokenHash: await sha256Hex(token), expiresAt, invitedBy: userId(c) })
+    .where(pending).returning({ id: invitations.id, email: invitations.email, role: invitations.role });
+  if (!row) throw notFound('Invitation');
+  const inviteUrl = `${config.appUrl}/invite/${token}`;
+
+  await logActivity(db, { orgId: oid, userId: userId(c), action: 'member.invite_resent', entityType: 'invitation', entityId: row.id, meta: { email: row.email, role: row.role } });
+  await sendInviteEmail(c, row.email, row.role, inviteUrl);
+
+  const out: CreatedInvitation = { id: row.id, email: row.email, role: row.role, inviteUrl, expiresAt: expiresAt.toISOString() };
   return c.json(out, 201);
 });
 

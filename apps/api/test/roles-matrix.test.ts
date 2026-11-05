@@ -48,6 +48,7 @@ const MATRIX: Entry[] = [
   { method: 'PATCH', path: '/api/org', min: 'bid_manager' },
   { method: 'POST', path: '/api/org/invitations', min: 'bid_manager' },
   { method: 'DELETE', path: '/api/org/invitations/:id', min: 'bid_manager' },
+  { method: 'POST', path: '/api/org/invitations/:id/resend', min: 'bid_manager' },
   { method: 'DELETE', path: '/api/org/members/me', min: 'session', fresh: true },
   { method: 'PATCH', path: '/api/org/members/:userId', min: 'owner' },
   { method: 'DELETE', path: '/api/org/members/:userId', min: 'owner' },
@@ -63,6 +64,7 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/notifications/:id/read', min: 'viewer' },
   // ── analyse ──
   { method: 'POST', path: '/api/tenders/:id/documents', min: 'analyst' },
+  { method: 'DELETE', path: '/api/tenders/:id/documents/:docId', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/fetch-documents', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/analyse', min: 'analyst' },
   { method: 'POST', path: '/api/analyses/:id/override', min: 'bid_manager' },
