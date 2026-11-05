@@ -195,7 +195,6 @@ export async function signInAs(context: BrowserContext, fx: ApplyFixture, role: 
 
 export { expect };
 
-
 /** Replace the checklist of the fixture's analysis (direct DB write; there is no public API for it). */
 export async function setChecklist(fx: ApplyFixture, checklist: ChecklistItem[]) {
   const { db, close } = await createNodeDb(E2E_DB_URL);

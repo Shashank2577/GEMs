@@ -1,8 +1,8 @@
-## QA verdict — REJECTED
+## QA verdict — APPROVED
 
 **Work item:** #179 · **PR:** #483 · **Reviewer:** qa (claude-code) · **Session:** https://claude.ai/code/session_01BUi6mHape454W5kq4qhhfS
 
-Spec: `e2e/006-apply-packet-assist/US2-mapping-readiness.e2e.ts` (T030 / #214). Result at branch head `d910cc6`: **20 passed, 1 failed** (desktop + mobile projects, 21 runs incl. the 3 `@mobile` tests on the mobile project; with the amended US1 spec the combined run was 35 passed, 1 failed).
+Spec: `e2e/006-apply-packet-assist/US2-mapping-readiness.e2e.ts` (T030 / #214). **Re-review after rejection 1** (previous verdict rejected criterion 5). Criterion 5 changed because the lead amended spec scenario 2 and issue #179 (commit `350a0c4`): the Udyam upload button label comes from the document-type catalog, so it is now 'Upload Udyam (MSE) certificate'; the product was not changed. Result at branch head `350a0c4`: US2 **21 passed, 0 failed** (desktop + mobile); US1 + US2 combined **36 passed, 0 failed** (US1 15/15).
 
 ### Acceptance criteria
 
@@ -12,7 +12,7 @@ Spec: `e2e/006-apply-packet-assist/US2-mapping-readiness.e2e.ts` (T030 / #214). 
 | 2 | One red blocker chip 'Expired · OEM authorisation certificate (MAF) for this bid' linking to `#item-oem_authorization` | met | S1 test (href + `text-danger` + click scrolls); [s1-ring-and-blocker-desktop.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s1-ring-and-blocker-desktop.png) |
 | 3 | GST / PAN Ready, Required, Auto-matched; balance sheets pick 'Balance sheet 2024-25' with FY 2024-25 (not 2023-24) | met | S2 test, plus API `readiness.items`; [s2-rows-desktop.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s2-rows-desktop.png) |
 | 4 | OEM Expired, Required, 'Dell MAF', red-tinted card, buttons Change + Upload renewed | met | S2 test; [s2-rows-desktop.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s2-rows-desktop.png) |
-| 5 | Udyam Missing, Optional, 'No matching document in the vault.', buttons Choose document + **'Upload Udyam registration'** | **not met** | Button reads **'Upload Udyam (MSE) certificate'** (catalog label), expected 'Upload Udyam registration'. Rest of row (Missing/Optional/note/Choose document, href `/vault?upload=1&uploadType=udyam`, vault dialog opens) is fine. [s2-udyam-label-FAILING-desktop.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s2-udyam-label-FAILING-desktop.png) · [s2-udyam-label-FAILING-trace-desktop.zip](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s2-udyam-label-FAILING-trace-desktop.zip) |
+| 5 | Udyam Missing, Optional, 'No matching document in the vault.', buttons Choose document + **'Upload Udyam (MSE) certificate'** (criterion as amended in 350a0c4) | met | Test `US2-mapping-readiness.e2e.ts:150` passes: label 'Upload Udyam (MSE) certificate', href `/vault?upload=1&uploadType=udyam`, vault dialog opens (S2 test; screenshot s2-rows-desktop.png) |
 | 6 | Two Generated rows (Non-blacklisting, Make in India) with 'Generated from your profile · Print, sign and stamp before upload' and Preview | met | S2 test; [s2-rows-desktop.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s2-rows-desktop.png) |
 | 7 | Filter tabs 'All 7', 'Needs attention 2', 'Covered 5'; selecting Needs attention shows only OEM + Udyam, `aria-selected=true` | met | S3 test; [s3-needs-attention-desktop.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s3-needs-attention-desktop.png) |
 | 8 | Empty filter shows 'Nothing here — Everything in this view is covered.' | met | S3 empty-filter test (fixture checklist gst, pan, non_blacklisting, 'Needs attention 0'); [s3-empty-filter-desktop.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-179-mapping-readiness/qa/evidence/006/US2/s3-empty-filter-desktop.png) |
@@ -37,11 +37,7 @@ Spec: `e2e/006-apply-packet-assist/US2-mapping-readiness.e2e.ts` (T030 / #214). 
 
 ### Findings
 
-1. **blocking** — the Missing Udyam row's upload button is labelled "Upload Udyam (MSE) certificate", not "Upload Udyam registration" (criterion 5; scenario 2 says the label comes from the document-type catalog).
-   - Observed: `#item-udyam a[href^="/vault?upload=1"]` text -> `Upload Udyam (MSE) certificate` (Playwright error: expected "Upload Udyam registration", received " Upload Udyam (MSE) certificate").
-   - Expected: `Upload Udyam registration` (issue #179 and spec scenario 2). Either the catalog label for `udyam` or the issue/spec text is wrong; they currently disagree. If the catalog label is intended, amend the issue/spec and QA will update the assertion; otherwise change the label.
-   - Where: `apps/web/src/features/workspace/DocumentsStep.tsx:109` (`typeLabel = docTypeInfo(docType).label`, used in the button at the "Upload ${typeLabel}" link) and `packages/core/src/vault/status.ts:106` (`label: 'Udyam (MSE) certificate'`). Note that changing the catalog label also changes the vault type names app-wide, so check other uses before editing it.
-   - Test: `e2e/006-apply-packet-assist/US2-mapping-readiness.e2e.ts:150`.
+1. **observation** — previous rejection (criterion 5, Udyam button label) is resolved by the spec/issue amendment, not by a product change: the catalog label for `udyam` is 'Udyam (MSE) certificate' (`packages/core/src/vault/status.ts:106`) and the row button uses it (`DocumentsStep.tsx:109`). The assertion at `US2-mapping-readiness.e2e.ts:150` was updated accordingly; the obsolete FAILING screenshot/trace were removed.
 
 2. **observation** — the "Upload renewed" / "Upload Udyam ..." links and the popover "Upload new" link only navigate to `/vault?upload=1&uploadType=...`; verified the href and that the vault upload dialog opens (S2), but the dialog's pre-selected type was not asserted.
 
@@ -65,7 +61,7 @@ An approval would cover only what is in the table above; it is not a statement t
 
 ### Verdict
 
-`qa:rejected` — criterion 5 not met (Udyam upload button label). Rejection 1 of 3 on this item.
+`qa:approved` — every criterion met, evidence above (re-review after rejection 1).
 
 ---
 _Generated by [Claude Code](https://claude.ai/code)_

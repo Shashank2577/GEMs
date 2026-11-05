@@ -140,17 +140,17 @@ test('S2 rows: states, badges, documents, buttons, Generated rows with Preview',
   expect(item(d, 'oem_authorization')).toMatchObject({ state: 'expired', blocking: true, docId: fx.docs.oem });
   expect(item(d, 'udyam')).toMatchObject({ state: 'missing', docId: null });
   expect(item(d, 'non_blacklisting').state).toBe('generated');
-  // "Upload renewed" / "Upload Udyam registration" jump into the vault pre-set to the type
+  // "Upload renewed" / "Upload Udyam (MSE) certificate" jump into the vault pre-set to the type
   await upl.click();
   await expect(page).toHaveURL(/\/vault/);
   await expect(page.getByRole('dialog')).toBeVisible();
   await shot(page, 's2-upload-udyam-vault');
 });
 
-test('S2 Udyam missing-row button is labelled "Upload Udyam registration"', async ({ page, context }) => {
+test('S2 Udyam missing-row button is labelled "Upload Udyam (MSE) certificate" (catalog label)', async ({ page, context }) => {
   await openDocs(page, context, fx, await ws());
   const upl = row(page, 'udyam').locator('a[href^="/vault?upload=1"]');
-  await expect(upl).toHaveText('Upload Udyam registration');
+  await expect(upl).toHaveText('Upload Udyam (MSE) certificate');
 });
 
 test('S3 filter tabs All 7 / Needs attention 2 / Covered 5, aria-selected, tabpanel, arrow-key navigation @mobile', async ({ page, context }) => {
