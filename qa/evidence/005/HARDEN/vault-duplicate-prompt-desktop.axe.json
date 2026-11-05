@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8807/vault",
-  "timestamp": "2026-11-05T04:21:30.464Z",
+  "url": "http://localhost:8791/vault",
+  "timestamp": "2026-11-05T04:42:47.039Z",
   "violations": [],
   "incomplete": [
     {
@@ -73,7 +73,7 @@
                   ]
                 },
                 {
-                  "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: qa Traders mw31gamk2. Switch organization\">",
+                  "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: qa Traders mw327oa010. Switch organization\">",
                   "target": [
                     "#radix-\\:r3\\:"
                   ]
@@ -163,9 +163,9 @@
                   ]
                 },
                 {
-                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"More vault actions\" id=\"radix-:rq:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"More vault actions\" id=\"radix-:rs:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
                   "target": [
-                    "#radix-\\:rq\\:"
+                    "#radix-\\:rs\\:"
                   ]
                 },
                 {
@@ -457,9 +457,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<p id=\"radix-:r10:\" class=\"text-sm text-muted-foreground\">PDF, PNG or JPG up to 20 MB. Files are stored privately and only your team can open them.</p>",
+          "html": "<p id=\"radix-:r12:\" class=\"text-sm text-muted-foreground\">PDF, PNG or JPG up to 20 MB. Files are stored privately and only your team can open them.</p>",
           "target": [
-            "#radix-\\:r10\\:"
+            "#radix-\\:r12\\:"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
         }

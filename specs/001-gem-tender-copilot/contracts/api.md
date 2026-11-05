@@ -68,7 +68,7 @@ Every route is scoped to the session's organization: an id belonging to another 
 | PUT (W) | /profile | partial upsert (omitted keys keep their value); validates GSTIN/PAN/Udyam and GSTIN↔PAN. Optional `expectedUpdatedAt` (ISO timestamp, or `null` = "no profile saved yet"): on mismatch → 409 `conflict` `details:{updatedAt}` and nothing is written; omitted = last write wins. Each `oemAuthorizations[i].documentId` that is new or changed must be an `oem_authorization` document of this org's vault, else 400 `validation_error` with `details.fields["oemAuthorizations.<i>.documentId"]` (ids already stored are accepted unchanged). Returns the same body as GET |
 | GET/POST(W) | /past-contracts | `{items: PastContract[], total}` (end date desc); POST → 201. `cracDocumentId` must be a document in this org's vault (400 otherwise) |
 | PATCH/DELETE (W) | /past-contracts/:id | – (404 for another org's or unknown id) |
-| GET | /vault | `type,category,status(valid|expiring|expired),q,sort(expiry|title|type)` → `{items: VaultDocument[], total}` |
+| GET | /vault | `type,category,status(valid|expiring|expired),q,sort(recent|expiry|title|type; default recent)` → `{items: VaultDocument[], total}` |
 | POST (W) | /vault | multipart `file` (PDF/PNG/JPG sniffed from bytes, ≤ 20 MB) + fields `type,title,number,issuer,issueDate,expiryDate,financialYear,tags(json)`, optional `allowDuplicate=1` → 201 `VaultDocument`. A file whose SHA-256 matches another document of the org → 409 `duplicate_document` `details:{existingId,title}` unless `allowDuplicate=1`. 413 `payload_too_large`, 415 `unsupported_media_type`, 422 `unreadable_pdf` |
 | GET | /vault/:id | `VaultDocument` |
 | PATCH/DELETE (W) | /vault/:id | PATCH metadata (a changed `expiryDate` restarts the 30/7/1 reminder cycle); DELETE removes the row, its versions and all blobs and unlinks CRAC / OEM references |
@@ -80,7 +80,7 @@ Every route is scoped to the session's organization: an id belonging to another 
 | POST (M) | /vault/reminders/run | runs the expiry-reminder job for this org now (same as the scheduler step; idempotent) → `{documents, notifications}` |
 
 DTOs (`packages/core/src/contracts/vault.ts`):
-- `VaultDocument` = stored fields + `status`, `daysToExpiry`, `uploadedBy:{id,name}|null`, `downloadUrl` and
+- `VaultDocument` = public fields (internal storage fields are not exposed) + `status`, `daysToExpiry`, `uploadedBy:{id,name}|null`, `downloadUrl` and
   `nextReminder: {days: 30|7|1|0, date: YYYY-MM-DD} | null` (the next 30/7/1-day or on-expiry reminder still to be sent; null without an expiry date or when none is left).
 - `VaultVersion` = `{id, fileName, mimeType, sizeBytes, pageCount, expiryDate (expiry while this file was current), replacedBy:{id,name}|null, replacedAt, downloadUrl}`.
 

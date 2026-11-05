@@ -9,7 +9,7 @@ import { test, expect, signupViaApi, seedDemo, a11y, evidence005, addPastContrac
 const STORY = 'HARDEN';
 /**
  * Whole page, shell included — except the two app-shell menu triggers (owned by 002/007, outside /profile and /vault)
- * whose aria-label does not contain their visible text (axe label-content-name-mismatch); reported separately.
+ * whose aria-label does not contain their visible text (axe label-content-name-mismatch); tracked in #505.
  */
 const SHELL_OUT_OF_SCOPE = ['[aria-label="Account menu"]', '[aria-label^="Organization:"]'];
 const scan = (page: Page, name: string) => a11y(page, name, { spec: '005', story: STORY, exclude: SHELL_OUT_OF_SCOPE });
@@ -20,8 +20,9 @@ const press = async (l: Locator) => { await l.focus(); await l.press('Enter'); }
 
 /** Settle: no skeletons and no running CSS transitions (dialogs/sheets animate in). */
 async function settle(page: Page) {
-  await expect(page.locator('[data-skeleton], .animate-pulse')).toHaveCount(0, { timeout: 15_000 }).catch(() => { /* decorative pulses */ });
-  await page.waitForTimeout(400);
+  await expect(page.locator('[data-skeleton], .animate-pulse')).toHaveCount(0, { timeout: 15_000 });
+  // Finite animations/transitions (dialogs and sheets sliding in) must be done before axe measures contrast.
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))));
 }
 
 test.describe('005 a11y — /profile and /vault have no serious or critical axe violations (T075)', () => {

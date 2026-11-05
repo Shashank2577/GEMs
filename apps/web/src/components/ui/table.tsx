@@ -40,6 +40,7 @@ export interface Column<T> {
   className?: string;
   /** Hidden in the mobile card view */
   hideOnMobile?: boolean;
+  /** Card title on mobile. Its cell is wrapped in a button there, so it must be non-interactive phrasing content (no links/buttons/inputs). */
   primary?: boolean;
 }
 
