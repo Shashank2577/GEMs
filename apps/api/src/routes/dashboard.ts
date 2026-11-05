@@ -247,6 +247,11 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
     { key: 'team', label: 'Invite a teammate', description: 'Bid managers, analysts and compliance can work together.', done: num(sc.members) > 1 || num(sc.invites) > 0, href: '/settings/team' },
   ];
 
+  // FR-007: a demo org (the sample company has no teammates) is not held back by the team step; its own
+  // `done` stays honest. Non-demo orgs need every step, team included (US3-12).
+  const demo = !!c.var.org.onboardingState?.demo;
+  const setupComplete = setup.filter((s) => !(demo && s.key === 'team')).every((s) => s.done);
+
   const body: DashboardResponse = {
     generatedAt: now.toISOString(),
     tiles: {
@@ -273,8 +278,8 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
     expiringDocuments: expiringDocuments.slice(0, 6),
     activity,
     setup,
-    setupComplete: setup.every((s) => s.done),
-    demo: !!c.var.org.onboardingState?.demo,
+    setupComplete,
+    demo,
   };
   return c.json(body);
 });

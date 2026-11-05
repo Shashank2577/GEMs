@@ -14,6 +14,7 @@
     "deploy": "pnpm --filter @tp/web run build && wrangler deploy"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.63.0",
     "typescript": "^5.6.3",
     "tsx": "^4.19.2",
