@@ -15,8 +15,8 @@ winners as competitive intel) as P2/P3 stories where valuable."
 **Parent spec**: [`specs/001-gem-tender-copilot/spec.md`](../001-gem-tender-copilot/spec.md) — User Story 1 ("Discover
 matching GeM bids and get alerted"), FR-001…FR-007, SC-001. This spec refines that story into independently testable
 slices, describes what is **built today** (verified against the code on 2026-11-05) and adds requirements for the gaps
-that matter. Requirements still marked *(gap)* (US5 alert completion, FR-052…055, and US6, FR-060…064) are not
-implemented yet (planned); everything else is implemented and covered by unit/API tests. Hardening items that started
+that matter. Requirements still marked *(gap)* (US6, FR-060…064) are not
+implemented yet (planned); US5 (FR-050…055) is delivered; everything else is implemented and covered by unit/API tests. Hardening items that started
 as gaps (FR-011…014, FR-027/028, FR-035…037, FR-047…049) were delivered by tasks T018–T021, T030–T031, T038–T043,
 T050–T054 and no longer carry the marker.
 
@@ -341,12 +341,12 @@ on the card, and an alert that names the change.
    is kept and no corrigendum is recorded for it.
 6. **Given** an open bid whose end date passes, **Then** the next sync sets `status:"closed"`; **given** GeM marks it
    cancelled, **Then** a `cancelled` event is recorded and the History tab shows "Bid cancelled".
-7. *(gap)* **Given** scenario 1 for a user with email (and/or WhatsApp) enabled and **Instant** frequency, **Then** a
+7. **Given** scenario 1 for a user with email (and/or WhatsApp) enabled and **Instant** frequency, **Then** a
    corrigendum email/WhatsApp is queued and sent with the same dedupe semantics, and in-app/email bodies contain a human
    summary of every changed field, e.g. "Bid end date: 19 Nov, 3:00 pm → 26 Nov, 3:00 pm IST · Quantity: 75 → 90".
-8. *(gap)* **Given** a corrigendum notification, **Then** its `kind` is `corrigendum` (not `deadline`), it shows a
+8. **Given** a corrigendum notification, **Then** its `kind` is `corrigendum` (not `deadline`), it shows a
    "Corrigendum" label and warning icon in the bell and `/notifications`, and can be filtered with `?kind=corrigendum`.
-9. *(gap)* **Given** a tracked tender is cancelled on GeM (`b_is_cancelled`), **Then** tracking orgs get an alert "Cancelled on
+9. **Given** a tracked tender is cancelled on GeM (`b_is_cancelled`), **Then** tracking orgs get an alert "Cancelled on
    GeM: <title>" on their chosen channels, and any bid workspace for it shows a "Cancelled on GeM" banner.
 
 ---
@@ -557,11 +557,11 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
   the tender for 7 days and "Re-check" on stale scores.
 - **FR-051**: Orgs that track a tender MUST get an in-app notification per member when a corrigendum is ingested, deduped per
   tender content hash per org.
-- **FR-052** *(gap)*: Corrigendum alerts MUST also go to email/WhatsApp per user preferences (instant; included in the daily
+- **FR-052**: Corrigendum alerts MUST also go to email/WhatsApp per user preferences (instant; included in the daily
   digest for daily users) and MUST contain a human-readable summary of each changed field with IST dates and ₹ amounts.
-- **FR-053** *(gap)*: Corrigendum notifications MUST use a dedicated kind `corrigendum`, rendered with its own label and icon.
-- **FR-054** *(gap)*: Cancellation of a tracked tender on GeM MUST alert tracking orgs on their channels.
-- **FR-055** *(gap)*: mock-gem MUST support `POST /__admin/cancel/<bidNumber>` and corrigendum changes to quantity and EMD
+- **FR-053**: Corrigendum notifications MUST use a dedicated kind `corrigendum`, rendered with its own label and icon.
+- **FR-054**: Cancellation of a tracked tender on GeM MUST alert tracking orgs on their channels.
+- **FR-055**: mock-gem MUST support `POST /__admin/cancel/<bidNumber>` and corrigendum changes to quantity and EMD
   for E2E tests.
 
 **Results & intelligence (US6)**

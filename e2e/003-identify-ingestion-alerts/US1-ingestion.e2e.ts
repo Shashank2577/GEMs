@@ -2,7 +2,7 @@
  * 003 / US1 (#62) — Polite, reliable GeM BidPlus ingestion with visible sync health. QA task T022.
  * Covers spec scenarios 1-9 (+ FR-013 cooldown, scenario 11). Serial: the scenarios build on one another's state
  * (empty DB -> first sync -> second sync -> outages -> recovery -> stale -> busy/timeout -> RBAC).
- * The manual-sync cooldown (FR-013, 2 min, platform-wide, real clock) is waited out via `details.retryAt`.
+ * The manual-sync cooldown (FR-013, default 10 min since 008/FR-026, platform-wide, real clock) is asserted on the first sync; later syncs wait via `details.retryAt` and fail fast beyond 60 s.
  * Direct SQL (psql) is used only to read counts and to arrange "running"/"old" rows that cannot be produced via the API.
  */
 import { execFileSync } from 'node:child_process';
@@ -33,7 +33,9 @@ async function runSync(req: APIRequestContext, data: unknown = { pages: 5 }) {
     const res = await req.post('/api/ingestion/run', { data });
     if (res.status() !== 429) return res;
     const retryAt = Date.parse((await res.json()).error.details.retryAt);
-    await sleep(Math.max(0, retryAt - Date.now()) + 1500);
+    const waitMs = Math.max(0, retryAt - Date.now()) + 1500;
+    if (waitMs > 60_000) throw new Error(`manual sync cooldown is ${Math.round(waitMs / 1000)}s: age ingestion_runs in SQL first`);
+    await sleep(waitMs);
   }
   throw new Error('cooldown never cleared');
 }

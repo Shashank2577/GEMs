@@ -27,12 +27,12 @@ if (!DB_URL || !/\/[^/]*perf[^/]*$/i.test(DB_URL.split('?')[0]!)) {
 const N = Number(process.env.PERF_TENDERS ?? 50_000);
 const MATCHES = Number(process.env.PERF_MATCHES ?? 500);
 const RUNS = Number(process.env.PERF_RUNS ?? 30);
-const OPEN_SHARE_PCT = Number(process.env.PERF_OPEN_PCT ?? 20); // production is ~6 % open; 20 % is deliberately heavier
+const OPEN_SHARE_PCT = Number(process.env.PERF_OPEN_PCT ?? 20); // share of seeded tenders that are open; deliberately high so the open-only default feed is a heavy case
 const NOW = new Date('2026-11-05T04:30:00Z');
 const out = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : undefined;
 
 const percentile = (sorted: number[], p: number) => sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)]!;
-interface Row { name: string; call: string; n: number; p50: number; p95: number; max: number; status: number; total: number | null; budgetMs: number }
+interface Row { name: string; call: string; expected: number | null; n: number; p50: number; p95: number; max: number; status: number; total: number | null; budgetMs: number; totalOk: boolean }
 
 async function main() {
   const ctx = await createTestContext({ now: NOW, databaseUrl: DB_URL });
@@ -73,9 +73,11 @@ async function main() {
       .then((r) => (r as unknown as { rows: { t: number; o: number; m: number }[] }).rows);
     console.info(`seeded tenders=${cnt!.t} open=${cnt!.o} matches=${cnt!.m} in ${(seedMs / 1000).toFixed(1)}s`);
 
-    const measure = async (name: string, method: 'GET' | 'POST', path: string, json: unknown, budgetMs: number) => {
+    // Expected totals hold for the default seed only (50,000 tenders, 500 matches, 20 % open); the exit code fails on a mismatch.
+    const defaultSeed = N === 50_000 && MATCHES === 500 && OPEN_SHARE_PCT === 20;
+    const measure = async (name: string, method: 'GET' | 'POST', path: string, json: unknown, budgetMs: number, expected: number | null) => {
       const call = () => request(ctx.app, method, path, { cookie, json });
-      for (let i = 0; i < 3; i++) await call(); // warm-up (plan cache, pool)
+      for (let i = 0; i < 3; i++) await call(); // 3 untimed warm-up calls (first request primes the pool and plan cache)
       const times: number[] = [];
       let last = await call();
       for (let i = 0; i < RUNS; i++) {
@@ -85,37 +87,38 @@ async function main() {
       }
       times.sort((a, b) => a - b);
       const total = typeof last.body?.total === 'number' ? last.body.total : typeof last.body?.count === 'number' ? last.body.count : null;
-      rows.push({ name, call: `${method} ${path}`, n: RUNS, p50: percentile(times, 0.5), p95: percentile(times, 0.95), max: times[times.length - 1]!, status: last.status, total, budgetMs });
-      console.info(`${name.padEnd(46)} status=${last.status} total=${total} p50=${rows.at(-1)!.p50.toFixed(1)}ms p95=${rows.at(-1)!.p95.toFixed(1)}ms`);
+      const totalOk = !defaultSeed || expected == null || total === expected;
+      rows.push({ name, call: `${method} ${path}`, expected: defaultSeed ? expected : null, totalOk, n: RUNS, p50: percentile(times, 0.5), p95: percentile(times, 0.95), max: times[times.length - 1]!, status: last.status, total, budgetMs });
+      console.info(`${name.padEnd(46)} status=${last.status} total=${total} p50=${rows.at(-1)!.p50.toFixed(1)}ms p95=${rows.at(-1)!.p95.toFixed(1)}ms${totalOk ? '' : ` TOTAL MISMATCH (expected ${expected})`}`);
     };
 
-    const feed: [string, string][] = [
-      ['default feed (open, page 1)', '/tenders'],
-      ['status=all', '/tenders?status=all'],
-      ['state=Maharashtra', '/tenders?state=Maharashtra'],
-      ['q=laptop', '/tenders?q=laptop'],
-      ['q=laptop supply (two words)', '/tenders?q=laptop%20supply'],
-      ['matched=1', '/tenders?matched=1'],
-      ['matched=1&unseen=1', '/tenders?matched=1&unseen=1'],
-      ['ministry+category+minValue, sort -value', '/tenders?ministry=Ministry%203&category=Category%2023&minValue=1000000&sort=-value'],
-      ['closingWithinDays=7&sort=endAt', '/tenders?closingWithinDays=7&sort=endAt'],
-      ['state+q+maxValue, page 3', '/tenders?state=Karnataka&q=printer&maxValue=50000000&page=3'],
-      ['status=closed, page 100', '/tenders?status=closed&page=100'],
+    const feed: [string, string, number][] = [
+      ['default feed (open, page 1)', '/tenders', 10000],
+      ['status=all', '/tenders?status=all', 50000],
+      ['state=Maharashtra', '/tenders?state=Maharashtra', 1250],
+      ['q=laptop', '/tenders?q=laptop', 1428],
+      ['q=laptop supply (two words)', '/tenders?q=laptop%20supply', 1428],
+      ['matched=1', '/tenders?matched=1', 500],
+      ['matched=1&unseen=1', '/tenders?matched=1&unseen=1', 450],
+      ['ministry+category+minValue, sort -value', '/tenders?ministry=Ministry%203&category=Category%2023&minValue=1000000&sort=-value', 83],
+      ['closingWithinDays=7&sort=endAt', '/tenders?closingWithinDays=7&sort=endAt', 2330],
+      ['state+q+maxValue, page 3', '/tenders?state=Karnataka&q=printer&maxValue=50000000&page=3', 107],
+      ['status=closed, page 100', '/tenders?status=closed&page=100', 13334],
     ];
-    for (const [name, qs] of feed) await measure(`GET ${name}`, 'GET', qs, undefined, 400);
+    for (const [name, qs, expected] of feed) await measure(`GET ${name}`, 'GET', qs, undefined, 400, expected);
 
     await measure('POST preview (narrow: laptop + Maharashtra)', 'POST', '/watchlists/preview',
-      { criteria: { keywords: ['laptop'], states: ['Maharashtra'] } }, 800);
+      { criteria: { keywords: ['laptop'], states: ['Maharashtra'] } }, 800, 178);
     await measure('POST preview (broad: 7 keywords, all states)', 'POST', '/watchlists/preview',
-      { criteria: { keywords: ['laptop', 'printer', 'cctv', 'server', 'desktop', 'chair', 'generator'], maxValue: 10_000_000_000 } }, 800);
+      { criteria: { keywords: ['laptop', 'printer', 'cctv', 'server', 'desktop', 'chair', 'generator'], maxValue: 10_000_000_000 } }, 800, 10000);
     await measure('POST preview (categories + ministries)', 'POST', '/watchlists/preview',
-      { criteria: { categories: ['Category 23', 'Category 43'], ministries: ['Ministry 3', 'Ministry 23'] } }, 800);
+      { criteria: { categories: ['Category 23', 'Category 43'], ministries: ['Ministry 3', 'Ministry 23'] } }, 800, 333);
 
     if (out) writeFileSync(out, JSON.stringify({ at: new Date().toISOString(), tenders: cnt, runs: RUNS, rows }, null, 2));
     const worstFeed = Math.max(...rows.filter((r) => r.call.startsWith('GET')).map((r) => r.p95));
     const worstPrev = Math.max(...rows.filter((r) => r.call.startsWith('POST')).map((r) => r.p95));
     console.info(`worst GET /tenders p95=${worstFeed.toFixed(1)}ms (budget 400), worst preview p95=${worstPrev.toFixed(1)}ms (budget 800)`);
-    process.exitCode = rows.some((r) => r.status !== 200 || r.p95 >= r.budgetMs) ? 1 : 0;
+    process.exitCode = rows.some((r) => r.status !== 200 || r.p95 >= r.budgetMs || !r.totalOk) ? 1 : 0;
   } finally {
     await ctx.close();
   }

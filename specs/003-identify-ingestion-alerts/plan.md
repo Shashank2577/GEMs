@@ -4,9 +4,9 @@
 
 **Input**: Feature specification from `/specs/003-identify-ingestion-alerts/spec.md`
 
-**Note**: Produced with the cairn plan workflow. US1–US4 are built (parent spec 001, tasks T030–T038, hardened by this spec's tasks) and US5 is partly built (event
-detection, badge, Re-check: T056–T059). This plan records the as-built design, the files involved and the design for the
-remaining work: FR-052…055 (US5 alert completion) and FR-060…064 (US6). FR-011…014, FR-027/028, FR-035…037 and FR-047…049
+**Note**: Produced with the cairn plan workflow. US1–US4 are built (parent spec 001, tasks T030–T038, hardened by this spec's tasks) and US5 is built (event
+detection, badge, Re-check, change summaries, `corrigendum` kind, all channels, cancellation alerts: T056–T065). This plan records the as-built design, the files involved and the design for the
+remaining work: FR-060…064 (US6, planned). FR-052…055 (US5) are delivered, as are FR-011…014, FR-027/028, FR-035…037 and FR-047…049
 are delivered.
 
 ## Summary
@@ -21,8 +21,8 @@ The React feed, watchlist builder, bell and notifications page sit on Hono route
 Delivered since the first draft (US1–US4 hardening, tasks T018–T021, T025, T030–T031, T038–T043, T050–T054):
 incremental/catch-up paging, targeted keyword search, format-drift detection, the manual-sync cooldown, the watchlist limit
 and uncapped back-fill, server-side saved views, status selector and bid-number jump, send retries, one-click unsubscribe
-and `kind` validation. Remaining work: the corrigendum alert
-completion (human change summary, dedicated `corrigendum` kind, all channels, cancellation alerts: US5 T060–T065) and a P3
+and `kind` validation. Delivered: the corrigendum alert
+completion (human change summary, dedicated `corrigendum` kind, all channels, cancellation alerts: US5 T060–T065). Remaining: a P3
 results/award/competitor module ported from arush15june/gem-search (MIT; US6 T066–T076, planned, nothing built).
 Every story gets a Playwright E2E with evidence in `qa/evidence/003/US<n>/`.
 
@@ -63,7 +63,7 @@ degrade to `skipped` (VII); org-scoped queries (IV)
 | III. Deterministic first | PASS | Matcher is pure regex/set logic with reasons; no LLM in this area. Results parsing is deterministic regex. |
 | IV. Tenant isolation | PASS | Tenders are global public data; `tender_matches`, `notifications`, `notification_prefs`, analyses joins, (new) `saved_views` all filtered by `org_id` (and `user_id`). API tests "isolates orgs" cover watchlists; notifications scoped per user. |
 | V. Delightful, accessible UX | PASS | Loading/empty/error states exist on all screens; 375 px bottom-sheet filters; aria labels. Axe checks run in the US3 E2E (T043). |
-| VI. Test-first, E2E verified | PASS for US1–US4, PARTIAL overall | Unit + API tests green; E2E specs for US1–US4 exist in `e2e/003-identify-ingestion-alerts/` and the E2E helpers (T004) are in place; the US1–US4 QA verdicts (T022, T032, T044, T055) are APPROVED (`qa/evidence/003/US<n>/VERDICT.md`); US5/US6 E2E remain. |
+| VI. Test-first, E2E verified | PASS for US1–US4, PARTIAL overall | Unit + API tests green; E2E specs for US1–US4 exist in `e2e/003-identify-ingestion-alerts/` and the E2E helpers (T004) are in place; the US1–US4 QA verdicts (T022, T032, T044, T055) are APPROVED (`qa/evidence/003/US<n>/VERDICT.md`); US5 E2E is in place; US6 E2E remains. |
 | VII. Edge-native | PASS | Same code on Worker `scheduled()` and Node cron via `apps/api/src/lib/scheduled.ts`; missing `RESEND_API_KEY` / `WHATSAPP_TOKEN` → `skipped`. |
 | VIII. Simplicity & traceability | PASS | Shared Zod contracts in `packages/core/src/contracts/identify.ts`; code comments cite FR ids. Source files reference `NOTICE`; the root `NOTICE` exists and attributes the reused projects and lists the ideas-only ones (T003). |
 | Constraints: licences | PASS with rule | Copy only from erenmyeager15 (Apache-2.0) and arush15june (MIT). Giridar33, PranavTamada, IshanMaheshwari-777, Mujahid-Alam, Giri-Aayush, rounittxx have no LICENSE → ideas only, re-implemented. |
@@ -97,11 +97,11 @@ packages/core/src/
 │   ├── normalize.ts       # unwrap/cleanText/firstText/firstNumber/parseAmount/parseGemDate/splitItems/tidyTitle [built]
 │   ├── states.ts          # canonicalState, deriveLocation                                                      [built]
 │   ├── hash.ts            # contentHash (stable JSON → hash)                                                    [built]
-│   ├── changes.ts         # summariseChanges(changes) → "Bid end date: … → … IST · Quantity: 75 → 90"           [US5 planned, T060]
+│   ├── changes.ts         # summariseChanges(changes) → "Bid end date: … → … IST · Quantity: 75 → 90"           [US5 built, T060]
 │   └── result.ts          # parseBidResultHtml(), BUYER_STATUS map                                              [US6 planned]
 ├── match/matcher.ts       # matchTender, matchWatchlists, keywordRegex, hasPositiveCriteria                     [built]
 └── contracts/identify.ts  # Zod: watchlist criteria/create/update/preview, tender query, ingestion, notifications [built]
-                           #  + savedView schemas [built]; result DTO, `corrigendum`/`result` notification kinds [planned]
+                           #  + savedView schemas [built]; result DTO, `corrigendum`/`result` notification kinds [built; `result` unused until US6]
 
 packages/db/src/schema.ts  # tenders, tender_events, ingestion_runs, watchlists, tender_matches, notifications,
                            # notification_prefs, saved_views, notifications.attempts/next_attempt_at [built]; tender_results [US6 planned]
@@ -129,8 +129,8 @@ apps/web/src/features/
 ├── tender/{HistoryTab,TenderPage}.tsx (+ ResultTab.tsx [US6 planned])
 └── insights/CompetitorsPage.tsx [US6 planned]
 
-tools/mock-gem/src/{app,pdf,server}.ts  # + /__admin/cancel, corrigendum qty/EMD, bidrastatus + result view [US5/US6 planned]
-e2e/003-identify-ingestion-alerts/US<n>-*.e2e.ts                          # US1–US4 built; US5/US6 planned
+tools/mock-gem/src/{app,pdf,server}.ts  # + /__admin/cancel, corrigendum qty/EMD, bidrastatus + result view [US5 built; US6 planned]
+e2e/003-identify-ingestion-alerts/US<n>-*.e2e.ts                          # US1–US5 built; US6 planned
 qa/evidence/003/US<n>/                                                   # evidence output
 NOTICE                                                                   # [built]
 ```
@@ -169,7 +169,7 @@ All endpoints are under `/api`, cookie-session (or `tp_` API token) authenticate
 | `GET /tenders/:id/result` *(US6 planned)* | any | — | `200 {evaluationStatus, bidders:[{rank,seller,price,level}], sourceUrl, fetchedAt}` | `404` |
 | `GET /insights/competitors` *(US6 planned)* | any | `category?, state?, page` | `200 {items:[{seller, wins, awardedValue, categories[], anomalies}], total}` | `400` |
 
-mock-gem additions *(US5/US6 planned; `corrigendum` takes `{days?}` today)*: `POST /__admin/cancel/<bidNumber>`; `POST /__admin/corrigendum/<bidNumber> {quantity?, emd?}`;
+mock-gem additions: `POST /__admin/cancel/<bidNumber>` and `POST /__admin/corrigendum/<bidNumber> {days?, endAt?, quantity?, emd?}` (US5, delivered); US6 *(planned)*:
 `POST /all-bids-data` honouring `bidStatusType:"bidrastatus"` + `byStatus`; `GET /bidding/bid/getBidResultView/:id` serving a
 recorded HTML fixture; `POST /__admin/award/<bidNumber>` to move a bid into the awarded set.
 
@@ -182,7 +182,7 @@ recorded HTML fixture; `POST /__admin/award/<bidNumber>` to move a bid into the 
 | `ingestion_runs` | `trigger, status, pages_fetched, tenders_seen/created/updated, matches_created, error, started_at, finished_at` | *(gap)* optional `kind text default 'listing'` (`listing`/`results`) so results refresh runs are visible |
 | `watchlists` | `org_id, name, criteria (WatchlistCriteria JSON), active, created_by` | none |
 | `tender_matches` | `org_id, tender_id, watchlist_id (uq triple), reasons, relevance, seen, dismissed, created_at` | none |
-| `notifications` | `org_id, user_id, channel, kind, title, body, link, dedupe_key (uq user+channel+key), status, error, sent_at, read_at` | `attempts` and `next_attempt_at` *(built, migration 0021)*; *(US5/US6 planned)* kind union + `corrigendum`, `result` |
+| `notifications` | `org_id, user_id, channel, kind, title, body, link, dedupe_key (uq user+channel+key), status, error, sent_at, read_at` | `attempts` and `next_attempt_at` *(built, migration 0021)*; kind union + `corrigendum`, `result` *(built; `result` is emitted only once US6 lands)* |
 | `notification_prefs` | `org_id, user_id (pk), in_app, email, whatsapp, frequency, expiry_reminders` | none (unsubscribe flips `email=false`) |
 | `saved_views` *(built, migration 0015)* | `id, org_id, user_id, name, params jsonb Record<string,string[]>, position int, created_at, updated_at`; uq `(org_id, user_id, name)` | built |
 | `tender_results` *(US6 planned, not in schema.ts)* | `tender_id pk/fk, evaluation_status text, bidders jsonb [{rank,seller,price,level}], source_url, fetched_at, error` | new table |
@@ -204,7 +204,7 @@ Cron */30 ─▶ runScheduledJobs(deps)
   │    │      (corrigendum → analyses.stale = true)
   │    ├─ matchAndNotify(changedIds): active watchlists × tenders ─▶ matchTender ─▶ insert tender_matches ON CONFLICT DO NOTHING
   │    │      new (org,tender) pairs ─▶ orgRecipients(prefs) ─▶ notifications (in_app sent, email pending, whatsapp pending|skipped)
-  │    ├─ notifyCorrigenda(corrigendumIds) ─▶ in-app 'deadline' rows (dedupe corrigendum:<id>:<hash>:<org>)
+  │    ├─ notifyCorrigenda(corrigendumIds) ─▶ in-app/email/WhatsApp 'corrigendum' rows with a change summary (dedupe corrigendum:<id>:<hash>:<org>)
   │    ├─ close past-deadline open tenders
   │    └─ finish run: success | partial | failed (+ first 5 errors)
   ├─ dispatchNotifications(): pending email/whatsapp ─▶ instant send / daily digest after 08:00 IST ─▶ sent|skipped|failed
@@ -224,9 +224,9 @@ ILIKE, keyset pages of 2,000 until exhausted (FR-028, no cap) ─▶ `matchTende
 `requireCriteria` ─▶ insert ─▶ `refreshMatches` (drop non-matching for edits; `matchAndNotify(..., notify:false)`) ─▶
 `logActivity` ─▶ `201 WatchlistDto`.
 
-### 4. Corrigendum with change summary (US5, planned: FR-052/053; today alerts use kind `deadline` without a change summary)
+### 4. Corrigendum with change summary (US5, delivered: FR-052/053)
 
-`upsertTender` detects corrigendum ─▶ event + stale analyses ─▶ `notifyCorrigenda` changes to: for each tracking org member,
+`upsertTender` detects corrigendum ─▶ event + stale analyses ─▶ `notifyCorrigenda`: for each tracking org member,
 build body with `summariseChanges(changes)` (core, unit-tested) and create rows for in-app (`sent`) + email/WhatsApp (`pending`)
 per prefs, kind `corrigendum`, dedupe `corrigendum:<tenderId>:<contentHash>:<orgId>` ─▶ dispatcher sends instantly (daily users:
 included in digest with a "Changed" section).

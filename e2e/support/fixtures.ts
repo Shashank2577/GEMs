@@ -77,8 +77,13 @@ export async function publishOnGem(request: APIRequestContext, count = 1) {
 }
 
 /** Issue a corrigendum on one mock bid, e.g. `gemCorrigendum(req, 'GEM/2026/B/6421101', { days: 7 })`. */
-export async function gemCorrigendum(request: APIRequestContext, bidNumber: string, body: { days?: number } = {}) {
+export async function gemCorrigendum(request: APIRequestContext, bidNumber: string, body: { days?: number; endAt?: string; quantity?: number; emd?: number } = {}) {
   return mockGem(request, `/__admin/corrigendum/${encodeURIComponent(bidNumber)}`, body);
+}
+
+/** Cancel one mock bid on GeM (`b_is_cancelled`), e.g. `gemCancel(req, 'GEM/2026/B/6421101')`. */
+export async function gemCancel(request: APIRequestContext, bidNumber: string) {
+  return mockGem(request, `/__admin/cancel/${encodeURIComponent(bidNumber)}`, {});
 }
 
 /** Simulate a GeM outage: 'down' (5xx), 'html' (format drift) or 'off' (healthy). */
@@ -88,7 +93,8 @@ export async function gemFail(request: APIRequestContext, mode: 'down' | 'html' 
 
 /**
  * Run a sync now (`POST /api/ingestion/run`, Bid Manager+). The 008/FR-026 manual cooldown (429 `sync_cooldown`)
- * is waited out via `error.details.retryAt` and retried (at most 2 waits); any other status is returned as is.
+ * is waited out via `error.details.retryAt` and retried (at most 2 waits); it fails fast when the wait would exceed
+ * 60 s (the default cooldown is 10 minutes: age earlier runs in SQL first, as the 003 US3-US5 specs do). Any other status is returned as is.
  */
 export async function syncNow(request: APIRequestContext, data: { pages?: number; search?: string } = { pages: 5 }) {
   for (let i = 0; i < 3; i++) {
@@ -97,7 +103,9 @@ export async function syncNow(request: APIRequestContext, data: { pages?: number
     const body = await res.json().catch(() => ({}));
     const retryAt = Date.parse(body?.error?.details?.retryAt ?? '');
     if (body?.error?.code !== 'sync_cooldown' || Number.isNaN(retryAt)) return res;
-    await new Promise((r) => setTimeout(r, Math.max(0, retryAt - Date.now()) + 1500));
+    const waitMs = Math.max(0, retryAt - Date.now()) + 1500;
+    if (waitMs > 60_000) throw new Error(`manual sync cooldown is ${Math.round(waitMs / 1000)}s: age earlier ingestion_runs in SQL before syncNow()`);
+    await new Promise((r) => setTimeout(r, waitMs));
   }
   throw new Error('manual sync cooldown never cleared');
 }
