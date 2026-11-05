@@ -378,9 +378,14 @@ authRoutes.post('/me/api-tokens', requireSession, async (c) => {
   const token = API_TOKEN_PREFIX + randomToken();
   const expiresAt = body.expiresInDays === null ? null : new Date(now.getTime() + body.expiresInDays * DAY_MS);
   const row = await db.transaction(async (tx) => {
-    // Serialise concurrent creates for this user+org so the limit cannot be overshot.
-    await tx.select({ userId: memberships.userId }).from(memberships)
+    // Lock order matches org.ts assertNotLastOwner (organizations, then memberships) to avoid deadlocks.
+    // The org row SHARE lock waits for an in-flight member removal; the membership FOR UPDATE then serialises
+    // concurrent creates for this user+org so the limit cannot be overshot.
+    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, oid)).for('share');
+    const member = await tx.select({ userId: memberships.userId }).from(memberships)
       .where(and(eq(memberships.orgId, oid), eq(memberships.userId, uid))).for('update');
+    // Removed from the org while this request waited: mint nothing.
+    if (!member.length) throw NO_ORGANIZATION();
     const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(apiTokens)
       .where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid), or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, now))));
     if (n >= API_TOKEN_LIMIT) throw new HttpError(409, 'token_limit', `You already have ${API_TOKEN_LIMIT} tokens. Revoke one first.`);

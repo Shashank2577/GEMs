@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expiresInDaysFor, tokenExpiry, tokenHintLabel } from './token-expiry';
+import { DEFAULT_TOKEN_EXPIRY_CHOICE, TOKEN_EXPIRY_OPTIONS, expiresInDaysFor, tokenExpiry, tokenHintLabel } from './token-expiry';
 
 const NOW = new Date('2026-11-05T10:00:00.000Z');
 const inDays = (d: number) => new Date(NOW.getTime() + d * 86_400_000).toISOString();
@@ -26,5 +26,12 @@ describe('002/FR-037 tokenExpiry', () => {
     expect(expiresInDaysFor('90')).toBe(90);
     expect(expiresInDaysFor('365')).toBe(365);
     expect(expiresInDaysFor('never')).toBeNull();
+  });
+});
+
+describe('002/FR-037 expiry choices', () => {
+  it('are built from API_TOKEN_EXPIRY_DAYS plus Never, default 90 days', () => {
+    expect(TOKEN_EXPIRY_OPTIONS.map((o) => o.label)).toEqual(['30 days', '90 days', '1 year', 'Never']);
+    expect(DEFAULT_TOKEN_EXPIRY_CHOICE).toBe('90');
   });
 });

@@ -138,12 +138,15 @@ export type NotificationPrefs = z.infer<typeof notificationPrefsSchema>;
 export const API_TOKEN_PREFIX = 'tp_';
 /** Allowed token lifetimes in days; `null` = never expires (002/FR-037). */
 export const API_TOKEN_EXPIRY_DAYS = [30, 90, 365] as const;
-export const API_TOKEN_DEFAULT_EXPIRY_DAYS = 90;
+export type ApiTokenExpiryDays = (typeof API_TOKEN_EXPIRY_DAYS)[number];
+export const API_TOKEN_DEFAULT_EXPIRY_DAYS: ApiTokenExpiryDays = 90;
 /** Max active (non-expired) tokens per user per organization (002/FR-037). */
 export const API_TOKEN_LIMIT = 10;
 export const createApiTokenInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
-  expiresInDays: z.union([z.literal(30), z.literal(90), z.literal(365), z.null()]).default(API_TOKEN_DEFAULT_EXPIRY_DAYS),
+  expiresInDays: z.union(
+    API_TOKEN_EXPIRY_DAYS.map((d) => z.literal(d)) as unknown as [z.ZodLiteral<ApiTokenExpiryDays>, z.ZodLiteral<ApiTokenExpiryDays>, ...z.ZodLiteral<ApiTokenExpiryDays>[]],
+  ).nullable().default(API_TOKEN_DEFAULT_EXPIRY_DAYS),
 });
 export type CreateApiTokenInput = z.input<typeof createApiTokenInputSchema>;
 export interface ApiTokenSummary {

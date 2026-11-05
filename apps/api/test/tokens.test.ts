@@ -3,6 +3,8 @@
  * session-only / membership / role behaviour of bearer tokens (FR-036).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { and, eq } from 'drizzle-orm';
+import { apiTokens } from '@tp/db';
 import { API_TOKEN_LIMIT } from '@tp/core/contracts/auth';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -126,6 +128,22 @@ describe('002/FR-036 bearer tokens cannot manage the account', () => {
     expect((await request(ctx.app, 'DELETE', `/api/org/members/${analyst.me.user.id}`, { cookie: owner.cookie })).status).toBe(200);
     expect((await request(ctx.app, 'GET', '/api/workspaces', { bearer: token })).status).toBe(401);
     expect((await request(ctx.app, 'GET', '/api/auth/me', { bearer: token })).status).toBe(401);
+  });
+
+  it('a member removed while creating a token ends up with no token (no 500s, no orphan rows)', async () => {
+    for (let i = 0; i < 5; i++) {
+      const { owner, analyst, orgId } = await seedOrgWithRoles(ctx.app, `Race Co ${i}`);
+      const [created, removed] = await Promise.all([
+        create(analyst.cookie, { name: 'racing' }),
+        request(ctx.app, 'DELETE', `/api/org/members/${analyst.me.user.id}`, { cookie: owner.cookie }),
+      ]);
+      expect(removed.status).toBe(200);
+      expect([201, 403]).toContain(created.status);
+      if (created.status === 403) expect(created.body.error.code).toBe('no_organization');
+      const left = await ctx.db.select({ id: apiTokens.id }).from(apiTokens)
+        .where(and(eq(apiTokens.orgId, orgId), eq(apiTokens.userId, analyst.me.user.id)));
+      expect(left).toHaveLength(0);
+    }
   });
 
   it('a role change applies to the next token request', async () => {

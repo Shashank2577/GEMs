@@ -102,7 +102,10 @@ export const apiTokens = pgTable('api_tokens', {
   /** Null = never expires (002/FR-037). Expired tokens are rejected by resolveAuth. */
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: createdAt(),
-}, (t) => ({ tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash) }));
+}, (t) => ({
+  tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash),
+  orgUserIdx: index('api_tokens_org_user_idx').on(t.orgId, t.userId),
+}));
 
 export const notificationPrefs = pgTable('notification_prefs', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),

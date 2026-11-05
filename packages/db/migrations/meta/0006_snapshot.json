@@ -1,5 +1,5 @@
 {
-  "id": "49a1cd44-32f8-4393-9330-6bceaddabc84",
+  "id": "bb2ab810-3e22-4073-b30e-34b83c5fd678",
   "prevId": "1e2ea001-0693-42fd-aef6-604f87e57eca",
   "version": "7",
   "dialect": "postgresql",
@@ -467,6 +467,27 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "api_tokens_org_user_idx": {
+          "name": "api_tokens_org_user_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { AlertTriangle, Check, Chrome, Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
-import type { ApiTokenSummary, CreatedApiToken } from '@tp/core/contracts/auth';
+import { API_TOKEN_LIMIT, type ApiTokenSummary, type CreatedApiToken } from '@tp/core/contracts/auth';
 import {
   Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, ErrorState, Field,
   Input, Kbd, Select, SkeletonList, toast,
@@ -8,7 +8,7 @@ import {
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { copyText, useCreateToken, useRevokeToken, useTokens } from '../api';
-import { TOKEN_EXPIRY_OPTIONS, expiresInDaysFor, tokenExpiry, tokenHintLabel, type TokenExpiryChoice } from '../token-expiry';
+import { DEFAULT_TOKEN_EXPIRY_CHOICE, TOKEN_EXPIRY_OPTIONS, expiresInDaysFor, tokenExpiry, tokenHintLabel, type TokenExpiryChoice } from '../token-expiry';
 import { Panel } from './Panel';
 
 export default function TokensSection() {
@@ -79,12 +79,12 @@ export default function TokensSection() {
 function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const create = useCreateToken();
   const [name, setName] = useState('Chrome extension');
-  const [expiry, setExpiry] = useState<TokenExpiryChoice>('90');
+  const [expiry, setExpiry] = useState<TokenExpiryChoice>(DEFAULT_TOKEN_EXPIRY_CHOICE);
   const [created, setCreated] = useState<CreatedApiToken | null>(null);
   const [copied, setCopied] = useState(false);
   const close = (o: boolean) => {
     onOpenChange(o);
-    if (!o) setTimeout(() => { setCreated(null); setCopied(false); setName('Chrome extension'); setExpiry('90'); create.reset(); }, 200);
+    if (!o) setTimeout(() => { setCreated(null); setCopied(false); setName('Chrome extension'); setExpiry(DEFAULT_TOKEN_EXPIRY_CHOICE); create.reset(); }, 200);
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -119,9 +119,9 @@ function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange
             <Field label="Token name" required>
               <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />
             </Field>
-            <Field label="Expires" hint="Expired tokens stop working. You can hold up to 10 active tokens.">
+            <Field label="Expires" hint={`Expired tokens stop working. You can hold up to ${API_TOKEN_LIMIT} active tokens.`}>
               <Select value={expiry} onValueChange={(v) => setExpiry(v as TokenExpiryChoice)}
-                options={TOKEN_EXPIRY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} />
+                options={TOKEN_EXPIRY_OPTIONS} />
             </Field>
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={() => close(false)}>Cancel</Button>
