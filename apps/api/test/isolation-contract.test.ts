@@ -110,6 +110,7 @@ const FOREIGN: Record<string, () => Call> = {
   'GET /tenders/:id/documents/:docId/download': () => asB('GET', `/tenders/${ids.tender}/documents/${ids.tenderDoc}/download`),
   'GET /tenders/:id/analysis': () => asB('GET', `/tenders/${ids.tender}/analysis`),
   'POST /analyses/:id/override': () => asB('POST', `/analyses/${ids.analysis}/override`, { factorKey: 'emd', status: 'fail', reason: 'Hijack attempt' }),
+  'POST /analyses/:id/rescore': () => asB('POST', `/analyses/${ids.analysis}/rescore`),
   'GET /vault/:id': () => asB('GET', `/vault/${ids.vault}`),
   'PUT /vault/:id/file': () => asBForm('PUT', `/vault/${ids.vault}/file`),
   'PATCH /past-contracts/:id': () => asB('PATCH', `/past-contracts/${ids.pastContract}`, { value: 1 }),

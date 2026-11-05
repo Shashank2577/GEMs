@@ -9,6 +9,7 @@
  *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis; 409 analysis_running / analysis_superseded  analyst+
  *   GET  /tenders/:id/analysis                        latest done Analysis (+lastAttempt) or 404  viewer+
  *   POST /analyses/:id/override                       {factorKey,status,reason}      bid_manager+
+ *   POST /analyses/:id/rescore                        recompute with current profile/vault/weights; 409 analysis_running / analysis_replaced / reanalysis_required  analyst+
  *   GET  /scoring-weights                             {weights, defaults, custom}    viewer+
  *   PUT  /scoring-weights                             partial weights ({} = reset)   bid_manager+
  */
@@ -23,7 +24,7 @@ import { TENDER_DOC_TOO_LARGE, TENDER_DOC_UPLOAD_MAX_BYTES, bodyLimit } from '..
 import { rateLimit } from '../middleware/rate-limit';
 import {
   analyseTender, fetchGemDocuments, getTender, getTenderDocument, lastAttemptOf, latestAnalysis, latestDoneAnalysis, listTenderDocuments, overrideFactor,
-  removeTenderDocument, saveWeights, shownAnalysisDto, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
+  removeTenderDocument, rescoreAnalysis, saveWeights, shownAnalysisDto, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
 } from '../services/analyse';
 import type { AppEnv } from '../types';
 
@@ -127,6 +128,12 @@ analysisRoutes.post('/analyses/:id/override', requireRole('bid_manager'), async 
   const body = await parseJson(c, overrideFactorInputSchema);
   const a = await overrideFactor(c.var.deps, { orgId: orgId(c), userId: userId(c), userName: c.var.user.name, analysisId: id, ...body });
   // Same shape as GET so the client cache keeps lastAttempt and documents.
+  return c.json(await analysisView(c, a.tenderId));
+});
+
+analysisRoutes.post('/analyses/:id/rescore', requireRole('analyst'), async (c) => {
+  const { id } = parseWith(idParamSchema, { id: c.req.param('id') }, 'path');
+  const a = await rescoreAnalysis(c.var.deps, { orgId: orgId(c), userId: userId(c), analysisId: id, viewer: c.var.org });
   return c.json(await analysisView(c, a.tenderId));
 });
 
