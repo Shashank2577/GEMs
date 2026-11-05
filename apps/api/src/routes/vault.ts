@@ -11,6 +11,7 @@
  *   PUT    /vault/:id/file        multipart file — replace the file, keep metadata       analyst+
  *   DELETE /vault/:id             removes the row and the blob, unlinks CRAC + OEM refs   analyst+
  *   GET    /vault/:id/download    streams the file (?inline=1 for preview)               viewer+
+ *   POST   /vault/reminders/run   run expiry reminders for this org now → {documents, notifications}  bid_manager+ (FR-052)
  */
 import { and, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
@@ -20,9 +21,10 @@ import { uuidSchema } from '@tp/core/contracts/common';
 import {
   VAULT_MAX_BYTES, vaultQuerySchema, vaultUpdateSchema, vaultUploadFieldsSchema, type VaultDocumentDto, type VaultSummary,
 } from '@tp/core/contracts/vault';
-import { DOC_TYPES, docStatus, EXPIRING_WITHIN_DAYS, guessDocType, guessFinancialYear, type DocType } from '@tp/core/vault/status';
+import { DOC_TYPES, docStatus, EXPIRING_WITHIN_DAYS, guessDocType, guessFinancialYear, nextReminder, type DocType } from '@tp/core/vault/status';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
+import { runExpiryReminders } from '../services/reminders';
 import { badRequest, HttpError, notFound, validationError } from '../lib/errors';
 import { parseQuery, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
@@ -127,7 +129,8 @@ export function toVaultDto(r: VaultRow, now: Date, uploader?: { id: string; name
     id: r.id, type: r.type, title: r.title, number: r.number, issuer: r.issuer, issueDate: r.issueDate, expiryDate: r.expiryDate,
     financialYear: r.financialYear, tags: r.tags, fileName: r.fileName, mimeType: r.mimeType, sizeBytes: r.sizeBytes, pageCount: r.pageCount,
     uploadedBy: uploader ?? null, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
-    status: s.status, daysToExpiry: s.daysToExpiry, downloadUrl: `/api/vault/${r.id}/download`,
+    status: s.status, daysToExpiry: s.daysToExpiry,
+    nextReminder: nextReminder(r.expiryDate, r.lastReminderDays, now), downloadUrl: `/api/vault/${r.id}/download`,
   };
 }
 
@@ -206,6 +209,15 @@ vaultRoutes.get('/vault', requireAuth, async (c) => {
 });
 
 vaultRoutes.get('/vault/summary', requireAuth, async (c) => c.json(await vaultSummary(c.var.deps, orgId(c))));
+
+/** Manual "Send reminders now" (FR-052): same job as the scheduler tick, scoped to the caller's org; idempotent. */
+vaultRoutes.post('/vault/reminders/run', requireRole('bid_manager'), async (c) => {
+  const { deps } = c.var;
+  const org = orgId(c);
+  const report = await runExpiryReminders(deps, { orgId: org });
+  await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.reminders_run', entityType: 'vault_document', meta: { ...report } });
+  return c.json(report);
+});
 
 vaultRoutes.post('/vault', requireRole('analyst'), async (c) => {
   const { deps } = c.var;
