@@ -180,6 +180,34 @@ export async function a11y(page: Page, name: string, opts: { spec?: string; stor
   return results;
 }
 
+// ───────────── 005 Profile & Vault helpers (T002) ─────────────
+// makePdf / makePng / uploadVaultDoc are the implementations in e2e/005-profile-vault/support.ts (re-exported,
+// not duplicated; that module resolves pdf-lib from apps/api). `inviteAs` above covers the analyst/viewer contexts.
+
+/** `makePdf(pages)` — a real multi-page PDF; `makePng()` — a genuine decodable PNG. */
+export { makePdf, makePng } from '../005-profile-vault/support';
+/** `uploadVaultDoc(request, {name, bytes, fields})` — multipart POST /api/vault, expects 201, returns the document DTO. */
+export { apiUploadOk as uploadVaultDoc } from '../005-profile-vault/support';
+
+/** PUT /api/profile with `body`; expects 200 and returns `{profile, completeness, issues, averageTurnover}`. */
+export async function putProfile(request: APIRequestContext, body: Record<string, unknown>) {
+  const res = await request.put('/api/profile', { data: body });
+  expect(res.status(), await res.text()).toBe(200);
+  return res.json();
+}
+
+/** POST /api/past-contracts (buyerType defaults to 'central'); expects 201 and returns the contract DTO. */
+export async function addPastContract(request: APIRequestContext, body: Record<string, unknown>) {
+  const res = await request.post('/api/past-contracts', { data: { buyerType: 'central', ...body } });
+  expect(res.status(), await res.text()).toBe(201);
+  return res.json();
+}
+
+/** Evidence screenshot for spec 005: writes `qa/evidence/005/<story>/<name>.png` (story = 'US1' … 'US6', 'HARDEN'). */
+export function evidence005(page: Page, story: string, name: string) {
+  return evidence(page, '005', story, name);
+}
+
 /** `test` with an auto fixture that disposes every context opened by inviteAs(), even when the test fails. */
 export const test = base.extend<{ _disposeInvited: void }>({
   _disposeInvited: [async ({}, use) => {

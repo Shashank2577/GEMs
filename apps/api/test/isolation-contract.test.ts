@@ -109,6 +109,8 @@ const FOREIGN: Record<string, () => Call> = {
   'GET /tenders/:id/documents/:docId/download': () => asB('GET', `/tenders/${ids.tender}/documents/${ids.tenderDoc}/download`),
   'GET /tenders/:id/analysis': () => asB('GET', `/tenders/${ids.tender}/analysis`),
   'POST /analyses/:id/override': () => asB('POST', `/analyses/${ids.analysis}/override`, { factorKey: 'emd', status: 'fail', reason: 'Hijack attempt' }),
+  'GET /vault/:id': () => asB('GET', `/vault/${ids.vault}`),
+  'PUT /vault/:id/file': () => asBForm('PUT', `/vault/${ids.vault}/file`),
   'PATCH /past-contracts/:id': () => asB('PATCH', `/past-contracts/${ids.pastContract}`, { value: 1 }),
   'DELETE /past-contracts/:id': () => asB('DELETE', `/past-contracts/${ids.pastContract}`),
   'PATCH /vault/:id': () => asB('PATCH', `/vault/${ids.vault}`, { title: 'Hijacked' }),
@@ -136,8 +138,6 @@ const FOREIGN: Record<string, () => Call> = {
 
 /** Implemented routes not (yet) in the contract, swept the same way. */
 const FOREIGN_EXTRA: Record<string, () => Call> = {
-  'GET /vault/:id': () => asB('GET', `/vault/${ids.vault}`),
-  'PUT /vault/:id/file': () => asBForm('PUT', `/vault/${ids.vault}/file`),
   'GET /workspaces/:id/packets': () => asB('GET', `/workspaces/${ids.workspace}/packets`),
   'DELETE /workspaces/:id/overrides/:itemId': () => asB('DELETE', `/workspaces/${ids.workspace}/overrides/oem_authorization`),
   'POST /workspaces/:id/annexures/:key/preview': () =>
