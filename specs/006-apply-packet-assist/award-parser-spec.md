@@ -31,16 +31,16 @@ export const MAX_RESULT_HTML = 512 * 1024   // already exported by the module; t
 - Input longer than `MAX_RESULT_HTML` (512 KB) is truncated to that length before parsing (real pages are far smaller).
 - A row longer than 16 KB (`MAX_ROW_LENGTH`) is not a bidder row and is skipped without being parsed (a real row is < 2 KB).
 - Row and cell counts are bounded by the input size cap; implementations may add explicit caps (rows, cells per row) as long as
-  B1-B16 still hold.
+  B1-B10 still hold.
 
 ## 4. Hostile-input requirements (NFR)
 
 - Single left-to-right scan, O(n) time and memory in input length. No regex with nested/overlapping quantifiers or
   backtracking-prone alternation; prefer a hand-written tokenizer (index scanning, `indexOf`) over regex on the whole input.
-- A 512 KB input of any of the shapes in B12/B13 must finish well under 200 ms (test limit 200 ms per input; target < 50 ms);
-  all hostile inputs in B13 together < 2 s.
+- A 512 KB input of any of the shapes in B7/B10 must finish well under 200 ms (test limit 200 ms per input; target < 50 ms);
+  all hostile inputs in B10 together < 2 s.
 - Unclosed tags/cells, unterminated `<td`, `<tr>` without `</tr>`, huge header rows, and tens of thousands of cells must neither
-  hang nor throw; they yield `null` (B13) or whatever valid rows exist.
+  hang nor throw; they yield `null` (B10) or whatever valid rows exist.
 - Output is plain text only: every returned `name` is entity-decoded text with all markup removed, whitespace collapsed and
   trimmed; it is safe to render as text (no tags survive). Callers must never inject it as HTML.
 
@@ -55,7 +55,7 @@ Classification of each table by its **first row** (header row), case-insensitive
 
 - Price/financial table: first row contains any of `rank`, `price`, `l1`, `financial`, `amount`, `total` (plan.md).
 - Any other table is ignored: technical-evaluation tables (headers like seller / vendor / bidder / technical / qualified with
-  none of the words above), RA-details key/value tables, tables like `Name | City`. Ignored tables contribute no bidders (B2, B12).
+  none of the words above), RA-details key/value tables, tables like `Name | City`. Ignored tables contribute no bidders (B2, B8).
 - All price tables in the document contribute rows (typical page has one).
 
 Column mapping inside a price table, from the first row's header words (not by position, B5):
@@ -63,24 +63,24 @@ Column mapping inside a price table, from the first row's header words (not by p
 - rank column: header contains `rank` (or `l1`-style rank wording).
 - name column: header contains `seller`, `vendor`, `bidder`, `company` or `name`. `S.No`/serial columns are neither rank nor name.
 - price column: header contains `price`, `amount` or `total` (e.g. `Total Price (₹)`).
-- Fallback when a role has no header word (B4, B3): the first row has no usable role headers or the table is only partially
+- Fallback when a role has no header word (B3c, B4): the first row has no usable role headers or the table is only partially
   labelled, then use content: the price is the right-most cell that parses as a positive amount in a column that is not the rank
   column; the name is the first cell with letters that is not the rank/price cell; rank is a cell that is purely a rank token
   (`1`, `L1`, `l2`).
 - A rank value is `N` or `L<N>` (case-insensitive) with N a positive integer, giving N; anything else, or no rank column, gives `0`.
-- Rank is never reused as the price: a cell identified as the rank cell is excluded from price candidates (B6).
+- Rank is never reused as the price: a cell identified as the rank cell is excluded from price candidates (B4).
 
 The first row of a price table is the header and is never a data row (also when its cells are `<td>` rather than `<th>`).
 
 ## 6. Row acceptance, name cleaning, winner selection
 
-A data row is accepted iff it yields a non-empty seller name and a price that is finite, `> 0` and `<= 1e13` (B8, B9). Other rows
+A data row is accepted iff it yields a non-empty seller name and a price that is finite, `> 0` and `<= 1e13` (B6, B9). Other rows
 are skipped silently; later rows are not affected by a skipped row.
 
 Name cleaning: plain text of the name cell; icon-only elements (e.g. `<i class="fa fa-trophy">`) add no text; a trailing
 parenthesised portal tag such as `(MSE)` is stripped (fixture: `<i trophy/> Kaveri ... (MSE)` gives `Kaveri Systems & Services Pvt Ltd`).
 
-Winner selection among accepted rows, first match wins (B7):
+Winner selection among accepted rows, first match wins (B3):
 1. A row marked as winner: the row (`<tr>`) or any of its cells carries a class token `winner`, or contains a trophy icon
    (class containing `trophy`). First such row in document order.
 2. Else the row with rank 1.
@@ -92,10 +92,10 @@ Applied to the price cell's text:
 
 - Accepts plain digits, Indian grouping (`28,40,500.00`), Western grouping, optional decimal part; commas are separators only.
 - Currency marks are ignored only as a prefix or a suffix of the numeric token, separated by optional whitespace: `₹`, `Rs`, `Rs.`,
-  `INR` (case-insensitive), including when they arrive as entities (`&#8377;`, `&nbsp;`) (B1, B11).
+  `INR` (case-insensitive), including when they arrive as entities (`&#8377;`, `&nbsp;`) (B1, B6c-d).
 - A currency word inside the digits (`15Rs0`), scientific notation (`1e5`), text (`abc`), empty, multiple numbers, or a negative
   sign gives "not an amount" so the row is skipped.
-- Value must be `> 0` and `<= 1e13`; `99999999999999` (1e14-1) is rejected (B8). `0` is rejected (B9).
+- Value must be `> 0` and `<= 1e13`; `99999999999999` (1e14-1) is rejected (B6). `0` is rejected (B9).
 - Returned price is the parsed number in rupees (decimals preserved, e.g. `28,40,500.00` gives `2840500`).
 - Parsing must be a linear scan of the cell (no backtracking regex).
 
@@ -122,8 +122,7 @@ Shorthand: `T(rows)` = `<table><tr><th>Rank</th><th>Seller</th><th>Price</th></t
 | B9 | skips rows without seller or positive price | `T` rows `1 / Alpha Co / 0`, `2 / Beta Co / abc`, `3 / Delta Co / 5,000` | `bidders` `toEqual` `[{rank:3,name:'Delta Co',price:5000}]` |
 | B10 | linear on hostile markup | (i) `<table><tr><th>Price</th>` + `<td` x 50,000 (unterminated); (ii) `<table><tr><th>Price</th></tr>` + `<tr><td>1</td><td>A` x (512 KB / 16) (unclosed cells/rows, no valid price) | both `null`; both together < 2000 ms |
 
-Cross-references used above: B11 (currency affix/entity handling) is covered by B1 (`₹ 31,25,000`), B3c, B6c-d; B12 (non-price
-tables) by B2 and B8; B13 (hostile) by B7 and B10; B14-B16 (limits) by section 3.
+Currency affix handling is covered by B1 (`₹ 31,25,000`), B3c, B6c-d; non-price tables by B2 and B8; hostile input by B7 and B10; limits by section 3.
 
 Observable behaviour from the UI/E2E (SubmitStep, S9/S9b), which the parser must satisfy:
 - Fixture gives L1 `2840500` and seller containing `Kaveri Systems & Services Pvt Ltd`; the UI rounds `l1Price` to an integer.
