@@ -85,8 +85,12 @@ test.describe('US3 vault', () => {
     await expect(d.getByRole('combobox').filter({ hasText: 'FY 2024-25' })).toBeVisible();
     await ev(page, 'ac02-guessed-metadata-balance-sheet');
     await d.getByRole('button', { name: 'Cancel' }).click();
+    // wait for the first dialog to unmount; otherwise, under load, the file lands in the closing dialog's input
+    // and the re-opened dialog starts empty (no type picker yet)
+    await expect(d).toBeHidden();
 
     await page.getByRole('button', { name: 'Upload document' }).first().click();
+    await expect(d).toBeVisible();
     await pickFile(page, { name: 'ISO_9001_cert.pdf', mimeType: 'application/pdf', buffer: await makePdf(1) });
     await expect(d.locator('button[aria-haspopup="listbox"]')).toContainText('ISO certificate');
     await d.getByLabel('Issue date').fill('2026-01-10');
