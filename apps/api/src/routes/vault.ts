@@ -138,8 +138,11 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return Array.from(d, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** At most this many un-hashed rows of the same size are hashed per upload (lazy backfill, FR-067). */
-const LAZY_HASH_LIMIT = 20;
+/** Lazy backfill budget per request (FR-067): at most 5 un-hashed rows and ~40 MB of blob reads. */
+const LAZY_HASH_MAX_ROWS = 5;
+const LAZY_HASH_MAX_BYTES = 40 * 1024 * 1024;
+/** `content_sha256` sentinel for a row whose blob is gone, so it is not fetched again. Never matches a hex digest. */
+const SHA_MISSING = 'missing';
 
 /**
  * Another document of the org with the same content (FR-067), or null. Rows stored before hashing
@@ -153,11 +156,11 @@ async function findDuplicate(deps: AppDeps, org: string, sha: string, size: numb
   if (hit) return hit;
   const unknown = await deps.db.select({ id: vaultDocuments.id, title: vaultDocuments.title, blobKey: vaultDocuments.blobKey }).from(vaultDocuments)
     .where(and(eq(vaultDocuments.orgId, org), isNull(vaultDocuments.contentSha256), eq(vaultDocuments.sizeBytes, size), ...notSelf))
-    .orderBy(vaultDocuments.createdAt).limit(LAZY_HASH_LIMIT);
+    .orderBy(vaultDocuments.createdAt).limit(Math.max(1, Math.min(LAZY_HASH_MAX_ROWS, Math.floor(LAZY_HASH_MAX_BYTES / Math.max(size, 1)))));
   for (const r of unknown) {
-    const obj = await deps.blobs.get(r.blobKey).catch(() => null);
-    if (!obj) continue;
-    const h = await sha256Hex(new Uint8Array(await obj.arrayBuffer()));
+    let obj: Awaited<ReturnType<AppDeps['blobs']['get']>>;
+    try { obj = await deps.blobs.get(r.blobKey); } catch { continue; } // transient storage error: retry on a later upload
+    const h = obj ? await sha256Hex(new Uint8Array(await obj.arrayBuffer())) : SHA_MISSING;
     await deps.db.update(vaultDocuments).set({ contentSha256: h })
       .where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, r.id), isNull(vaultDocuments.contentSha256)));
     if (h === sha) return { id: r.id, title: r.title };
@@ -353,7 +356,8 @@ vaultRoutes.put('/vault/:id/file', requireRole('analyst'), async (c) => {
   const issue = fields.issueDate !== undefined ? fields.issueDate : existing.issueDate;
   const expiry = fields.expiryDate !== undefined ? fields.expiryDate : existing.expiryDate;
   if (issue && expiry && expiry < issue) throw validationError('expiryDate: Expiry date is before the issue date', { fields: { expiryDate: 'Expiry date is before the issue date' } });
-  const expiryChanged = fields.expiryDate !== undefined && fields.expiryDate !== existing.expiryDate;
+  // A renewal = a new, non-empty expiry date: restart reminders and log vault.renewed (FR-064). Clearing it is a plain edit.
+  const expiryChanged = fields.expiryDate != null && fields.expiryDate !== existing.expiryDate;
 
   const contentSha256 = await sha256Hex(file.bytes);
   await rejectDuplicate(deps, org, body, contentSha256, file.bytes.length, existing.id);
@@ -408,7 +412,7 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
   const org = orgId(c);
   const existing = await getDoc(deps, org, c.req.param('id'));
   // One transaction: CRAC unlink, OEM unlink (FR-041), versions (FR-065) and the row delete commit together.
-  const versionKeys = await deps.db.transaction(async (tx) => {
+  const blobKeys = await deps.db.transaction(async (tx) => {
     await tx.update(pastContracts).set({ cracDocumentId: null }).where(and(eq(pastContracts.orgId, org), eq(pastContracts.cracDocumentId, existing.id)));
     // Profile OEM authorisations pointing at this document (case-insensitive id match, order preserved).
     await tx.update(companyProfiles).set({
@@ -418,11 +422,14 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
     const versions = await tx.delete(vaultDocumentVersions)
       .where(and(eq(vaultDocumentVersions.orgId, org), eq(vaultDocumentVersions.documentId, existing.id)))
       .returning({ blobKey: vaultDocumentVersions.blobKey });
-    await tx.delete(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id)));
-    return versions.map((v) => v.blobKey);
+    // The blob key comes from the deleted row itself: a replace that committed after getDoc() must not leak its file.
+    const [gone] = await tx.delete(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id)))
+      .returning({ blobKey: vaultDocuments.blobKey });
+    if (!gone) throw notFound('Document');
+    return [gone.blobKey, ...versions.map((v) => v.blobKey)];
   });
   // After commit: the blobs (current file + versions) and the activity entry.
-  for (const key of [existing.blobKey, ...versionKeys]) {
+  for (const key of blobKeys) {
     await deps.blobs.delete(key).catch((e) => deps.logger.warn('vault blob delete failed', { key, error: String(e) }));
   }
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.deleted', entityType: 'vault_document', entityId: existing.id, meta: { type: existing.type, title: existing.title } });

@@ -15,14 +15,15 @@ import { errorMessage } from '@/lib/api';
 import { useReplaceVaultFile } from './api';
 import { DuplicatePrompt } from './doc-ui';
 import { checkVaultFile } from './file-check';
-import { duplicateOf, renewDefaults, renewedMessage, type DuplicateInfo, type RenewDraft } from './renew';
+import { duplicateOf, renewDefaults, renewedMessage, renewFields, type DuplicateInfo, type RenewDraft } from './renew';
 import { serverFieldErrors } from './UploadDialog';
 
 export function RenewDialog({ doc, open, onOpenChange, onOpenExisting }: {
   doc: VaultDocumentDto; open: boolean; onOpenChange: (o: boolean) => void; onOpenExisting: (id: string) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [draft, setDraft] = useState<RenewDraft>(() => renewDefaults(doc));
+  const [initial, setInitial] = useState<RenewDraft>(() => renewDefaults(doc));
+  const [draft, setDraft] = useState<RenewDraft>(initial);
   const [expiryTouched, setExpiryTouched] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dup, setDup] = useState<DuplicateInfo | null>(null);
@@ -31,7 +32,8 @@ export function RenewDialog({ doc, open, onOpenChange, onOpenExisting }: {
 
   useEffect(() => {
     if (!open) return;
-    setFile(null); setDraft(renewDefaults(doc)); setExpiryTouched(false); setErrors({}); setDup(null);
+    const d = renewDefaults(doc);
+    setFile(null); setInitial(d); setDraft(d); setExpiryTouched(false); setErrors({}); setDup(null);
   }, [open, doc.id]);
 
   const pick = (f: File) => {
@@ -49,13 +51,11 @@ export function RenewDialog({ doc, open, onOpenChange, onOpenExisting }: {
   const submit = (allowDuplicate = false) => {
     if (!file) { setErrors({ file: 'Choose the renewed file' }); return; }
     const e: Record<string, string> = {};
-    if (draft.issueDate && draft.expiryDate && draft.expiryDate < draft.issueDate) e.expiryDate = 'Expiry date is before the issue date';
+    if (info.expires && !draft.expiryDate) e.expiryDate = 'Add the new expiry date so reminders restart';
+    else if (draft.issueDate && draft.expiryDate && draft.expiryDate < draft.issueDate) e.expiryDate = 'Expiry date is before the issue date';
     setErrors(e);
     if (Object.keys(e).length) return;
-    replace.mutate({
-      id: doc.id, file,
-      fields: { issueDate: draft.issueDate, expiryDate: draft.expiryDate, number: draft.number.trim(), allowDuplicate },
-    }, {
+    replace.mutate({ id: doc.id, file, fields: { ...renewFields(draft, initial), allowDuplicate } }, {
       onSuccess: (updated) => { toast.success(renewedMessage(updated)); onOpenChange(false); },
       onError: (err) => {
         const d = duplicateOf(err);

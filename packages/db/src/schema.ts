@@ -208,7 +208,7 @@ export const vaultDocumentVersions = pgTable('vault_document_versions', {
   expiryDate: date('expiry_date'),
   replacedBy: uuid('replaced_by').references(() => users.id),
   replacedAt: timestamp('replaced_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({ docIdx: index('vault_versions_doc_idx').on(t.documentId, t.replacedAt.desc()) }));
+}, (t) => ({ orgIdx: index('vault_versions_org_idx').on(t.orgId), docIdx: index('vault_versions_doc_idx').on(t.documentId, t.replacedAt.desc()) }));
 
 // ───────────── Tenders (global, public GeM data) ─────────────
 

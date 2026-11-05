@@ -13,6 +13,19 @@ export function renewDefaults(doc: Pick<VaultDocumentDto, 'type' | 'number'>, no
   return { issueDate, expiryDate: suggestExpiry(doc.type, issueDate) ?? '', number: doc.number ?? '' };
 }
 
+/**
+ * Fields to send with the renewed file: filled values as typed, '' for a value the user cleared (the server
+ * clears it), nothing for a field that was empty to begin with (the server keeps the stored value).
+ */
+export function renewFields(draft: RenewDraft, initial: RenewDraft): Partial<RenewDraft> {
+  const out: Partial<RenewDraft> = {};
+  for (const k of ['issueDate', 'expiryDate', 'number'] as const) {
+    const v = draft[k].trim();
+    if (v || initial[k]) out[k] = v;
+  }
+  return out;
+}
+
 /** Toast after a renewal: "“<title>” renewed — valid till <date>" (FR-064). */
 export function renewedMessage(doc: Pick<VaultDocumentDto, 'title' | 'expiryDate'>): string {
   return doc.expiryDate ? `“${doc.title}” renewed — valid till ${formatDateIST(doc.expiryDate)}` : `“${doc.title}” renewed`;

@@ -56,7 +56,7 @@ export function useUpdateVault() {
   return useMutation({ mutationFn: ({ id, ...body }: VaultUpdateInput & { id: string }) => api.patch<VaultDocumentDto>(`/vault/${id}`, body), onSuccess: inv });
 }
 
-/** Renewal fields sent with the replacement file (FR-064); empty values are not sent. */
+/** Renewal fields sent with the replacement file (FR-064). `undefined` = keep; '' = clear. */
 export interface ReplaceFields { issueDate?: string; expiryDate?: string; number?: string; allowDuplicate?: boolean }
 
 export function useReplaceVaultFile() {
@@ -66,7 +66,7 @@ export function useReplaceVaultFile() {
       const fd = new FormData();
       fd.append('file', file);
       const { allowDuplicate, ...rest } = fields;
-      for (const [k, v] of Object.entries(rest)) if (v) fd.append(k, v);
+      for (const [k, v] of Object.entries(rest)) if (v !== undefined) fd.append(k, v);
       if (allowDuplicate) fd.append('allowDuplicate', '1');
       return apiFetch<VaultDocumentDto>(`/vault/${id}/file`, { method: 'PUT', body: fd });
     },

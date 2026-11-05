@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
-import { duplicateMessage, duplicateOf, renewDefaults, renewedMessage, versionLine } from './renew';
+import { duplicateMessage, duplicateOf, renewDefaults, renewedMessage, renewFields, versionLine } from './renew';
 
 describe('renewal copy and helpers (US6; FR-064, FR-066, FR-067)', () => {
   it('defaults the issue date to today in IST and suggests the expiry from the type', () => {
@@ -8,6 +8,13 @@ describe('renewal copy and helpers (US6; FR-064, FR-066, FR-067)', () => {
     const now = new Date('2026-11-05T20:00:00Z');
     expect(renewDefaults({ type: 'iso', number: 'QMS-1' }, now)).toEqual({ issueDate: '2026-11-06', expiryDate: '2029-11-05', number: 'QMS-1' });
     expect(renewDefaults({ type: 'pan', number: null }, now)).toEqual({ issueDate: '2026-11-06', expiryDate: '', number: '' });
+  });
+
+  it('sends typed values, \'\' for cleared ones and omits fields that were always empty', () => {
+    const initial = { issueDate: '2026-11-06', expiryDate: '2029-11-05', number: 'QMS-1' };
+    expect(renewFields({ ...initial, number: ' QMS-2 ' }, initial)).toEqual({ issueDate: '2026-11-06', expiryDate: '2029-11-05', number: 'QMS-2' });
+    expect(renewFields({ ...initial, number: '', issueDate: '' }, initial)).toEqual({ issueDate: '', expiryDate: '2029-11-05', number: '' });
+    expect(renewFields({ issueDate: '2026-11-06', expiryDate: '', number: '' }, { issueDate: '2026-11-06', expiryDate: '', number: '' })).toEqual({ issueDate: '2026-11-06' });
   });
 
   it('formats the renewed toast', () => {

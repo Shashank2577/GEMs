@@ -13,11 +13,11 @@ import { useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { useDeleteVault, useReplaceVaultFile, useUpdateVault, useVaultVersions } from './api';
 import { checkVaultFile } from './file-check';
-import { DocTypeIcon, ExpiryBadge } from './doc-ui';
+import { DocTypeIcon, DuplicatePrompt, ExpiryBadge } from './doc-ui';
 import { DocumentForm, validateDraft, type DocDraft } from './DocumentForm';
 import { nextReminderLine } from './reminders';
 import { RenewDialog } from './RenewDialog';
-import { versionLine } from './renew';
+import { duplicateOf, versionLine, type DuplicateInfo } from './renew';
 import { serverFieldErrors } from './UploadDialog';
 
 const toDraft = (d: VaultDocumentDto): DocDraft => ({
@@ -85,12 +85,16 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
   const [confirm, setConfirm] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const [, setParams] = useSearchParams();
+  const openDoc = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('doc', id); return n; });
+  /** Replace file refused as a duplicate (FR-067): the file to re-send with allowDuplicate and the existing document. */
+  const [replaceDup, setReplaceDup] = useState<{ file: File; info: DuplicateInfo } | null>(null);
   const update = useUpdateVault();
   const replace = useReplaceVaultFile();
   const del = useDeleteVault();
 
   useEffect(() => { if (doc) { setDraft(toDraft(doc)); setErrors({}); } }, [doc?.id, doc?.updatedAt]);
   useEffect(() => { if (!open) { setEditing(false); setRenewing(false); } }, [open]);
+  useEffect(() => setReplaceDup(null), [doc?.id, open]);
 
   if (!doc) return null;
   const info = docTypeInfo(doc.type);
@@ -109,13 +113,18 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
     });
   };
 
-  const onReplace = (f: File | undefined) => {
+  const onReplace = (f: File | undefined, allowDuplicate = false) => {
     if (!f) return;
     const problem = checkVaultFile(f);
     if (problem) { toast.error(problem); return; }
-    replace.mutate({ id: doc.id, file: f }, {
+    setReplaceDup(null);
+    replace.mutate({ id: doc.id, file: f, fields: { allowDuplicate } }, {
       onSuccess: () => toast.success('File replaced', { description: 'Metadata kept. Update the expiry date if this is a renewed copy.' }),
-      onError: (err) => toast.error(errorMessage(err)),
+      onError: (err) => {
+        const d = duplicateOf(err);
+        if (d) setReplaceDup({ file: f, info: d });
+        else toast.error(errorMessage(err));
+      },
     });
   };
 
@@ -143,6 +152,13 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
             </div>
           </SheetHeader>
           <SheetBody className="grid content-start gap-5">
+            {replaceDup && (
+              <DuplicatePrompt
+                title={replaceDup.info.title} busy={replace.isPending}
+                onOpenExisting={() => { const id = replaceDup.info.existingId; setReplaceDup(null); openDoc(id); }}
+                onUploadAnyway={() => onReplace(replaceDup.file, true)}
+              />
+            )}
             {doc.status === 'expired' && (
               <div role="status" className="flex items-start gap-2.5 rounded-lg border border-danger/25 bg-danger-soft/60 px-3 py-2.5 text-sm">
                 <FileWarning className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
@@ -207,7 +223,7 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
       {canWrite && (
         <RenewDialog
           doc={doc} open={renewing} onOpenChange={setRenewing}
-          onOpenExisting={(id) => setParams((p) => { const n = new URLSearchParams(p); n.set('doc', id); return n; })}
+          onOpenExisting={openDoc}
         />
       )}
       <ConfirmDialog

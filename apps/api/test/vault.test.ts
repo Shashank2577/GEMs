@@ -1044,6 +1044,80 @@ describe('vault renewal, versions and duplicates (T064)', () => {
     expect(row!.contentSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('two concurrent replaces of the same document: one 200, the other 409 conflict with its blob removed', async () => {
+    const doc = await isoUpload('ISO race', await pdf(1), 'race.pdf');
+    const written: string[] = [];
+    // Hold both blob writes until both requests have read the row, so they really race.
+    let release!: () => void;
+    const both = new Promise<void>((r) => { release = r; });
+    const blobs: AppDeps['blobs'] = {
+      ...ctx.deps.blobs,
+      put: async (key, body, o) => {
+        written.push(key);
+        if (written.length === 2) release();
+        await both;
+        return ctx.deps.blobs.put(key, body, o);
+      },
+    };
+    const app = createApp({ ...ctx.deps, blobs });
+    const [a, b] = await Promise.all([
+      request(app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'a.pdf') } }),
+      request(app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'b.pdf') } }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    const loser = a.status === 409 ? a : b;
+    expect(loser.body.error.code).toBe('conflict');
+    expect(written).toHaveLength(2);
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    const loserKey = written.find((k) => k !== row!.blobKey)!;
+    expect(written).toContain(row!.blobKey);
+    expect(await ctx.deps.blobs.head(loserKey)).toBeNull();
+    expect(await ctx.deps.blobs.head(row!.blobKey)).not.toBeNull();
+    const vs = await versionsOf(doc.id);
+    expect(vs.map((v) => v.fileName)).toEqual(['race.pdf']);
+    expect(await ctx.deps.blobs.head(vs[0]!.blobKey)).not.toBeNull();
+  });
+
+  it('clearing the expiry on replace is not a renewal: no vault.renewed, reminder state kept (FR-064)', async () => {
+    const doc = await isoUpload('ISO cleared expiry', await pdf(1));
+    await ctx.db.update(vaultDocuments).set({ lastReminderDays: 7 }).where(eq(vaultDocuments.id, doc.id));
+    const r = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'n.pdf'), expiryDate: '' } });
+    expect(r.status).toBe(200);
+    expect(r.body.expiryDate).toBeNull();
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    expect(row!.lastReminderDays).toBe(7);
+    expect(await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, doc.id), eq(activityLog.action, 'vault.renewed')))).toHaveLength(0);
+  });
+
+  it('lazy hashing marks rows whose blob is gone as "missing" and reads at most 5 blobs per request (FR-067)', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Lazy Hash Traders');
+    // Seven legacy rows with identical size and unknown hash; one blob is gone.
+    const sameSize = (n: number) => { const b = new Uint8Array(4096); b.set(PNG); b[100] = n; return b; };
+    const ids: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const up = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(sameSize(i), `p${i}.png`, 'image/png'), title: `Legacy ${i}` } });
+      expect(up.status, up.text).toBe(201);
+      ids.push(up.body.id);
+    }
+    await ctx.db.update(vaultDocuments).set({ contentSha256: null }).where(eq(vaultDocuments.orgId, o.orgId));
+    const [first] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, ids[0]!));
+    await ctx.deps.blobs.delete(first!.blobKey);
+    let gets = 0;
+    const app = createApp({ ...ctx.deps, blobs: { ...ctx.deps.blobs, get: async (k) => { gets++; return ctx.deps.blobs.get(k); } } });
+    const r1 = await request(app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(sameSize(99), 'new.png', 'image/png') } });
+    expect(r1.status).toBe(201);
+    expect(gets).toBe(5);
+    const rows = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.orgId, o.orgId));
+    expect(rows.find((x) => x.id === ids[0])!.contentSha256).toBe('missing');
+    expect(rows.filter((x) => x.contentSha256 === null)).toHaveLength(2);
+    // The next upload continues with the remaining unknown rows and catches the duplicate among them.
+    gets = 0;
+    const r2 = await request(app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(sameSize(6), 'again.png', 'image/png') } });
+    expect(r2.status).toBe(409);
+    expect(r2.body.error.details.existingId).toBe(ids[6]);
+    expect(gets).toBe(2);
+  });
+
   it('a DB failure during replace removes the new blob and leaves the old file, row and versions untouched', async () => {
     const oldBytes = await pdf(1);
     const doc = await isoUpload('ISO doomed renewal', oldBytes, 'same.pdf');
