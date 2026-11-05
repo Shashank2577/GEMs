@@ -74,6 +74,8 @@ export interface EmailMessage {
   html?: string;
   text?: string;
   replyTo?: string;
+  /** Extra headers, e.g. List-Unsubscribe / List-Unsubscribe-Post (RFC 8058). */
+  headers?: Record<string, string>;
 }
 
 export interface Mailer {
