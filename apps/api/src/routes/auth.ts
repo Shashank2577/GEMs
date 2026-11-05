@@ -20,7 +20,7 @@ import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/
 import { buildMe } from '../lib/me';
 import { defer } from '../lib/defer';
 import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reset } from '../lib/rate-limit';
-import { clearSessionCookie, firstMembership, loadMembership, loadUser, resolveAuth, startSession } from '../lib/session';
+import { clearSessionCookie, firstMembership, loadMembership, loadUser, rememberOrg, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
 import { parseJson, parseWith } from '../lib/validate';
 import type { AppEnv } from '../types';
@@ -85,11 +85,13 @@ authRoutes.post('/auth/signup', async (c) => {
 
 const NO_ORGANIZATION = () => new HttpError(403, 'no_organization', 'You are not a member of any organization. Ask an owner to invite you.');
 
-/** The org to sign into: the most recently used one the user is still a member of, else the oldest membership. */
+/**
+ * The org to sign into: the last one the user worked in (`users.last_org_id`, kept across sign-outs and updated by
+ * sign-in, switch-org and accept-invite in any session) if still a member, else the oldest membership.
+ */
 async function pickSignInOrg(db: Db, uid: string) {
-  const [last] = await db.select({ orgId: sessions.activeOrgId }).from(sessions)
-    .where(eq(sessions.userId, uid)).orderBy(desc(sessions.createdAt)).limit(1);
-  let m = last?.orgId ? await loadMembership(db, uid, last.orgId) : null;
+  const [u] = await db.select({ orgId: users.lastOrgId }).from(users).where(eq(users.id, uid));
+  let m = u?.orgId ? await loadMembership(db, uid, u.orgId) : null;
   if (!m) m = await firstMembership(db, uid);
   return m;
 }
@@ -130,6 +132,7 @@ authRoutes.post('/auth/switch-org', requireSession, async (c) => {
   const m = await loadMembership(db, c.var.user.id, target);
   if (!m) throw notFound('Organization');
   await db.update(sessions).set({ activeOrgId: target }).where(eq(sessions.id, c.var.sessionId!));
+  await rememberOrg(db, c.var.user.id, target);
   return respondMe(c, c.var.user.id, target);
 });
 
@@ -297,7 +300,10 @@ authRoutes.post('/auth/accept-invite', async (c) => {
   await logActivity(db, { orgId: inv.orgId, userId: uid, action: 'member.joined', entityType: 'user', entityId: uid, meta: { role: inv.role, email: inv.email } });
 
   if (needsSession) await startSession(c, uid, inv.orgId);
-  else await db.update(sessions).set({ activeOrgId: inv.orgId }).where(eq(sessions.id, current!.sessionId!));
+  else {
+    await db.update(sessions).set({ activeOrgId: inv.orgId }).where(eq(sessions.id, current!.sessionId!));
+    await rememberOrg(db, uid, inv.orgId);
+  }
   return respondMe(c, uid, inv.orgId);
 });
 

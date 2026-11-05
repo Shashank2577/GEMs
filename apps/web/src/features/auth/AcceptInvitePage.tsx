@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CalendarClock, LogIn, LogOut, Mail, MailCheck, UserRound } from 'lucide-react';
 import type { InvitePreview } from '@tp/core/contracts/auth';
 import { Button } from '@/components/ui/button';
@@ -9,14 +10,15 @@ import { Avatar } from '@/components/ui/misc';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/states';
 import { toast } from '@/components/ui/toaster';
-import { useAuth, type Me } from '@/lib/auth';
+import { ApiError } from '@/lib/api';
+import { ME_KEY, useAuth, type Me } from '@/lib/auth';
 import { formatDateIST } from '@/lib/format';
 import { ROLE_LABEL } from '@/lib/types';
 import { AuthLayout } from './AuthLayout';
 import { PasswordInput, StrengthMeter } from './PasswordInput';
 import { FormAlert } from './FormAlert';
 import {
-  acceptInviteError, acceptInviteFieldErrors, inviteMode, isInviteInvalid, isInviteMismatch, mismatchMessage, useInvitePreview,
+  INVITE_INVALID_MESSAGE, acceptInviteError, acceptInviteFieldErrors, inviteMode, isInviteInvalid, isInviteMismatch, mismatchMessage, useInvitePreview,
 } from './api';
 
 const TITLE = (
@@ -37,7 +39,8 @@ export default function AcceptInvitePage() {
 
   if (invalidated || (preview.isError && isInviteInvalid(preview.error))) return <InvalidInvite />;
 
-  if (preview.isError) {
+  // A failed background refetch keeps showing the cached preview.
+  if (preview.isError && !preview.data) {
     return (
       <AuthLayout docTitle="Accept invitation" title={TITLE} subtitle={SUBTITLE}>
         <ErrorState compact title="We couldn’t load this invitation" error={preview.error}
@@ -63,7 +66,7 @@ function InvalidInvite() {
       subtitle="Invitation links work once and expire after 7 days.">
       <div className="grid gap-5">
         <ErrorState compact title="Ask your admin for a new invitation"
-          body="This invitation link is invalid, already used or has expired." />
+          body={INVITE_INVALID_MESSAGE} />
         <Button asChild size="lg" block>
           <Link to="/login"><LogIn /> Go to sign in</Link>
         </Button>
@@ -118,6 +121,7 @@ function SignedInAs({ me }: { me: Me }) {
 
 function InviteForm({ token, invite, me, onInvalid }: { token: string; invite: InvitePreview; me: Me | null; onInvalid: () => void }) {
   const { acceptInvite, logout } = useAuth();
+  const qc = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -140,8 +144,12 @@ function InviteForm({ token, invite, me, onInvalid }: { token: string; invite: I
       if (isInviteInvalid(err)) return onInvalid();
       if (isInviteMismatch(err)) { setServerMismatch(true); return; }
       const fields = acceptInviteFieldErrors(err);
-      if (fields.name || fields.password) setErrors(fields);
+      // Field errors only have a field to sit under in the signed-out forms; otherwise show them as a form error.
+      const formShown = mode === 'existing' || mode === 'new';
+      if (formShown && (fields.name || fields.password)) setErrors(fields);
       else setFormError(acceptInviteError(err));
+      // Signed in here but the API saw no session (expired/revoked): refresh `me` so the signed-out form appears.
+      if (!formShown && err instanceof ApiError && err.status === 401) void qc.invalidateQueries({ queryKey: ME_KEY });
     } finally {
       setLoading(false);
     }

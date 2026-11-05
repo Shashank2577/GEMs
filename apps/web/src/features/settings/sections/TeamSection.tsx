@@ -5,7 +5,7 @@ import {
   Avatar, Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState,
   ErrorState, Field, Input, ResponsiveTable, Select, SkeletonList, toast, type Column,
 } from '@/components/ui';
-import { errorMessage } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { ROLE_LABEL, type Role } from '@/lib/types';
@@ -143,7 +143,8 @@ function InviteDialog({ open, onOpenChange, allowOwner }: { open: boolean; onOpe
     setErr(null);
     invite.mutate({ email: email.trim(), role }, {
       onSuccess: (inv) => setCreated(inv),
-      onError: (e2) => setErr(fieldErrors(e2).email ?? errorMessage(e2)),
+      // 409: "<email> is already a member of this organization" under the email field (US2 scenario 3).
+      onError: (e2) => setErr(e2 instanceof ApiError && e2.isConflict ? e2.message : fieldErrors(e2).email ?? errorMessage(e2)),
     });
   };
   const roles = (Object.keys(ROLE_LABEL) as Role[]).filter((r) => allowOwner || r !== 'owner');

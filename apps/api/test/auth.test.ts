@@ -247,6 +247,37 @@ describe('invitations & roles', () => {
     expect(login.body.org.name).toBe('Alpha Supplies');
   });
 
+  it('002/FR-021: sign-in resumes the last-used org across sign-outs, else the oldest membership', async () => {
+    const a = await signup(ctx.app, { orgName: 'Oldest Org' });
+    const b = await signup(ctx.app, { orgName: 'Newer Org' });
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: b.cookie, json: { email: a.email, role: 'analyst' } });
+    const token = inv.body.inviteUrl.split('/invite/')[1];
+    const login = () => request(ctx.app, 'POST', '/api/auth/login', { json: { email: a.email, password: a.password } });
+
+    // accepting (signed in) makes B active; sign out → sign in lands in B
+    expect((await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: a.cookie, json: { token } })).body.org.name).toBe('Newer Org');
+    expect((await request(ctx.app, 'POST', '/api/auth/logout', { cookie: a.cookie })).status).toBe(200);
+    const l1 = await login();
+    expect(l1.body.org.name).toBe('Newer Org');
+
+    // switching in an older session counts too
+    const s2 = (await login()).cookie!;
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: l1.cookie!, json: { orgId: a.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: s2, json: { orgId: b.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: l1.cookie!, json: { orgId: b.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: s2, json: { orgId: a.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: l1.cookie!, json: { orgId: b.me.org.id } });
+    await request(ctx.app, 'POST', '/api/auth/logout', { cookie: l1.cookie! });
+    await request(ctx.app, 'POST', '/api/auth/logout', { cookie: s2 });
+    expect((await login()).body.org.name).toBe('Newer Org');
+
+    // removed from B → falls back to the oldest membership
+    expect((await request(ctx.app, 'DELETE', `/api/org/members/${a.me.user.id}`, { cookie: b.cookie })).status).toBe(200);
+    const l3 = await login();
+    expect(l3.status).toBe(200);
+    expect(l3.body.org.name).toBe('Oldest Org');
+  });
+
   it('a signed-in user accepting an invite for their email joins with their current account', async () => {
     const host = await signup(ctx.app, { orgName: 'Host Org' });
     const guest = await signup(ctx.app, { orgName: 'Guest Org' });
@@ -320,8 +351,11 @@ describe('invitations & roles', () => {
     expect((await request(ctx.app, 'POST', '/api/org/invitations', { cookie: bidManager.cookie, json: e() })).status).toBe(201);
     // only owners can invite owners
     expect((await request(ctx.app, 'POST', '/api/org/invitations', { cookie: bidManager.cookie, json: { email: uniqueEmail(), role: 'owner' } })).status).toBe(403);
-    // cannot invite an existing member
-    expect((await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: analyst.email, role: 'viewer' } })).status).toBe(409);
+    // cannot invite an existing member; the full sentence is the email field error (US2 scenario 3)
+    const dup = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: analyst.email, role: 'viewer' } });
+    expect(dup.status).toBe(409);
+    const dupMsg = `${analyst.email} is already a member of this organization`;
+    expect(dup.body.error).toMatchObject({ code: 'conflict', message: dupMsg, details: { fields: { email: dupMsg } } });
 
     // PATCH /org: bid_manager+
     expect((await request(ctx.app, 'PATCH', '/api/org', { cookie: analyst.cookie, json: { name: 'Hacked' } })).status).toBe(403);

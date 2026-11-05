@@ -19,6 +19,8 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   phone: text('phone'), // E.164, for WhatsApp alerts
+  // Org the user last worked in; survives sign-out so the next sign-in resumes there (002/FR-021, US2 scenario 14).
+  lastOrgId: uuid('last_org_id').references(() => organizations.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
 }, (t) => ({ emailUq: uniqueIndex('users_email_uq').on(t.email) }));
 

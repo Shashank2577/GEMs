@@ -118,7 +118,10 @@ orgRoutes.post('/org/invitations', requireRole('bid_manager'), async (c) => {
 
   const [already] = await db.select({ id: users.id }).from(memberships).innerJoin(users, eq(users.id, memberships.userId))
     .where(and(eq(memberships.orgId, oid), eq(users.email, body.email)));
-  if (already) throw conflict(`${body.email} is already a member of this organization`, { fields: { email: 'Already a member' } });
+  if (already) {
+    const msg = `${body.email} is already a member of this organization`;
+    throw conflict(msg, { fields: { email: msg } });
+  }
 
   // Re-inviting replaces any pending invitation for the same email.
   await db.delete(invitations).where(and(eq(invitations.orgId, oid), eq(invitations.email, body.email), isNull(invitations.acceptedAt)));

@@ -16,7 +16,8 @@ export function useInvitePreview(token: string) {
   });
 }
 
-export const INVITE_INVALID_MESSAGE = 'This invitation link is invalid, already used or has expired. Ask your admin for a new invitation.';
+/** Same copy as the API's 404 `invite_invalid` (US2 scenario 10). */
+export const INVITE_INVALID_MESSAGE = 'This invitation link is invalid, already used or has expired. Ask your admin for a new one.';
 
 /** The invitation itself can no longer be used (expired, revoked, already accepted, unknown). */
 export const isInviteInvalid = (err: unknown) => err instanceof ApiError && (err.code === 'invite_invalid' || err.status === 404);
