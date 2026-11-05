@@ -1,6 +1,6 @@
 /** Data hooks for the tender detail page (Identify: GET /tenders/:id; Analyse: documents, analysis, override). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { TenderDetail } from '@tp/core/contracts/identify';
+import type { TenderDetail, TenderResultDto } from '@tp/core/contracts/identify';
 import type { AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto, UploadTenderDocumentResponse } from '@tp/core/contracts/analyse';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import { api, ApiError } from '@/lib/api';
@@ -11,6 +11,7 @@ export const tenderKeys = {
   analysis: (id: string) => ['tender', id, 'analysis'] as const,
   documents: (id: string) => ['tender', id, 'documents'] as const,
   activity: (id: string) => ['tender', id, 'activity'] as const,
+  result: (id: string) => ['tender', id, 'result'] as const,
 };
 
 export function useTender(id: string) {
@@ -38,6 +39,11 @@ export function useAnalysis(id: string) {
 
 export function useTenderDocuments(id: string) {
   return useQuery({ queryKey: tenderKeys.documents(id), queryFn: () => api.get<{ items: TenderDocumentDto[]; total: number }>(`/tenders/${id}/documents`) });
+}
+
+/** GET /tenders/:id/result (FR-062) — always 200; `bidders: []` until GeM publishes. */
+export function useTenderResult(id: string) {
+  return useQuery({ queryKey: tenderKeys.result(id), queryFn: () => api.get<TenderResultDto>(`/tenders/${id}/result`) });
 }
 
 export function useTenderActivity(id: string, enabled: boolean) {
