@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { CloudDownload, Download, Eye, FileText, Globe, Upload } from 'lucide-react';
+import { CloudDownload, Download, Eye, FileText, Globe, MoreHorizontal, Trash2, Upload } from 'lucide-react';
 import type { TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
 import {
-  Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, EmptyState, ErrorState, FileDropzone, Select, SkeletonList, Tooltip, formatBytes, toast,
+  Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, ConfirmDialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, EmptyState, ErrorState, FileDropzone, Select, SkeletonList, Tooltip, formatBytes, toast,
 } from '@/components/ui';
 import { apiUrl, errorMessage } from '@/lib/api';
-import { RoleGate } from '@/lib/auth';
+import { RoleGate, useCan } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
-import { useFetchFromGem, useTenderDocuments, useUploadDocument } from './api';
+import { useFetchFromGem, useRemoveDocument, useTender, useTenderDocuments, useUploadDocument } from './api';
 import { DOC_KIND_LABEL } from './labels';
 
 const KIND_OPTIONS = (Object.keys(DOC_KIND_LABEL) as TenderDocKind[]).map((k) => ({ value: k, label: DOC_KIND_LABEL[k] }));
@@ -16,19 +17,32 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
   const docs = useTenderDocuments(tenderId);
   const upload = useUploadDocument(tenderId);
   const fetchGem = useFetchFromGem(tenderId);
+  const remove = useRemoveDocument(tenderId);
+  const bidNumber = useTender(tenderId).data?.bidNumber ?? '';
+  const canRemove = useCan('analyst');
   const [kind, setKind] = useState<TenderDocKind>('bid');
+  const [removing, setRemoving] = useState<TenderDocumentDto | null>(null);
 
   const onFiles = (files: File[]) => {
     const file = files[0];
     if (!file) return;
     upload.mutate({ file, kind }, {
-      onSuccess: (d) => toast.success(`${d.fileName} uploaded`, {
-        description: `${d.pageCount ?? 0} pages read${d.hasText ? '' : ' — no text found; it may be a scan'}`,
-        action: hasAnalysis ? { label: 'Re-analyse', onClick: onReanalyse } : undefined,
-      }),
+      onSuccess: (d) => {
+        const pagesRead = `${d.pageCount ?? 0} pages read${d.hasText ? '' : ' — no text found; it may be a scan'}`;
+        const action = hasAnalysis ? { label: 'Re-analyse', onClick: onReanalyse } : undefined;
+        toast.success(`${d.fileName} uploaded`, { description: pagesRead, action });
+        // FR-010: the document is stored either way; warn separately that it may belong to another bid.
+        const mismatch = d.warnings?.find((w) => w.code === 'bid_number_mismatch');
+        if (mismatch) toast.warning(`This PDF looks like ${mismatch.found}, not ${bidNumber || 'this bid'}`, { description: 'Check that you uploaded the right document.' });
+      },
       onError: (e) => toast.error(errorMessage(e)),
     });
   };
+
+  const onRemove = () => removing && remove.mutate(removing.id, {
+    onSuccess: () => { toast.success(`${removing.fileName} removed`); setRemoving(null); },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
 
   const onFetch = () => fetchGem.mutate(undefined, {
     onSuccess: (r) => toast.success(r.fetched ? 'Bid document downloaded from GeM' : 'The GeM bid document is already here'),
@@ -56,11 +70,18 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
             <EmptyState compact icon={FileText} title="No documents yet" body={hasGemLink ? 'Fetch the bid document from GeM, or upload the PDF you downloaded.' : 'Upload the bid PDF you downloaded from GeM.'} />
           ) : (
             <ul className="grid gap-2">
-              {items.map((d) => <DocRow key={d.id} doc={d} tenderId={tenderId} />)}
+              {items.map((d) => (
+                <DocRow key={d.id} doc={d} tenderId={tenderId} bidNumber={bidNumber} onRemove={canRemove && d.source === 'upload' ? () => setRemoving(d) : undefined} />
+              ))}
             </ul>
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} loading={remove.isPending} confirmLabel="Remove"
+        title={removing ? `Remove ${removing.fileName}?` : 'Remove document?'} description="The next analysis will no longer use it."
+        onConfirm={onRemove}
+      />
 
       <RoleGate min="analyst" fallback={<Card><CardContent className="p-5 text-sm text-muted-foreground">Viewers can read documents. Ask an analyst to upload new ones.</CardContent></Card>}>
         <Card className="content-start">
@@ -85,7 +106,7 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
   );
 }
 
-function DocRow({ doc, tenderId }: { doc: TenderDocumentDto; tenderId: string }) {
+function DocRow({ doc, tenderId, bidNumber, onRemove }: { doc: TenderDocumentDto; tenderId: string; bidNumber: string; onRemove?: () => void }) {
   const base = `/tenders/${tenderId}/documents/${doc.id}/download`;
   return (
     <li className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center">
@@ -99,12 +120,25 @@ function DocRow({ doc, tenderId }: { doc: TenderDocumentDto; tenderId: string })
             <span>· {doc.pageCount ?? '?'} pages · {formatBytes(doc.sizeBytes)}</span>
             <Tooltip content={formatDateIST(doc.createdAt, { time: true })}><span>· {relativeTime(doc.createdAt)}</span></Tooltip>
             {!doc.hasText && <Badge size="sm" tone="warning">No text — scanned?</Badge>}
+            {doc.bidNumberFound && (
+              <Tooltip content={`Page 1 shows ${doc.bidNumberFound}${bidNumber ? `, but this tender is ${bidNumber}` : ''}. Check that this is the right PDF.`}>
+                <span tabIndex={0} className="rounded focus-ring"><Badge size="sm" tone="warning">Different bid?</Badge></span>
+              </Tooltip>
+            )}
           </div>
         </div>
       </div>
       <div className="flex shrink-0 gap-2">
         <Button asChild size="sm" variant="secondary"><a href={apiUrl(base, { inline: 1 })} target="_blank" rel="noreferrer"><Eye /> View</a></Button>
         <Button asChild size="sm" variant="ghost"><a href={apiUrl(base)} download={doc.fileName} aria-label={`Download ${doc.fileName}`}><Download /> <span className="sm:sr-only">Download</span></a></Button>
+        {onRemove && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`More actions for ${doc.fileName}`}><MoreHorizontal /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem destructive onSelect={onRemove}><Trash2 />Remove</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </li>
   );

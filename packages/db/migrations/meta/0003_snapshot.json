@@ -1,5 +1,5 @@
 {
-  "id": "4c005423-67bb-485e-979c-f35945828f80",
+  "id": "36a43f03-48c2-4fcb-bea4-209ce73affc8",
   "prevId": "d5654a64-334b-443e-8800-7790e232a07e",
   "version": "7",
   "dialect": "postgresql",
@@ -211,6 +211,25 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "stale_reason": {
+          "name": "stale_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stale_at": {
+          "name": "stale_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "created_by": {
           "name": "created_by",
@@ -2142,6 +2161,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "text_source": {
+          "name": "text_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pdf'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2728,12 +2754,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "last_org_id": {
-          "name": "last_org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2759,21 +2779,7 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "users_last_org_id_organizations_id_fk": {
-          "name": "users_last_org_id_organizations_id_fk",
-          "tableFrom": "users",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "last_org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
