@@ -34,6 +34,7 @@ import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, forbidden, notFound, unprocessable } from '../lib/errors';
 import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
+import { assertWithinPlan, checkAnalysisQuota, meteredCompleteJson, releaseAbandonedReservations, reserveLlmSlot } from '../lib/plan';
 import { keepStaleOnCompletion, lockTenderInputs, markStale, type DbOrTx } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
@@ -404,8 +405,11 @@ async function expireTimedOutRuns(tx: Tx, orgId: string, tenderId: string, now: 
   const where = timedOutRuns(orgId, tenderId, now);
   const locked = await tx.select({ id: analyses.id }).from(analyses).where(where).orderBy(asc(analyses.id)).for('update');
   if (!locked.length) return;
-  await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
-    .where(and(inArray(analyses.id, locked.map((r) => r.id)), eq(analyses.status, 'running')));
+  const expired = await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
+    .where(and(inArray(analyses.id, locked.map((r) => r.id)), eq(analyses.status, 'running')))
+    .returning({ id: analyses.id });
+  // 008/FR-037: a run that died before releasing its unfilled AI reservation does not keep the slot (review NIT-a).
+  await releaseAbandonedReservations(tx, orgId, expired.map((r) => r.id));
 }
 
 /** A `running` analysis older than this is treated as failed ("timed out") (FR-028). */
@@ -492,6 +496,8 @@ export async function analyseTender(
   const started = deps.clock.now().getTime();
   const callWithTimeout = opts.withTimeout ?? withTimeout;
   const seen = await getTender(deps, input.tenderId, input.viewer);
+  // 008/FR-036: fail fast, before any GeM download (re-checked under the org row lock before the insert).
+  await assertWithinPlan(deps, input.orgId, 'analysesPerMonth');
   const docsBefore = await listTenderDocuments(deps, seen.id, input.orgId);
   if (seen.gemBidId || seen.documentUrl) {
     if (!docsBefore.length) {
@@ -522,7 +528,11 @@ export async function analyseTender(
   // tender-input lock that every writer of those inputs also takes before its write + markStale (S4): a change either
   // committed before this read (and is analysed) or its markStale runs after the running row committed (and flags it,
   // FR-045). Company inputs are read just before the final write and changes to them flag the running row.
-  const { row, tender, readable, notes, now } = await deps.db.transaction(async (tx) => {
+  // 008/FR-036/FR-037: the monthly quota is then checked under the org row lock (`SELECT … FOR UPDATE`), so concurrent
+  // analyses of one org (any tender) are counted and inserted one at a time and cannot overshoot the limit.
+  // Lock order is always advisory (org+tender) → org row. The AI slot is reserved in the same transaction (review S1),
+  // after the analyses insert, so the reservation row is born with its `analysis_id` (review NEW-B1).
+  const { row, tender, readable, notes, now, llmAllowed, reservationId } = await deps.db.transaction(async (tx) => {
     await lockAnalyses(tx, input.orgId, seen.id);
     await lockTenderInputs(tx, seen.id, 'shared');
     const [tender] = await tx.select().from(tenders).where(eq(tenders.id, seen.id));
@@ -541,10 +551,14 @@ export async function analyseTender(
     const scope = and(eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'));
     const [running] = await tx.select({ id: analyses.id }).from(analyses).where(scope).limit(1);
     if (running) throw new HttpError(409, 'analysis_running', 'An analysis is already running for this tender');
+    const quota = await checkAnalysisQuota(deps, tx, input.orgId);
     const [inserted] = await tx.insert(analyses).values({
       orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
     }).returning();
-    return { row: inserted, tender, readable, notes, now };
+    const reservation = deps.llm && quota.llmAllowed
+      ? await reserveLlmSlot(deps, tx, { orgId: input.orgId, analysisId: inserted!.id, model: deps.llm.model })
+      : null;
+    return { row: inserted!, tender, readable, notes, now, llmAllowed: quota.llmAllowed, reservationId: reservation };
   });
   // Every write to this row from here on is guarded by `status = 'running'`: if a newer request marked
   // it timed out (and maybe replaced it), the late finisher changes nothing and logs nothing (FR-028).
@@ -554,6 +568,11 @@ export async function analyseTender(
   let extractMs = 0;
   let llmMs = 0;
   let pageTotal = 0;
+  const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
+  // 008/FR-039: one llm_usage row per call, with the provider's token counts; the first metered call fills the reservation.
+  const completeJson = deps.llm && llmAllowed
+    ? meteredCompleteJson(deps, { orgId: input.orgId, analysisId: row.id, kind: 'extract', reservationId })
+    : null;
   try {
     const ordered = [...readable].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
     const perDoc: Requirement[][] = [];
@@ -563,7 +582,6 @@ export async function analyseTender(
     // No LLM call starts or runs past this point, so the final write lands a fixed reserve before both the overall
     // budget and the 2-minute running timeout (FR-028): two worst-case slow calls cannot make the run look timed out.
     const llmDeadlineMs = Math.min(limits.budgetMs, ANALYSIS_RUNNING_TIMEOUT_MS) - LLM_FINISH_RESERVE_MS;
-    const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
     for (const d of ordered) {
       const tx0 = performance.now();
       const pages = splitPages(d.text);
@@ -573,8 +591,8 @@ export async function analyseTender(
       const meta = { documentId: d.id, fileName: d.fileName, estimatedValue: tender.estimatedValue };
       const rules = extractRequirementsRules(pages, meta);
       extractMs += performance.now() - tx0;
-      if (!deps.llm) { perDoc.push(rules); continue; }
-      const llm = deps.llm;
+      // 008/FR-037: monthly AI quota used up → this analysis runs on rules only.
+      if (!completeJson) { perDoc.push(rules); continue; }
       const elapsed = elapsedSince(started);
       const remaining = limits.maxChars - llmUse.chars;
       const docBudget = remaining - promptChars(buildLlmPrompt([], rules)) - PAGE_HEADER_CHARS * pages.length;
@@ -588,7 +606,7 @@ export async function analyseTender(
       llmUse.calls++;
       const timeoutMs = Math.min(limits.callTimeoutMs, llmDeadlineMs - elapsed);
       const tl0 = performance.now();
-      const r = await enrichWithLlm(pages, rules, (req) => callWithTimeout((signal) => llm.completeJson({ ...req, signal }), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
+      const r = await enrichWithLlm(pages, rules, (req) => callWithTimeout((signal) => completeJson({ ...req, signal }), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
       llmMs += performance.now() - tl0;
       llmUse.chars += r.inputChars;
       if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
@@ -597,10 +615,12 @@ export async function analyseTender(
       perDoc.push(r.requirements);
     }
     // Any document the LLM did not cover — skipped for budget, or a call that failed/timed out — gets the caveat (S4).
-    const warnings: AnalysisWarning[] = deps.llm && llmUse.covered < llmUse.total
-      ? [{ code: 'llm_budget_exhausted', covered: llmUse.covered, total: llmUse.total }]
+    // 008/FR-037: with the monthly AI quota used up, no document went to the LLM — say why instead.
+    const warnings: AnalysisWarning[] = !deps.llm ? []
+      : !llmAllowed ? [{ code: 'llm_quota_reached' }]
+      : llmUse.covered < llmUse.total ? [{ code: 'llm_budget_exhausted', covered: llmUse.covered, total: llmUse.total }]
       : [];
-    if (deps.llm) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: elapsedSince(started) });
+    if (deps.llm && llmAllowed) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: elapsedSince(started) });
     const ts0 = performance.now();
     const requirements = combineRequirements(perDoc, requirementsFromListing(tender));
     const company = await loadCompany(deps.db, input.orgId);
@@ -649,6 +669,11 @@ export async function analyseTender(
       .where(ours).returning({ id: analyses.id });
     if (!marked.length) throw supersededError();
     throw new HttpError(500, 'analysis_failed', 'The analysis failed. Please try again; if it keeps failing, upload a cleaner PDF.');
+  } finally {
+    // 008/FR-037: an analysis with no metered LLM call (documents skipped for budget, provider unreachable, or it failed
+    // first) is not an AI analysis — the meter gives the reserved slot back; a metered one keeps it, even when the
+    // analysis row was deleted meanwhile (review NEW-B1).
+    await completeJson?.finish();
   }
 }
 

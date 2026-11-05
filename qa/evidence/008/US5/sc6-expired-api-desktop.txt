@@ -1,0 +1,23 @@
+# sc6-expired-api — project desktop — 2026-11-05T09:31:24.082Z
+packet built before expiry: 201
+expected message: Your free trial ended on 3 Nov 2026. Your data is safe and read-only — talk to us to choose a plan.
+POST /api/watchlists → 402 plan_expired
+POST /api/org/invitations → 402 plan_expired
+POST /api/tenders/607608a6-986f-4a75-9741-51014b3caa2a/analyse → 402 plan_expired
+POST /api/workspaces/01ce49fd-32c3-4713-a08a-ea89d4f94d9b/packets → 402 plan_expired
+PUT /api/profile → 402 plan_expired
+POST /api/vault → 402 plan_expired
+GET /api/tenders → 200
+GET /api/watchlists → 200
+GET /api/vault → 200
+GET /api/org → 200
+GET /api/org/usage → 200
+GET /api/tenders/cb5cd6ea-e527-4dc5-95d9-6ad1d01c407d/analysis → 200
+GET /api/workspaces → 200
+GET /api/vault/b9e18577-39ed-450e-aa9f-76031bff85e8/download → 200
+GET /api/auth/me → 200
+GET /api/packets/bd1f979d-dad7-4899-964a-1274180c83f7/download → 200
+allow-list PATCH /api/me → 200
+allow-list POST /api/notifications/read-all → 200
+allow-list PUT /api/me/notification-prefs → 400
+allow-list POST /api/auth/logout → 200

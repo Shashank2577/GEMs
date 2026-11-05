@@ -34,10 +34,11 @@ A read-only token (`scope:"read"`, 006/FR-074) may only `GET`/`HEAD`: every othe
 | GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` (PUT needs the full object, per org) | prefs |
 | POST (S) | /me/notifications/test | – (1/min per user → 429 `rate_limited` + `Retry-After`) | `{inApp:'sent',email,whatsapp,skipReasons?}`, email/whatsapp each `sent\|skipped\|failed\|off`; `skipReasons` (only when something was skipped) maps a channel to `not_configured\|no_phone` (002/FR-034) |
 | GET/POST/DELETE | /me/api-tokens[/:id] | POST (S) `{name, expiresInDays?: 30\|90\|365\|null, scope?: "full"\|"read"}` (default 90, null = never; scope default `full`, fixed at creation) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint,scope}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens per org (002/FR-037); `scope:"read"` = "Extension (read-only)" (006/FR-074) |
-| GET | /org | – | org |
+| GET | /org | – | org (incl. `trialEndsAt`, 008/FR-035) |
+| GET | /org/usage | – | any member (008/FR-039): `{plan, trialEndsAt, period:{start,end}, usage:{seats, watchlists, analysesThisMonth, llmAnalysesThisMonth, vaultBytes, packetsThisMonth, llmTokensThisMonth:{input,output}}, limits}`; months are IST calendar months; `limits.watchlists: null` = no plan limit (the 003/FR-027 cap of 50 still applies); demo-seeded analyses are not counted, and deleted analyses keep their AI count |
 | GET | /org/members | – | `{items:[{userId,name,email,phone,role,joinedAt}], total, invitations:[{id,email,role,createdAt,expiresAt,invitedBy}]}` (pending = unexpired, unaccepted) |
 | POST (M) | /org/invitations | `{email,role}` | `{id,email,role,inviteUrl,expiresAt}`, 201; replaces a pending invite for the same email; 409 `conflict` if already a member; 403 `forbidden` when a non-owner invites an owner |
-| POST (M) | /org/invitations/:id/resend | – | as above, 201: new token and 7-day expiry, also revives an expired invite; `invitedBy` becomes the resender; 404 for other orgs' or accepted invites |
+| POST (M) | /org/invitations/:id/resend | – | as above, 201: new token and 7-day expiry, also revives an expired invite (then counts one seat: 402 `plan_limit_reached` when the plan's seats are full, 008/FR-036); `invitedBy` becomes the resender; 404 for other orgs' or accepted invites |
 | DELETE (M) | /org/invitations/:id | – | `{ok:true}`; 404 as above |
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member; 409 `last_owner` when it would leave no owner (FR-021) |
 | DELETE (S) | /org/members/me | – | `{ok:true,nextOrgId}`: leave the active org (FR-027); 409 `last_owner` |
@@ -245,6 +246,12 @@ Both arrays hold at most 5 items (`MY_WORK_LIMIT`), are computed for the signed-
 
 `TenderCore.isDemo: boolean` (in `packages/core/src/contracts/identify.ts`) is on every tender DTO (list items and detail). It is true when `tenders.source = 'demo'` or the stored payload carries `raw.demo === true` (the list query does not select `raw`, so `source` decides there). The web shows a "Sample" badge in the feed (card and table) and on the tender page. Demo tenders are visible only to orgs that loaded the demo (008/FR-016).
 
+## Operator — owner: Ops (`routes/admin.ts`, spec 008 FR-042)
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | /admin/orgs/:id/plan | `{plan:'trial'\|'starter'\|'pro'\|'enterprise', note, trialEndsAt?}` | `Authorization: Bearer <ADMIN_TOKEN>` only (never a member session). `{org:{id,plan,trialEndsAt}, subscriptionId}`; a paid plan clears `trialEndsAt`; writes a `subscriptions` row and the `org.plan_changed` activity. Without `ADMIN_TOKEN` configured, with a wrong token or an unknown org → the generic 404 |
+
 ## Scheduled (Worker `scheduled`, also `POST /ingestion/run`)
 
 1. `runIngestion()` — fetch N pages, upsert tenders, record events, match watchlists, create notifications.
@@ -257,8 +264,8 @@ Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/
 
 | Status | Code | When | `details` |
 |---|---|---|---|
-| 402 | `plan_limit_reached` | a plan limit (seats, watchlists, analyses, vault bytes, packets) is reached | `{limit, used, max}` |
-| 402 | `plan_expired` | the trial or plan has ended (writes only) | – |
+| 402 | `plan_limit_reached` | a plan limit (seats, watchlists, analyses, vault bytes, packets) is reached; `enterprise` is never limited (`PLAN_LIMITS`, `packages/core/src/contracts/plans.ts`) | `{limit, used, max, plan, resetsAt?}` (`resetsAt` = next IST month start, monthly limits only) |
+| 402 | `plan_expired` | the free trial has ended: every write except the FR-038 allow-list (auth, own account/sessions, revoking an API token, marking notifications read, notification prefs, `DELETE /demo`, `POST /tenders/:id/seen`, leaving the org `DELETE /org/members/me`, revoking an invitation `DELETE /org/invitations/:id`, and the operator-only `/admin/*`); reads keep working | `{plan:'trial', trialEndsAt}` |
 | 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
 | 413 | `packet_too_large` | packet would exceed 40 MB or 40 items | – |
 | 422 | `document_too_long` | tender document over 300 pages (refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning) | – |

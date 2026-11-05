@@ -151,6 +151,10 @@ const FOREIGN_EXTRA: Record<string, () => Call> = {
 
 /** Parameter is public/global data; the call may succeed but must only affect org B. Run after the foreign sweep. */
 const GLOBAL: Record<string, { why: string; call: () => Call }> = {
+  'POST /admin/orgs/:id/plan': {
+    why: 'operator-only (Bearer ADMIN_TOKEN, 008/FR-042): a member session gets the same 404 as an unknown path and changes nothing (plan.test.ts)',
+    call: () => asB('POST', `/admin/orgs/${A.org.orgId}/plan`, { plan: 'enterprise', note: 'self-upgrade attempt' }),
+  },
   'GET /auth/invite/:token': { why: 'public invitation preview by secret token; no org data without the token', call: () => async () => request(ctx.app, 'GET', '/auth/invite/not-a-real-token', {}) },
   'GET /tenders/:id': { why: 'GeM tenders are public', call: () => asB('GET', `/tenders/${ids.tender}`) },
   'POST /tenders/:id/seen': { why: 'marks B’s own matches', call: () => asB('POST', `/tenders/${ids.tender}/seen`) },

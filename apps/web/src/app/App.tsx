@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
+import { PlanLimitDialog } from '@/components/layout/PlanLimitDialog';
 import { TooltipProvider } from '@/components/ui/menu';
 import { Toaster } from '@/components/ui/toaster';
 import { queryClient } from '@/lib/api';
@@ -19,6 +20,8 @@ export function App() {
           <TooltipProvider delayDuration={250} skipDelayDuration={100}>
             <RouterProvider router={router} />
             <Toaster />
+            {/* 008/FR-041b: opened by any 402 from the API (lib/api.ts). */}
+            <PlanLimitDialog />
           </TooltipProvider>
         </AuthProvider>
       </QueryClientProvider>

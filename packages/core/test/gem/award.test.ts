@@ -137,7 +137,7 @@ describe('readTextCapped (result page body cap)', () => {
   });
 });
 
-describe('parseAwardResult (T092; 006/FR-085) — scrape_ra_schedule table heuristics', () => {
+describe('parseAwardResult (T092; 006/FR-085) — evaluation table reader', () => {
   const ra = readFileSync(join(__dirname, '../fixtures/gem/ra-result.html'), 'utf8');
 
   it('reads the rank/price table: L1 price and seller, every bidder, Indian digit grouping, portal tags stripped', () => {
