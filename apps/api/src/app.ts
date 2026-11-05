@@ -3,7 +3,6 @@
  * Everything lives under /api; each area router is mounted at "/api" and declares its full
  * sub-paths from contracts/api.md.
  */
-import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { bodyLimits } from './middleware/body-limit';
@@ -16,6 +15,7 @@ import { assistRoutes } from './routes/assist';
 import { authRoutes } from './routes/auth';
 import { dashboardRoutes } from './routes/dashboard';
 import { demoRoutes } from './routes/demo';
+import { healthRoutes } from './routes/health';
 import { ingestionRoutes } from './routes/ingestion';
 import { notificationsRoutes } from './routes/notifications';
 import { orgRoutes } from './routes/org';
@@ -33,6 +33,7 @@ export type { AppDeps } from './deps';
 
 /** All area routers, mounted at /api in this order. */
 export const routers = {
+  health: healthRoutes,
   auth: authRoutes,
   sessions: sessionsRoutes,
   org: orgRoutes,
@@ -64,17 +65,6 @@ export function createApp(deps: AppDeps) {
   api.use('*', bodyLimits);
   // 008/FR-019 `api.ip` for requests without credentials (`api.user` is applied once authenticated, middleware/auth.ts).
   api.use('*', ipLimit);
-
-  api.get('/health', async (c) => {
-    let db = false;
-    try {
-      await deps.db.execute(sql`select 1`);
-      db = true;
-    } catch (e) {
-      deps.logger.error('health: database unreachable', { error: (e as Error).message });
-    }
-    return c.json({ ok: db, db, version: deps.config.version }, db ? 200 : 503);
-  });
 
   for (const r of Object.values(routers)) api.route('/', r);
 

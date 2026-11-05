@@ -1,12 +1,12 @@
 /** Build AppDeps from environment variables + runtime-specific db/blob store. */
 import type { Db } from '@tp/db';
-import type { AppDeps, BlobStore, Clock, GemLease, Logger } from '../deps';
+import type { AppDeps, BlobStore, Clock, ErrorReporter, GemLease, Logger } from '../deps';
 import { loadConfig, loadGemConfig, type RuntimeEnv } from '../env';
 import { createPgRateLimiter } from '../lib/rate-limiter';
 import { systemClock } from './clock';
 import { noopErrorReporter } from './errors';
 import { createAnthropicClient } from './llm';
-import { consoleLogger } from './logger';
+import { createJsonLogger } from './logger';
 import { createLogMailer, createResendMailer } from './mailer';
 import { createLogWhatsApp, createMetaWhatsApp } from './whatsapp';
 
@@ -16,11 +16,14 @@ export interface CreateDepsInput {
   blobs: BlobStore;
   clock?: Clock;
   logger?: Logger;
+  /** Error reporter (default no-op); worker.ts / node.ts pass a Sentry-backed one when SENTRY_DSN is set. */
+  errors?: ErrorReporter;
   fetch?: typeof fetch;
 }
 
-export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetch: f }: CreateDepsInput): AppDeps {
+export function createDeps({ env, db, blobs, clock, logger, errors, fetch: f }: CreateDepsInput): AppDeps {
   const config = loadConfig(env);
+  logger ??= createJsonLogger({ level: config.logLevel });
   const doFetch: typeof fetch = f ?? ((input, init) => fetch(input, init));
   return {
     db,
@@ -40,7 +43,7 @@ export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetc
       ? createMetaWhatsApp({ token: env.WHATSAPP_TOKEN, phoneNumberId: env.WHATSAPP_PHONE_ID, apiVersion: env.WHATSAPP_API_VERSION, fetch: doFetch })
       : createLogWhatsApp(logger),
     rateLimiter: createPgRateLimiter(db),
-    errors: noopErrorReporter,
+    errors: errors ?? noopErrorReporter,
     gemLease: noopGemLease,
   };
 }

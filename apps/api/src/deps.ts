@@ -99,6 +99,8 @@ export interface WhatsApp {
 export interface Clock { now(): Date }
 
 export interface Logger {
+  /** Optional so test doubles need not implement it; call as `logger.debug?.()`. */
+  debug?(msg: string, meta?: Record<string, unknown>): void;
   info(msg: string, meta?: Record<string, unknown>): void;
   warn(msg: string, meta?: Record<string, unknown>): void;
   error(msg: string, meta?: Record<string, unknown>): void;

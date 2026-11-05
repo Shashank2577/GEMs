@@ -70,3 +70,97 @@ demo data loaded:
   - IPv6 clients are limited per /64.
 - Fixed windows: a client can burst up to twice a limit across a window boundary. A limiter call slower than 300 ms is
   treated as unavailable (fail-open, `rate_limit_unavailable` logged at most once per rule per 10 s).
+
+## Monitors
+
+Source of truth: `GET https://<APP_DOMAIN>/api/health` (008/FR-044). No auth; no org data. Example:
+
+```json
+{ "ok": false, "db": true, "version": "0.1.0",
+  "ingestion": { "lastSuccessAt": "2026-06-01T08:55:00.000Z", "ageMinutes": 185, "lastStatus": "failed", "state": "stale" },
+  "alerts": { "pendingOlderThan30m": 0 }, "reasons": ["ingestion_stale"] }
+```
+
+| Field | Meaning |
+|---|---|
+| `ingestion.state` | `ok` (last success within `HEALTH_INGESTION_MAX_AGE_MIN`, default 120), `stale` (older), `never` (no success yet; HTTP 200 so a fresh stack is not paged). While `db` is false the ingestion and alert fields are placeholders. |
+| `ingestion.lastStatus` | status of the most recent run (`success`, `partial`, `failed`, `running`). A `failed` latest run does not page by itself; staleness does. |
+| `alerts.pendingOlderThan30m` | notifications still `pending` 30 minutes after creation (the dispatcher runs every cron tick). |
+| `reasons[]` | `db_unreachable`, `ingestion_stale`, `alerts_backlog`. HTTP 503 whenever non-empty. Each query has a 3 s timeout, so a hung database answers 503 rather than hanging the monitor. |
+
+External uptime monitor (FR-047; the vendor and account are set up by the operator, see T099 in the spec tasks):
+
+- Production: poll `https://<APP_DOMAIN>/api/health` every 5 minutes, alert the on-call email/phone after 2 consecutive
+  non-200 results (worst-case detection about 10 minutes plus the stale threshold for ingestion problems).
+- Staging: a separate monitor on the staging URL that alerts only the team channel.
+- Keyword check (optional): response contains `"ok":true`.
+
+Logs and errors:
+
+- Logs are JSON lines (`ts`, `level`, `msg`, fields). `LOG_LEVEL` = `debug|info|warn|error` (default `info`). Keys named
+  like `password|token|secret|cookie|authorization` are redacted. Health polls log at `debug` only.
+- Every API response carries `x-request-id`; the same value is the `rid` field on the request log line and on Sentry events.
+- Sentry is active only when `SENTRY_DSN` is set (`SENTRY_ENVIRONMENT` = `production|staging|development`; release is
+  `APP_VERSION`). Unhandled API errors and failed cron steps (tag `job`) are reported; expected `HttpError`s are not.
+
+## First 10 minutes
+
+Start with `curl -s https://<APP_DOMAIN>/api/health`, note the time, and look at `reasons`.
+
+### `db_unreachable`
+
+1. Check the database provider status page and the Neon console (branch up? compute suspended? connection limit?).
+2. Workers Logs: filter `msg:"health: database unreachable"`; the `error` field says timeout vs refused vs auth.
+3. If `DATABASE_URL` changed recently, `wrangler secret list` and redeploy with the right secret.
+4. Still down after 10 minutes: escalate (below). Do not run migrations or restore while diagnosing.
+
+### `ingestion_stale`
+
+1. Look at the latest runs:
+   ```sql
+   select id, trigger, status, started_at, finished_at, pages_fetched, tenders_seen, listing_stop, left(error, 200) as error
+   from ingestion_runs order by started_at desc limit 5;
+   ```
+2. A row stuck in `running` older than 15 minutes is reaped by the next run; if no new rows appear at all the cron is
+   not firing: check the Cloudflare dashboard, Worker, Triggers, Cron (`*/30 * * * *`) and Workers Logs for
+   `msg:"scheduled run finished"`.
+3. `failed` rows: read `error`. HTML instead of JSON, 403 or 429 means GeM is blocking us, see "GeM 403/429".
+4. After the cause is fixed, run **Sync now** from Settings (cooldown `MANUAL_SYNC_COOLDOWN_MIN`, default 10) or wait for
+   the next tick; `/api/health` returns 200 once a `success` or `partial` run finishes.
+
+### `alerts_backlog`
+
+1. Find what is stuck:
+   ```sql
+   select channel, kind, count(*), min(created_at) from notifications
+   where status = 'pending' and created_at < now() - interval '30 minutes' group by 1, 2;
+   ```
+2. Workers Logs: `msg:"scheduled step failed: alerts"` or mailer/WhatsApp warnings (`Resend`, `WhatsApp`). A bad
+   `RESEND_API_KEY`/`WHATSAPP_TOKEN` keeps rows pending or failed; fix the secret and the next cron tick drains them.
+3. If the cron itself is not running, treat it as `ingestion_stale` step 2.
+
+### 5xx spike
+
+1. Workers Logs: filter `level:"error"` and `msg:"unhandled error"`; group by `path`. Each line has `rid`.
+2. Take a `rid` from a failing user report or a Sentry event (same value as the `x-request-id` response header) and filter
+   Workers Logs by `rid:"<value>"` to see that request line (`status`, `ms`, `orgId`, `userId`) and its error.
+3. To scope the blast radius filter by `orgId:"<uuid>"`; one org only usually means bad data, all orgs means a deploy.
+4. Started right after a deploy: `wrangler rollback` (never roll back migrations; roll forward).
+
+### GeM 403/429
+
+1. `select status, left(error, 200), started_at from ingestion_runs where status = 'failed' order by started_at desc limit 5;`
+   Messages such as `GeM returned HTML instead of JSON` or HTTP 403/429 mean the portal is throttling or blocking us.
+2. Do not increase the request rate. The GeM request rate is capped (spec 008 NFR-002: 1 request per second cluster-wide); leave the
+   cron to retry on its next tick and keep the manual cooldown. Never bypass CAPTCHA or authentication.
+3. If blocking persists for more than a day, tell customers the feed is delayed (sync health already shows
+   "Delayed"/"Last run failed") and escalate.
+
+### Escalation
+
+1. Minute 0 to 10: the on-call person works the section above. Post findings in the team channel with the `rid` or SQL
+   output used.
+2. Not resolved at minute 10, or customer data may be affected: page the owner of the area (database: platform lead;
+   GeM: ingestion lead) and open an incident issue with the timeline.
+3. Anything that looks like data exposure (a log line with a secret, cross-org data): stop, rotate the secret, and
+   follow the Secrets section (FR-048, documented by its own task).

@@ -15,8 +15,9 @@ import { createNodeDb } from '@tp/db';
 import { spaCspFor } from '@tp/core/security/headers';
 import { createApp } from './app';
 import { createDeps } from './adapters/index';
+import { createSentryReporter, sentryOptions } from './adapters/errors';
 import { createFsBlobStore } from './adapters/blob-fs';
-import type { RuntimeEnv } from './env';
+import { loadConfig, type RuntimeEnv } from './env';
 import { runScheduledJobs } from './lib/scheduled';
 import { settleDeferred } from './lib/defer';
 import { securityHeaders } from './middleware/security';
@@ -43,10 +44,18 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
   }
 
   const { db, close } = await createNodeDb(databaseUrl);
+  const runtimeEnv: RuntimeEnv = { APP_URL: env.APP_URL || `http://localhost:${port}`, ...(env as RuntimeEnv) };
+  // 008/FR-046: Sentry only when SENTRY_DSN is set (loaded lazily so a plain dev server never touches the SDK).
+  let sentry: typeof import('@sentry/node') | null = null;
+  if (runtimeEnv.SENTRY_DSN) {
+    sentry = await import('@sentry/node');
+    sentry.init(sentryOptions(loadConfig(runtimeEnv), runtimeEnv.SENTRY_ENVIRONMENT));
+  }
   const deps = createDeps({
-    env: { APP_URL: env.APP_URL || `http://localhost:${port}`, ...(env as RuntimeEnv) },
+    env: runtimeEnv,
     db,
     blobs: createFsBlobStore(blobDir),
+    errors: sentry ? createSentryReporter(sentry) : undefined,
   });
 
   const server = new Hono();
@@ -100,6 +109,7 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
     // Background work (lib/defer.ts, e.g. a password-reset email) still needs the pool: close only after it settles.
     await settleDeferred(deps).catch(() => {});
     await close();
+    await sentry?.close(2000).catch(() => {});
   };
   return { deps, server, shutdown, port };
 }

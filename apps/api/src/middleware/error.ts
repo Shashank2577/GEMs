@@ -22,6 +22,9 @@ export function errorHandler(err: Error, c: Context<AppEnv>) {
   const logger = c.var.deps?.logger;
   const meta = { rid: c.var.requestId, path: redactPath(c.req.path), error: err?.message, stack: err?.stack?.split('\n').slice(0, 6).join(' | ') };
   if (logger) logger.error('unhandled error', meta); else console.error('[tp] unhandled error', meta);
+  try {
+    c.var.deps?.errors.capture(err, { rid: c.var.requestId, orgId: c.var.org?.id, userId: c.var.user?.id, route: c.req.routePath });
+  } catch { /* reporting must never mask the 500 */ }
   return c.json({ error: { code: 'internal_error', message: 'Something went wrong on our side. Please try again.', details: { requestId: c.var.requestId } } }, 500);
 }
 
