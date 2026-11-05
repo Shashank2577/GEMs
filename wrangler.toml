@@ -30,6 +30,9 @@ crons = ["*/30 * * * *"]
 APP_URL = "https://tenderpilot.workers.dev"
 GEM_BASE_URL = "https://bidplus.gem.gov.in"
 LLM_MODEL = "claude-sonnet-5-5"
+# Model tiers (004 FR-050): OCR defaults to claude-opus-5-5 whenever ANTHROPIC_API_KEY is set; escalation is off unless set.
+# LLM_OCR_MODEL = "claude-opus-5-5"
+# LLM_ESCALATION_MODEL = "claude-fable-5-1"
 MAIL_FROM = "TenderPilot <alerts@tenderpilot.in>"
 # Packet build input cap (008 FR-032 / 006 FR-056): 40 MB keeps pdf-lib's 2-3x peak (ADR-0007) under the 128 MB isolate.
 PACKET_MAX_INPUT_BYTES = "41943040"

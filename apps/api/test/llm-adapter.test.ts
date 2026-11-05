@@ -86,3 +86,28 @@ describe('createAnthropicClient', () => {
     expect(JSON.stringify(item)).not.toMatch(/minLength|maxLength|minimum|maximum/);
   });
 });
+
+describe('model tiers (T086, FR-050)', () => {
+  it('config: OCR defaults to claude-opus-5-5, escalation is off, both come from env', async () => {
+    const { loadConfig } = await import('../src/env');
+    expect(loadConfig({})).toMatchObject({ llmModel: 'claude-sonnet-5-5', llmOcrModel: 'claude-opus-5-5', llmEscalationModel: null });
+    expect(loadConfig({ LLM_OCR_MODEL: 'o', LLM_ESCALATION_MODEL: ' claude-fable-5-1 ', LLM_MODEL: 'm' }))
+      .toMatchObject({ llmModel: 'm', llmOcrModel: 'o', llmEscalationModel: 'claude-fable-5-1' });
+  });
+
+  it('createDeps.llmFor: no key → every purpose is null; key → enrichment + ocr; escalation only when set', async () => {
+    const { createDeps } = await import('../src/adapters');
+    const base = { db: {} as never, blobs: {} as never };
+    const none = createDeps({ ...base, env: { NODE_ENV: 'test' } });
+    expect([none.llm, none.llmFor('enrichment'), none.llmFor('ocr'), none.llmFor('escalation')]).toEqual([null, null, null, null]);
+    const keyed = createDeps({ ...base, env: { NODE_ENV: 'test', ANTHROPIC_API_KEY: 'k' } });
+    expect(keyed.llmFor('enrichment')).toBe(keyed.llm);
+    expect(keyed.llmFor('enrichment')?.model).toBe('claude-sonnet-5-5');
+    expect(keyed.llmFor('ocr')?.model).toBe('claude-opus-5-5');
+    expect(keyed.llmFor('escalation')).toBeNull();
+    const full = createDeps({ ...base, env: { NODE_ENV: 'test', ANTHROPIC_API_KEY: 'k', LLM_ESCALATION_MODEL: 'claude-fable-5-1', LLM_OCR_MODEL: 'claude-sonnet-5-5' } });
+    expect(full.llmFor('escalation')?.model).toBe('claude-fable-5-1');
+    expect(full.llmFor('ocr')?.model).toBe('claude-sonnet-5-5');
+    expect(full.llmFor('ocr')).toBe(full.llmFor('ocr'));
+  });
+});

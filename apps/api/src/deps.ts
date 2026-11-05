@@ -67,6 +67,9 @@ export interface LlmClient {
   completeJson<T = unknown>(req: LlmRequest, opts?: LlmCallOptions): Promise<T>;
 }
 
+/** What an LLM client is used for; each purpose has its own model (004/FR-050). */
+export type LlmPurpose = 'enrichment' | 'ocr' | 'escalation';
+
 // ───────────── Messaging ─────────────
 
 export interface SendResult {
@@ -161,6 +164,11 @@ export interface AppDeps {
   blobs: BlobStore;
   /** null when ANTHROPIC_API_KEY is not set — rules-only mode (Constitution III). */
   llm: LlmClient | null;
+  /**
+   * The client for a purpose, or null when it is off: `enrichment` = `llm` (LLM_MODEL), `ocr` = LLM_OCR_MODEL (on
+   * whenever an API key is set), `escalation` = LLM_ESCALATION_MODEL (only when set). 004/FR-050.
+   */
+  llmFor(purpose: LlmPurpose): LlmClient | null;
   mailer: Mailer;
   whatsapp: WhatsApp;
   gem: GemConfig;

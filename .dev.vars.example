@@ -12,6 +12,10 @@ PACKET_MAX_INPUT_BYTES=41943040
 # Optional integrations — leave empty to run in rules-only / log-only mode.
 ANTHROPIC_API_KEY=
 LLM_MODEL=claude-sonnet-5-5
+# Scanned-PDF transcription (OCR) model; used whenever ANTHROPIC_API_KEY is set.
+# LLM_OCR_MODEL=claude-opus-5-5
+# Optional adjudicator for uncertain blocking requirements (turnover, experience, OEM authorisation, EMD); unset = off.
+# LLM_ESCALATION_MODEL=claude-fable-5-1
 RESEND_API_KEY=
 MAIL_FROM=TenderPilot <alerts@tenderpilot.in>
 WHATSAPP_TOKEN=
