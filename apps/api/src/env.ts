@@ -33,6 +33,10 @@ export interface RuntimeEnv {
   NODE_ENV?: string;
   /** Operator token for /api/admin/* (008/FR-042). Unset → admin routes answer 404. */
   ADMIN_TOKEN?: string;
+  /** HMAC key for one-click email unsubscribe links (003/FR-048). Unset in production → no unsubscribe headers. */
+  UNSUBSCRIBE_SECRET?: string;
+  /** "1" mounts the test-only GET /api/__test/mail (003/NFR-008). Never set on the Worker. */
+  E2E_TEST_HOOKS?: string;
   /** Sentry DSN; unset → error reporter is a no-op (008/FR-046). */
   SENTRY_DSN?: string;
   /** "debug" | "info" | "warn" | "error" (default info). */
@@ -58,6 +62,8 @@ export interface AppConfig {
   packetMaxInputBytes: number;
   /** Null when ADMIN_TOKEN is unset. */
   adminToken: string | null;
+  /** Null when UNSUBSCRIBE_SECRET is unset in production (non-production falls back to a fixed dev key). */
+  unsubscribeSecret: string | null;
   /** Null when SENTRY_DSN is unset. */
   sentryDsn: string | null;
   logLevel: LogLevel;
@@ -107,6 +113,7 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     packetMaxInputBytes: positiveInt(env.PACKET_MAX_INPUT_BYTES, DEFAULT_PACKET_MAX_INPUT_BYTES),
     adminToken: env.ADMIN_TOKEN || null,
+    unsubscribeSecret: env.UNSUBSCRIBE_SECRET || (environment === 'production' ? null : 'tp-dev-unsubscribe-secret'),
     sentryDsn: env.SENTRY_DSN || null,
     logLevel: parseLogLevel(env.LOG_LEVEL),
     healthIngestionMaxAgeMin: nonNegativeInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),

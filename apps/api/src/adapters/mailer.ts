@@ -16,6 +16,7 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetch?:
           subject: msg.subject,
           html: msg.html, text: msg.text,
           ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
+          ...(msg.headers ? { headers: msg.headers } : {}),
         }),
       });
       const body = await res.text();

@@ -13,6 +13,7 @@ import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, ty
 
 const REF = new Date('2026-11-04T04:30:00.000Z');
 const GEM = 'http://mock-gem.test';
+const TEST_APP = 'http://tp.test';
 
 let ctx: TestContext;
 let team: Awaited<ReturnType<typeof seedOrgWithRoles>>;
@@ -549,5 +550,68 @@ describe('watchlist SQL helpers and batched matching', () => {
     } finally {
       await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
     }
+  });
+});
+
+describe('notifications ?kind validation (003/FR-049)', () => {
+  it('rejects an unknown kind with 400 and accepts a real one', async () => {
+    const bad = await get('/notifications?kind=bogus', team.owner);
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('validation_error');
+    const ok = await get('/notifications?kind=tender_match', team.owner);
+    expect(ok.status).toBe(200);
+    expect(ok.body.items.every((i: { kind: string }) => i.kind === 'tender_match')).toBe(true);
+    expect((await get('/notifications?kind=digest', team.owner)).body.total).toBe(0);
+  });
+});
+
+describe('one-click email unsubscribe (003/FR-048)', () => {
+  const ids = () => ({ userId: other.me.user.id as string, orgId: other.me.org.id as string });
+  const prefsEmail = async () => (await get('/me/notification-prefs', other)).body.email;
+  const tokenOf = (h: string) => new URL(h.slice(1, -1)).searchParams.get('token')!;
+
+  it('alert emails carry List-Unsubscribe + List-Unsubscribe-Post; the link (GET and POST) turns email off without signing in', async () => {
+    const { userId, orgId } = ids();
+    const { unsubscribeHeaders } = await import('../src/lib/unsubscribe');
+    const headers = (await unsubscribeHeaders(ctx.deps.config, userId, orgId))!;
+    expect(headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+    expect(headers['List-Unsubscribe']).toMatch(new RegExp(`^<${TEST_APP}/api/notifications/unsubscribe\\?token=[\\w.-]+>$`));
+    const token = tokenOf(headers['List-Unsubscribe']);
+
+    // real dispatched alert emails include the headers
+    const sent = ctx.mailer.sent.filter((m) => m.headers?.['List-Unsubscribe']);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent[0].headers!['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+
+    expect(await prefsEmail()).toBe(true);
+    const post = await request(ctx.app, 'POST', `/notifications/unsubscribe?token=${token}`, { form: { 'List-Unsubscribe': 'One-Click' } });
+    expect(post.status).toBe(200);
+    expect(post.body).toEqual({ ok: true, email: false });
+    expect(await prefsEmail()).toBe(false);
+
+    await request(ctx.app, 'PUT', '/me/notification-prefs', { cookie: other.cookie, json: { ...(await get('/me/notification-prefs', other)).body, email: true } });
+    expect(await prefsEmail()).toBe(true);
+    const page = await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${token}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toMatch(/unsubscribed/i);
+    expect(await prefsEmail()).toBe(false);
+  });
+
+  it('a tampered, truncated, foreign-scope or missing token is 400 invalid_token and changes nothing', async () => {
+    const { userId, orgId } = ids();
+    const { signUnsubscribeToken } = await import('../src/lib/unsubscribe');
+    const good = await signUnsubscribeToken(ctx.deps.config.unsubscribeSecret!, userId, orgId);
+    const [p, s] = good.split('.');
+    const forged = await signUnsubscribeToken('another-secret', userId, orgId);
+    const otherUser = Buffer.from(`${team.owner.me.user.id}:${orgId}:email_matches`).toString('base64url');
+    for (const token of [`${p}.${s.slice(0, -2)}AA`, `${otherUser}.${s}`, forged, p, '', 'garbage']) {
+      for (const method of ['GET', 'POST']) {
+        const r = await request(ctx.app, method, `/notifications/unsubscribe?token=${token}`);
+        expect(r.status, `${method} ${token}`).toBe(400);
+        expect(r.body.error.code).toBe('invalid_token');
+      }
+    }
+    const none = await request(ctx.app, 'POST', '/notifications/unsubscribe');
+    expect(none.body.error.code).toBe('invalid_token');
   });
 });

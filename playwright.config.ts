@@ -43,7 +43,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'e2e/support/start-api.sh',
+      command: 'E2E_TEST_HOOKS=1 e2e/support/start-api.sh',
       url: `http://localhost:${E2E_PORT}/api/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

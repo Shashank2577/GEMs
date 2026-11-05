@@ -205,9 +205,11 @@ export interface IngestionRunsResponse {
 
 // ───────────── Notifications ─────────────
 
+export const NOTIFICATION_KINDS = ['tender_match', 'expiry', 'deadline', 'assignment', 'mention', 'digest', 'system'] as const;
+
 export const notificationsQuerySchema = z.object({
   unread: flag,
-  kind: z.string().optional(),
+  kind: z.enum(NOTIFICATION_KINDS).optional(), // 003/FR-049
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });

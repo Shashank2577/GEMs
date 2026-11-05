@@ -4,14 +4,15 @@
  * Test alert (002/FR-034): `POST /me/notifications/test` across the user's enabled channels.
  */
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { Hono } from 'hono';
-import { notificationPrefs, notifications } from '@tp/db';
+import { Hono, type Context } from 'hono';
+import { memberships, notificationPrefs, notifications } from '@tp/db';
 import { notificationsQuerySchema, type NotificationDto } from '@tp/core/contracts/identify';
 import {
   DEFAULT_NOTIFICATION_PREFS, TEST_ALERT_TITLE, type TestAlertOutcome, type TestAlertResult, type TestAlertSkipReason,
 } from '@tp/core/contracts/auth';
 import { uuidSchema } from '@tp/core/contracts/common';
-import { notFound } from '../lib/errors';
+import { HttpError, notFound } from '../lib/errors';
+import { unsubscribeHeaders, verifyUnsubscribeToken } from '../lib/unsubscribe';
 import { TEST_ALERT_LIMIT, hit, rateLimited } from '../lib/rate-limit';
 import { parseQuery } from '../lib/validate';
 import { orgId, requireAuth, requireSession, userId } from '../middleware/auth';
@@ -27,7 +28,7 @@ notificationsRoutes.get('/notifications', requireAuth, async (c) => {
   const where = and(
     scope,
     q.unread ? ne(notifications.status, 'read') : undefined,
-    q.kind ? eq(notifications.kind, q.kind as NotificationDto['kind']) : undefined,
+    q.kind ? eq(notifications.kind, q.kind) : undefined,
   );
   const [rows, [{ total }], [{ unread }]] = await Promise.all([
     db.select().from(notifications).where(where).orderBy(desc(notifications.createdAt)).limit(q.pageSize).offset((q.page - 1) * q.pageSize),
@@ -47,6 +48,33 @@ notificationsRoutes.get('/notifications', requireAuth, async (c) => {
     })),
   }));
   return c.json({ items, unreadCount: Number(unread), total: Number(total) });
+});
+
+/**
+ * One-click unsubscribe (003/FR-048, RFC 8058). PUBLIC: the signed `?token=` is the credential (lib/unsubscribe.ts), so
+ * mail clients can POST `List-Unsubscribe=One-Click` and people can click the GET link without signing in. Switches
+ * email alerts off for that user in that org; idempotent. Tampered/unknown token → 400 `invalid_token`.
+ */
+async function unsubscribe(c: Context<AppEnv>) {
+  const { db, config } = c.var.deps;
+  const who = await verifyUnsubscribeToken(config.unsubscribeSecret, c.req.query('token') ?? '');
+  const [member] = who
+    ? await db.select({ userId: memberships.userId }).from(memberships).where(and(eq(memberships.userId, who.userId), eq(memberships.orgId, who.orgId)))
+    : [];
+  if (!who || !member) throw new HttpError(400, 'invalid_token', 'This unsubscribe link is invalid');
+  await db.insert(notificationPrefs).values({ orgId: who.orgId, userId: who.userId, email: false })
+    .onConflictDoUpdate({ target: [notificationPrefs.orgId, notificationPrefs.userId], set: { email: false } });
+  return who;
+}
+
+notificationsRoutes.post('/notifications/unsubscribe', async (c) => {
+  await unsubscribe(c);
+  return c.json({ ok: true, email: false });
+});
+
+notificationsRoutes.get('/notifications/unsubscribe', async (c) => {
+  await unsubscribe(c);
+  return c.html('<!doctype html><meta charset="utf-8"><title>Unsubscribed</title><body style="font-family:sans-serif;max-width:32rem;margin:4rem auto"><h1>You are unsubscribed</h1><p>TenderPilot will no longer email you new-tender match alerts. You can turn them back on in Settings &rarr; Notifications.</p></body>');
 });
 
 notificationsRoutes.post('/notifications/read-all', requireAuth, async (c) => {
@@ -123,6 +151,7 @@ notificationsRoutes.post('/me/notifications/test', requireSession, async (c) => 
     const r = await mailer.send({
       to: user.email,
       subject: TEST_ALERT_TITLE,
+      headers: await unsubscribeHeaders(config, userId(c), orgId(c)),
       html: renderAlertEmail({ heading: TEST_ALERT_TITLE, intro: body, rows: [], appUrl: config.appUrl, orgName: c.var.org.name, now }),
       text: `${TEST_ALERT_TITLE}\n${body}\n\nManage alerts: ${url}`,
     });

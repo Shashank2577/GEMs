@@ -62,7 +62,7 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
     return cspCache.csp;
   };
   server.use('*', securityHeaders({ csp: spaCsp }));
-  server.route('/', createApp(deps));
+  server.route('/', createApp(deps, { testHooks: env.E2E_TEST_HOOKS === '1' }));
 
   if (hasWeb) {
     const root = relative(process.cwd(), webDist) || '.';

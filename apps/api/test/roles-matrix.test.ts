@@ -68,6 +68,7 @@ const MATRIX: Entry[] = [
   { method: 'PATCH', path: '/api/watchlists/:id', min: 'analyst' },
   { method: 'DELETE', path: '/api/watchlists/:id', min: 'analyst' },
   { method: 'POST', path: '/api/ingestion/run', min: 'bid_manager', json: { pages: 'not-a-number' } },
+  { method: 'POST', path: '/api/notifications/unsubscribe', min: 'public', json: null }, // signed token is the credential (003/FR-048)
   { method: 'POST', path: '/api/notifications/read-all', min: 'viewer' },
   { method: 'POST', path: '/api/notifications/:id/read', min: 'viewer' },
   // ── analyse ──

@@ -13,6 +13,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { notificationPrefs, notifications, organizations, tenders, users } from '@tp/db';
 import { isTransientSendError } from '../adapters/provider-error';
 import type { AppDeps } from '../deps';
+import { unsubscribeHeaders } from '../lib/unsubscribe';
 
 type NotificationRow = typeof notifications.$inferSelect;
 type TenderRow = typeof tenders.$inferSelect;
@@ -244,6 +245,7 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
         const r = await mailer.send({
           to: first.email,
           subject: `Daily digest: ${title}`,
+          headers: await unsubscribeHeaders(config, userId, orgId),
           html: renderAlertEmail({ heading: title, intro: `Here is your daily summary of tenders matching ${first.orgName}'s watchlists.`, rows, appUrl: config.appUrl, orgName: first.orgName, now }),
           text: textVersion(rows, config.appUrl),
         });
@@ -289,6 +291,7 @@ async function sendOne(
     const r = await mailer.send({
       to: p.email,
       subject: p.n.title,
+      headers: await unsubscribeHeaders(config, p.n.userId, p.n.orgId),
       html: renderAlertEmail({ heading, intro: p.n.kind === 'tender_match' ? 'Act early — the best bids are prepared well before the deadline.' : p.n.body, rows: [{ n: p.n, tender }], appUrl: config.appUrl, orgName: p.orgName, now }),
       text: textVersion([p], config.appUrl),
     });
