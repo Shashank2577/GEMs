@@ -374,3 +374,49 @@ Deferred decisions, each with the measurable trigger that reopens it (FR-076). C
 | Workers Analytics Engine request metrics | a customer asks for per-org request/usage metrics that `activity_log` + `llm_usage` cannot answer | [ADR-0011 §5](adr/0011-observability.md) |
 | Weekly `pg_dump` to R2 | a customer requires off-provider backups (contract / security questionnaire) | [ADR-0013 §3](adr/0013-deployment-migrations-backups-secrets.md) |
 | Revisit keeping closed tenders | `tenders` reaches 5M rows | [ADR-0012](adr/0012-data-retention-and-housekeeping.md) |
+
+## Spec 008 launch checklist (ARCH-01 to ARCH-13)
+
+Every recommendation from the architecture review's summary (`docs/architecture.md` § 7) mapped to the spec 008 tasks that
+deliver it and the QA verdict that proves it (008/FR-023, SC-001, T116). This complements the spec 002 release gate at the
+top of this file (that gate covers ARCH-11's auth rules and the 002 requirements).
+
+Last checked: 2026-11-05, against `main` at `c75d2b6` (after 008/US3, US4, US5, US6 and US7 merged). Sources are repository
+files only: `qa/evidence/008/US<n>/VERDICT.md`, ticked tasks in `specs/008-operations-scale/tasks.md` and the code. Re-check
+before each paid activation and update the table and the date.
+
+**Gate: no org may be moved to `starter` or `pro` (`POST /api/admin/orgs/:id/plan`, no invoice) until every P1 story has a QA
+verdict `qa:approved` on `main`.** Today US3, US4, US5 and US6 are approved; **US1 (CI gate, PR #475) and US2 (releases,
+secrets, backups, security headers; PR #492, `needs-human`) are not merged, so the gate is closed.**
+
+| ARCH | Recommendation (level) | Spec 008 tasks | QA verdict | Status |
+|---|---|---|---|---|
+| 01 | Demo data does not leak into other tenants' feeds (MUST) | T044 to T048 (FR-016): `source = 'demo'`, `visibleTenderSource`, matching only `gem`, data-fix migration 0010, contract-driven isolation sweep | [US3](../qa/evidence/008/US3/VERDICT.md) `qa:approved` | **met** |
+| 02 | Pooled Neon endpoint now; Hyperdrive + one `pg` driver next (MUST / SHOULD) | Pooled host: T041 (operator, FR-010). Hyperdrive: T110, T111 (FR-075) | US2 not merged; [US7](../qa/evidence/008/US7/VERDICT.md) `qa:approved`, criterion 7c unverifiable | **unverified**: the single `pg` driver and the commented `[[hyperdrive]]` binding are built; the pooled `DATABASE_URL` check (§ Secrets, from #492) and the staging connection test (T111, #468) are operator tasks not yet done |
+| 03 | Global GeM lease, 10-minute manual-sync cooldown, atomic single ingestion (MUST) | T059 to T066 (FR-024 to FR-026) | [US4](../qa/evidence/008/US4/VERDICT.md) `qa:approved` (round 2) | **met** |
+| 04 | Open-only partial feed indexes (MUST); full-text search column (SHOULD) | Indexes T067, T068, T070 (FR-027, FR-028); search T103 (FR-073) | US4 `qa:approved` (4e, p95 on production Neon, unverifiable); US7 `qa:approved` | **met** in CI-sized Postgres (500k tenders, p95 189 ms); production latency **unverified** until staging/Neon access |
+| 05 | Pending-notifications partial index (MUST) | T069 (FR-029) | US4 `qa:approved` | **met** |
+| 06 | Worker limits: `cpu_ms`, page, LLM and packet-size caps (MUST) | Caps T073 to T076 (FR-030 to FR-033); `[limits] cpu_ms` T030 (FR-009) | US4 `qa:approved` (8c, a real 301-page GeM document, unverifiable); US2 not merged | **partly met**: page, LLM budget and 40-item packet caps proven; `cpu_ms = 120000` waits for US2 (#492) |
+| 07 | LLM metering + per-org quota (MUST); shared extraction cache (SHOULD) | T084, T085 (FR-037 to FR-039); T102 (FR-072) | [US5](../qa/evidence/008/US5/VERDICT.md) and US7 `qa:approved` | **met** |
+| 08 | Plan limits, trial expiry, 402 contract, usage endpoint (MUST) | T079 to T091 (FR-034 to FR-042) | US5 `qa:approved`, every scenario met | **met** |
+| 09 | Health with ingestion staleness + external monitor (MUST); Sentry (SHOULD) | T094 to T098 (FR-044 to FR-048); operator T099 (FR-047) | [US6](../qa/evidence/008/US6/VERDICT.md) `qa:approved`; criteria 10b (runbook sections owned by US2), 11 (monitor + fire drill) and 12 (SC-009) unverifiable | **partly met**: health v2, logs, Sentry and the runbook's monitor/first-10-minutes sections are proven; **the external uptime monitor and the staging fire drill (T099) are not configured**, so nobody is paged yet |
+| 10 | CI deploy pipeline with migrations, Neon retention, custom domain, security headers (MUST) | US1: T016 to T026 (FR-001 to FR-006); US2: T030 to T042 (FR-007 to FR-015) | none yet (US1 PR #475, US2 PR #492) | **unverified** |
+| 11 | Rate limiting for auth, uploads, preview, fetch-documents (MUST) | T049 to T056 (FR-017 to FR-022); auth rules are spec 002's (FR-010) | US3 `qa:approved`; [002/US1](../qa/evidence/002/US1/VERDICT.md) `qa:approved` | **met** |
+| 12 | Cross-tenant isolation sweep test (MUST) | T048 (FR-016), extending 002 T052 | US3 `qa:approved` | **met**; becomes a CI gate with US1 (#475) |
+| 13 | Matching efficiency (SHOULD) | T104, T105 (FR-074) | US7 `qa:approved` | **met** (not a gate) |
+
+Numbering note: the spec's ownership table (spec 008 § Ownership boundaries) uses ARCH-12 for password reset and ARCH-13 for the
+isolation sweep and mentions ARCH-19 to ARCH-26, while `docs/architecture.md` § 7 defines ARCH-12 as the isolation sweep, ARCH-13
+as matching efficiency and stops at ARCH-18. This table follows `docs/architecture.md`; the mismatch is recorded in
+`specs/008-operations-scale/checklists/requirements.md` (finding F-08).
+
+### Before the first paid plan flip
+
+1. US1 (#356) and US2 (#357) merged with `qa:approved` verdicts; every row above reads **met** except the explicitly
+   operator-only items below. Merge order is not important; the gate is the verdict files on `main`.
+2. Operator tasks done and noted in the release PR: pooled `DATABASE_URL` verified on staging and production (T041), Neon
+   history retention of at least 7 days and one dated restore drill (FR-014), external uptime monitor with a staging fire
+   drill (T099, FR-047), Hyperdrive decision and staging load test (T111) or a recorded decision to stay on the pooled URL.
+3. `ADMIN_TOKEN` (32 characters or more) set on the Worker so the plan flip endpoint exists (it answers 404 without it).
+4. Spec 002 release gate at the top of this file reads PASS.
+5. Update "Last checked" and the Status column here in the release PR.

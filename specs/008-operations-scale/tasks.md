@@ -45,11 +45,11 @@ plus a QA `VERDICT.md`. Review uses the cairn review workflow (`cairn-reviewer`)
 - [x] T002 [P] Local/CI Postgres 16 on :5433 via `scripts/local-pg.sh`; API test harness on real Postgres with `TEST_DATABASE_URL` in `apps/api/test/helpers.ts` FR-001
 - [x] T003 [P] Architecture review and ADRs 0001–0014 in `docs/architecture.md`, `docs/adr/`; wiki publishes "Spec 008 Operations" in `.github/workflows/wiki-sync.yml` FR-076
 - [ ] T004 [P] E2E scaffold: create `e2e/008-operations-scale/` and helpers `evidence008(page, story, name)`, `saveTranscript(story, name, text|json)` (writes `.txt`/`.json` to `qa/evidence/008/<story>/`), `atPhone(page)` (375×812), `noHorizontalOverflow(page)` in `e2e/support/fixtures.ts` FR-005 (#363)
-- [ ] T005 [P] Add `@axe-core/playwright` (exact version, shared with 007 T003 if already added) and `a11y(page, name)` helper failing on serious/critical, saving JSON next to evidence in `e2e/support/fixtures.ts` NFR-011 (#364)
+- [x] T005 [P] Add `@axe-core/playwright` (exact version, shared with 007 T003 if already added) and `a11y(page, name)` helper failing on serious/critical, saving JSON next to evidence in `e2e/support/fixtures.ts` NFR-011 (#364) *(already on main: `@axe-core/playwright` 4.14.0 pinned, `a11y()` in `e2e/support/fixtures.ts` saves the JSON and fails on serious/critical)*
 - [x] T006 [P] Port `fetchBoundedResource`, `canRetrySource`, `SourceHttpError`, `SourceBodyLimitError`, `waitForSourceDelay`, `isPdfBody` from `/home/user/refs/erenmyeager15_india-government-tenders-scraper/src/http.ts` to `packages/core/src/gem/http.ts` (fetch-API version, no undici) with unit tests `packages/core/src/gem/http.test.ts`; add NOTICE entry (Apache-2.0) naming the target file and the `ci.yml`/`dod.yml` adaptations in `NOTICE` FR-021, FR-030, NFR-010 (#365)
 - [x] T007 [P] Caps module `MAX_TENDER_DOC_PAGES=300`, `MAX_LLM_CALLS_PER_ANALYSIS=2`, `MAX_LLM_INPUT_CHARS=90_000`, `LLM_CALL_TIMEOUT_MS=60_000`, `ANALYSIS_BUDGET_MS=120_000`, `PACKET_MAX_ITEMS=40` (packet size: `PACKET_MAX_INPUT_BYTES` env, see T076), `JSON_BODY_MAX_BYTES=1 MB`, `MANUAL_SYNC_COOLDOWN_MIN=10` with a test pinning each value in `packages/core/src/contracts/caps.ts`, `packages/core/src/contracts/caps.test.ts` NFR-009, FR-030, FR-031, FR-032, FR-026 (#366)
-- [ ] T008 [P] Fold this spec's contract additions (402 `plan_limit_reached`/`plan_expired`, 429 `rate_limited`/`sync_cooldown`, 413 `packet_too_large`, 422 `document_too_long`/`scanned_document`, 503 `gem_busy`, `GET /org/usage`, `POST /admin/orgs/:id/plan`, health v2, `org.trialEndsAt`) into `specs/001-gem-tender-copilot/contracts/api.md` and new tables/columns/indexes into `specs/001-gem-tender-copilot/data-model.md` FR-040 (#367)
-- [ ] T009 [P] Remove `SESSION_SECRET` from `specs/001-gem-tender-copilot/plan.md` and replace the secrets list with the one in spec FR-015 FR-015 (#368)
+- [x] T008 [P] Fold this spec's contract additions (402 `plan_limit_reached`/`plan_expired`, 429 `rate_limited`/`sync_cooldown`, 413 `packet_too_large`, 422 `document_too_long`/`scanned_document`, 503 `gem_busy`, `GET /org/usage`, `POST /admin/orgs/:id/plan`, health v2, `org.trialEndsAt`) into `specs/001-gem-tender-copilot/contracts/api.md` and new tables/columns/indexes into `specs/001-gem-tender-copilot/data-model.md` FR-040 (#367)
+- [x] T009 [P] Remove `SESSION_SECRET` from `specs/001-gem-tender-copilot/plan.md` and replace the secrets list with the one in spec FR-015 FR-015 (#368)
 
 ---
 
@@ -244,9 +244,9 @@ the expected rows/blobs.
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T114 [P] Update `README.md` (Operations section: CI, deploy, environments, runbook link) and `wrangler.toml` header comment; remove stale `pnpm deploy` instructions FR-007, FR-048 (#371)
-- [ ] T115 [P] Run `/cairn-analyze` on spec 008 against 002/003/007 to confirm no duplicate ownership (cooldown, retries, plans file, isolation test) and record results in `specs/008-operations-scale/checklists/requirements.md` FR-023 (#372)
-- [ ] T116 Launch checklist in `docs/runbook.md` § Launch checklist: every MUST (ARCH-01…ARCH-13) mapped to its task and QA verdict; all P1 verdicts `approved` before the first plan flip to a paid plan FR-023, SC-001 (#373)
+- [x] T114 [P] Update `README.md` (Operations section: CI, deploy, environments, runbook link) and `wrangler.toml` header comment; remove stale `pnpm deploy` instructions FR-007, FR-048 (#371) *(README done; the `wrangler.toml` header and the `deploy` script are rewritten by US2 PR #492, so they are not touched here to avoid a conflict)*
+- [x] T115 [P] Run `/cairn-analyze` on spec 008 against 002/003/007 to confirm no duplicate ownership (cooldown, retries, plans file, isolation test) and record results in `specs/008-operations-scale/checklists/requirements.md` FR-023 (#372)
+- [x] T116 Launch checklist in `docs/runbook.md` § Launch checklist: every MUST (ARCH-01…ARCH-13) mapped to its task and QA verdict; all P1 verdicts `approved` before the first plan flip to a paid plan FR-023, SC-001 (#373)
 
 ---
 
