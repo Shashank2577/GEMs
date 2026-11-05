@@ -159,7 +159,7 @@ All endpoints are under `/api`, cookie-session (or `tp_` API token) authenticate
 | `POST /notifications/read-all` *(built)* | any | — | `200 {ok:true, updated}` | — |
 | `GET /me/notification-prefs` *(built)* | any | — | `200 {inApp, email, whatsapp, frequency, expiryReminders}` | — |
 | `PUT /me/notification-prefs` *(built)* | any | same shape | `200` | `400` (WhatsApp without phone / invalid) |
-| `GET /notifications/unsubscribe?token=` + `POST` *(gap)* | public (signed token) | — | `200` HTML "You won’t get match emails from <org> any more." / `200` for one-click POST | `400 invalid_token` |
+| `GET /notifications/unsubscribe?token=` + `POST` *(gap)* | public (signed token) | `POST` body `List-Unsubscribe=One-Click` (RFC 8058) or the confirmation form | `GET`: `200` HTML confirmation page with a `<form method="post">` button — no side effect (link scanners); `POST`: sets `email=false` for that user/org (all alert, digest and reminder emails) and skips their queued email rows → `200` JSON `{ok,email:false}` for one-click, `200` HTML "You are unsubscribed" for the form | `400 invalid_token` (bad token or no longer a member) |
 | `GET /views` *(gap)* | any | — | `200 {items: SavedViewDto[]}` | — |
 | `POST /views` *(gap)* | any | `{name≤40, params: string (URLSearchParams)}` | `201 SavedViewDto` | `400`; `409 view_limit` (> 20) |
 | `PATCH /views/:id` / `DELETE /views/:id` *(gap)* | owner of view | `{name?, params?, position?}` | `200` | `404` |

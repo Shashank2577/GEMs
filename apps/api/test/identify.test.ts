@@ -2,17 +2,19 @@
  * T038 — Identify routes: tender feed filters/facets/sort/pagination, detail, seen/dismiss, watchlists CRUD +
  * preview + roles, ingestion run/runs roles, notifications, and org isolation.
  */
-import { eq, like, sql } from 'drizzle-orm';
+import { and, eq, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, bidWorkspaces, ingestionRuns, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
+import { analyses, bidWorkspaces, ingestionRuns, memberships, notificationPrefs, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
 import type { NormalizedTender } from '@tp/core/gem/parse';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { byPreviewOrder, escapeLike, phraseLike, type Candidate } from '../src/routes/watchlists';
+import { dispatchNotifications } from '../src/services/alerts';
 import { matchAndNotify, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z');
 const GEM = 'http://mock-gem.test';
+const TEST_APP = 'http://tp.test';
 
 let ctx: TestContext;
 let mock: ReturnType<typeof createMockGem>;
@@ -658,5 +660,172 @@ describe('watchlist SQL helpers and batched matching', () => {
     } finally {
       await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
     }
+  });
+});
+
+describe('notifications ?kind validation (003/FR-049)', () => {
+  it('rejects an unknown kind with 400 and accepts a real one', async () => {
+    const bad = await get('/notifications?kind=bogus', team.owner);
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('validation_error');
+    const ok = await get('/notifications?kind=tender_match', team.owner);
+    expect(ok.status).toBe(200);
+    expect(ok.body.items.every((i: { kind: string }) => i.kind === 'tender_match')).toBe(true);
+    expect((await get('/notifications?kind=digest', team.owner)).body.total).toBe(0);
+  });
+
+  it('accepts the corrigendum and result kinds (US5)', async () => {
+    for (const kind of ['corrigendum', 'result']) {
+      const r = await get(`/notifications?kind=${kind}`, team.owner);
+      expect(r.status).toBe(200);
+      expect(r.body.items.every((i: { kind: string }) => i.kind === kind)).toBe(true);
+    }
+  });
+});
+
+describe('one-click email unsubscribe (003/FR-048)', () => {
+  const ids = () => ({ userId: other.me.user.id as string, orgId: other.me.org.id as string });
+  const prefsEmail = async () => (await get('/me/notification-prefs', other)).body.email;
+  const setPrefsEmail = async (email: boolean) =>
+    request(ctx.app, 'PUT', '/me/notification-prefs', { cookie: other.cookie, json: { ...(await get('/me/notification-prefs', other)).body, email } });
+  const tokenOf = (h: string) => new URL(h.slice(1, -1)).searchParams.get('token')!;
+  const tokenFor = async (userId: string, orgId: string) => {
+    const { signUnsubscribeToken } = await import('../src/lib/unsubscribe');
+    return signUnsubscribeToken(ctx.deps.config.unsubscribeSecret!, userId, orgId);
+  };
+  const queueEmail = async (title: string, orgId = ids().orgId) =>
+    (await ctx.db.insert(notifications).values({ orgId, userId: ids().userId, channel: 'email', kind: 'system', title, body: 'x', status: 'pending', dedupeKey: title }).returning())[0];
+  const rowOf = async (id: string) => (await ctx.db.select().from(notifications).where(eq(notifications.id, id)))[0];
+  const oneClick = (token: string) => ctx.app.request(`${TEST_APP}/api/notifications/unsubscribe?token=${token}`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click',
+  });
+
+  it('dispatched alert emails carry List-Unsubscribe + List-Unsubscribe-Post for the recipient and org', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    await queueEmail('Unsub headers check');
+    await dispatchNotifications(ctx.deps);
+    const mail = ctx.mailer.sent.find((m) => m.subject === 'Unsub headers check');
+    expect(mail?.to).toBe(other.email);
+    expect(mail!.headers!['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+    expect(mail!.headers!['List-Unsubscribe']).toMatch(new RegExp(`^<${TEST_APP}/api/notifications/unsubscribe\\?token=[\\w.-]+>$`));
+    expect(tokenOf(mail!.headers!['List-Unsubscribe'])).toBe(await tokenFor(userId, orgId));
+  });
+
+  it('GET only shows a confirmation form (link scanners change nothing); its POST unsubscribes and confirms in HTML', async () => {
+    const { userId, orgId } = ids();
+    const token = await tokenFor(userId, orgId);
+    await setPrefsEmail(true);
+    for (let i = 0; i < 3; i++) {
+      const page = await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${token}`);
+      expect(page.status).toBe(200);
+      expect(page.headers.get('content-type')).toMatch(/text\/html/);
+      expect(page.text).toContain('<form method="post" action="/api/notifications/unsubscribe?token=');
+      expect(page.text).toContain('Rival Traders');
+      expect(page.text).toMatch(/match alerts, daily digests and bid deadline reminders/);
+    }
+    expect(await prefsEmail()).toBe(true);
+
+    const action = (await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${token}`)).text.match(/action="([^"]+)"/)![1].replace(/&amp;/g, '&');
+    const done = await request(ctx.app, 'POST', action, { form: {} });
+    expect(done.status).toBe(200);
+    expect(done.headers.get('content-type')).toMatch(/text\/html/);
+    expect(done.text).toMatch(/You are unsubscribed/);
+    expect(await prefsEmail()).toBe(false);
+  });
+
+  it('the confirmation POST from a signed-in browser (Origin: null under no-referrer, or APP_URL) is not blocked by the origin check, and ignores the cookie', async () => {
+    const { userId, orgId } = ids();
+    const token = await tokenFor(userId, orgId);
+    // Signed in as a *different* user: the token alone decides whose email is switched off.
+    const signedIn = team.owner;
+    const ownerPrefs = async () => (await get('/me/notification-prefs', signedIn)).body.email;
+    const ownerBefore = await ownerPrefs();
+    for (const origin of ['null', TEST_APP]) {
+      await setPrefsEmail(true);
+      const r = await request(ctx.app, 'POST', `/notifications/unsubscribe?token=${token}`, { cookie: signedIn.cookie, form: {}, headers: { origin } });
+      expect(r.status, origin).toBe(200);
+      expect(r.text).toMatch(/You are unsubscribed/);
+      expect(await prefsEmail()).toBe(false);
+      expect(await ownerPrefs()).toBe(ownerBefore);
+    }
+    // The exemption is that exact path, POST only: other methods there and other routes are still refused.
+    for (const [method, path] of [['PUT', `/notifications/unsubscribe?token=${token}`], ['POST', '/notifications/unsubscribe/x'], ['PATCH', '/org']]) {
+      const r = await request(ctx.app, method, path, { cookie: signedIn.cookie, json: { name: 'X' }, headers: { origin: 'null' } });
+      expect(r.status, `${method} ${path}`).toBe(403);
+      expect(r.body.error.code).toBe('bad_origin');
+    }
+  });
+
+  it('RFC 8058 one-click POST turns email off without signing in and skips already-queued emails', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    const queued = await queueEmail('Unsub queued before click');
+    const res = await oneClick(await tokenFor(userId, orgId));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, email: false });
+    expect(await prefsEmail()).toBe(false);
+    expect(await rowOf(queued.id)).toMatchObject({ status: 'skipped', error: 'unsubscribed', nextAttemptAt: null });
+    await dispatchNotifications(ctx.deps);
+    expect(ctx.mailer.sent.some((m) => m.subject === 'Unsub queued before click')).toBe(false);
+    // Idempotent.
+    expect((await oneClick(await tokenFor(userId, orgId))).status).toBe(200);
+  });
+
+  it('the token is bound to its org, and stops working once the user leaves that org', async () => {
+    const { userId, orgId } = ids();
+    // `other` is also a member of team's org, with email on there.
+    await ctx.db.insert(memberships).values({ orgId: team.orgId, userId, role: 'analyst' });
+    await ctx.db.insert(notificationPrefs).values({ orgId: team.orgId, userId, email: true })
+      .onConflictDoUpdate({ target: [notificationPrefs.orgId, notificationPrefs.userId], set: { email: true } });
+    const teamEmail = async () => (await ctx.db.select().from(notificationPrefs).where(and(eq(notificationPrefs.orgId, team.orgId), eq(notificationPrefs.userId, userId))))[0].email;
+    const queuedInTeam = await queueEmail('Unsub other org row', team.orgId);
+    try {
+      await setPrefsEmail(true);
+      expect((await oneClick(await tokenFor(userId, orgId))).status).toBe(200);
+      expect(await prefsEmail()).toBe(false);
+      expect(await teamEmail()).toBe(true); // org B untouched
+      expect(await rowOf(queuedInTeam.id)).toMatchObject({ status: 'pending' });
+
+      // A token for org A with the payload rewritten to org B fails the signature.
+      const [, sig] = (await tokenFor(userId, orgId)).split('.');
+      const swapped = `${Buffer.from(`${userId}:${team.orgId}:email_matches`).toString('base64url')}.${sig}`;
+      expect((await oneClick(swapped)).status).toBe(400);
+      expect(await teamEmail()).toBe(true);
+
+      // After leaving team's org its link is invalid (GET and POST) and nothing changes.
+      const teamToken = await tokenFor(userId, team.orgId);
+      expect((await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${teamToken}`)).status).toBe(200);
+      await ctx.db.delete(memberships).where(and(eq(memberships.orgId, team.orgId), eq(memberships.userId, userId)));
+      for (const method of ['GET', 'POST']) {
+        const r = await request(ctx.app, method, `/notifications/unsubscribe?token=${teamToken}`);
+        expect(r.status, method).toBe(400);
+        expect(r.body.error.code).toBe('invalid_token');
+      }
+      expect(await teamEmail()).toBe(true);
+    } finally {
+      await ctx.db.delete(memberships).where(and(eq(memberships.orgId, team.orgId), eq(memberships.userId, userId)));
+      await ctx.db.delete(notifications).where(eq(notifications.id, queuedInTeam.id));
+    }
+  });
+
+  it('a tampered, truncated, foreign-scope or missing token is 400 invalid_token and changes nothing', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    const good = await tokenFor(userId, orgId);
+    const [p, s] = good.split('.');
+    const { signUnsubscribeToken } = await import('../src/lib/unsubscribe');
+    const forged = await signUnsubscribeToken('another-secret', userId, orgId);
+    const otherUser = Buffer.from(`${team.owner.me.user.id}:${orgId}:email_matches`).toString('base64url');
+    for (const token of [`${p}.${s.slice(0, -2)}AA`, `${otherUser}.${s}`, forged, p, '', 'garbage']) {
+      for (const method of ['GET', 'POST']) {
+        const r = await request(ctx.app, method, `/notifications/unsubscribe?token=${token}`);
+        expect(r.status, `${method} ${token}`).toBe(400);
+        expect(r.body.error.code).toBe('invalid_token');
+      }
+    }
+    const none = await request(ctx.app, 'POST', '/notifications/unsubscribe');
+    expect(none.body.error.code).toBe('invalid_token');
+    expect(await prefsEmail()).toBe(true);
   });
 });

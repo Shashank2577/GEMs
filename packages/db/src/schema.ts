@@ -4,6 +4,7 @@
  */
 import { sql } from 'drizzle-orm';
 import type { AnalysisWarning } from '@tp/core/contracts/analyse';
+import type { NotificationKind } from '@tp/core/contracts/identify';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -522,7 +523,10 @@ export const comments = pgTable('comments', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
   createdAt: createdAt(),
-});
+}, (t) => ({
+  /** Comment thread per workspace (006/NFR-001). */
+  wsIdx: index('comments_ws_idx').on(t.workspaceId),
+}));
 
 export const annexureTemplates = pgTable('annexure_templates', {
   id: id(),
@@ -532,7 +536,10 @@ export const annexureTemplates = pgTable('annexure_templates', {
   body: text('body').notNull(), // {{placeholders}}
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (t) => ({
+  /** One override per (org, key) (006/FR-036). System templates (org_id NULL) are code, not rows. */
+  orgKeyUq: uniqueIndex('annexure_templates_org_key_uq').on(t.orgId, t.key),
+}));
 
 export interface PacketItem {
   kind: 'cover' | 'annexure' | 'vault' | 'tender_doc';
@@ -566,13 +573,17 @@ export const notifications = pgTable('notifications', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   channel: text('channel').$type<'in_app' | 'email' | 'whatsapp'>().notNull(),
-  kind: text('kind').$type<'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system' | 'corrigendum' | 'result'>().notNull(),
+  kind: text('kind').$type<NotificationKind>().notNull(), // derived from NOTIFICATION_KINDS in @tp/core
   title: text('title').notNull(),
   body: text('body').notNull(),
   link: text('link'),
   dedupeKey: text('dedupe_key'),
   status: text('status').$type<'pending' | 'sent' | 'failed' | 'skipped' | 'read'>().notNull().default('pending'),
   error: text('error'),
+  /** Delivery attempts made so far (email / WhatsApp); FR-047 retries transient failures up to 3. */
+  attempts: integer('attempts').notNull().default(0),
+  /** Earliest time the dispatcher may (re)try this row; also the claim lease while a dispatcher holds it. */
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
   sentAt: timestamp('sent_at', { withTimezone: true }),
   readAt: timestamp('read_at', { withTimezone: true }),
   createdAt: createdAt(),

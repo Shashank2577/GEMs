@@ -54,7 +54,7 @@ export const routers = {
   demo: demoRoutes,
 } as const;
 
-export function createApp(deps: AppDeps) {
+export function createApp(deps: AppDeps, opts: { testHooks?: boolean } = {}) {
   const app = new Hono<AppEnv>();
   app.onError(errorHandler);
   app.notFound(notFoundHandler);
@@ -70,6 +70,13 @@ export function createApp(deps: AppDeps) {
   api.use('*', ipLimit);
   // 006/FR-074: read-only API tokens may only GET (uses the credentials ipLimit resolved).
   api.use('*', readOnlyTokenGuard);
+
+  // 003/NFR-008: E2E-only mail capture. Opt-in via E2E_TEST_HOOKS=1 on the Node server (never wired in worker.ts),
+  // never in production, and only with the in-memory log mailer.
+  if (opts.testHooks && deps.config.environment !== 'production' && 'sent' in deps.mailer && Array.isArray(deps.mailer.sent)) {
+    const mailer = deps.mailer as { sent: unknown[] };
+    api.get('/__test/mail', (c) => c.json({ sent: mailer.sent }));
+  }
 
   for (const r of Object.values(routers)) api.route('/', r);
 
