@@ -30,6 +30,12 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
   const blobDir = resolve(repoRoot, env.BLOB_DIR || '.data/blobs');
   const webDist = resolve(repoRoot, env.WEB_DIST || 'apps/web/dist');
 
+  // 008/FR-022: cf-connecting-ip can only be trusted on the Worker (Cloudflare overwrites it there). On Node a client
+  // could send it directly, so refuse to start rather than silently trusting a forgeable header.
+  if (/^cloudflare$/i.test(env.TRUST_PROXY ?? '')) {
+    throw new Error('TRUST_PROXY=cloudflare is only valid on the Cloudflare Worker. On Node use TRUST_PROXY=1 behind a reverse proxy, or leave it unset.');
+  }
+
   if (env.AUTO_MIGRATE === '1' || env.AUTO_MIGRATE === 'true') {
     const { runMigrations } = await import('@tp/db/migrate');
     await runMigrations(databaseUrl);

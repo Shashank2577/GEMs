@@ -7,6 +7,7 @@ import { runIngestion } from '../services/ingest';
 import { dispatchNotifications } from '../services/alerts';
 import { runExpiryReminders } from '../services/reminders';
 import { pruneAuthState } from './rate-limit';
+import { pruneRateLimits } from './rate-limiter';
 
 export interface ScheduledReport { step: string; ok: boolean; ms: number; error?: string }
 
@@ -16,6 +17,7 @@ export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' |
     ['alerts', () => dispatchNotifications(deps)],
     ['reminders', () => runExpiryReminders(deps)],
     ['auth-cleanup', () => pruneAuthState(deps.db, deps.clock.now())],
+    ['rate-limit-cleanup', () => pruneRateLimits(deps.db, deps.clock.now())],
   ];
   const report: ScheduledReport[] = [];
   for (const [step, fn] of steps) {

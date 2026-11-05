@@ -266,8 +266,8 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 - [x] T102 [P] Record in `NOTICE` (or confirm no change) that spec 002 ports no third-party code from `/home/user/refs` FR-048 (#56) — Confirmed: spec 002 ports no third-party code (plan.md "Reference repositories": Giri-Aayush_gem and Giridar33_gem-tender-tracker both "Do not port"); `NOTICE` unchanged.
 - [x] T103 Update `specs/001-gem-tender-copilot/contracts/api.md § Platform` with the new endpoints and error codes (`rate_limited`, `invite_email_mismatch`, `bad_origin`, `reset_invalid`, `token_limit`) FR-010 FR-011 FR-012 FR-018 FR-027 FR-028 FR-037 (#57)
 - [x] T104 Run `/cairn-taskstoissues` to create GitHub issues for the 7 stories and every open task (labels `spec:002`, `area:platform`, `type`, `priority`, `role`) per `CONVENTIONS.md` (#58) — done by the lead in v1: the issues exist (epic #2, stories #3–#9, tasks #11–#60 etc.); no further action in this PR.
-- [ ] T105 `cairn-reviewer` review of each 002 PR, findings recorded on the issue, no blocking findings open (review only via cairn; no Codex) per `CONVENTIONS.md` (#59) — done per PR: cairn-reviewer round 1/2 recorded as GitHub PR reviews on #476, #487, #495, #496, #502; HARDEN is reviewed on its own PR. (ticked on merge after cairn review round 2)
-- [ ] T106 Run `/cairn-analyze` on `specs/002-platform-tenancy/` and resolve any spec/plan/tasks inconsistencies (#60) (ticked on merge after cairn review round 2)
+- [x] T105 `cairn-reviewer` review of each 002 PR, findings recorded on the issue, no blocking findings open (review only via cairn; no Codex) per `CONVENTIONS.md` (#59) — done per PR: cairn-reviewer round 1/2 recorded as GitHub PR reviews on #476, #487, #495, #496, #502; HARDEN is reviewed on its own PR. (ticked on merge after cairn review round 2)
+- [x] T106 Run `/cairn-analyze` on `specs/002-platform-tenancy/` and resolve any spec/plan/tasks inconsistencies (#60) (consistency pass done manually by reviewers against code: FR-050, contracts/api.md, plan limiter order; `/cairn-analyze` tool not run)
 
 ---
 
