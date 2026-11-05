@@ -141,7 +141,11 @@ export async function removeTenderDocument(deps: AppDeps, input: { orgId: string
   await getTender(deps, input.tenderId);
   const doc = await getTenderDocument(deps, input.tenderId, input.docId, input.orgId);
   if (doc.orgId === null) throw forbidden('Documents fetched from GeM are shared and cannot be removed');
-  await deps.db.delete(tenderDocuments).where(and(eq(tenderDocuments.id, doc.id), eq(tenderDocuments.orgId, input.orgId)));
+  const deleted = await deps.db.delete(tenderDocuments)
+    .where(and(eq(tenderDocuments.id, doc.id), eq(tenderDocuments.orgId, input.orgId)))
+    .returning({ id: tenderDocuments.id });
+  // A concurrent delete already removed it: only one request logs and marks the analysis stale.
+  if (!deleted.length) throw notFound('Document');
   try {
     await deps.blobs.delete(doc.blobKey);
   } catch (e) {

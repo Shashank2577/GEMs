@@ -135,7 +135,7 @@ function DocRow({ doc, tenderId, bidNumber, onRemove }: { doc: TenderDocumentDto
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`More actions for ${doc.fileName}`}><MoreHorizontal /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onRemove} className="text-danger focus:text-danger"><Trash2 />Remove</DropdownMenuItem>
+              <DropdownMenuItem destructive onSelect={onRemove}><Trash2 />Remove</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}

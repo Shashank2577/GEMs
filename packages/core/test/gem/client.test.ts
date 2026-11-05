@@ -198,6 +198,22 @@ describe('extractCsrfToken', () => {
       expect(new TextDecoder().decode(doc.bytes.slice(0, 8))).toBe('%PDF-1.7');
     });
 
+    it('keeps the request deadline through the body read and cancels a trickling body (FR-005)', async () => {
+      let canceled = false;
+      const neverCloses = new ReadableStream<Uint8Array>({
+        start(c) { c.enqueue(new TextEncoder().encode('%PDF-1.7')); }, // first chunk, then silence
+        cancel() { canceled = true; },
+      });
+      const { f } = fakeGem((c) => (c.url.includes('showbid') ? new Response(neverCloses, { headers: { 'content-type': 'application/pdf' } }) : undefined));
+      const time = fakeTime();
+      const gem = new GemClient(f, { baseUrl: 'http://gem.test', minIntervalMs: 0, sleep: time.sleep, now: time.now, timeoutMs: 50 });
+      const err = await gem.fetchBidDocument('7421001').catch((e) => e);
+      expect(err).toBeInstanceOf(GemError);
+      expect(err).toMatchObject({ code: 'timeout', retryable: true });
+      expect(err.message).toMatch(/timed out/);
+      expect(canceled).toBe(true);
+    });
+
     it('defaults to a 25 MB cap', async () => {
       const { f } = fakeGem((c) => (c.url.includes('showbid')
         ? new Response('%PDF-1.7', { headers: { 'content-length': String(25 * 1024 * 1024 + 1) } })

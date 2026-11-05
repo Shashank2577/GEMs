@@ -467,5 +467,9 @@ export function normalizeBidNumber(s: string | null | undefined): string | null 
 export function detectBidNumber(pages: string[]): string | null {
   const first = pages[0] ?? '';
   if (!first.trim()) return null;
-  return normalizeBidNumber(first.slice(0, HEADER_CHARS)) ?? normalizeBidNumber(first.slice(-FOOTER_CHARS));
+  // Match over the whole page (slicing could cut a number in half), then judge by where it starts.
+  const matches = [...first.matchAll(new RegExp(BID_NO_RE.source, 'gi'))];
+  const header = matches.find((m) => m.index < HEADER_CHARS);
+  const footer = matches.find((m) => m.index >= first.length - FOOTER_CHARS);
+  return normalizeBidNumber((header ?? footer)?.[0]);
 }

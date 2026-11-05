@@ -200,6 +200,21 @@ describe('detectBidNumber (FR-010)', () => {
     expect(detectBidNumber(['Additional terms and conditions', 'Bid Number: GEM/2026/B/6140019'])).toBeNull();
   });
 
+  it('reads a header bid number straddling the header boundary in full, not truncated', () => {
+    const page1 = `${'x'.repeat(790)} GEM/2026/B/6133872 ${'y'.repeat(2000)}`; // starts at 791, ends past 800
+    expect(detectBidNumber([page1])).toBe('GEM/2026/B/6133872');
+  });
+
+  it('only accepts a footer match that starts inside the footer window', () => {
+    const tail = ' | Page 1';
+    const n = 'GEM/2026/B/6140019';
+    // Starts 5 chars before the 400-char footer window: neither header nor footer.
+    const outside = `${'x'.repeat(2000)} ${n}${'z'.repeat(400 - tail.length - n.length + 5)}${tail}`;
+    expect(detectBidNumber([outside])).toBeNull();
+    const inside = `${'x'.repeat(2000)} ${n}${tail}`;
+    expect(detectBidNumber([inside])).toBe(n);
+  });
+
   it('tolerates spacing and case and returns null without text', () => {
     expect(detectBidNumber(['Bid Number : gem / 2026 / r / 42 '])).toBe('GEM/2026/R/42');
     expect(detectBidNumber([''])).toBeNull();

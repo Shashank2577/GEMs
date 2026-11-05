@@ -45,7 +45,7 @@ export interface FetchPageOptions {
 }
 
 /** Machine-readable GemError causes callers branch on (status covers plain HTTP failures). */
-export type GemErrorCode = 'too_large';
+export type GemErrorCode = 'too_large' | 'timeout';
 
 export class GemError extends Error {
   constructor(message: string, readonly status?: number, readonly retryable = false, readonly code?: GemErrorCode) {
@@ -66,6 +66,8 @@ export class GemClient {
   private readonly maxRetries: number;
   private readonly backoff: number;
   private readonly timeout: number;
+  /** When the attempt that produced each response started, so body reads share its deadline. */
+  private readonly attemptStartedAt = new WeakMap<Response, number>();
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
   private readonly maxDocumentBytes: number;
@@ -152,7 +154,10 @@ export class GemClient {
       await res.body?.cancel().catch(() => {});
       throw new GemError(`GeM document download failed: HTTP ${res.status}`, res.status);
     }
-    const bytes = await readCapped(res, this.maxDocumentBytes);
+    // The request timer stops once headers arrive; keep the same deadline running through the body
+    // read so a slowly trickling body cannot outlive the timeout (FR-005).
+    const started = this.attemptStartedAt.get(res) ?? Date.now();
+    const bytes = await readCapped(res, this.maxDocumentBytes, started + this.timeout);
     const contentType = res.headers.get('content-type') ?? 'application/pdf';
     if (bytes.length < 5 || String.fromCharCode(...bytes.slice(0, 5)) !== '%PDF-') {
       throw new GemError('GeM did not return a PDF for this bid document', res.status);
@@ -206,6 +211,7 @@ export class GemClient {
         this.requests++;
         let res: Response | null = null;
         let err: unknown = null;
+        const attemptStartedAt = Date.now();
         const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
         const timer = ctrl ? setTimeout(() => ctrl.abort(), this.timeout) : null;
         try {
@@ -216,6 +222,7 @@ export class GemClient {
             body: init.body,
             signal: ctrl?.signal,
           });
+          this.attemptStartedAt.set(res, attemptStartedAt);
           this.storeCookies(res);
         } catch (e) {
           err = e;
@@ -242,7 +249,7 @@ export class GemClient {
 }
 
 /** Read a response body, cancelling it as soon as it is known to exceed `maxBytes`. */
-async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array> {
+async function readCapped(res: Response, maxBytes: number, deadline = Infinity): Promise<Uint8Array> {
   const tooLarge = () => new GemError(`GeM document is larger than ${maxBytes} bytes`, res.status, false, 'too_large');
   const advertised = Number(res.headers.get('content-length'));
   if (Number.isFinite(advertised) && advertised > maxBytes) {
@@ -253,15 +260,29 @@ async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array> 
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let received = 0;
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    received += value.byteLength;
-    if (received > maxBytes) {
-      await reader.cancel().catch(() => {});
-      throw tooLarge();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = Symbol('timeout');
+  const expired = Number.isFinite(deadline)
+    ? new Promise<typeof timedOut>((resolve) => { timer = setTimeout(() => resolve(timedOut), Math.max(0, deadline - Date.now())); })
+    : null;
+  try {
+    for (;;) {
+      const r = expired ? await Promise.race([reader.read(), expired]) : await reader.read();
+      if (r === timedOut) {
+        await reader.cancel().catch(() => {});
+        throw new GemError('GeM unreachable: document download timed out', res.status, true, 'timeout');
+      }
+      const { value, done } = r;
+      if (done) break;
+      received += value.byteLength;
+      if (received > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw tooLarge();
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   const out = new Uint8Array(received);
   let at = 0;

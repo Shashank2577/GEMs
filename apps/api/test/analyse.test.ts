@@ -410,6 +410,27 @@ describe('US1 documents: messages, bid-number check, removal, staleness (FR-002,
     expect((await request(ctx.app, 'DELETE', `/tenders/${t.id}/documents/not-a-uuid`, { cookie: roles.analyst.cookie })).status).toBe(404);
   });
 
+  it('DELETE with a docId belonging to a different tender → 404 and nothing is removed (FR-009)', async () => {
+    const a = await insertTender('go-it-services', { contentHash: 'us1-xdel-a', source: 'us1-xdel-a' });
+    const b = await insertTender('go-it-services', { contentHash: 'us1-xdel-b', source: 'us1-xdel-b' });
+    const doc = await upload(a.id, pdfFile('go-it-services'));
+    expect(doc.status).toBe(201);
+    const r = await request(ctx.app, 'DELETE', `/tenders/${b.id}/documents/${doc.body.id}`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(404);
+    expect(r.body.error.code).toBe('not_found');
+    expect((await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.id, doc.body.id)))).toHaveLength(1);
+  });
+
+  it('concurrent DELETEs of the same document: exactly one 204 and one audit entry (FR-009)', async () => {
+    const t = await insertTender('go-it-services', { contentHash: 'us1-racedel', source: 'us1-racedel' });
+    const doc = await upload(t.id, pdfFile('go-it-services', 'Race.pdf'));
+    const url = `/tenders/${t.id}/documents/${doc.body.id}`;
+    const res = await Promise.all([1, 2, 3].map(() => request(ctx.app, 'DELETE', url, { cookie: roles.analyst.cookie })));
+    expect(res.map((r) => r.status).sort()).toEqual([204, 404, 404]);
+    const log = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, roles.orgId), eq(activityLog.entityId, t.id), eq(activityLog.action, 'tender.document_removed')));
+    expect(log).toHaveLength(1);
+  });
+
   it('GeM-fetched documents cannot be removed (403 forbidden)', async () => {
     const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/7000103', contentHash: 'us1-gemdel', source: 'us1-gemdel', gemBidId: 'go-it-services' });
     const f = await request(ctx.app, 'POST', `/tenders/${t.id}/fetch-documents`, { cookie: roles.analyst.cookie });
