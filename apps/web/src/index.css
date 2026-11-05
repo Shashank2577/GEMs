@@ -21,9 +21,9 @@
     --input: 230 18% 86%;
     --ring: 243 75% 58%;
     --primary: 243 75% 52%;
+    --primary-ink: 243 75% 52%; /* primary as text colour (>= 4.5:1 on card/background) */
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 90% 96.5%;
-    --primary-ink: 243 75% 52%; /* text on primary-soft surfaces */
     /* Primary used as text/link colour (text-primary). Same as --primary in light; lighter in dark (WCAG AA ≥ 4.5:1). */
     --primary-text: 243 75% 52%;
     --accent: 33 96% 50%;
@@ -35,7 +35,7 @@
     --warning: 30 95% 31%;
     --warning-foreground: 0 0% 100%;
     --warning-soft: 45 100% 94%;
-    --danger: 350 74% 50%;
+    --danger: 350 74% 46%;
     --danger-foreground: 0 0% 100%;
     --danger-soft: 352 100% 96.5%;
     --info: 205 90% 32%;
@@ -68,9 +68,9 @@
     --input: 234 16% 22%;
     --ring: 243 90% 70%;
     --primary: 243 82% 66%;
+    --primary-ink: 243 90% 74%;
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 45% 18%;
-    --primary-ink: 243 90% 78%;
     --primary-text: 243 90% 74%; /* ≥ 5:1 on background, card, muted and primary-soft (white-on-primary buttons keep --primary) */
     --accent: 36 98% 58%;
     --accent-foreground: 26 90% 10%;

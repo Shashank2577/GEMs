@@ -1,0 +1,1 @@
+ALTER TABLE "tender_documents" ADD COLUMN "total_pages" integer;

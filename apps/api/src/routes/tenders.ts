@@ -99,7 +99,7 @@ function buildFilters(q: TenderQuery, org: string, now: Date, scope: SQL, omit?:
 }
 
 function orderBy(q: TenderQuery, org: string): SQL[] {
-  const score = sql`(select a.score from ${analyses} a where a.org_id = ${org} and a.tender_id = ${tenders.id} order by a.created_at desc limit 1)`;
+  const score = sql`(select a.score from ${analyses} a where a.org_id = ${org} and a.tender_id = ${tenders.id} and a.status = 'done' order by a.created_at desc limit 1)`;
   const relevance = sql`(select max(m.relevance) from ${tenderMatches} m where m.org_id = ${org} and m.tender_id = ${tenders.id})`;
   switch (q.sort) {
     case 'endAt': return [sql`${tenders.endAt} asc nulls last`, desc(tenders.createdAt)];
@@ -129,7 +129,7 @@ export async function decorateTenders(deps: AppDeps, org: string, rows: TenderRo
       .where(and(eq(tenderMatches.orgId, org), inArray(tenderMatches.tenderId, ids)))
       .orderBy(desc(tenderMatches.relevance)),
     db.selectDistinctOn([analyses.tenderId], { tenderId: analyses.tenderId, id: analyses.id, score: analyses.score, verdict: analyses.verdict, stale: analyses.stale })
-      .from(analyses).where(and(eq(analyses.orgId, org), inArray(analyses.tenderId, ids)))
+      .from(analyses).where(and(eq(analyses.orgId, org), eq(analyses.status, 'done'), inArray(analyses.tenderId, ids)))
       .orderBy(analyses.tenderId, desc(analyses.createdAt)),
     db.select({ tenderId: bidWorkspaces.tenderId, id: bidWorkspaces.id, stage: bidWorkspaces.stage })
       .from(bidWorkspaces).where(and(eq(bidWorkspaces.orgId, org), inArray(bidWorkspaces.tenderId, ids))),
@@ -208,7 +208,7 @@ tendersRoutes.get('/tenders/:id', requireAuth, async (c) => {
     deps.db.select().from(tenderDocuments)
       .where(and(eq(tenderDocuments.tenderId, t.id), or(isNull(tenderDocuments.orgId), eq(tenderDocuments.orgId, org))))
       .orderBy(desc(tenderDocuments.createdAt)),
-    deps.db.select().from(analyses).where(and(eq(analyses.orgId, org), eq(analyses.tenderId, t.id))).orderBy(desc(analyses.createdAt)).limit(1),
+    deps.db.select().from(analyses).where(and(eq(analyses.orgId, org), eq(analyses.tenderId, t.id), eq(analyses.status, 'done'))).orderBy(desc(analyses.createdAt)).limit(1),
   ]);
   return c.json({
     ...item,
