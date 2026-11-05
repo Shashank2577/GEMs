@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { AnalysisDto, FactorStatus, Requirement, StaleReason, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
-import { formatDateIST, formatINR } from '@/lib/format';
+import { formatDateIST, formatINR, relativeTime } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
   turnover: Banknote, experience: Award, similarWork: Handshake, emd: Landmark, mii: Flag, oem: BadgeCheck,
@@ -106,6 +106,24 @@ export function formatRequirementValue(r: Requirement): string {
 export function mismatchedDocuments(analysis: Pick<AnalysisDto, 'createdAt'>, documents: TenderDocumentDto[] | undefined): TenderDocumentDto[] {
   const at = Date.parse(analysis.createdAt);
   return (documents ?? []).filter((d) => d.bidNumberFound && !(Date.parse(d.createdAt) > at));
+}
+
+/** How often the page re-reads the analysis while another member's run is in progress (FR-029). */
+export const ANALYSIS_POLL_MS = 3000;
+
+/** Another analysis for this org+tender is running (GET …/analysis `lastAttempt`, FR-028/FR-029). */
+export function isAnalysisRunning(a: Pick<AnalysisDto, 'lastAttempt'> | null | undefined): boolean {
+  return a?.lastAttempt?.status === 'running';
+}
+
+/**
+ * US3 #15 warning when the newest attempt failed but a previous result is shown, else null:
+ * "The last re-analysis failed: <reason>. Showing the previous result from <relative time>."
+ */
+export function failedAttemptCopy(a: Pick<AnalysisDto, 'status' | 'lastAttempt' | 'updatedAt'> | null | undefined, now: Date = new Date()): string | null {
+  if (!a || a.status !== 'done' || a.lastAttempt?.status !== 'failed') return null;
+  const reason = (a.lastAttempt.error ?? '').trim().replace(/[.\s]+$/, '') || 'unknown error';
+  return `The last re-analysis failed: ${reason}. Showing the previous result from ${relativeTime(a.updatedAt, now)}.`;
 }
 
 /** The "Check documents: … is for GEM/…." prefix the API puts on an analysis summary, if any. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Requirement } from '@tp/core/contracts/analyse';
 import type { TenderDocumentDto } from '@tp/core/contracts/analyse';
-import { REQ_GROUPS, STALE_REASON_COPY, documentCheckPrefix, formatRequirementValue, mismatchedDocuments, staleReasonCopy } from './labels';
+import { REQ_GROUPS, STALE_REASON_COPY, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
 
 describe('staleReasonCopy (FR-043)', () => {
   it('falls back to the corrigendum copy when the reason is null or missing (legacy stale analyses)', () => {
@@ -51,5 +51,30 @@ describe('document check (T036)', () => {
       .toBe('Check documents: a.pdf is for GEM/2026/B/1.');
     expect(documentCheckPrefix('Go — 92/100.')).toBeNull();
     expect(documentCheckPrefix(null)).toBeNull();
+  });
+});
+
+describe('run lifecycle copy (FR-028, FR-029)', () => {
+  const now = new Date('2026-11-04T10:00:00Z');
+  const done = { status: 'done' as const, updatedAt: '2026-11-04T07:00:00Z' };
+
+  it('isAnalysisRunning only when lastAttempt is running', () => {
+    expect(isAnalysisRunning(null)).toBe(false);
+    expect(isAnalysisRunning({})).toBe(false);
+    expect(isAnalysisRunning({ lastAttempt: { status: 'failed', error: 'x', at: now.toISOString() } })).toBe(false);
+    expect(isAnalysisRunning({ lastAttempt: { status: 'running', error: null, at: now.toISOString() } })).toBe(true);
+  });
+
+  it('failedAttemptCopy shows the reason and the previous result time (US3 #15)', () => {
+    expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'failed', error: 'LLM provider down.', at: now.toISOString() } }, now))
+      .toBe('The last re-analysis failed: LLM provider down. Showing the previous result from 3 hours ago.');
+    expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'failed', error: null, at: now.toISOString() } }, now))
+      .toBe('The last re-analysis failed: unknown error. Showing the previous result from 3 hours ago.');
+  });
+
+  it('failedAttemptCopy is null without a failed attempt or without a previous result', () => {
+    expect(failedAttemptCopy(done, now)).toBeNull();
+    expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'running', error: null, at: now.toISOString() } }, now)).toBeNull();
+    expect(failedAttemptCopy({ status: 'failed', updatedAt: done.updatedAt, lastAttempt: { status: 'failed', error: 'boom', at: now.toISOString() } }, now)).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { AlertOctagon, Bot, ChevronDown, Cpu, ExternalLink, Gavel, History, Info, Quote, RefreshCw, ShieldAlert, UserRoundPen } from 'lucide-react';
+import { AlertOctagon, Bot, ChevronDown, Cpu, ExternalLink, Gavel, History, Info, Loader2, Quote, RefreshCw, ShieldAlert, TriangleAlert, UserRoundPen } from 'lucide-react';
 import type { AnalysisDto, FactorStatus, Requirement, ScoreFactor } from '@tp/core/contracts/analyse';
 import {
   Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -12,7 +12,7 @@ import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useOverride } from './api';
 import { ChecklistCard } from './ChecklistCard';
-import { FACTOR_HELP, FACTOR_ICON, STATUS_META } from './labels';
+import { FACTOR_HELP, FACTOR_ICON, STATUS_META, failedAttemptCopy, isAnalysisRunning } from './labels';
 
 const eff = (f: ScoreFactor): FactorStatus => f.overridden?.status ?? f.status;
 
@@ -34,10 +34,38 @@ export function PageChip({ tenderId, req, className }: { tenderId: string; req?:
   ) : <span className={cls}>{label}</span>;
 }
 
+/** Another member's analysis is running (FR-029): the page polls every 3 s until it finishes. */
+export function AnalysisInProgress({ hasResult }: { hasResult: boolean }) {
+  return (
+    <div role="status" className="flex items-center gap-3 rounded-xl border border-primary/25 bg-primary-soft/50 p-4 text-sm">
+      <Loader2 className="size-5 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+      <div className="min-w-0">
+        <div className="font-semibold">Analysis in progress…</div>
+        <div className="text-muted-foreground">
+          {hasResult ? 'Someone on your team is re-analysing this tender. The previous result is shown until it finishes.' : 'Someone on your team is analysing this tender. The result will appear here when it finishes.'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** US3 #15: the newest attempt failed; the previous result stays visible below (FR-029). */
+function FailedAttemptWarning({ copy, canAnalyse, onReanalyse, reanalysing, disabled }: { copy: string; canAnalyse: boolean; onReanalyse: () => void; reanalysing: boolean; disabled: boolean }) {
+  return (
+    <div role="alert" className="flex flex-col gap-3 rounded-xl border border-danger/30 bg-danger-soft/50 p-4 sm:flex-row sm:items-center">
+      <TriangleAlert className="size-5 shrink-0 text-danger" aria-hidden />
+      <p className="min-w-0 flex-1 text-sm">{copy}</p>
+      {canAnalyse && <Button size="sm" variant="secondary" onClick={onReanalyse} loading={reanalysing} disabled={disabled}>{!reanalysing && <RefreshCw />} Try again</Button>}
+    </div>
+  );
+}
+
 export function AnalysisPanel({
-  analysis, tenderId, onReanalyse, reanalysing, canAnalyse, hasWorkspace,
+  analysis, tenderId, onReanalyse, reanalysing, canAnalyse, hasWorkspace, analyseDisabled = false,
 }: {
   analysis: AnalysisDto; tenderId: string; onReanalyse: () => void; reanalysing: boolean; canAnalyse: boolean; hasWorkspace: boolean;
+  /** Another analysis is running (lastAttempt or a 409 analysis_running): keep Analyse buttons disabled (FR-028). */
+  analyseDisabled?: boolean;
 }) {
   const [overrideFor, setOverrideFor] = useState<ScoreFactor | null>(null);
   const canOverride = useCan('bid_manager');
@@ -47,13 +75,18 @@ export function AnalysisPanel({
     return m;
   }, [analysis.requirements]);
 
+  const running = isAnalysisRunning(analysis);
+  const failedCopy = failedAttemptCopy(analysis);
+
+  if (analysis.status === 'running' || analysis.status === 'pending') return <AnalysisInProgress hasResult={false} />;
+
   if (analysis.status === 'failed') {
     return (
       <Card className="border-danger/30">
         <CardContent className="flex flex-col items-start gap-3 p-6">
           <div className="flex items-center gap-2 font-semibold text-danger"><AlertOctagon className="size-5" /> The last analysis failed</div>
           <p className="text-sm text-muted-foreground">{analysis.error ?? 'Something went wrong while reading the documents.'} Try again, or upload a cleaner PDF in the Documents tab.</p>
-          {canAnalyse && <Button size="sm" onClick={onReanalyse} loading={reanalysing}><RefreshCw /> Try again</Button>}
+          {canAnalyse && <Button size="sm" onClick={onReanalyse} loading={reanalysing} disabled={analyseDisabled}><RefreshCw /> Try again</Button>}
         </CardContent>
       </Card>
     );
@@ -68,7 +101,9 @@ export function AnalysisPanel({
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="grid min-w-0 content-start gap-6">
-        <ScoreCard analysis={analysis} onReanalyse={onReanalyse} reanalysing={reanalysing} canAnalyse={canAnalyse} />
+        {running && <AnalysisInProgress hasResult />}
+        {!running && failedCopy && <FailedAttemptWarning copy={failedCopy} canAnalyse={canAnalyse} onReanalyse={onReanalyse} reanalysing={reanalysing} disabled={analyseDisabled} />}
+        <ScoreCard analysis={analysis} onReanalyse={onReanalyse} reanalysing={reanalysing} canAnalyse={canAnalyse} disabled={analyseDisabled} />
 
         <Card>
           <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -104,7 +139,7 @@ export function AnalysisPanel({
   );
 }
 
-function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse }: { analysis: AnalysisDto; onReanalyse: () => void; reanalysing: boolean; canAnalyse: boolean }) {
+function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse, disabled }: { analysis: AnalysisDto; onReanalyse: () => void; reanalysing: boolean; canAnalyse: boolean; disabled: boolean }) {
   const reduce = useReducedMotion();
   const verdict = analysis.verdict ?? 'review';
   const conf = Math.round((analysis.confidence ?? 0) * 100);
@@ -159,7 +194,7 @@ function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse }: { analysi
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground sm:flex-col sm:items-end">
               <span>Analysed {relativeTime(analysis.updatedAt)}</span>
-              {canAnalyse && <Button size="xs" variant="ghost" onClick={onReanalyse} loading={reanalysing}>{!reanalysing && <RefreshCw />} Re-analyse</Button>}
+              {canAnalyse && <Button size="xs" variant="ghost" onClick={onReanalyse} loading={reanalysing} disabled={disabled}>{!reanalysing && <RefreshCw />} Re-analyse</Button>}
             </div>
           </div>
         </div>
