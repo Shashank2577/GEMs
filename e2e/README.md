@@ -63,7 +63,14 @@ Layout for 007: `e2e/007-experience-growth/US<n>-*.e2e.ts`, evidence in `qa/evid
 - CI (`.github/workflows/ci.yml`): `e2e-shard` ×8 runs `scripts/e2e-ci.sh <shard> 8` against a `postgres:16` service —
   every spec file is its own `playwright test <file>` run on a freshly recreated database (specs assume a fresh DB, as
   in `pnpm exec playwright test e2e/<NNN>/US<n>*`). A spec that needs extra **server** environment declares it in its
-  header as `@e2e-env KEY=value …` (read by `scripts/e2e-ci.sh`). The `e2e` job merges the shard blob reports, writes
+  header as `@e2e-env KEY=value …`. `scripts/e2e-ci.sh` exports it; a directly-run `playwright test <spec>` gets it from
+  `playwright.config.ts`, which matches the filters like Playwright does (regex over the path; `:line` suffixes, absolute
+  paths and option values like `--grep x` handled) and applies the header only if the selected specs agree on every key —
+  otherwise (e.g. `e2e/008-operations-scale`, US4 + US7) it applies nothing and warns, so run one spec per command. A variable
+  already set in your environment wins per key; the fake-LLM port is hard-coded in the header (`:4114`/`:4115`/`:4119`), so
+  `E2E_LLM_PORT` alone needs a matching `LLM_BASE_URL`. Locally `reuseExistingServer` is on: an API already listening on
+  `E2E_PORT` that was started without these variables is reused as is, so stop it first. `E2E_DEBUG=1` logs the header
+  scan. The `e2e` job merges the shard blob reports, writes
   a pass/fail/flaky summary with `scripts/e2e-summary.ts`, and uploads `qa/evidence/**` + `qa/.runs/**` as artifact
   `e2e-evidence-<run_id>` (30 days).
 
