@@ -2,13 +2,20 @@
  * T038 — ingestion idempotency, corrigenda, matching → notifications, dispatch & digests, failure modes.
  * Runs against the in-process mock BidPlus (tools/mock-gem) through deps.fetch.
  */
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, ingestionRuns, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
+import { analyses, ingestionRuns, notificationPrefs, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
+import type { NormalizedTender } from '@tp/core/gem/parse';
 import { toGemSolrDate } from '@tp/core/gem/normalize';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
-import { dispatchNotifications } from '../src/services/alerts';
+import { createResendMailer } from '../src/adapters/mailer';
+import { isTransientSendError, isTransientStatus, PROVIDER_TIMEOUT_MS, ProviderError } from '../src/adapters/provider-error';
+import { createMetaWhatsApp } from '../src/adapters/whatsapp';
+import { CLAIM_LEASE_MS, DISPATCH_BATCH, LEASE_SAFETY_MARGIN_MS, dispatchNotifications, renderAlertEmail } from '../src/services/alerts';
+import type { AppDeps } from '../src/deps';
 import { IngestionBusyError, planPages, runIngestion } from '../src/services/ingest';
+import { gemCopyOutdated } from '../src/services/analyse';
+import { keepStaleOnCompletion } from '../src/services/staleness';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z'); // fixture reference = 10:00 IST
@@ -143,7 +150,10 @@ describe('runIngestion', () => {
 
   it('acceptance #4: a corrigendum updates the end date, records history and marks analyses stale', async () => {
     const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/6421001'));
-    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go' });
+    const analysedAt = new Date(ctx.clock.now().getTime() - 86_400_000);
+    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go', createdAt: analysedAt, updatedAt: analysedAt });
+    // A failed attempt has no result to invalidate: markStale leaves it alone (004/T074).
+    const [failed] = await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'failed', error: 'x', createdAt: new Date(0) }).returning();
     const r = await admin(`/__admin/corrigendum/${encodeURIComponent('GEM/2026/B/6421001')}`, { days: 7 });
     expect(r.status).toBe(200);
     ctx.clock.advance(30 * 60_000);
@@ -154,18 +164,155 @@ describe('runIngestion', () => {
     const events = await ctx.db.select().from(tenderEvents).where(and(eq(tenderEvents.tenderId, t.id), eq(tenderEvents.kind, 'corrigendum')));
     expect(events).toHaveLength(1);
     expect(events[0].changes).toEqual({ endAt: { from: t.endAt!.toISOString(), to: after.endAt!.toISOString() } });
-    const [a] = await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id));
+    const [a] = await ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, t.id), eq(analyses.status, 'done')));
     expect(a.stale).toBe(true);
     expect(a.staleReason).toBe('corrigendum'); // Re-score refuses it: a corrigendum needs a re-analysis (004/FR-037)
-    expect(a.staleAt).not.toBeNull();
+    expect(a.staleAt).toEqual(ctx.clock.now()); // via markStale (004/FR-043, T074): when the corrigendum was seen
+    expect(a.updatedAt).toEqual(analysedAt); // "Analysed <time>" is not moved
+    expect((await ctx.db.select().from(analyses).where(eq(analyses.id, failed.id)))[0]).toMatchObject({ stale: false, staleReason: null, staleAt: null });
     // Members who track it get an in-app heads-up; the match itself is not duplicated.
-    expect(await count(notifications, and(eq(notifications.kind, 'deadline'), eq(notifications.orgId, team.orgId))!)).toBe(4);
+    // FR-053: a dedicated `corrigendum` kind (not `deadline`), one in-app row per member plus a queued email each.
+    expect(await count(notifications, and(eq(notifications.kind, 'deadline'), eq(notifications.orgId, team.orgId))!)).toBe(0);
+    const corr = and(eq(notifications.kind, 'corrigendum'), eq(notifications.orgId, team.orgId))!;
+    expect(await count(notifications, and(corr, eq(notifications.channel, 'in_app'))!)).toBe(4);
+    expect(await count(notifications, and(corr, eq(notifications.channel, 'email'), eq(notifications.status, 'pending'))!)).toBe(4);
+    const [inApp] = await ctx.db.select().from(notifications).where(and(corr, eq(notifications.channel, 'in_app')));
+    expect(inApp).toMatchObject({ status: 'sent', link: `/tenders/${t.id}` });
+    expect(inApp.title).toMatch(/^Corrigendum: /);
+    expect(inApp.body).toMatch(/^GEM\/2026\/B\/6421001 was amended on GeM — now closes .* IST\. Changed: Bid end date: .* → .* IST\. Re-check the analysis before you bid\.$/);
     expect(await count(tenderMatches, eq(tenderMatches.tenderId, t.id))).toBe(1);
     // Detail API shows the history.
     const d = await request(ctx.app, 'GET', `/tenders/${t.id}`, { cookie: team.analyst.cookie });
     expect(d.body.events[0]).toMatchObject({ kind: 'corrigendum' });
     expect(d.body.hasCorrigendum).toBe(true);
     expect(d.body.analysis).toMatchObject({ stale: true, verdict: 'go' });
+  });
+
+  it('FR-052/053: corrigendum email carries the change summary; quantity + EMD changes are listed; no duplicates on re-sync', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const [before] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    const r = await admin(`/__admin/corrigendum/${encodeURIComponent(bid)}`, { days: 1, quantity: 90, emd: 300_000 });
+    expect(await r.json()).toMatchObject({ ok: true, quantity: 90, emd: 300_000 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    expect(t).toMatchObject({ quantity: 90, emdAmount: 300_000 });
+    const ev = await ctx.db.select().from(tenderEvents).where(and(eq(tenderEvents.tenderId, t.id), eq(tenderEvents.kind, 'corrigendum')));
+    expect(ev).toHaveLength(2);
+    const [mail] = await ctx.db.select().from(notifications)
+      .where(and(eq(notifications.dedupeKey, `corrigendum:${t.id}:${t.contentHash}:${team.orgId}`), eq(notifications.channel, 'email'), eq(notifications.userId, team.owner.me.user.id)));
+    expect(mail).toMatchObject({ kind: 'corrigendum', status: 'pending' });
+    expect(mail.body).toContain(`Quantity: ${before.quantity} → 90`);
+    expect(mail.body).toContain('EMD: ₹2.4 L → ₹3 L');
+    // Identical re-sync: nothing new.
+    const total = await count(notifications, eq(notifications.kind, 'corrigendum'));
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(notifications, eq(notifications.kind, 'corrigendum'))).toBe(total);
+    // The dispatcher sends it as an "amended" email with the Changed section.
+    ctx.mailer.sent.length = 0;
+    await dispatchNotifications(ctx.deps);
+    const sent = ctx.mailer.sent.filter((m) => m.to === team.owner.email && m.subject.startsWith('Corrigendum:')).at(-1); // newest amendment
+    expect(sent).toBeTruthy();
+    expect(sent!.html).toContain('A tracked GeM bid was amended');
+    expect(sent!.html).toContain('Changed:');
+    expect(sent!.html).toContain('EMD: ₹2.4 L → ₹3 L');
+    // ?kind=corrigendum filters the bell list.
+    const list = await request(ctx.app, 'GET', '/notifications?kind=corrigendum', { cookie: team.owner.cookie });
+    expect(list.status).toBe(200);
+    expect(list.body.items.length).toBeGreaterThan(0);
+    expect(list.body.items.every((n: { kind: string }) => n.kind === 'corrigendum')).toBe(true);
+  });
+
+  it('FR-052: digests list amended bids under a "Changed" section after the new matches', () => {
+    const mk = (kind: 'tender_match' | 'corrigendum', title: string, body: string) =>
+      ({ n: { kind, title, body, link: null } as typeof notifications.$inferSelect });
+    const html = renderAlertEmail({
+      heading: 'h', intro: 'i', appUrl: 'http://tp.test', orgName: 'O', now: REF,
+      rows: [mk('corrigendum', 'Amended bid', 'B was amended on GeM — now closes x IST. Changed: Quantity: 75 → 90. Re-check the analysis before you bid.'), mk('tender_match', 'Fresh match', 'b')],
+    });
+    expect(html.indexOf('Fresh match')).toBeLessThan(html.indexOf('>Changed<'));
+    expect(html.indexOf('>Changed<')).toBeLessThan(html.indexOf('Amended bid'));
+    expect(html).toContain('<strong>Changed:</strong>');
+  });
+
+  it('FR-054: cancelling a tracked tender on GeM alerts tracking orgs on every channel, once', async () => {
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber, title: tenders.title }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), sql`${tenders.bidNumber} <> 'GEM/2026/B/6421001'`)).limit(1);
+    const r = await admin(`/__admin/cancel/${encodeURIComponent(m.bid)}`);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true, cancelled: true });
+    expect((await admin('/__admin/cancel/GEM%2F2026%2FB%2F0000000')).status).toBe(404);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    const [after] = await ctx.db.select().from(tenders).where(eq(tenders.id, m.id));
+    expect(after.status).toBe('cancelled');
+    expect(await count(tenderEvents, and(eq(tenderEvents.tenderId, m.id), eq(tenderEvents.kind, 'cancelled'))!)).toBe(1);
+    const cancelled = and(eq(notifications.orgId, team.orgId), eq(notifications.dedupeKey, `cancelled:${m.id}:${team.orgId}`))!;
+    expect(await count(notifications, and(cancelled, eq(notifications.channel, 'in_app'))!)).toBe(4);
+    expect(await count(notifications, and(cancelled, eq(notifications.channel, 'email'), eq(notifications.status, 'pending'))!)).toBe(4);
+    const [n] = await ctx.db.select().from(notifications).where(and(cancelled, eq(notifications.channel, 'in_app')));
+    expect(n.title).toBe(`Cancelled on GeM: ${m.title}`);
+    expect(n.link).toBe(`/tenders/${m.id}`);
+    // Re-sync: no duplicate alerts; the detail API exposes the status the banner reads.
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(notifications, and(cancelled, eq(notifications.channel, 'in_app'))!)).toBe(4);
+    const d = await request(ctx.app, 'GET', `/tenders/${m.id}`, { cookie: team.analyst.cookie });
+    expect(d.body).toMatchObject({ status: 'cancelled' });
+    expect(d.body.events[0]).toMatchObject({ kind: 'cancelled' });
+  });
+
+  it('B2: a re-cased title is not a corrigendum: no event, no stale analysis, no alerts', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    await ctx.db.update(analyses).set({ stale: false, staleReason: null }).where(eq(analyses.tenderId, t.id));
+    // Stored copy differs from GeM only by case/whitespace (hash forced stale so the diff path runs).
+    await ctx.db.update(tenders).set({ title: `  ${t.title.toUpperCase()}  `, contentHash: 'stale-hash' }).where(eq(tenders.id, t.id));
+    const events = await count(tenderEvents, eq(tenderEvents.tenderId, t.id));
+    const notes = await count(notifications, sql`true`);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(tenderEvents, eq(tenderEvents.tenderId, t.id))).toBe(events);
+    expect(await count(notifications, sql`true`)).toBe(notes);
+    const stale = await ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, t.id), eq(analyses.stale, true)));
+    expect(stale).toHaveLength(0);
+  });
+
+  it('B3: corrigendum and cancellation WhatsApp payloads lead with the notification title', async () => {
+    await ctx.db.update(users).set({ phone: '+919812345678' }).where(eq(users.email, team.analyst.email));
+    await ctx.db.update(notificationPrefs).set({ whatsapp: true }).where(eq(notificationPrefs.userId, team.analyst.me.user.id));
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber, title: tenders.title }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), sql`${tenders.status} <> 'cancelled' and ${tenders.bidNumber} <> 'GEM/2026/B/6421001'`)).limit(1);
+    await admin(`/__admin/corrigendum/${encodeURIComponent(m.bid)}`, { days: 2, quantity: 111 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    await admin(`/__admin/cancel/${encodeURIComponent(m.bid)}`);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    const sent = ctx.whatsapp as unknown as { sent: { to: string; template?: { name: string; params?: string[] } }[] };
+    sent.sent.length = 0;
+    await dispatchNotifications(ctx.deps);
+    const params = sent.sent.filter((x) => x.to === '+919812345678').map((x) => x.template?.params ?? []);
+    expect(params).toEqual(expect.arrayContaining([
+      [`Corrigendum: ${m.title}`, m.bid, expect.any(String), expect.stringContaining(`/tenders/${m.id}`)],
+      [`Cancelled on GeM: ${m.title}`, m.bid, expect.any(String), expect.stringContaining(`/tenders/${m.id}`)],
+    ]));
+  });
+
+  it('N3: tracking alerts skip orgs with no match or only dismissed matches', async () => {
+    const other = await seedOrgWithRoles(ctx.app, 'Other Org');
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), eq(tenders.status, 'open'))).limit(1);
+    // other org: a dismissed match on this tender; team org: dismiss too, so nobody tracks it.
+    const [w] = await ctx.db.insert(watchlists).values({ orgId: other.orgId, name: 'w', criteria: {}, active: false } as never).returning();
+    await ctx.db.insert(tenderMatches).values({ orgId: other.orgId, tenderId: m.id, watchlistId: w!.id, reasons: [], relevance: 1, dismissed: true } as never);
+    await ctx.db.update(tenderMatches).set({ dismissed: true }).where(and(eq(tenderMatches.tenderId, m.id), eq(tenderMatches.orgId, team.orgId)));
+    const onTender = and(eq(notifications.kind, 'corrigendum'), eq(notifications.link, `/tenders/${m.id}`))!;
+    const before = await count(notifications, onTender);
+    await admin(`/__admin/corrigendum/${encodeURIComponent(m.bid)}`, { days: 3 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(notifications, onTender)).toBe(before);
+    expect(await count(tenderEvents, and(eq(tenderEvents.tenderId, m.id), eq(tenderEvents.kind, 'corrigendum'))!)).toBeGreaterThan(0);
   });
 
   it('GeM down → run failed with error, nothing lost; HTML → failed too', async () => {
@@ -220,14 +367,26 @@ describe('runIngestion', () => {
 
     const held = await dispatchNotifications(ctx.deps);
     expect(held.held).toBe(mine.length);
+    // Held until today's 08:00 IST, not re-claimed on every run before that.
+    for (const n of await ctx.db.select().from(notifications).where(and(eq(notifications.userId, daily.me.user.id), eq(notifications.channel, 'email')))) {
+      expect(n).toMatchObject({ status: 'pending', nextAttemptAt: new Date('2026-11-05T02:30:00.000Z') });
+    }
+    expect((await dispatchNotifications(ctx.deps)).held).toBe(0);
     ctx.clock.set(new Date('2026-11-05T03:30:00.000Z')); // 09:00 IST
     const sent = await dispatchNotifications(ctx.deps);
     expect(sent.digests).toBe(1);
     const digest = ctx.mailer.sent.find((m) => m.subject.startsWith('Daily digest') && m.to === daily.email);
     expect(digest?.subject).toMatch(/new GeM tenders? matched today/);
     expect(await count(notifications, and(eq(notifications.userId, daily.me.user.id), eq(notifications.status, 'pending'))!)).toBe(0);
-    // Same day: no second digest.
+    // Same day: no second digest — a match queued after today's digest waits for tomorrow's 08:00 IST.
     expect((await dispatchNotifications(ctx.deps)).digests).toBe(0);
+    const [late] = await ctx.db.insert(notifications).values({
+      orgId: team.orgId, userId: daily.me.user.id, channel: 'email', kind: 'tender_match', title: 'Late match', body: 'x', status: 'pending',
+    }).returning();
+    const again = await dispatchNotifications(ctx.deps);
+    expect(again).toMatchObject({ digests: 0, held: 1 });
+    expect((await ctx.db.select().from(notifications).where(eq(notifications.id, late.id)))[0])
+      .toMatchObject({ status: 'pending', nextAttemptAt: new Date('2026-11-06T02:30:00.000Z') });
   });
 });
 
@@ -485,5 +644,399 @@ describe('format-drift guard (FR-014)', () => {
     expect(d.logs.filter((l) => l.level === 'error' && l.msg === 'ingestion.format_drift')).toHaveLength(1);
     const runs = await request(ctx.app, 'GET', '/ingestion/runs', { cookie: team.viewer.cookie });
     expect(runs.body.lastRun).toMatchObject({ status: 'failed', error: expect.stringMatching(/^GeM response format changed/) });
+  });
+});
+
+// Review B1: a run's corrigendum writes are stamped when they happen, not when the run started (which can be up to
+// the run budget earlier), because analyses and GeM copies created meanwhile carry their own write times.
+describe('corrigendum event and stale time are the time of the write (004/FR-045, FR-046)', () => {
+  const RUN_TAKES = 5 * 60_000;
+  /** A run whose listing request takes RUN_TAKES; `during` runs mid-request; GeM then returns `bid` with `change`. */
+  async function slowRun(bid: string, change: Partial<NormalizedTender>, during: () => Promise<void>) {
+    const [row] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    const t: NormalizedTender = {
+      source: 'gem', bidNumber: row.bidNumber, gemBidId: row.gemBidId, bidType: row.bidType, title: row.title, items: row.items,
+      category: row.category, quantity: row.quantity, ministry: row.ministry, department: row.department, organisation: row.organisation,
+      buyerOffice: row.buyerOffice, state: row.state, city: row.city, startAt: row.startAt, endAt: row.endAt, openingAt: row.openingAt,
+      emdAmount: row.emdAmount, estimatedValue: row.estimatedValue, epbgPercent: row.epbgPercent, hsnCodes: row.hsnCodes, status: row.status,
+      documentUrl: row.documentUrl, sourceUrl: row.sourceUrl, raw: row.raw ?? {}, contentHash: `${row.contentHash}:b1:${ctx.clock.now().getTime()}`,
+      ...change,
+    };
+    const client = {
+      fetchTenders: async () => {
+        ctx.clock.advance(RUN_TAKES);
+        await during();
+        ctx.clock.advance(1000); // the corrigendum is written after `during`
+        return { tenders: [t], rawCount: 1, numFound: 1 };
+      },
+    };
+    ctx.clock.advance(60_000);
+    const started = ctx.clock.now();
+    const run = await runIngestion(ctx.deps, { trigger: 'manual', pages: 1, client });
+    expect(run).toMatchObject({ status: 'success', tendersUpdated: 1 });
+    const [event] = await ctx.db.select().from(tenderEvents)
+      .where(and(eq(tenderEvents.tenderId, row.id), eq(tenderEvents.kind, 'corrigendum'))).orderBy(desc(tenderEvents.createdAt)).limit(1);
+    expect(event.createdAt).toEqual(new Date(started.getTime() + RUN_TAKES + 1000));
+    return { row, event };
+  }
+
+  it('an analysis that started after the run started but before the corrigendum was written completes stale (FR-045)', async () => {
+    let runningId = '';
+    const { row, event } = await slowRun('GEM/2026/B/6421010', { endAt: new Date('2026-12-24T09:30:00Z') }, async () => {
+      const [t] = await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/6421010'));
+      const [a] = await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'running', createdAt: ctx.clock.now(), updatedAt: ctx.clock.now() }).returning();
+      runningId = a.id;
+    });
+    expect(row.id).toBeTruthy();
+    // The run's own completion write (analyseTender) keeps a flag set at or after its created_at.
+    const [done] = await ctx.db.update(analyses).set({ status: 'done', ...keepStaleOnCompletion() }).where(eq(analyses.id, runningId)).returning();
+    expect(done).toMatchObject({ status: 'done', stale: true, staleReason: 'corrigendum', staleAt: event.createdAt });
+  });
+
+  it('a GeM copy fetched after the run started but before the documentUrl corrigendum was written is re-fetched (FR-046)', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const { row } = await slowRun(bid, { documentUrl: `${GEM}/showbidDocument/7421001-amended` }, async () => {
+      const [t] = await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, bid));
+      await ctx.db.insert(tenderDocuments).values({
+        tenderId: t.id, orgId: null, kind: 'bid', fileName: 'bid.pdf', blobKey: 'b1/bid.pdf', sizeBytes: 10, pageCount: 1, text: 'bid', createdAt: ctx.clock.now(),
+      });
+    });
+    const copies = await ctx.db.select().from(tenderDocuments).where(and(eq(tenderDocuments.tenderId, row.id), isNull(tenderDocuments.orgId)));
+    expect(copies).toHaveLength(1);
+    expect(await gemCopyOutdated(ctx.db, row.id, copies)).toBe(true);
+  });
+});
+
+// ───────────── US4 gap: retries with back-off, error classification, concurrent dispatch (FR-047, SC-006) ─────────────
+
+describe('alert delivery retries (FR-047, SC-006)', () => {
+  const MIN = 60_000;
+  type Mail = Parameters<typeof ctx.deps.mailer.send>[0];
+  /** A configured mailer: `onMine` handles our test rows (by subject prefix), every other message is accepted. */
+  const prefixMailer = (prefix: string, mine: Mail[], onMine: (m: Mail) => Promise<{ id?: string }>): AppDeps['mailer'] => ({
+    configured: true,
+    send: async (m) => {
+      if (!m.subject.startsWith(prefix)) return { id: 'other' };
+      mine.push(m);
+      return onMine(m);
+    },
+  });
+  /** Swap in a configured mailer for the duration of `fn`. */
+  async function withMailer<T>(prefix: string, onMine: (m: Mail) => Promise<{ id?: string }>, fn: (mine: Mail[]) => Promise<T>): Promise<T> {
+    const mine: Mail[] = [];
+    const orig = ctx.deps.mailer;
+    ctx.deps.mailer = prefixMailer(prefix, mine, onMine);
+    try { return await fn(mine); } finally { ctx.deps.mailer = orig; }
+  }
+  const addRow = async (title: string, extra: Partial<typeof notifications.$inferInsert> = {}) => {
+    const [row] = await ctx.db.insert(notifications).values({
+      orgId: team.orgId, userId: team.owner.me.user.id, channel: 'email', kind: 'system', title, body: 'x', status: 'pending', dedupeKey: title, ...extra,
+    }).returning();
+    return row;
+  };
+  const rowOf = async (id: string) => (await ctx.db.select().from(notifications).where(eq(notifications.id, id)))[0];
+  const dailyUser = async (name: string) => {
+    const u = await signup(ctx.app, { role: 'analyst', ownerCookie: team.owner.cookie, name });
+    await ctx.db.update(notificationPrefs).set({ frequency: 'daily', email: true }).where(eq(notificationPrefs.userId, u.me.user.id));
+    return u;
+  };
+  const addMatches = async (userId: string, n: number, extra: Partial<typeof notifications.$inferInsert> = {}) =>
+    (await ctx.db.insert(notifications).values(Array.from({ length: n }, (_, i) => ({
+      orgId: team.orgId, userId, channel: 'email' as const, kind: 'tender_match' as const, title: `Match ${i + 1}`, body: 'x', status: 'pending' as const, ...extra,
+    }))).returning()).map((r) => r.id);
+  const digestRows = (userId: string) => ctx.db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.kind, 'digest')));
+
+  beforeAll(() => { ctx.clock.set(new Date('2026-11-07T04:30:00.000Z')); }); // 10:00 IST, after the digest hour
+
+  it('a transient failure stays pending, is retried at +5 min then +25 min, and is marked failed after 3 attempts', async () => {
+    const row = await addRow('Retry-A 503');
+    await withMailer('Retry-A', async () => { throw new ProviderError('Resend error 503: upstream', true, 503); }, async (mine) => {
+      const t0 = ctx.clock.now();
+      const r1 = await dispatchNotifications(ctx.deps);
+      expect(r1.retried).toBeGreaterThanOrEqual(1);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'pending', attempts: 1, error: 'Resend error 503: upstream', nextAttemptAt: new Date(t0.getTime() + 5 * MIN) });
+      // Not due yet: nothing is attempted.
+      ctx.clock.advance(4 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(1);
+      ctx.clock.advance(1 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(2);
+      const t2 = ctx.clock.now();
+      expect(await rowOf(row.id)).toMatchObject({ status: 'pending', attempts: 2, nextAttemptAt: new Date(t2.getTime() + 25 * MIN) });
+      ctx.clock.advance(24 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(2);
+      ctx.clock.advance(1 * MIN);
+      const r3 = await dispatchNotifications(ctx.deps);
+      expect(r3.failed).toBeGreaterThanOrEqual(1);
+      expect(mine).toHaveLength(3);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'failed', attempts: 3, nextAttemptAt: null, error: 'Resend error 503: upstream' });
+      // Terminal: never tried again.
+      ctx.clock.advance(60 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(3);
+    });
+  });
+
+  it('SC-006: on the 30-min cron a failing row is terminal within 3 cycles, even when each run starts a minute early', async () => {
+    const row = await addRow('Early-1');
+    await withMailer('Early-', async () => { throw new ProviderError('Resend error 502: bad gateway', true, 502); }, async (mine) => {
+      await dispatchNotifications(ctx.deps);
+      ctx.clock.advance(29 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(2);
+      ctx.clock.advance(29 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(3);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'failed', attempts: 3, nextAttemptAt: null });
+    });
+  });
+
+  it('the Resend adapter: a network error is retried and the next attempt is sent; a 4xx fails at once', async () => {
+    const flaky = await addRow('Retry-B network');
+    const bad = await addRow('Retry-C invalid');
+    let calls = 0;
+    const signals: unknown[] = [];
+    const resend = createResendMailer({
+      apiKey: 'k', from: 'alerts@tenderpilot.test', logger: ctx.deps.logger,
+      fetch: (async (_url: string, init?: RequestInit) => {
+        signals.push(init?.signal);
+        const subject = JSON.parse(String(init?.body)).subject as string;
+        if (subject.startsWith('Retry-C')) return new Response('{"message":"invalid to"}', { status: 422 });
+        if (subject.startsWith('Retry-B') && calls++ === 0) throw new TypeError('fetch failed');
+        return new Response('{"id":"re_1"}', { status: 200 });
+      }) as typeof fetch,
+    });
+    await withMailer('Retry-', (m) => resend.send(m), async () => {
+      await dispatchNotifications(ctx.deps);
+      expect(await rowOf(flaky.id)).toMatchObject({ status: 'pending', attempts: 1, error: expect.stringMatching(/^Resend network error: fetch failed/) });
+      expect(await rowOf(bad.id)).toMatchObject({ status: 'failed', attempts: 1, nextAttemptAt: null, error: expect.stringMatching(/^Resend error 422/) });
+      ctx.clock.advance(5 * MIN);
+      await dispatchNotifications(ctx.deps);
+      expect(await rowOf(flaky.id)).toMatchObject({ status: 'sent', attempts: 2, nextAttemptAt: null, sentAt: ctx.clock.now() });
+    });
+    // Every provider request carries a timeout signal (PROVIDER_TIMEOUT_MS).
+    expect(signals.length).toBeGreaterThan(0);
+    for (const sig of signals) expect(sig).toBeInstanceOf(AbortSignal);
+  });
+
+  it('classifies provider errors: network/timeout/408/429/5xx and Meta throttling codes are transient, other 4xx and bugs permanent', async () => {
+    const wa = (status: number, body: string) => createMetaWhatsApp({
+      token: 't', phoneNumberId: '1', fetch: (async () => new Response(body, { status })) as unknown as typeof fetch,
+    }).send({ to: '+919812345678', text: 'x' }).then(() => null, (e) => e as ProviderError);
+    expect((await wa(500, '{}'))?.transient).toBe(true);
+    expect((await wa(429, '{}'))?.transient).toBe(true);
+    expect((await wa(400, '{"error":{"code":131056,"message":"pair rate limit"}}'))?.transient).toBe(true);
+    expect((await wa(400, '{"error":{"code":131026,"message":"undeliverable"}}'))?.transient).toBe(false);
+    expect((await wa(401, '{"error":{"code":190}}'))?.transient).toBe(false);
+    const waNet = await createMetaWhatsApp({ token: 't', phoneNumberId: '1', fetch: (async () => { throw new TypeError('fetch failed'); }) as unknown as typeof fetch })
+      .send({ to: '+919812345678', text: 'x' }).then(() => null, (e) => e);
+    expect(isTransientSendError(waNet)).toBe(true); // thrown by fetch → wrapped by providerFetch
+    const timedOut = await createMetaWhatsApp({ token: 't', phoneNumberId: '1', fetch: (async () => { throw new DOMException('The operation timed out.', 'TimeoutError'); }) as unknown as typeof fetch })
+      .send({ to: '+919812345678', text: 'x' }).then(() => null, (e) => e);
+    expect(isTransientSendError(timedOut)).toBe(true);
+    expect(PROVIDER_TIMEOUT_MS).toBe(30_000);
+    expect(isTransientSendError(new DOMException('The operation timed out.', 'TimeoutError'))).toBe(true);
+    expect(isTransientStatus(408)).toBe(true);
+    expect(isTransientStatus(404)).toBe(false);
+    expect(isTransientSendError(new Error('boom'))).toBe(false);
+    // A bare TypeError outside fetch is a programming error, not a network failure: not retried.
+    expect(isTransientSendError(new TypeError("Cannot read properties of undefined (reading 'id')"))).toBe(false);
+  });
+
+  it('a dispatcher never sends rows another running dispatcher has claimed; each row is sent exactly once', async () => {
+    const rows = await Promise.all([1, 2, 3, 4].map((i) => addRow(`Conc-${i}`)));
+    const sentA: Mail[] = [];
+    const sentB: Mail[] = [];
+    let inSend!: () => void;
+    const aInSend = new Promise<void>((r) => { inSend = r; });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    // Run A blocks inside its first send until released.
+    const depsA: AppDeps = { ...ctx.deps, mailer: prefixMailer('Conc-', sentA, async (m) => { if (sentA.length === 1) { inSend(); await gate; } return { id: m.subject }; }) };
+    const depsB: AppDeps = { ...ctx.deps, mailer: prefixMailer('Conc-', sentB, async (m) => ({ id: m.subject })) };
+    const runA = dispatchNotifications(depsA);
+    try {
+      await aInSend;
+      ctx.clock.advance(1); // B is a later run: its own lease differs from A's
+      const reportB = await dispatchNotifications(depsB);
+      expect(sentB).toEqual([]);
+      expect(reportB.failed + reportB.retried).toBe(0);
+    } finally { release(); }
+    const reportA = await runA;
+    expect(reportA.failed + reportA.retried).toBe(0);
+    expect(sentA.map((m) => m.subject).sort()).toEqual(rows.map((r) => r.title).sort());
+    for (const r of rows) expect(await rowOf(r.id)).toMatchObject({ status: 'sent', attempts: 1, nextAttemptAt: null });
+    // Re-running is a no-op.
+    await dispatchNotifications(depsB);
+    await dispatchNotifications(depsA);
+    expect(sentB).toEqual([]);
+    expect(sentA).toHaveLength(rows.length);
+  });
+
+  it('a row claimed by a dispatcher that died is retried once its lease expires', async () => {
+    const row = await addRow('Lease-1', { nextAttemptAt: new Date(ctx.clock.now().getTime() + CLAIM_LEASE_MS) });
+    await withMailer('Lease-', async () => ({ id: 'ok' }), async (mine) => {
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(0);
+      ctx.clock.advance(CLAIM_LEASE_MS);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(1);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'sent', attempts: 1 });
+    });
+  });
+
+  it('a slow run stops sending once less than the safety margin of its lease is left and hands the rest back', async () => {
+    const rows = await Promise.all([1, 2, 3].map((i) => addRow(`Slow-${i}`, { createdAt: new Date(ctx.clock.now().getTime() - 10 * MIN + i) })));
+    // Each send takes 7 minutes of (fake) clock time: sends start at +0, +7, then +14 min — only 1 min of the
+    // 15-min lease left, which is within the margin, so the third row is not sent by this run.
+    expect(LEASE_SAFETY_MARGIN_MS).toBe(MIN);
+    await withMailer('Slow-', async (m) => { ctx.clock.advance(7 * MIN); return { id: m.subject }; }, async (mine) => {
+      const t0 = ctx.clock.now();
+      await dispatchNotifications(ctx.deps);
+      expect(mine.map((m) => m.subject)).toEqual(['Slow-1', 'Slow-2']);
+      expect(await rowOf(rows[0].id)).toMatchObject({ status: 'sent', attempts: 1 });
+      expect(await rowOf(rows[1].id)).toMatchObject({ status: 'sent', attempts: 1 });
+      // Handed back, due at once, not counted as an attempt.
+      expect(await rowOf(rows[2].id)).toMatchObject({ status: 'pending', attempts: 0, nextAttemptAt: new Date(t0.getTime() + 14 * MIN) });
+      await dispatchNotifications(ctx.deps);
+      expect(mine.map((m) => m.subject)).toEqual(['Slow-1', 'Slow-2', 'Slow-3']);
+      expect(await rowOf(rows[2].id)).toMatchObject({ status: 'sent', attempts: 1, nextAttemptAt: null });
+    });
+  });
+
+  it('a queued email for a user who switched email off (or unsubscribed) is skipped, not sent', async () => {
+    const off = await signup(ctx.app, { role: 'analyst', ownerCookie: team.owner.cookie, name: 'Email Off' });
+    await ctx.db.update(notificationPrefs).set({ email: false }).where(eq(notificationPrefs.userId, off.me.user.id));
+    const row = await addRow('Off-1', { userId: off.me.user.id });
+    await withMailer('Off-', async () => ({ id: 'x' }), async (mine) => {
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(0);
+      expect(await rowOf(row.id)).toMatchObject({ status: 'skipped', error: 'Email alerts are turned off', nextAttemptAt: null });
+    });
+  });
+
+  it('a daily digest is reserved as pending during the send; a transient failure frees the slot, the retry is sent once', async () => {
+    ctx.clock.set(new Date('2026-11-08T04:30:00.000Z')); // 10:00 IST
+    const daily = await dailyUser('Retry Digest');
+    const ids = await addMatches(daily.me.user.id, 2);
+    let fail = true;
+    const orig = ctx.deps.mailer;
+    const digests: Mail[] = [];
+    const statusDuringSend: string[] = [];
+    ctx.deps.mailer = {
+      configured: true,
+      send: async (m) => {
+        if (m.to !== daily.email) return { id: 'other' };
+        digests.push(m);
+        statusDuringSend.push(...(await digestRows(daily.me.user.id)).map((d) => d.status));
+        if (fail) throw new ProviderError('Resend error 429: slow down', true, 429);
+        return { id: 'digest' };
+      },
+    };
+    try {
+      await dispatchNotifications(ctx.deps);
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'pending', attempts: 1 });
+      expect(await digestRows(daily.me.user.id)).toHaveLength(0);
+      fail = false;
+      ctx.clock.advance(5 * MIN);
+      const r = await dispatchNotifications(ctx.deps);
+      expect(r.digests).toBe(1);
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'sent', attempts: 2 });
+      expect(digests).toHaveLength(2);
+      expect(digests[1].subject).toBe('Daily digest: 2 new GeM tenders matched today');
+      expect(statusDuringSend).toEqual(['pending', 'pending']); // never `sent` before the provider accepted it
+      expect(await digestRows(daily.me.user.id)).toEqual([expect.objectContaining({ status: 'sent', attempts: 1, nextAttemptAt: null, sentAt: ctx.clock.now() })]);
+    } finally { ctx.deps.mailer = orig; }
+  });
+
+  it('a digest reservation in flight holds the rows until its lease ends; once stale it is removed and the digest is sent', async () => {
+    ctx.clock.set(new Date('2026-11-09T04:30:00.000Z')); // 10:00 IST
+    const daily = await dailyUser('Stale Digest');
+    const now = ctx.clock.now();
+    const leaseEnd = new Date(now.getTime() + 10 * MIN);
+    // Another dispatcher reserved today's digest 5 minutes ago and is still within its lease.
+    await ctx.db.insert(notifications).values({
+      orgId: team.orgId, userId: daily.me.user.id, channel: 'email', kind: 'digest', title: 'reserved', body: 'x',
+      dedupeKey: `digest:${team.orgId}:2026-11-09`, status: 'pending', nextAttemptAt: leaseEnd,
+    });
+    const ids = await addMatches(daily.me.user.id, 2);
+    const mine: Mail[] = [];
+    const orig = ctx.deps.mailer;
+    ctx.deps.mailer = { configured: true, send: async (m) => { if (m.to === daily.email) mine.push(m); return { id: 'x' }; } };
+    try {
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(0);
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'pending', attempts: 0, nextAttemptAt: leaseEnd });
+      // That dispatcher died: when its lease runs out the reservation is dropped and the digest goes out once.
+      ctx.clock.set(leaseEnd);
+      const r = await dispatchNotifications(ctx.deps);
+      expect(r.digests).toBe(1);
+      expect(mine.map((m) => m.subject)).toEqual(['Daily digest: 2 new GeM tenders matched today']);
+      expect(await digestRows(daily.me.user.id)).toEqual([expect.objectContaining({ status: 'sent', title: '2 new GeM tenders matched today' })]);
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'sent', attempts: 1 });
+    } finally { ctx.deps.mailer = orig; }
+  });
+
+  it('a database error after a successful send neither frees the digest slot nor counts as a failed attempt', async () => {
+    ctx.clock.set(new Date('2026-11-10T04:30:00.000Z')); // 10:00 IST
+    const daily = await dailyUser('Db Error Digest');
+    const ids = await addMatches(daily.me.user.id, 2);
+    const instant = await addRow('DbErr-1');
+    // Simulated outage: any write that marks these rows `sent` fails.
+    await ctx.db.execute(sql.raw(`
+      create or replace function tp_test_fail_sent() returns trigger language plpgsql as $$
+      begin
+        if new.status = 'sent' and (new.title = 'DbErr-1' or (new.kind = 'digest' and new.user_id = '${daily.me.user.id}')) then
+          raise exception 'simulated database outage';
+        end if;
+        return new;
+      end $$;
+      create trigger tp_test_fail_sent before update on notifications for each row execute function tp_test_fail_sent();`));
+    const mine: Mail[] = [];
+    const orig = ctx.deps.mailer;
+    ctx.deps.mailer = { configured: true, send: async (m) => { if (m.to === daily.email || m.subject === 'DbErr-1') mine.push(m); return { id: 'x' }; } };
+    try {
+      const r = await dispatchNotifications(ctx.deps);
+      expect(r.failed + r.retried).toBe(0);
+      expect(mine.map((m) => m.subject).sort()).toEqual(['Daily digest: 2 new GeM tenders matched today', 'DbErr-1']);
+      // Not failed / retried, attempt not counted, digest reservation kept (still leased): nothing is re-sent now.
+      expect(await rowOf(instant.id)).toMatchObject({ status: 'pending', attempts: 0 });
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'pending', attempts: 0 });
+      expect(await digestRows(daily.me.user.id)).toEqual([expect.objectContaining({ status: 'pending' })]);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(2);
+      await ctx.db.execute(sql.raw('drop trigger tp_test_fail_sent on notifications'));
+      // After the lease the rows are delivered again (at-least-once) and settle normally.
+      ctx.clock.advance(CLAIM_LEASE_MS);
+      await dispatchNotifications(ctx.deps);
+      expect(mine).toHaveLength(4);
+      expect(await rowOf(instant.id)).toMatchObject({ status: 'sent', attempts: 1 });
+      for (const id of ids) expect(await rowOf(id)).toMatchObject({ status: 'sent', attempts: 1 });
+      expect(await digestRows(daily.me.user.id)).toEqual([expect.objectContaining({ status: 'sent' })]);
+    } finally {
+      ctx.deps.mailer = orig;
+      await ctx.db.execute(sql.raw('drop trigger if exists tp_test_fail_sent on notifications; drop function if exists tp_test_fail_sent();'));
+    }
+  });
+
+  it('held daily rows wait for 08:00 IST and never starve instant rows out of the batch', async () => {
+    ctx.clock.set(new Date('2026-11-11T00:30:00.000Z')); // 06:00 IST
+    // Drain anything else that is due, so the batch below only sees this test's rows.
+    await dispatchNotifications(ctx.deps);
+    await dispatchNotifications(ctx.deps);
+    const daily = await dailyUser('Starve Digest');
+    const held = await addMatches(daily.me.user.id, 6);
+    const instant = await addRow('Starve-instant'); // newest row
+    await withMailer('Starve-', async () => ({ id: 'ok' }), async (mine) => {
+      // Batch of 4 (stands in for DISPATCH_BATCH = 500 with 500+ held rows): the old behaviour re-claimed the same
+      // 4 held rows every run and never reached the instant one.
+      for (let i = 0; i < 3; i++) await dispatchNotifications(ctx.deps, { limit: 4 });
+      expect(mine.map((m) => m.subject)).toEqual(['Starve-instant']);
+    });
+    expect(await rowOf(instant.id)).toMatchObject({ status: 'sent' });
+    for (const id of held) expect(await rowOf(id)).toMatchObject({ status: 'pending', attempts: 0, nextAttemptAt: new Date('2026-11-11T02:30:00.000Z') });
+    expect(DISPATCH_BATCH).toBe(500);
   });
 });

@@ -218,7 +218,9 @@ test('sc4 palette: Ctrl+K and "/" open, groups, filter, tender search (>=2 chars
   await open(page, '/dashboard');
   await openPalette(page);
   await p.getByRole('option', { name: 'Upload to document vault' }).click();
-  await expect(page).toHaveURL(/\/vault\?upload=1$/);
+  // The vault opens its upload dialog for ?upload=1 and then strips the parameter (replace), so the URL may already be /vault.
+  await expect(page).toHaveURL(/\/vault(\?upload=1)?$/);
+  await expect(page.getByRole('dialog', { name: 'Add a document' })).toBeVisible();
   await ev(page, 'sc4-quick-action-upload-vault');
   await open(page, '/dashboard');
   // preferences: dark theme from the palette, then sign out

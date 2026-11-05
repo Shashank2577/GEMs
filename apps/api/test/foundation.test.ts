@@ -14,7 +14,7 @@ import { slugify } from '../src/lib/slug';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import type { BlobStore } from '../src/deps';
 import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
-import { loadConfig } from '../src/env';
+import { adminTokenWarning, loadConfig, TEST_UNSUBSCRIBE_SECRET } from '../src/env';
 import {
   HttpError, payloadTooLarge, paymentRequired, rateLimitMessage, serviceUnavailable, tooManyRequests, unprocessable,
 } from '../src/lib/errors';
@@ -134,7 +134,7 @@ describe('provider adapters', () => {
   it('scheduled pipeline runs every step', async () => {
     const deps = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     const report = await runScheduledJobs(deps);
-    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup', 'rate-limit-cleanup']);
+    expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup', 'rate-limit-cleanup', 'housekeeping']);
   });
 });
 
@@ -181,9 +181,17 @@ describe('ops config and deps (008/T013)', () => {
   it('reads the ops env keys with safe defaults', () => {
     const d = loadConfig({});
     expect(d).toMatchObject({ adminToken: null, sentryDsn: null, logLevel: 'info', healthIngestionMaxAgeMin: 120, manualSyncCooldownMin: 10, trustProxy: 'none' });
-    const c = loadConfig({ ADMIN_TOKEN: 'adm', SENTRY_DSN: 'https://k@sentry.io/1', LOG_LEVEL: 'DEBUG', HEALTH_INGESTION_MAX_AGE_MIN: '90', MANUAL_SYNC_COOLDOWN_MIN: '0', TRUST_PROXY: '1' });
-    expect(c).toMatchObject({ adminToken: 'adm', sentryDsn: 'https://k@sentry.io/1', logLevel: 'debug', healthIngestionMaxAgeMin: 90, manualSyncCooldownMin: 0, trustProxy: 'xff' });
+    const adm = 'adm_0123456789abcdef0123456789abcdef';
+    const c = loadConfig({ ADMIN_TOKEN: adm, SENTRY_DSN: 'https://k@sentry.io/1', LOG_LEVEL: 'DEBUG', HEALTH_INGESTION_MAX_AGE_MIN: '90', MANUAL_SYNC_COOLDOWN_MIN: '0', TRUST_PROXY: '1' });
+    expect(c).toMatchObject({ adminToken: adm, sentryDsn: 'https://k@sentry.io/1', logLevel: 'debug', healthIngestionMaxAgeMin: 90, manualSyncCooldownMin: 0, trustProxy: 'xff' });
     expect(loadConfig({ LOG_LEVEL: 'verbose', MANUAL_SYNC_COOLDOWN_MIN: 'soon' })).toMatchObject({ logLevel: 'info', manualSyncCooldownMin: 10 });
+    // 008 review N4: a guessable (< 32 chars) ADMIN_TOKEN is treated as unset, with a startup warning.
+    expect(loadConfig({ ADMIN_TOKEN: 'adm' }).adminToken).toBeNull();
+    expect(loadConfig({ ADMIN_TOKEN: 'a'.repeat(31) }).adminToken).toBeNull();
+    expect(loadConfig({ ADMIN_TOKEN: 'a'.repeat(32) }).adminToken).toBe('a'.repeat(32));
+    expect(adminTokenWarning({ ADMIN_TOKEN: 'adm' })).toMatch(/shorter than 32 characters and is ignored/);
+    expect(adminTokenWarning({ ADMIN_TOKEN: adm })).toBeNull();
+    expect(adminTokenWarning({})).toBeNull();
   });
 
   it('createDeps wires a rate limiter, a no-op error reporter and the GeM lease (no-op only when unthrottled)', async () => {
@@ -196,6 +204,31 @@ describe('ops config and deps (008/T013)', () => {
     const throttled = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     expect(throttled.gemLease).not.toBe(noopGemLease);
     expect(typeof throttled.gemLease.acquire).toBe('function');
+  });
+});
+
+describe('unsubscribe secret (003/FR-048)', () => {
+  it('fixed key only in test, a random per-process key in development, none in production unless configured', () => {
+    expect(loadConfig({ NODE_ENV: 'test' }).unsubscribeSecret).toBe(TEST_UNSUBSCRIBE_SECRET);
+    const dev = loadConfig({}).unsubscribeSecret;
+    expect(dev).toMatch(/^dev-[0-9a-f-]{36}-[0-9a-f-]{36}$/);
+    expect(dev).not.toBe(TEST_UNSUBSCRIBE_SECRET);
+    expect(loadConfig({ NODE_ENV: 'development' }).unsubscribeSecret).toBe(dev); // stable within the process
+    expect(loadConfig({ NODE_ENV: 'production' }).unsubscribeSecret).toBeNull();
+    expect(loadConfig({ NODE_ENV: 'production', UNSUBSCRIBE_SECRET: 's3cret' }).unsubscribeSecret).toBe('s3cret');
+  });
+
+  it('warns once when production sends real email without UNSUBSCRIBE_SECRET', () => {
+    const warnings: string[] = [];
+    const logger = { ...silentLogger, warn: (msg: string) => { warnings.push(msg); } };
+    const make = (env: Record<string, string>) => createDeps({ env, db: {} as never, blobs: createMemoryBlobStore(), logger });
+    make({ NODE_ENV: 'production' }); // no email configured: nothing to warn about
+    make({ NODE_ENV: 'production', RESEND_API_KEY: 'r', UNSUBSCRIBE_SECRET: 's' });
+    make({ NODE_ENV: 'development', RESEND_API_KEY: 'r' });
+    expect(warnings).toEqual([]);
+    make({ NODE_ENV: 'production', RESEND_API_KEY: 'r' });
+    make({ NODE_ENV: 'production', RESEND_API_KEY: 'r' }); // once per process (createDeps runs per request on the Worker)
+    expect(warnings).toEqual([expect.stringMatching(/^UNSUBSCRIBE_SECRET is not set/)]);
   });
 });
 

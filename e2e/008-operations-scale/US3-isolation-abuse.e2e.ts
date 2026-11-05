@@ -86,7 +86,7 @@ async function twoOrgs(browser: Browser, baseURL: string) {
 }
 
 async function expectErr(res: Awaited<ReturnType<APIRequestContext['get']>>, status: number, code: string) {
-  const body = await res.json().catch(() => ({}));
+  const body: any = await res.json().catch(() => ({}));
   expect({ status: res.status(), code: body?.error?.code }, JSON.stringify(body)).toEqual({ status, code });
   return body;
 }
@@ -214,9 +214,9 @@ test.describe('sc3 data-fix migration', () => {
     };
     const before = snap('BEFORE migration 0009');
     expect(before).toContain(`${legacyBid} source=gem matches: `);
-    psqlFile('packages/db/migrations/0009_demo_source_datafix.sql');
-    const after = snap('AFTER migration 0009 (psql -f packages/db/migrations/0009_demo_source_datafix.sql)');
-    psqlFile('packages/db/migrations/0009_demo_source_datafix.sql'); // idempotent
+    psqlFile('packages/db/migrations/0010_demo_source_datafix.sql');
+    const after = snap('AFTER migration 0009 (psql -f packages/db/migrations/0010_demo_source_datafix.sql)');
+    psqlFile('packages/db/migrations/0010_demo_source_datafix.sql'); // idempotent
     expect(snap('AFTER second run (idempotent)')).toBe(after);
     expect(after).toContain(`${legacyBid} source=demo matches: A`);        // flipped; org B's match deleted, org A (demo org) kept
     expect(after).toContain(`${realBid} source=gem matches: B`);           // real bid untouched, B's match kept
@@ -334,7 +334,7 @@ test.describe('sc6 preview spam', () => {
     expect(statuses.slice(0, 30).every((s) => s === 200)).toBe(true);
     expect(statuses[30]).toBe(429);
     await t.http('call 31', last429!, 'POST /api/watchlists/preview');
-    const body = await last429!.json();
+    const body: any = await last429!.json();
     expect(body.error).toMatchObject({ code: 'rate_limited', details: { rule: 'watchlist.preview.user' } });
     expect(last429!.headers()['retry-after']).toMatch(/^\d+$/);
     t.save();

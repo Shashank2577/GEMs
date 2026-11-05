@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-05
 
-**Status**: In Progress
+**Status**: In Progress (all seven stories delivered and QA-approved; open items are listed under *As delivered* notes and in `qa/evidence/007/README.md`)
 
 **Input**: User description: "Experience area of TenderPilot in detail: dashboard aggregates & widgets per persona, pipeline
 kanban, onboarding wizard, marketing landing page & pricing, demo seed, mobile experience for Owners, accessibility &
@@ -172,6 +172,9 @@ submit yet" toast listing the missing items.
     Space again, **Then** the card lands two columns to the right, and the live region announced "Picked up …", "Over
     <stage>." and "Dropped in <stage>."; **When** Escape is pressed mid-drag, **Then** "Drag cancelled." is announced and
     the card returns.
+    *Spec amendment (#527):* the scenario runs as a **Bid Manager** (or Owner); an Analyst dropping a card on Go (the
+    Go / No-Go call) is refused with "Only a Bid Manager can make the Go/No-Go call", the card goes back and no request is
+    sent. Analysts keep every other column.
 14. **Given** a phone at 375 px, **When** `/pipeline` opens, **Then** a "Jump to stage" chip row shows every stage with its
     count, columns are 84 vw wide (max 320 px) with snap scrolling, tapping the "Won" chip scrolls the Won column into
     view, and the page itself has no horizontal scroll (only the board container scrolls).
@@ -181,12 +184,16 @@ submit yet" toast listing the missing items.
 16. *(gap)* **Given** an Analyst on any card, **When** they open the card's "Move to…" menu and choose "Go", **Then** the card
     moves exactly as with drag-and-drop (same API call, toast and activity), satisfying WCAG 2.5.7 (dragging movements)
     without a pointer drag.
+    *Spec amendment (#527):* "Go" and "Dropped" are disabled for an Analyst (tooltip "Only a Bid Manager can make the
+    Go/No-Go call"); the scenario runs as a Bid Manager.
 17. *(gap)* **Given** an Analyst drops a card on Won or Lost, **When** the move succeeds, **Then** an "Record the result"
     dialog asks for L1 price (₹), our price (₹) and notes (all optional); "Save" sends `PATCH` with `outcome` and the card
     shows "Won · L1 ₹x L" in the workspace header; "Skip" keeps the stage-only outcome.
 18. *(gap)* **Given** a demo org with one workspace moved to `dropped`, **When** the board renders, **Then** a "Show dropped
     (1)" toggle appears; enabling it adds a ninth "Dropped" column; dropping via "Move to… → Dropped" asks for
     confirmation "Drop this bid? It leaves the active pipeline but keeps its history."
+    *Spec amendment (#527):* dropping is the No-Go call, so the scenario runs as a Bid Manager; for an Analyst the "Dropped"
+    target is disabled and `PATCH {stage:'dropped'}` answers 403.
 19. *(gap)* **Given** the search box, **When** the user types "dell" quickly, **Then** at most one `GET /api/workspaces?q=dell`
     is sent after 300 ms of inactivity and the URL gains `q=dell`, so the filtered view survives reload and can be shared.
 
@@ -560,7 +567,9 @@ page.
 - **FR-022**: Analysts and above MUST be able to reorder and move cards by pointer (activation after 6 px), touch
   (220 ms long-press, 8 px tolerance) and keyboard (dnd-kit sortable keyboard coordinates), with screen-reader
   announcements for pick-up, over, drop and cancel; Viewers MUST get a static board.
-- **FR-023**: `PATCH /api/workspaces/:id` (analyst+; 403 below; 404 cross-org) MUST persist `stage` and `position`
+  *Spec amendment (#527):* Analysts cannot move a card into **Go** or **Dropped** (Bid Manager+ owns the Go / No-Go call); the
+  Go and Dropped columns show a lock and refuse the drop gracefully (card returns, same message as the API).
+- **FR-023**: `PATCH /api/workspaces/:id` (analyst+; 403 below; go/dropped bid_manager+ (#527); 404 cross-org) MUST persist `stage` and `position`
   (fractional; `positionAt()` between neighbours, append at end when only `stage` is sent), set `submittedAt` on first
   move to submitted, set `outcome {result, at}` on move to won/lost without an outcome, and log
   `workspace.stage_changed {from, to, fromLabel, toLabel}`.
@@ -578,6 +587,7 @@ page.
 - **FR-028**: On < 768 px the board MUST show the "Jump to stage" chip row and snap-scrolling columns (US2-14).
 - **FR-029** *(gap)*: Every card MUST offer a "Move to…" menu (keyboard and touch accessible, analyst+) listing all other
   stages including Dropped, using the same API, toasts and error handling as drag-and-drop.
+  *Spec amendment (#527):* "Go" and "Dropped" are disabled (tooltip "Only a Bid Manager can make the Go/No-Go call") for Analysts.
 - **FR-030** *(gap)*: After a successful move to Won or Lost the web MUST open a "Record the result" dialog (L1 price,
   our price in whole rupees, notes ≤ 2000 chars; all optional) that sends `outcome` via `PATCH`; "Skip" leaves the
   stage-only outcome.
@@ -611,11 +621,16 @@ page.
   `onboardingState` keys rather than replace them and MUST NOT log onboarding ticks to the activity feed.
 - **FR-048** *(gap)*: `PATCH /api/org` MUST accept only the onboarding keys `company`, `categories`, `watchlist`,
   `documents`, `skipped`, `completed`, `demo` (≤ 16 keys) and answer 400 otherwise.
+  *As delivered (T080):* the contract is `z.record(z.string(), z.boolean())` plus a `superRefine` (not a closed object),
+  so an unknown key or more than 16 keys answers 400 `validation_error` with `details.fields.onboardingState`
+  (`Unknown onboarding key: <key>` / `At most 16 onboarding keys`). Intent unchanged.
 - **FR-049** *(gap)*: Step 3 MUST NOT create a second watchlist when `onboardingState.watchlist` is already true.
 - **FR-050** *(gap)*: Onboarding tick failures MUST be retried once and then surfaced with a toast (US3-16).
 - **FR-051** *(gap)*: Step 4 MUST pre-mark key-document cards already present in the vault (by type).
 - **FR-052** *(gap)*: Completing the wizard MUST write one `onboarding.completed` activity entry with `durationSec` (sign-up
   to Done) so SC-001 can be measured from data.
+  *As delivered (T080):* `durationSec` is measured from organisation creation (`organizations.created_at`) to the
+  conditional `completed` flip, which is what makes the entry exactly-once under concurrent requests.
 
 **Demo data (US4)**
 
@@ -635,18 +650,36 @@ page.
   analyses, matches, comments, notifications, activity with `meta.demo`, past contracts, vault documents and their blobs,
   the three demo watchlists) while preserving every row the users created, reset a still-demo profile (US4-14), set
   `onboardingState.demo = false`, log `demo.removed`, and be idempotent.
+  *As delivered (T080):* the response is `{ ok: true, removed: { workspaces, analyses, matches, comments, notifications,
+  activity, pastContracts, vaultDocuments, watchlists, profileReset } }` — `profileReset` sits inside `removed`.
+  Provenance of the three demo watchlists is the `demo.seeded` activity entry's `meta.watchlistIds` (orgs seeded before
+  that was recorded fall back to a name + creator + exact back-dating rule); rows are never matched by name alone.
+  `removeDemo` also deletes user-written activity that is about demo workspaces/tenders, which goes beyond the text above
+  (deviation, tracked in #523 item 2: keep, or narrow it). Demo tenders are global and stay.
 - **FR-066** *(gap)*: The dashboard MUST show the demo banner with "Remove demo data" and a confirmation dialog (US4-12).
 - **FR-067** *(gap)*: Demo tenders MUST be badged "Sample" wherever tenders are listed or shown.
+  *As delivered (T080) — PARTIAL, requirement unchanged:* `isDemo` is on every tender DTO and the badge shows in the
+  tender feed (card and table) and on the tender page. It is **not yet** on the dashboard "closing soon" and "recent
+  matches" lists or on pipeline cards, so FR-067 is not fully met; tracked in #523 item 1.
 
 **Persona-aware widgets (US5)** *(gap)*
 
 - **FR-070** *(gap)*: `GET /api/dashboard` MUST add `myWork` (≤ 5 active workspaces where the caller is owner or assignee,
   ordered by `dueAt` nulls last, then `endAt`) and `awaitingDecision` (≤ 5 workspaces in `analysing` whose latest analysis
   is done, oldest first, with score and verdict).
+  *As delivered (T080):* `myWork` also excludes `submitted` (as scenario US5-2 already said; "active" here means
+  stages identified…ready). Items are `MyWorkItem {workspaceId, tenderId, bidNumber, title, stage, dueAt, endAt,
+  readiness:{percent, blockers, analysed}}` (the id field is `workspaceId`, not `id`); `DecisionItem` is **flat**
+  `{tenderId, workspaceId, bidNumber, title, score, verdict, endAt}` — there is no nested `analysis` object (#527 item 6).
 - **FR-071** *(gap)*: The web MUST show "My bids" to analyst and bid_manager directly after the KPI tiles and to owners
   below the first row; Viewers MUST NOT see it.
 - **FR-072** *(gap)*: The web MUST show "Awaiting your decision" with one-tap "Go" and "Drop" (with confirmation) to
   bid_manager+; read-only to analysts; hidden from viewers.
+  *Spec amendment (#527):* the read-only state for analysts is now also enforced by the API (403 `forbidden` on a move into
+  `go`/`dropped`).
+  *As delivered (T080):* the confirmation applies to **Drop only**; "Go" is one tap with no dialog (scenario US5-5 and the
+  landing promise "Approve Go / No-Go in one tap"). *Amended (#527):* Role gating of the Go/No-Go call is no longer UI-only: a move into `go`/`dropped` is
+  bid_manager+ at the API too (403 `forbidden`; see the amendment to FR-023/FR-029); every other stage move stays analyst+.
 - **FR-073** *(gap)*: Role-gated CTAs on the dashboard MUST be hidden for roles that would get 403 ("Create a watchlist"
   for viewers; "Finish setting up" card for analysts and viewers).
 
@@ -678,6 +711,9 @@ page.
   assert no horizontal overflow at 375 px (US7-9).
 - **FR-095** *(gap)*: The web app MUST ship a web app manifest and icons (US7-10).
 - **FR-096** *(gap)*: The app MUST show an offline banner and fail mutations fast while offline (US7-11).
+  *As delivered (T080):* mutations use TanStack Query `networkMode: 'always'` (`'online'` would pause them silently), so
+  they fail at once with one error toast; roughly 50 other call sites with their own toast can still double-toast
+  (#547 item 1).
 
 ### Non-Functional Requirements
 
@@ -688,6 +724,8 @@ page.
   (no dropped frames > 100 ms while dragging).
 - **NFR-003**: The landing page MUST score ≥ 85 Performance, ≥ 95 Accessibility, ≥ 90 Best Practices and ≥ 90 SEO in
   Lighthouse mobile emulation; LCP < 2.5 s and CLS < 0.1.
+  *As delivered (T080):* `scripts/lighthouse-landing.mjs` enforces all of these (median of 3 runs; LCP < 2500 ms and
+  CLS < 0.1 are exclusive upper bounds). Measured: Perf 93, A11y 100, BP 96, SEO 100, LCP 905 ms, CLS 0.
 - **NFR-004**: All pages MUST meet WCAG 2.1 AA, plus WCAG 2.2 AA 2.5.7 (dragging alternatives) and 2.5.8 (target size).
 - **NFR-005**: Every dashboard, pipeline and demo query MUST be org-scoped (Constitution IV); cross-org ids answer 404 and
   API tests MUST prove isolation.
@@ -764,6 +802,8 @@ page.
 - **SC-001**: A new user reaches a populated matched feed within 5 minutes of sign-up (parent SC-004); the scripted E2E
   completes sign-up → onboarding → feed in < 90 s, and *(gap)* the median `onboarding.completed.durationSec` in production
   is ≤ 300.
+  *As delivered (T080):* the scripted E2E took 56.6 s (53.9 s on the re-run capture). The entry is written, but the production median cannot be
+  measured before launch, so that half of SC-001 is open by design.
 - **SC-002**: For the demo org, 100% of the six KPI tiles and nine pipeline counts equal SQL ground truth (API test).
 - **SC-003**: 0 serious/critical axe violations on 11 core pages × 2 viewports × 2 themes.
 - **SC-004**: 0 pages with horizontal page scroll at 375 px.
@@ -787,4 +827,7 @@ page.
   area (public award/result parsing for outcome hints, P3, via 003 ingestion). Unlicensed repos
   (`PranavTamada_Tender_Scraper`, `Giri-Aayush_gem`, `Giridar33_gem-tender-tracker`) inform ideas only (keyword-boundary
   matching for onboarding keywords, profile-driven setup, dashboard tabs).
+- The canonical host `https://tenderpilot.in` used in `index.html` (canonical, og, JSON-LD), `robots.txt` and
+  `sitemap.xml` is an **assumption**: `wrangler.toml` has `APP_URL=https://tenderpilot.workers.dev` and ADR-0005 / spec 008
+  mention `app.tenderpilot.in`. Confirm before launch (#534 item 6); it must then be changed in those three files.
 - E2E runs in Chromium only (desktop + Pixel 7 emulation); real-device testing on iOS Safari is a manual QA check.

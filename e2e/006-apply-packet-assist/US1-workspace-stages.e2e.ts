@@ -53,7 +53,9 @@ test('S1-S3 API: create workspace 201 / repeat+race 200 / Viewer 403 / unknown t
   const w = await res.json();
   wsId = w.id;
   expect(w.created).toBe(true);
-  expect(w.stage).toBe('go');
+  // Amended scenario 1 (FR-002, #527): the Go verdict starts a bid in "go" only for a Bid Manager+; an Analyst's waits in
+  // "analysing" until the Bid Manager makes the Go/No-Go call (below).
+  expect(w.stage).toBe('analysing');
   expect(w.owner.id).toBe(fx.users.analyst.id);
   expect(new Date(w.dueAt).getTime()).toBe(new Date(fx.tender.endAt).getTime());
   expect(w.assignees).toEqual([]);
@@ -71,6 +73,10 @@ test('S1-S3 API: create workspace 201 / repeat+race 200 / Viewer 403 / unknown t
   const tAct = await activityOf('analyst', 'tender', fx.tender.id);
   expect(wAct.some((a) => a.action === 'workspace.created')).toBe(true);
   expect(tAct.some((a) => a.action === 'workspace.created' && a.meta.workspaceId === wsId)).toBe(true);
+
+  const bm0 = await apiAs(fx, 'bid_manager');
+  expect((await bm0.patch(`/api/workspaces/${wsId}`, { data: { stage: 'go' } })).status()).toBe(200); // the Bid Manager's call
+  await bm0.dispose();
 
   // Scenario 2: repeat (any Analyst+)
   const again = await analyst.post(`/api/tenders/${fx.tender.id}/workspace`);
@@ -335,8 +341,16 @@ test('S13 Viewer sees no dropdown or edit controls anywhere', async ({ page, con
 
 test('S14 won/lost from Go -> 409 invalid_transition; allowed from Submitted', async () => {
   const api = await apiAs(fx, 'analyst');
-  const g = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: 'go' } });
+  // Moving INTO Go is the Bid Manager's call (#527): an Analyst is refused, a Bid Manager succeeds.
+  const bm = await apiAs(fx, 'bid_manager');
+  const refused = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: 'go' } });
+  expect(refused.status()).toBe(403);
+  expect(E(await refused.json())).toMatchObject({ code: 'forbidden', message: 'Only a Bid Manager or Owner can make the Go/No-Go call.' });
+  const refusedDrop = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: 'dropped' } });
+  expect(refusedDrop.status()).toBe(403);
+  const g = await bm.patch(`/api/workspaces/${wsId}`, { data: { stage: 'go' } });
   expect(g.status()).toBe(200);
+  await bm.dispose();
   for (const to of ['won', 'lost']) {
     const r = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: to } });
     expect(r.status()).toBe(409);

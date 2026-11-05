@@ -2,6 +2,8 @@
 
 ## Launch checklist
 
+The spec 008 table (ARCH-01 to ARCH-13) and the pre-flip steps are appended at the end of this file: [Spec 008 launch checklist](#spec-008-launch-checklist-arch-01-to-arch-13).
+
 ### Release gate: spec 002 auth hardening (008/FR-023)
 
 No paid plan may be activated (no `POST /api/admin/orgs/:id/plan` to `starter`/`pro`, no invoice) until every MUST row
@@ -189,3 +191,314 @@ Filled in by the operator (T099). Story #361 stays open until this table and the
 | Fire drill date | n/a | _TBD_ |
 | Drill method | n/a | _TBD (stop cron, or point `GEM_BASE_URL` at a dead host)_ |
 | Measured detection time (failure to notification) | n/a | _TBD (SC-009: at most 15 min)_ |
+
+## Data retention and housekeeping
+
+Spec 008 US7, FR-070, ADR-0012. The single source of truth is `RETENTION` in
+[`apps/api/src/services/housekeeping.ts`](../apps/api/src/services/housekeeping.ts) (pinned by
+`apps/api/test/housekeeping.test.ts`); change both together, and this table.
+
+| Data | Rule |
+|---|---|
+| `sessions` | deleted 7 days after `expires_at` |
+| `invitations` | deleted 30 days after acceptance, or 30 days after expiry when never accepted |
+| `notifications` | `read` / `sent` / `skipped`: deleted 180 days after creation; `failed`: after 30 days; `pending` never |
+| `tender_events` | deleted after 365 days, only for tenders that are no longer `open` |
+| `tenders.raw` | set to `NULL` 90 days after the tender closed (`coalesce(end_at, updated_at)`), real tenders only; rows are kept |
+| `rate_limits` | windows older than 1 day (the `rate-limit-cleanup` step also prunes every 30 min) |
+| `packets` | the newest 5 per workspace are kept; older ones (not `building`) lose their R2 object first, then the row |
+| `gem_throttle`, `activity_log`, `llm_usage` | never touched by housekeeping |
+
+How it runs: the `housekeeping` step of `runScheduledJobs` (after `rate-limit-cleanup`) runs on the first cron tick at
+or after **02:00 IST** each IST day. It claims the day in `job_runs (job='housekeeping', day)` — every other tick and
+isolate that day skips. Deletes run in batches of 1,000 rows, at most 50 batches per rule per run (the rest is picked
+up the next day). Packet R2 objects are deleted with R2's multi-key delete (≤ 1,000 keys per call), at most 1,000
+packet objects per run. A failed R2 delete keeps those packet rows for the next run (no orphaned objects); a run that
+throws deletes its claim, so the next tick retries. Every rule is idempotent (a second run deletes 0). `tenders.raw` is
+only nulled on real tenders (`REAL_ONLY`): the demo marker in `raw` is what keeps demo tenders out of other orgs' feeds.
+
+Check it ran (one JSON line per day in Workers Logs / `wrangler tail`):
+
+```sh
+wrangler tail --format json | grep '"housekeeping finished"'
+# {"level":"info","msg":"housekeeping finished","job":"housekeeping","day":"2026-11-06",
+#  "deleted":{"sessions":12,"invitations":0,"notifications":311,"tenderEvents":0,"tenderRaw":845,"rateLimits":0,"packets":3,"packetBlobs":3},"ms":412}
+psql "$DATABASE_URL" -c "select day, started_at, finished_at, summary from job_runs where job='housekeeping' order by day desc limit 7"
+```
+
+A claim with `finished_at IS NULL` older than an hour means the run died mid-way (Worker CPU limit or eviction): the
+first cron tick after that hour takes the claim over and re-runs the day by itself (`HOUSEKEEPING_STALE_CLAIM_MS`) —
+nothing to do. To re-run a day on purpose, delete that day's row
+(`delete from job_runs where job = 'housekeeping' and day = '<YYYY-MM-DD>'`) and the next tick runs it; there is no
+manual endpoint.
+
+### Shared LLM extraction cache (FR-072)
+
+GeM-fetched documents (`tender_documents.org_id IS NULL`) keep the LLM's requirements in `requirements`, with
+`extracted_method = 'LLM'` and `extractor_version` = `CURRENT_EXTRACTOR_VERSION` (packages/core/src/analyse/llm.ts);
+every org's analysis reuses them without an LLM call. An org's own uploads are never cached. Empty or malformed LLM
+replies are never cached. Bumping `CURRENT_EXTRACTOR_VERSION` re-extracts every document once, lazily. To drop one bad
+entry (the next analysis of that document calls the LLM again):
+
+```sh
+psql "$DATABASE_URL" -c "update tender_documents set extractor_version = null where id = '<documentId>' and org_id is null"
+```
+
+## R2 lifecycle for packets
+
+FR-071 asks for an R2 lifecycle rule expiring packet PDFs after 365 days as defence in depth for the packet rule
+above. **Constraint (spec conflict, raised on the US7 PR):** R2 lifecycle rules match a literal key **prefix** only;
+packet keys are `org/<orgId>/packets/<packetId>/<file>.pdf` (pinned by spec 006 tests), so `org/*/packets/` cannot be
+expressed, and a rule on `org/` would also expire **vault** files (customer data, never lifecycle-expired). Until the
+architect decides between (a) moving new packets under a top-level `packets/` prefix (offboarding then purges both
+prefixes) or (b) one rule per org — tracked in #552 — the DB-driven housekeeping is the only packet expiry. **No
+lifecycle rule is configured today.** If a packet's object is ever missing (lifecycle, manual purge), its download answers
+404, never 500 (`apps/api/test/packet.test.ts`). Per-org rule (b), at most
+1,000 rules per bucket:
+
+```sh
+wrangler r2 bucket lifecycle add tenderpilot-blobs "packets-<orgId>" "org/<orgId>/packets/" --expire-days 365
+wrangler r2 bucket lifecycle add tenderpilot-blobs-staging "packets-<orgId>" "org/<orgId>/packets/" --expire-days 365
+wrangler r2 bucket lifecycle list tenderpilot-blobs      # verify
+```
+
+With option (a) the single rule would be
+`wrangler r2 bucket lifecycle add tenderpilot-blobs packets-365d "packets/" --expire-days 365`.
+
+## Offboarding
+
+Deleting an organisation on a confirmed request (ADR-0012 §3; FR-048, FR-071). Tenant data is deleted within 30 days
+of the confirmed request; public tender data (`tenders`, GeM-fetched `tender_documents`) is kept.
+
+1. Export first if the customer asked for it: vault files (`org/<orgId>/vault/…` in R2) and a JSON of profile,
+   analyses and workspaces (`GET /api/org`, `/api/profile`, `/api/vault`, … with an owner token).
+2. Record the request (who asked, when, ticket) in the incident/ops log.
+3. Delete the org — every org-owned table cascades on `organizations.id`:
+
+   ```sh
+   psql "$DATABASE_URL" -c "begin; select id, name from organizations where id = '<orgId>';
+     delete from organizations where id = '<orgId>'; commit;"
+   ```
+
+   Users who belonged only to this org keep their `users` row (they can sign in and create or join another org);
+   delete them separately on request (`delete from users where id = …` cascades their sessions).
+4. Purge the org's R2 prefix (vault files, packets, uploaded tender documents live under `org/<orgId>/` and
+   `tenders/<tenderId>/<orgId>/`):
+
+   ```sh
+   # list, then delete every object under the org prefix (rclone with the R2 S3 endpoint, or the dashboard)
+   rclone ls  r2:tenderpilot-blobs/org/<orgId>/
+   rclone purge r2:tenderpilot-blobs/org/<orgId>/
+   # uploaded tender documents: keys tenders/<tenderId>/<orgId>/<docId>.pdf
+   rclone lsf -R r2:tenderpilot-blobs/tenders/ --include "*/<orgId>/*" | xargs -I{} rclone deletefile r2:tenderpilot-blobs/tenders/{}
+   ```
+
+5. Verify: `select count(*) from memberships where org_id = '<orgId>'` is 0 and `rclone ls …/org/<orgId>/` is empty.
+   Neon point-in-time history still holds the data until it ages out of the retention window (≥ 7 days, ADR-0013).
+
+## Hyperdrive
+
+FR-075, ADR-0002. The Worker connects with one driver (`pg`): `createNodeDb(url, { max: 5 })`, where `url` is the
+`HYPERDRIVE` binding's `connectionString` when the binding exists, else the `DATABASE_URL` secret (Neon pooled
+`-pooler` URL — also what `pnpm db:migrate` uses). The pool fails a connection attempt after 10 s
+(`connectionTimeoutMillis`).
+
+**Current state: the binding is NOT enabled.** `wrangler.toml` ships the `[[hyperdrive]]` table commented out, because
+it needs a real config id that only an operator can create; until then production runs on `DATABASE_URL` (exactly the
+pre-FR-075 connection path, minus the second driver) and `wrangler deploy` needs no Hyperdrive config.
+
+### Enable Hyperdrive (operator, once per environment; Cloudflare API token with Hyperdrive edit)
+
+```sh
+wrangler hyperdrive create tenderpilot-db --connection-string="$NEON_POOLED_URL" --caching-disabled
+wrangler hyperdrive get <id>            # caching.disabled must be true
+# wrangler.toml: uncomment the [[hyperdrive]] table and paste <id>; deploy staging first, then production
+wrangler deploy --dry-run | grep HYPERDRIVE   # the bindings table lists env.HYPERDRIVE
+```
+
+Staging (spec 008 US2 owns `[env.staging]`; bindings are not inherited by environments): once `[env.staging]` exists,
+add to it
+
+```toml
+[[env.staging.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "<id from: wrangler hyperdrive create tenderpilot-db-staging --connection-string=$NEON_STAGING_POOLED_URL --caching-disabled>"
+```
+
+— never as a bare `[[env.staging.hyperdrive]]` table without the rest of `[env.staging]` (that silently creates a
+staging environment with no vars and no R2 bucket).
+
+Caching stays **disabled**: Hyperdrive's query cache would serve stale reads right after writes (correctness first).
+
+### Staging verification (T111, operator — not runnable from CI)
+
+Proves FR-075 / NFR-003 on staging after the binding is deployed. Record the transcript in
+`qa/evidence/008/US7/hyperdrive-staging.txt`.
+
+```sh
+# 1. The deployed Worker uses the binding (the bindings table lists env.HYPERDRIVE)
+wrangler deploy --env staging --dry-run | grep HYPERDRIVE
+# 2. 50 concurrent feed requests → 0 non-2xx / 0 connection errors
+N=200 C=50 P95_BUDGET_MS=300 scripts/load/feed.sh https://staging.tenderpilot.in | tee -a qa/evidence/008/US7/hyperdrive-staging.txt
+wrangler tail --env staging --format json | grep -iE 'too many connections|ECONNRESET|connection terminated' # expect nothing
+# 3. Health latency: p50 < 150 ms, p95 < 400 ms (NFR-003)
+for i in $(seq 100); do curl -s -o /dev/null -w '%{time_total}\n' https://staging.tenderpilot.in/api/health; done \
+  | sort -n | awk '{a[NR]=$1} END {print "p50", a[int(NR*0.5)]*1000, "ms  p95", a[int(NR*0.95)]*1000, "ms"}' | tee -a qa/evidence/008/US7/hyperdrive-staging.txt
+```
+
+Rollback: remove the `[[hyperdrive]]` table (or deploy the previous version with `wrangler rollback`); the Worker then
+uses `DATABASE_URL`.
+
+## Full-text search migration
+
+FR-073 adds the generated column `tenders.search` and the indexes `tenders_search_gin` / `tenders_bid_number_prefix_idx`
+(`packages/db/migrations/*_tenders_search.sql`, `-- tp:non-transactional`). Adding a STORED generated column
+**rewrites `tenders` under an ACCESS EXCLUSIVE lock** (≈ 1 minute at 500k rows): reads and ingestion block meanwhile.
+Run `pnpm db:migrate` for this release **off-peak** (before 07:00 IST), then deploy. The indexes are built
+`CONCURRENTLY` (no write lock). The column and indexes are deliberately not in the Drizzle schema (they would leak into
+`select *` rows); `drizzle-kit` never drops them because it diffs its own snapshots, not the database — never run
+`drizzle-kit push` against production.
+
+The watchlist pre-filter is designed to be a superset of the keyword matcher: ASCII punctuation and the invisible
+characters U+00AD, U+200B–U+200D, U+2060, U+FEFF become spaces on both the column and every query, and the matcher never
+splits a word at a combining mark. Known, accepted gaps (case folding differs between JS and Postgres): Greek final sigma
+(σ/ς) and micro sign vs mu (µ/μ) — a keyword written with one form may miss text written with the other.
+
+## LATER triggers
+
+Deferred decisions, each with the measurable trigger that reopens it (FR-076). Check these at the monthly ops review.
+
+| Item | Trigger (any one) | Decision record |
+|---|---|---|
+| Cloudflare Queues for analysis / packet builds | analysis p95 > 60 s over a week (`tender.analysed` `total_ms` in `activity_log`); an "analyse all new matches" batch feature is scheduled; a customer needs > 300-page documents | [ADR-0007 §5](adr/0007-synchronous-analysis-and-packet-with-caps.md) |
+| Postgres row-level security | a second code path to the database (reporting, admin tools, BI) is planned; or a customer security questionnaire requires RLS | [ADR-0004 §3](adr/0004-tenant-isolation-application-level.md) |
+| Razorpay subscriptions + webhook | ≥ 5 paying orgs (`select count(*) from organizations where plan <> 'trial'`) | [ADR-0010 §6](adr/0010-plan-limits-and-billing-readiness.md) |
+| Workers Analytics Engine request metrics | a customer asks for per-org request/usage metrics that `activity_log` + `llm_usage` cannot answer | [ADR-0011 §5](adr/0011-observability.md) |
+| Weekly `pg_dump` to R2 | a customer requires off-provider backups (contract / security questionnaire) | [ADR-0013 §3](adr/0013-deployment-migrations-backups-secrets.md) |
+| Revisit keeping closed tenders | `tenders` reaches 5M rows | [ADR-0012](adr/0012-data-retention-and-housekeeping.md) |
+
+## Spec 008 launch checklist (ARCH-01 to ARCH-13)
+
+Every recommendation from the architecture review's summary (`docs/architecture.md` § 7) mapped to the spec 008 tasks that
+deliver it and the QA verdict that proves it (008/FR-023, SC-001, T116). This complements the spec 002 release gate at the
+top of this file (that gate covers ARCH-11's auth rules and the 002 requirements).
+
+Last checked: 2026-11-05, against `main` at `c75d2b6` (after 008/US3, US4, US5, US6 and US7 merged). Sources are repository
+files only: `qa/evidence/008/US<n>/VERDICT.md`, ticked tasks in `specs/008-operations-scale/tasks.md` and the code. Re-check
+before each paid activation and update the table and the date.
+
+**Gate: no org may be moved to `starter` or `pro` (`POST /api/admin/orgs/:id/plan`, no invoice) until every P1 story has a QA
+verdict `qa:approved` on `main`.** Today US3, US4, US5, US6 and US7 (P2) are approved; **US1 (CI gate, PR #475) and US2 (releases,
+secrets, backups, security headers; PR #492, `needs-human`) are not merged, so the gate is closed.**
+
+| ARCH | Recommendation (level) | Spec 008 tasks | QA verdict | Status |
+|---|---|---|---|---|
+| 01 | Demo data does not leak into other tenants' feeds (MUST) | T044 to T048 (FR-016): `source = 'demo'`, `visibleTenderSource`, matching only `gem`, data-fix migration 0010, contract-driven isolation sweep | [US3](../qa/evidence/008/US3/VERDICT.md) `qa:approved` | **met** |
+| 02 | Pooled Neon endpoint now; Hyperdrive + one `pg` driver next (MUST / SHOULD) | Pooled host: T041 (operator, FR-010). Hyperdrive: T110, T111 (FR-075) | US2 not merged; [US7](../qa/evidence/008/US7/VERDICT.md) `qa:approved`, criterion 7c unverifiable | **unverified**: the single `pg` driver and the commented `[[hyperdrive]]` binding are built; the pooled `DATABASE_URL` check (§ Secrets, from #492) and the staging connection test (T111, #468) are operator tasks not yet done |
+| 03 | Global GeM lease, 10-minute manual-sync cooldown, atomic single ingestion (MUST) | T059 to T066 (FR-024 to FR-026) | [US4](../qa/evidence/008/US4/VERDICT.md) `qa:approved` (round 2) | **met** |
+| 04 | Open-only partial feed indexes (MUST); full-text search column (SHOULD) | Indexes T067, T068, T070 (FR-027, FR-028); search T103 (FR-073) | US4 `qa:approved` (4e, p95 on production Neon, unverifiable); US7 `qa:approved` | **met** in CI-sized Postgres (500k tenders, p95 189 ms); production latency **unverified** until staging/Neon access |
+| 05 | Pending-notifications partial index (MUST) | T069 (FR-029) | US4 `qa:approved` | **met** |
+| 06 | Worker limits: `cpu_ms`, page, LLM and packet-size caps (MUST) | Caps T073 to T076 (FR-030 to FR-033); `[limits] cpu_ms` T030 (FR-009) | US4 `qa:approved` (8c, a real 301-page GeM document, unverifiable); US2 not merged | **partly met**: page, LLM budget and 40-item packet caps proven (the fetched-document page cap is covered by a unit test only; US4 criterion 8c is unverifiable); `cpu_ms = 120000` waits for US2 (#492) |
+| 07 | LLM metering + per-org quota (MUST); shared extraction cache (SHOULD) | T084, T085 (FR-037 to FR-039); T102 (FR-072) | [US5](../qa/evidence/008/US5/VERDICT.md) and US7 `qa:approved` | **met** |
+| 08 | Plan limits, trial expiry, 402 contract, usage endpoint (MUST) | T079 to T091 (FR-034 to FR-042) | US5 `qa:approved`, every scenario met | **met** |
+| 09 | Health with ingestion staleness + external monitor (MUST); Sentry (SHOULD) | T094 to T098 (FR-044 to FR-048); operator T099 (FR-047) | [US6](../qa/evidence/008/US6/VERDICT.md) `qa:approved`; criteria 10b (runbook sections owned by US2), 11 (monitor + fire drill) and 12 (SC-009) unverifiable | **partly met**: health v2, logs, Sentry and the runbook's monitor/first-10-minutes sections are proven; **the external uptime monitor and the staging fire drill (T099) are not configured**, so nobody is paged yet |
+| 10 | CI deploy pipeline with migrations, Neon retention, custom domain, security headers (MUST) | US1: T016 to T026 (FR-001 to FR-006); US2: T030 to T042 (FR-007 to FR-015) | none yet (US1 PR #475, US2 PR #492) | **unverified** |
+| 11 | Rate limiting for auth, uploads, preview, fetch-documents (MUST) | T049 to T056 (FR-017 to FR-022); auth rules are spec 002's (FR-010) | US3 `qa:approved`; [002/US1](../qa/evidence/002/US1/VERDICT.md) `qa:approved` | **met** (per-IP rules and `gem.fetch.org` proven by API tests only; the US3 verdict lists per-IP limits on a real proxy under "Not checked") |
+| 12 | Cross-tenant isolation sweep test (MUST) | T048 (FR-016), extending 002 T052 | US3 `qa:approved` | **met**; becomes a CI gate with US1 (#475) |
+| 13 | Matching efficiency (SHOULD) | T104, T105 (FR-074) | US7 `qa:approved` | **met** (not a gate) |
+
+Numbering note: the spec's ownership table (spec 008 § Ownership boundaries) uses ARCH-12 for password reset and ARCH-13 for the
+isolation sweep and mentions ARCH-19 to ARCH-26, while `docs/architecture.md` § 7 defines ARCH-12 as the isolation sweep, ARCH-13
+as matching efficiency and stops at ARCH-18. This table follows `docs/architecture.md`; the mismatch is recorded in
+`specs/008-operations-scale/checklists/requirements.md` (finding F-08).
+
+### Before the first paid plan flip
+
+1. US1 (#356) and US2 (#357) merged with `qa:approved` verdicts; every row above reads **met** except the explicitly
+   operator-only items below. Merge order is not important; the gate is the verdict files on `main`.
+2. Operator tasks done and noted in the release PR: pooled `DATABASE_URL` verified on staging and production (T041), Neon
+   history retention of at least 7 days and one dated restore drill (FR-014), external uptime monitor with a staging fire
+   drill (T099, FR-047), Hyperdrive decision and staging load test (T111) or a recorded decision to stay on the pooled URL.
+3. `ADMIN_TOKEN` (32 characters or more) set on the Worker so the plan flip endpoint exists (it answers 404 without it).
+4. Spec 002 release gate at the top of this file reads PASS.
+5. Update "Last checked" and the Status column here in the release PR.
+
+## CI
+
+Every PR into `main` and every push to `main` runs `.github/workflows/ci.yml`; story PRs also run
+`.github/workflows/dod.yml` (spec 008 US1, FR-001..FR-006).
+
+| Check (job name) | Workflow | What it proves | Timeout |
+|---|---|---|---|
+| `typecheck` | ci | `pnpm typecheck` + `pnpm typecheck:scripts` (scripts/, e2e/); `pnpm audit --prod --audit-level high` (advisory, see below) | 10 min |
+| `unit` | ci | `pnpm -r --filter '!@tp/api' run test` (core, web, extension) + `pnpm test:scripts` | 10 min |
+| `api` | ci | `pnpm --filter @tp/api test` against a `postgres:16` service on `:5433` (`TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test`); runs after `unit` | 15 min |
+| `e2e` | ci | Runs after `api` as `e2e-shard-1..8` (matrix, 30 min each, not required checks): `scripts/e2e-ci.sh <n> 8` runs every spec file of its shard (`scripts/e2e-shard.ts`, balanced by test count) as its own Playwright invocation on a freshly recreated `E2E_DATABASE_URL=…/tenderpilot_e2e` (specs assume a fresh DB); real API + SPA + mock-gem; extra server env from a spec's `@e2e-env KEY=value` header line. The required `e2e` job (skipped unless `api` passed) merges the shard blob reports into `qa/.runs/8788/results.json` + HTML report, writes the job summary from `scripts/e2e-summary.ts`, uploads artifact `e2e-evidence-<run_id>` with `qa/evidence/**` + `qa/.runs/**` (30 days, also on failure) and fails unless every shard passed | 30 min |
+| `migrations-additive` | ci | `scripts/check-migrations.ts` over migrations added/changed vs the PR base, then `pnpm --filter @tp/db generate` must leave no diff (schema drift) | 10 min |
+| `ci-gate` | ci | Aggregator (`if: always()`, needs every job above plus `changes`): fails if any of them failed or was cancelled, or if the `changes` path filter itself did not succeed | 5 min |
+| `deploy` | ci → deploy.yml | Push to `main` only, after `ci-gate` succeeded: calls the reusable deploy workflow (see below). Not a required check | 5 min |
+| `dod` | dod | `scripts/dod-check.ts`: `qa/evidence/<nnn>/US<n>/VERDICT.md` exists and is approved (`## QA verdict — APPROVED`, `qa:approved` or `Verdict: approved`; any REJECTED / `qa:rejected` wins), every criterion row's Verdict cell is `met` (`not met`, `unverifiable`, blank fail), ≥ 1 `.png` and ≥ 1 `.webm` present and linked, every PR commit carries `Work-Item`/`Requirement`/`Agent-Role`/`Harness`. Always runs; fails if `dod-changes` errors | 5 min |
+
+- **Docs-only PRs** (every changed path under `specs/**`, `docs/**` or `*.md`, none under `qa/evidence/**`; see
+  `scripts/docs-only.sh`; the diff uses `--no-renames`, so moving code into `docs/` is not docs-only) run only
+  `typecheck`; `unit`, `api`, `e2e` and `migrations-additive` are skipped, `ci-gate` passes, and `dod` passes with a
+  "docs-only" note. Skipped jobs count as passing for required checks, which is why the required checks are the
+  always-running `ci-gate` and `dod` rather than the individual (skippable) jobs.
+- **Story resolution in `dod`**: PR title `[<NNN>/US<n>] …`, else `Closes #<issue>` / `Work-Item:` issue numbers mapped
+  through the `(#issue)` references in `specs/<NNN>-*/spec.md` and `tasks.md`, else label `spec:<NNN>` + `US<n>` in the
+  title/body. PRs with no story (hardening) pass with a note; a `type:story` PR with no resolvable story fails.
+- **Destructive migrations**: `DROP TABLE`, `DROP COLUMN`, `ALTER COLUMN … TYPE`, `RENAME`, `SET NOT NULL` without a
+  `DEFAULT` for that column in the same statement, `ADD COLUMN … NOT NULL` without `DEFAULT`, `DROP TYPE`,
+  `DROP SCHEMA` and `TRUNCATE` fail `migrations-additive` unless line 1 of the file is
+  `-- tp:allow-destructive <reason>`. Deleting or renaming an existing migration file always fails.
+- **Dependency audit**: `pnpm audit --prod --audit-level high` reported 17 advisories on `main` when the gate was added
+  (6 moderate, 10 high, 1 critical), tracked in Shashank2577/GEMs#479, so the step is `continue-on-error: true`
+  (visible as a warning, not a red check). Make it blocking by removing that line when #479 is closed.
+- **Deploy hand-off (scenario 8, FR-007)**: job `deploy` in `ci.yml` has `needs: ci-gate` and
+  `if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-gate.result == 'success'`, and calls
+  the reusable `.github/workflows/deploy.yml` (`on: workflow_call` + `workflow_dispatch`, `secrets: inherit`). A green
+  push to `main` starts a deploy; a red `ci` (any job failed or cancelled, hence `ci-gate` failed) never does. On PRs the
+  `deploy` job is skipped; `ci-gate` does not need it, so that never affects the gate. `deploy.yml` holds
+  `concurrency: deploy` (no cancel) on its job, not on the caller, which would deadlock on the same group. Until US2
+  task T036 it is a placeholder that only prints the SHA. `workflow_run` is deliberately not used: it only fires for
+  workflow files on the repository's **default branch**, which is currently not `main`. Manual redeploys use
+  `workflow_dispatch` (`gh workflow run deploy.yml --ref main`); note that GitHub only lists/dispatches workflows that
+  also exist on the default branch.
+- **Run locally**: `pnpm typecheck && pnpm typecheck:scripts`, `pnpm -r --filter '!@tp/api' run test`, `pnpm test:scripts`,
+  `TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test pnpm --filter @tp/api test`, `pnpm e2e` (or one CI shard: `CI=1 scripts/e2e-ci.sh 1 8`),
+  `pnpm exec tsx scripts/check-migrations.ts --base origin/main`,
+  `PR_TITLE='[008/US1] …' BASE_SHA=origin/main pnpm exec tsx scripts/dod-check.ts`.
+
+### Branch protection on `main`
+
+Required status checks (FR-003): `typecheck`, `unit`, `api`, `e2e`, `migrations-additive`, `dod`, plus the
+aggregator `ci-gate` (branch must be up to date). A skipped job counts as passing for branch protection, so `ci-gate`
+closes the gap where the path filter itself errors and every gated job is skipped;
+force pushes and branch deletion disabled; applies to admins. The workflows must already exist on `main` for the
+checks to be selectable. Apply (repo admin, from a clone of the repo):
+
+```sh
+gh api -X PUT repos/:owner/:repo/branches/main/protection \
+  -H "Accept: application/vnd.github+json" --input - <<'JSON'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["typecheck", "unit", "api", "e2e", "migrations-additive", "dod", "ci-gate"]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+JSON
+```
+
+Verify:
+
+```sh
+gh api repos/:owner/:repo/branches/main/protection \
+  --jq '{checks: .required_status_checks.contexts, strict: .required_status_checks.strict, force_push: .allow_force_pushes.enabled}'
+```
+
+A red required check (or a pending one) shows "Required statuses must pass before merging" and disables the merge button.

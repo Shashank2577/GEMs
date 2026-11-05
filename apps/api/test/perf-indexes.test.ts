@@ -137,6 +137,38 @@ describe('feed uses the open-tender partial indexes (FR-027, US4 scenario 4)', (
   });
 });
 
+describe('full-text search uses tenders_search_gin (008/FR-073, US7 scenario 3)', () => {
+  it('q=solar street light&status=all: the page and the total/facets queries read tenders_search_gin, never a Seq Scan on tenders', async () => {
+    const qs = await sqlOf('GET', `/tenders?status=all&q=${encodeURIComponent('solar street light')}`);
+    const tenderQueries = qs.filter((q) => /from "tenders"/.test(q.text));
+    expect(tenderQueries.length).toBe(2);
+    for (const q of tenderQueries) {
+      const all = nodes((await explain(q.text, q.values)).plan);
+      expect(all.map((n) => n['Index Name']), JSON.stringify(all.map((n) => [n['Node Type'], n['Index Name']]))).toContain('tenders_search_gin');
+      expect(all.filter((n) => n['Node Type'] === 'Seq Scan' && n['Relation Name'] === 'tenders')).toEqual([]);
+    }
+  });
+
+  it('q=solar street light (open feed): index-backed — the GIN or, on this small fixture, an open-tender partial index', async () => {
+    // At 50k rows / 3k open the planner may filter the open partial index instead; at 500k it picks the GIN
+    // (test/perf/search.perf.ts asserts that on the full-size fixture).
+    const qs = await sqlOf('GET', `/tenders?q=${encodeURIComponent('solar street light')}`);
+    for (const q of qs.filter((x) => /from "tenders"/.test(x.text))) {
+      const all = nodes((await explain(q.text, q.values)).plan);
+      const used = all.map((n) => n['Index Name']).filter((n): n is string => !!n);
+      expect(used.some((u) => u === 'tenders_search_gin' || /^tenders_open_/.test(u)), JSON.stringify(used)).toBe(true);
+      expect(all.filter((n) => n['Node Type'] === 'Seq Scan' && n['Relation Name'] === 'tenders')).toEqual([]);
+    }
+  });
+
+  it('q=GEM/BULK/B/12 (bid-number shape) uses tenders_bid_number_prefix_idx, status=all included', async () => {
+    const list = listQuery(await sqlOf('GET', `/tenders?status=all&q=${encodeURIComponent('GEM/BULK/B/12')}`));
+    const all = nodes((await explain(list.text, list.values)).plan);
+    expect(all.map((n) => n['Index Name'])).toContain('tenders_bid_number_prefix_idx');
+    expect(all.filter((n) => n['Node Type'] === 'Seq Scan' && n['Relation Name'] === 'tenders')).toEqual([]);
+  });
+});
+
 describe('dispatcher select uses notifications_pending_idx (FR-029, US4 scenario 5)', () => {
   it(`EXPLAIN ANALYZE on ${NOTIFICATIONS.toLocaleString('en-IN')} rows with ${PENDING} pending`, async () => {
     const q = pendingNotificationsQuery(ctx.db, 500).toSQL();

@@ -1,0 +1,27 @@
+{
+  "us7-8-user-menu-open": {
+    "otherViolations": 0,
+    "ariaHiddenFocusNodes": 0,
+    "tabReachesHiddenContent": false
+  },
+  "us7-8-theme-menu-open": {
+    "otherViolations": 0,
+    "ariaHiddenFocusNodes": 4,
+    "tabReachesHiddenContent": false
+  },
+  "us7-8-shortcuts-dialog-open": {
+    "otherViolations": 0,
+    "ariaHiddenFocusNodes": 0,
+    "tabReachesHiddenContent": false
+  },
+  "us7-8-user-menu-open-dark": {
+    "otherViolations": 0,
+    "ariaHiddenFocusNodes": 0,
+    "tabReachesHiddenContent": false
+  },
+  "us7-8-move-to-menu-open": {
+    "otherViolations": 0,
+    "ariaHiddenFocusNodes": 6,
+    "tabReachesHiddenContent": false
+  }
+}

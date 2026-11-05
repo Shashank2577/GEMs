@@ -67,7 +67,7 @@ export function ChipInput({
         {value.map((v) => (
           <span key={v} className={cn('inline-flex h-6 max-w-full items-center gap-1 rounded-md border pl-2 pr-1 text-xs font-medium', chipTone)}>
             <span className="truncate">{v}</span>
-            <button type="button" onClick={(e) => { e.stopPropagation(); onChange(value.filter((x) => x !== v)); }} className="rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring" aria-label={`Remove ${v}`}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onChange(value.filter((x) => x !== v)); }} className="-mr-1 inline-flex size-6 items-center justify-center rounded-md opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring" aria-label={`Remove ${v}`}>
               <X className="size-3" />
             </button>
           </span>
@@ -162,7 +162,7 @@ export function MultiSelect({
           {value.map((v) => (
             <span key={v} className="inline-flex h-6 items-center gap-1 rounded-md border bg-muted pl-2 pr-1 text-xs font-medium">
               {v}
-              <button type="button" onClick={() => toggle(v)} className="rounded p-0.5 opacity-70 hover:opacity-100 focus-ring" aria-label={`Remove ${v}`}><X className="size-3" /></button>
+              <button type="button" onClick={() => toggle(v)} className="-mr-1 inline-flex size-6 items-center justify-center rounded-md opacity-70 hover:opacity-100 focus-ring" aria-label={`Remove ${v}`}><X className="size-3" /></button>
             </span>
           ))}
         </div>

@@ -85,7 +85,9 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
             {t.isDemo && <SampleBadge />}
             {t.hasCorrigendum && (
               <Tooltip content="GeM published a corrigendum this week — dates or terms changed.">
-                <Badge size="sm" tone="warning"><FileWarning aria-hidden />Corrigendum</Badge>
+                <span tabIndex={0} data-testid="corrigendum-badge" className="relative z-10 inline-flex rounded-sm focus-ring">
+                  <Badge size="sm" tone="warning"><FileWarning aria-hidden />Corrigendum</Badge>
+                </span>
               </Tooltip>
             )}
             {t.workspace && <StageBadge stage={t.workspace.stage as Stage} size="sm" />}
@@ -118,7 +120,7 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
 
         <div className="relative z-10 flex shrink-0 flex-col items-end gap-2">
           {t.analysis?.score != null ? (
-            <Link to={href} onClick={open} className="flex flex-col items-center gap-1 rounded-lg p-0.5 focus-ring" aria-label={`Score ${t.analysis.score}`}>
+            <Link to={href} onClick={open} className="flex flex-col items-center gap-1 rounded-lg p-0.5 focus-ring">
               <ScoreRing score={t.analysis.score} verdict={t.analysis.verdict ?? undefined} size={48} animate={false} />
               {t.analysis.verdict && <VerdictBadge verdict={t.analysis.verdict} size="sm" showIcon={false} />}
               {t.analysis.stale && <Tooltip content="A corrigendum changed this bid after it was scored — re-run the analysis."><Badge tone="warning" size="sm">Re-check</Badge></Tooltip>}

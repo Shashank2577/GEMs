@@ -2,17 +2,24 @@
  * T038 — Identify routes: tender feed filters/facets/sort/pagination, detail, seen/dismiss, watchlists CRUD +
  * preview + roles, ingestion run/runs roles, notifications, and org isolation.
  */
-import { eq, like, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, bidWorkspaces, ingestionRuns, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
+import { analyses, bidWorkspaces, ingestionRuns, memberships, notificationPrefs, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
 import type { NormalizedTender } from '@tp/core/gem/parse';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
+import { anyKeywordCondition, SEARCH_INVISIBLES, SEARCH_SEPARATORS } from '../src/lib/tender-search';
 import { byPreviewOrder, escapeLike, phraseLike, type Candidate } from '../src/routes/watchlists';
+import { dispatchNotifications } from '../src/services/alerts';
 import { matchAndNotify, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z');
+const MIGRATIONS = fileURLToPath(new URL('../../../packages/db/migrations', import.meta.url));
 const GEM = 'http://mock-gem.test';
+const TEST_APP = 'http://tp.test';
 
 let ctx: TestContext;
 let mock: ReturnType<typeof createMockGem>;
@@ -136,6 +143,46 @@ describe('GET /tenders', () => {
     expect((await get('/tenders?bidType=service')).body.total).toBeGreaterThanOrEqual(10);
     expect((await get('/tenders?status=closed')).body.total).toBe(0);
     expect((await get('/tenders?status=all')).body.total).toBe(36);
+  });
+
+  it('008/FR-073 full-text search: multi-word, quoted phrase, -exclusion, or, prefix words, item names, bid-number prefix and digits', async () => {
+    const mk = (bidNumber: string, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber, title, status: 'open' as const, endAt: new Date(REF.getTime() + 10 * 86_400_000), sourceUrl: `https://bidplus.gem.gov.in/${bidNumber}`, contentHash: bidNumber, ...extra,
+    });
+    await ctx.db.insert(tenders).values([
+      mk('GEM/2026/B/7770001', 'Solar Street Light poles with LED', { state: 'Kerala' }),
+      mk('GEM/2026/B/7770002', 'Street light maintenance (sodium vapour)'),
+      mk('GEM/2026/B/7780003', 'Supply of solar water heater', { items: [{ name: 'Light fittings' }] }),
+      mk('GEM/2026/B/7780004', 'IS-2062 steel plates and OPC Grade-43 cement <bundle>'),
+    ]);
+    const bids = async (q: string) => ((await get(`/tenders?q=${encodeURIComponent(q)}&pageSize=100`)).body.items as { bidNumber: string }[])
+      .map((t) => t.bidNumber).filter((b) => /^GEM\/2026\/B\/77[78]/.test(b)).sort();
+    try {
+      expect(await bids('solar street light')).toEqual(['GEM/2026/B/7770001']); // every word, any field
+      expect(await bids('"street light" -solar')).toEqual(['GEM/2026/B/7770002']); // phrase + exclusion
+      expect(await bids('solar or sodium')).toEqual(['GEM/2026/B/7770001', 'GEM/2026/B/7770002', 'GEM/2026/B/7780003']);
+      expect(await bids('pole')).toEqual(['GEM/2026/B/7770001']); // prefix: "pole" finds "poles"
+      expect(await bids('fittings')).toEqual(['GEM/2026/B/7780003']); // item names
+      expect(await bids('kerala SOLAR')).toEqual(['GEM/2026/B/7770001']); // state, case-insensitive
+      expect(await bids('GEM/2026/B/777')).toEqual(['GEM/2026/B/7770001', 'GEM/2026/B/7770002']); // bid-number prefix
+      expect(await bids('gem/2026/b/7780003')).toEqual(['GEM/2026/B/7780003']);
+      expect(await bids('7780003')).toEqual(['GEM/2026/B/7780003']); // the bid number's digits alone
+      // Hyphenated codes and bracketed words (review B1): the default parser would read "-2062" as a signed number.
+      expect(await bids('2062')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('IS-2062')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('"IS 2062"')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('grade 43')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('bundle')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('steel -2062')).toEqual([]); // a leading "-" is still the websearch exclusion
+      expect(await bids('%')).toEqual([]);
+      expect((await get(`/tenders?q=${encodeURIComponent('"')}`)).status).toBe(200); // malformed websearch input never errors
+      // The feed DTO never carries the tsvector.
+      const one = await get('/tenders?q=7770001');
+      expect(one.body.items[0]).not.toHaveProperty('search');
+      expect((await get(`/tenders/${one.body.items[0].id}`)).body).not.toHaveProperty('search');
+    } finally {
+      await ctx.db.delete(tenders).where(inArray(tenders.bidNumber, ['GEM/2026/B/7770001', 'GEM/2026/B/7770002', 'GEM/2026/B/7780003', 'GEM/2026/B/7780004']));
+    }
   });
 
   it('status selector: closed / awarded / cancelled / all (FR-036)', async () => {
@@ -637,6 +684,213 @@ describe('watchlist SQL helpers and batched matching', () => {
     }
   });
 
+  it('008/FR-073: the full-text keyword pre-filter keeps every tender the matcher would match (plurals, separators, items, buyer, punctuation)', async () => {
+    const prefix = 'GEM/2099/B/7900';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7900${n}`, contentHash: `fts-${n}`, ...extra,
+    });
+    const preview = async (keywords: string[]) => {
+      const r = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { keywords } } });
+      expect(r.status).toBe(200);
+      return r.body.count as number;
+    };
+    try {
+      await ctx.db.insert(tenders).values([
+        row(1, 'Zorbing balls for parks'), // plural of the keyword
+        row(2, 'Supply of zorb/trampoline sets'), // slash-joined in the text
+        row(3, 'Misc sports goods', { items: [{ name: 'Zorbing harness' }] }), // item names only
+        row(4, 'Annual rate contract', { organisation: 'Zorbtech Board' }), // buyer field
+        row(5, 'Wombat-proof fencing'), // hyphenated
+        row(6, 'R&D quokkatron unit'), // ampersand
+      ]);
+      expect(await preview(['zorbing'])).toBe(2); // rows 1 and 3 — the matcher still applies word boundaries
+      expect(await preview(['zorb'])).toBe(1 + 0); // "zorb/trampoline" (row 2); "Zorbing"/"Zorbtech" are other words
+      expect(await preview(['trampoline'])).toBe(1);
+      expect(await preview(['zorbtech board'])).toBe(1);
+      expect(await preview(['wombat-proof'])).toBe(1);
+      expect(await preview(['wombat proof'])).toBe(1);
+      expect(await preview(['R&D quokkatron'])).toBe(1);
+      expect(await preview(['&'])).toBeGreaterThanOrEqual(1); // no lexemes → the matcher decides on every open tender
+      expect(await preview(['no-such-zorbword'])).toBe(0);
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
+
+  it('008/FR-073 (review B1): hyphenated codes, bracketed words and operator-like keywords stay in the pre-filter', async () => {
+    const prefix = 'GEM/2099/B/7910';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7910${n}`, contentHash: `fts-b1-${n}`, ...extra,
+    });
+    // Both the matcher and the SQL pre-filter, restricted to this test's rows.
+    const hits = async (keyword: string) => {
+      const sqlHits = (await ctx.db.select({ bidNumber: tenders.bidNumber }).from(tenders)
+        .where(and(like(tenders.bidNumber, `${prefix}%`), anyKeywordCondition([keyword])))).map((r) => r.bidNumber).sort();
+      const all = await ctx.db.select().from(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      const crit = compileCriteria({ keywords: [keyword] });
+      const matched = all.filter((t) => matchTender(t, crit, { now: ctx.clock.now() }).matched).map((t) => t.bidNumber).sort();
+      return { sql: sqlHits, matched };
+    };
+    try {
+      await ctx.db.insert(tenders).values([
+        row(1, 'COVID-19 kits'),
+        row(2, 'IS-2062 steel plates'),
+        row(3, 'OPC Grade-43 cement'),
+        row(4, 'RS-232 cables'),
+        row(5, 'M-30 concrete'),
+        row(6, 'ABC-123-DEF spares'),
+        row(7, 'Dome <cctv> camera'),
+        row(8, 'Misc', { items: [{ name: '<laptop bag>' }, { name: 'line\nToner' }] }),
+        row(9, 'Type -cctv unit with "laptop bag'),
+      ]);
+      const b = (...ns: number[]) => ns.map((n) => `${prefix}${n}`);
+      const cases: [string, number[]][] = [
+        ['Covid 19', [1]], ['IS 2062', [2]], ['2062', [2]], ['Grade 43', [3]], ['43', [3]], ['RS 232', [4]], ['232', [4]],
+        ['30', [5]], ['123', [6]], ['cctv', [7, 9]], ['laptop bag', [8, 9]], ['toner', [8]],
+        // Keywords are plain text for the matcher: no websearch NOT / phrase operators in the pre-filter.
+        ['-cctv', [9]], ['"laptop bag', [9]], ['<cctv>', [7]],
+      ];
+      for (const [k, want] of cases) {
+        const r = await hits(k);
+        expect(r.matched, `matcher: ${k}`).toEqual(b(...want));
+        expect(r.sql, `pre-filter: ${k}`).toEqual(expect.arrayContaining(r.matched));
+      }
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
+
+  it('008/FR-073 (review R2-S1): invisible format characters and combining marks keep the pre-filter a superset', async () => {
+    const prefix = 'GEM/2099/B/7915';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7915${n}`, contentHash: `fts-r2s1-${n}`, ...extra,
+    });
+    const hits = async (keyword: string) => {
+      const sqlHits = (await ctx.db.select({ bidNumber: tenders.bidNumber }).from(tenders)
+        .where(and(like(tenders.bidNumber, `${prefix}%`), anyKeywordCondition([keyword])))).map((r) => r.bidNumber).sort();
+      const all = await ctx.db.select().from(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      const crit = compileCriteria({ keywords: [keyword] });
+      const matched = all.filter((t) => matchTender(t, crit, { now: ctx.clock.now() }).matched).map((t) => t.bidNumber).sort();
+      return { sql: sqlHits, matched };
+    };
+    try {
+      await ctx.db.insert(tenders).values([
+        row(1, 'Solar​street light poles'), // zero-width space
+        row(2, 'LED­lamp fittings'), // soft hyphen
+        row(3, 'Toner⁠cartridge'), // word joiner
+        row(4, 'Misc', { items: [{ name: 'Paper﻿reams' }, { name: 'A4‌paper' }, { name: 'IS‍2062 plates' }] }), // BOM, ZWNJ, ZWJ in items
+        row(5, 'किताब की आपूर्ति'), // Hindi: "ताब" after the matra ि is not a word
+        row(6, 'सोलर स्ट्रीट लाइट'),
+        row(7, 'Café chairs'), // decomposed é
+      ]);
+      const b = (...ns: number[]) => ns.map((n) => `${prefix}${n}`);
+      const cases: [string, number[]][] = [
+        ['street', [1]], ['street light', [1]], ['solar', [1]], ['lamp', [2]], ['LED', [2]], ['cartridge', [3]], ['toner', [3]],
+        ['reams', [4]], ['paper', [4]], ['2062', [4]], ['IS 2062', []], // the matcher joins words only by space - _ /
+        ['ताब', []], ['किताब', [5]], ['सोलर', [6]], ['सोलर लाइट', []], ['स्ट्रीट लाइट', [6]],
+        ['cafe', []], ['café', [7]], ['chairs', [7]],
+      ];
+      for (const [k, want] of cases) {
+        const r = await hits(k);
+        expect(r.matched, `matcher: ${JSON.stringify(k)}`).toEqual(b(...want));
+        expect(r.sql, `pre-filter: ${JSON.stringify(k)}`).toEqual(expect.arrayContaining(r.matched));
+      }
+      // The column itself: the invisible characters became separators.
+      const [lexemes] = (await ctx.db.execute(sql`select tsvector_to_array(search)::text as l from tenders where bid_number = ${`${prefix}1`}`)).rows as { l: string }[];
+      expect(lexemes.l).toBe('{2099,79151,b,gem,light,poles,solar,street}');
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
+
+  it('008/FR-073 (review R2-N2): a tender with > 1 MB of item names is stored (the item-name part of the column is capped)', async () => {
+    const bid = 'GEM/2099/B/79160001';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    // ~1.6 MB of distinct words: uncapped, to_tsvector fails with "string is too long for tsvector".
+    const items = Array.from({ length: 160 }, (_, i) => ({ name: Array.from({ length: 1000 }, (_, j) => `w${i}x${j}`).join(' ') }));
+    try {
+      await ctx.db.insert(tenders).values({ bidNumber: bid, title: 'Huge item list', endAt: end, status: 'open', sourceUrl: `${GEM}/bid/79160001`, contentHash: 'fts-r2n2', items });
+      const found = await ctx.db.select({ id: tenders.id }).from(tenders).where(and(eq(tenders.bidNumber, bid), anyKeywordCondition(['huge item list'])));
+      expect(found).toHaveLength(1);
+    } finally {
+      await ctx.db.delete(tenders).where(eq(tenders.bidNumber, bid));
+    }
+  });
+
+  it('008/FR-073 property: on a generated corpus of tricky strings the keyword pre-filter is a superset of the matcher', async () => {
+    const prefix = 'GEM/2099/B/7920';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    let seed = 0x5eed;
+    const rnd = () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
+    const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
+    const WORDS = ['IS', '2062', 'Covid', '19', 'Grade', '43', 'RS', '232', 'M', '30', 'ABC', '123', 'DEF', 'cctv', 'laptops', 'laptop',
+      'bag', 'UPS', '1kVA', 'café', 'न्यू', 'दिल्ली', 'A4', 'paper', 'x', 'e5', '1e5', '0.5', 'amp', 'or', 'and', 'not', 'ñandú', 'Ⅳ', '²',
+      // review R2-S1: combining marks — decomposed Latin (e + U+0301), a bare mark, Devanagari words with matras/virama
+      // (सोलर, लाइट, किताब, क्षमता), a matra standing alone.
+      'cafe\u0301', 'e\u0301', '\u0301', 'n\u0303andu', 'सोलर', 'लाइट', 'किताब', 'ताब', 'क्षमता', 'ि', 'स्ट्रीट'];
+    const SEPS = [' ', ' ', '-', '/', '.', '_', '<', '>', '+', '&', ',', '(', ')', ':', '@', '"', "'", '–', '€', '\n', '#', '*', '|', '!',
+      '\\', '~', '=', '?', ';', '[', ']', '{', '}', '%', '^', '`', '$', '·', '&amp;', '://', ' -', '- ',
+      // review R2-S1: invisible format characters (soft hyphen, ZWSP, ZWNJ, ZWJ, word joiner, BOM) and a bare mark.
+      '\u00AD', '\u200B', '\u200C', '\u200D', '\u2060', '\uFEFF', ' \u200B', '\u0301', '\u093F'];
+    const phrase = (min: number, max: number) => {
+      const n = min + Math.floor(rnd() * (max - min + 1));
+      let out = rnd() < 0.3 ? pick(SEPS) : '';
+      for (let i = 0; i < n; i++) out += (i ? pick(SEPS) : '') + pick(WORDS);
+      return out + (rnd() < 0.3 ? pick(SEPS) : '');
+    };
+    const rows = Array.from({ length: 250 }, (_, i) => ({
+      bidNumber: `${prefix}${String(i).padStart(4, '0')}`, title: phrase(1, 6), endAt: end, status: 'open' as const,
+      sourceUrl: `${GEM}/bid/7920${i}`, contentHash: `fts-prop-${i}`,
+      items: rnd() < 0.4 ? [{ name: phrase(1, 4) }] : [],
+      category: rnd() < 0.2 ? phrase(1, 3) : null,
+      organisation: rnd() < 0.2 ? phrase(1, 3) : null,
+    }));
+    const keywords = [
+      'Covid 19', 'IS 2062', '2062', 'Grade 43', '43', 'RS 232', '232', '30', '123', 'cctv', 'laptop bag', '-cctv', '"laptop',
+      'UPS-1kVA', 'café', 'न्यू', '1e5', '0.5', 'or', 'A4 paper', 'amp', '<cctv>',
+      // review R2-S1: keywords around invisible characters and combining marks (incl. Hindi).
+      'cafe', 'cafe\u0301', 'e', 'सोलर', 'सोलर लाइट', 'ताब', 'किताब', 'क्षमता', 'स्ट्रीट', 'laptop\u200Bbag', 'IS\u00AD2062', 'paper\uFEFF',
+      ...Array.from({ length: 120 }, () => phrase(1, 3)),
+    ];
+    try {
+      const ids = (await ctx.db.insert(tenders).values(rows).returning({ id: tenders.id, bidNumber: tenders.bidNumber })) as { id: string; bidNumber: string }[];
+      const stored = await ctx.db.select().from(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      expect(stored).toHaveLength(ids.length);
+      let matcherHits = 0;
+      const misses: string[] = [];
+      for (const k of keywords) {
+        const crit = compileCriteria({ keywords: [k] });
+        const want = stored.filter((t) => matchTender(t, crit, { now: ctx.clock.now() }).matched).map((t) => t.bidNumber);
+        if (!want.length) continue;
+        matcherHits += want.length;
+        const got = new Set((await ctx.db.select({ bidNumber: tenders.bidNumber }).from(tenders)
+          .where(and(like(tenders.bidNumber, `${prefix}%`), anyKeywordCondition([k])))).map((r) => r.bidNumber));
+        for (const bid of want) if (!got.has(bid)) misses.push(`${JSON.stringify(k)} ⊄ ${JSON.stringify(stored.find((t) => t.bidNumber === bid)!.title)}`);
+      }
+      expect(misses).toEqual([]);
+      expect(matcherHits).toBeGreaterThan(200); // the corpus really exercises the matcher
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
+
+  it('SEARCH_SEPARATORS is exactly the translate() set of the tenders_search migration', () => {
+    const file = readdirSync(MIGRATIONS).find((f) => /_tenders_search\.sql$/.test(f))!;
+    const body = readFileSync(`${MIGRATIONS}/${file}`, 'utf8');
+    // `'<ASCII punctuation>' || U&'<\XXXX escapes>', '<spaces>'` — the ASCII part byte for byte, the escapes decoded.
+    const m = /'(!"#[^\n]*?)' \|\| U&'((?:\\[0-9A-Fa-f]{4})+)', '( +)'\)\)/.exec(body);
+    expect(m).not.toBeNull();
+    const invisibles = m![2].match(/[0-9A-Fa-f]{4}/g)!.map((h) => String.fromCharCode(parseInt(h, 16))).join('');
+    expect(invisibles).toBe(SEARCH_INVISIBLES);
+    expect(m![1].replace(/''/g, "'") + invisibles).toBe(SEARCH_SEPARATORS);
+    expect(m![3]).toHaveLength(SEARCH_SEPARATORS.length);
+    expect([...SEARCH_INVISIBLES].map((c) => c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')))
+      .toEqual(['00AD', '200B', '200C', '200D', '2060', 'FEFF']);
+  });
+
   it('preview tolerates a tender whose items jsonb is not an array (no 500)', async () => {
     const prefix = 'GEM/2099/B/7800';
     const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
@@ -658,5 +912,172 @@ describe('watchlist SQL helpers and batched matching', () => {
     } finally {
       await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
     }
+  });
+});
+
+describe('notifications ?kind validation (003/FR-049)', () => {
+  it('rejects an unknown kind with 400 and accepts a real one', async () => {
+    const bad = await get('/notifications?kind=bogus', team.owner);
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('validation_error');
+    const ok = await get('/notifications?kind=tender_match', team.owner);
+    expect(ok.status).toBe(200);
+    expect(ok.body.items.every((i: { kind: string }) => i.kind === 'tender_match')).toBe(true);
+    expect((await get('/notifications?kind=digest', team.owner)).body.total).toBe(0);
+  });
+
+  it('accepts the corrigendum and result kinds (US5)', async () => {
+    for (const kind of ['corrigendum', 'result']) {
+      const r = await get(`/notifications?kind=${kind}`, team.owner);
+      expect(r.status).toBe(200);
+      expect(r.body.items.every((i: { kind: string }) => i.kind === kind)).toBe(true);
+    }
+  });
+});
+
+describe('one-click email unsubscribe (003/FR-048)', () => {
+  const ids = () => ({ userId: other.me.user.id as string, orgId: other.me.org.id as string });
+  const prefsEmail = async () => (await get('/me/notification-prefs', other)).body.email;
+  const setPrefsEmail = async (email: boolean) =>
+    request(ctx.app, 'PUT', '/me/notification-prefs', { cookie: other.cookie, json: { ...(await get('/me/notification-prefs', other)).body, email } });
+  const tokenOf = (h: string) => new URL(h.slice(1, -1)).searchParams.get('token')!;
+  const tokenFor = async (userId: string, orgId: string) => {
+    const { signUnsubscribeToken } = await import('../src/lib/unsubscribe');
+    return signUnsubscribeToken(ctx.deps.config.unsubscribeSecret!, userId, orgId);
+  };
+  const queueEmail = async (title: string, orgId = ids().orgId) =>
+    (await ctx.db.insert(notifications).values({ orgId, userId: ids().userId, channel: 'email', kind: 'system', title, body: 'x', status: 'pending', dedupeKey: title }).returning())[0];
+  const rowOf = async (id: string) => (await ctx.db.select().from(notifications).where(eq(notifications.id, id)))[0];
+  const oneClick = (token: string) => ctx.app.request(`${TEST_APP}/api/notifications/unsubscribe?token=${token}`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click',
+  });
+
+  it('dispatched alert emails carry List-Unsubscribe + List-Unsubscribe-Post for the recipient and org', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    await queueEmail('Unsub headers check');
+    await dispatchNotifications(ctx.deps);
+    const mail = ctx.mailer.sent.find((m) => m.subject === 'Unsub headers check');
+    expect(mail?.to).toBe(other.email);
+    expect(mail!.headers!['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+    expect(mail!.headers!['List-Unsubscribe']).toMatch(new RegExp(`^<${TEST_APP}/api/notifications/unsubscribe\\?token=[\\w.-]+>$`));
+    expect(tokenOf(mail!.headers!['List-Unsubscribe'])).toBe(await tokenFor(userId, orgId));
+  });
+
+  it('GET only shows a confirmation form (link scanners change nothing); its POST unsubscribes and confirms in HTML', async () => {
+    const { userId, orgId } = ids();
+    const token = await tokenFor(userId, orgId);
+    await setPrefsEmail(true);
+    for (let i = 0; i < 3; i++) {
+      const page = await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${token}`);
+      expect(page.status).toBe(200);
+      expect(page.headers.get('content-type')).toMatch(/text\/html/);
+      expect(page.text).toContain('<form method="post" action="/api/notifications/unsubscribe?token=');
+      expect(page.text).toContain('Rival Traders');
+      expect(page.text).toMatch(/match alerts, daily digests and bid deadline reminders/);
+    }
+    expect(await prefsEmail()).toBe(true);
+
+    const action = (await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${token}`)).text.match(/action="([^"]+)"/)![1].replace(/&amp;/g, '&');
+    const done = await request(ctx.app, 'POST', action, { form: {} });
+    expect(done.status).toBe(200);
+    expect(done.headers.get('content-type')).toMatch(/text\/html/);
+    expect(done.text).toMatch(/You are unsubscribed/);
+    expect(await prefsEmail()).toBe(false);
+  });
+
+  it('the confirmation POST from a signed-in browser (Origin: null under no-referrer, or APP_URL) is not blocked by the origin check, and ignores the cookie', async () => {
+    const { userId, orgId } = ids();
+    const token = await tokenFor(userId, orgId);
+    // Signed in as a *different* user: the token alone decides whose email is switched off.
+    const signedIn = team.owner;
+    const ownerPrefs = async () => (await get('/me/notification-prefs', signedIn)).body.email;
+    const ownerBefore = await ownerPrefs();
+    for (const origin of ['null', TEST_APP]) {
+      await setPrefsEmail(true);
+      const r = await request(ctx.app, 'POST', `/notifications/unsubscribe?token=${token}`, { cookie: signedIn.cookie, form: {}, headers: { origin } });
+      expect(r.status, origin).toBe(200);
+      expect(r.text).toMatch(/You are unsubscribed/);
+      expect(await prefsEmail()).toBe(false);
+      expect(await ownerPrefs()).toBe(ownerBefore);
+    }
+    // The exemption is that exact path, POST only: other methods there and other routes are still refused.
+    for (const [method, path] of [['PUT', `/notifications/unsubscribe?token=${token}`], ['POST', '/notifications/unsubscribe/x'], ['PATCH', '/org']]) {
+      const r = await request(ctx.app, method, path, { cookie: signedIn.cookie, json: { name: 'X' }, headers: { origin: 'null' } });
+      expect(r.status, `${method} ${path}`).toBe(403);
+      expect(r.body.error.code).toBe('bad_origin');
+    }
+  });
+
+  it('RFC 8058 one-click POST turns email off without signing in and skips already-queued emails', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    const queued = await queueEmail('Unsub queued before click');
+    const res = await oneClick(await tokenFor(userId, orgId));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, email: false });
+    expect(await prefsEmail()).toBe(false);
+    expect(await rowOf(queued.id)).toMatchObject({ status: 'skipped', error: 'unsubscribed', nextAttemptAt: null });
+    await dispatchNotifications(ctx.deps);
+    expect(ctx.mailer.sent.some((m) => m.subject === 'Unsub queued before click')).toBe(false);
+    // Idempotent.
+    expect((await oneClick(await tokenFor(userId, orgId))).status).toBe(200);
+  });
+
+  it('the token is bound to its org, and stops working once the user leaves that org', async () => {
+    const { userId, orgId } = ids();
+    // `other` is also a member of team's org, with email on there.
+    await ctx.db.insert(memberships).values({ orgId: team.orgId, userId, role: 'analyst' });
+    await ctx.db.insert(notificationPrefs).values({ orgId: team.orgId, userId, email: true })
+      .onConflictDoUpdate({ target: [notificationPrefs.orgId, notificationPrefs.userId], set: { email: true } });
+    const teamEmail = async () => (await ctx.db.select().from(notificationPrefs).where(and(eq(notificationPrefs.orgId, team.orgId), eq(notificationPrefs.userId, userId))))[0].email;
+    const queuedInTeam = await queueEmail('Unsub other org row', team.orgId);
+    try {
+      await setPrefsEmail(true);
+      expect((await oneClick(await tokenFor(userId, orgId))).status).toBe(200);
+      expect(await prefsEmail()).toBe(false);
+      expect(await teamEmail()).toBe(true); // org B untouched
+      expect(await rowOf(queuedInTeam.id)).toMatchObject({ status: 'pending' });
+
+      // A token for org A with the payload rewritten to org B fails the signature.
+      const [, sig] = (await tokenFor(userId, orgId)).split('.');
+      const swapped = `${Buffer.from(`${userId}:${team.orgId}:email_matches`).toString('base64url')}.${sig}`;
+      expect((await oneClick(swapped)).status).toBe(400);
+      expect(await teamEmail()).toBe(true);
+
+      // After leaving team's org its link is invalid (GET and POST) and nothing changes.
+      const teamToken = await tokenFor(userId, team.orgId);
+      expect((await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${teamToken}`)).status).toBe(200);
+      await ctx.db.delete(memberships).where(and(eq(memberships.orgId, team.orgId), eq(memberships.userId, userId)));
+      for (const method of ['GET', 'POST']) {
+        const r = await request(ctx.app, method, `/notifications/unsubscribe?token=${teamToken}`);
+        expect(r.status, method).toBe(400);
+        expect(r.body.error.code).toBe('invalid_token');
+      }
+      expect(await teamEmail()).toBe(true);
+    } finally {
+      await ctx.db.delete(memberships).where(and(eq(memberships.orgId, team.orgId), eq(memberships.userId, userId)));
+      await ctx.db.delete(notifications).where(eq(notifications.id, queuedInTeam.id));
+    }
+  });
+
+  it('a tampered, truncated, foreign-scope or missing token is 400 invalid_token and changes nothing', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    const good = await tokenFor(userId, orgId);
+    const [p, s] = good.split('.');
+    const { signUnsubscribeToken } = await import('../src/lib/unsubscribe');
+    const forged = await signUnsubscribeToken('another-secret', userId, orgId);
+    const otherUser = Buffer.from(`${team.owner.me.user.id}:${orgId}:email_matches`).toString('base64url');
+    for (const token of [`${p}.${s.slice(0, -2)}AA`, `${otherUser}.${s}`, forged, p, '', 'garbage']) {
+      for (const method of ['GET', 'POST']) {
+        const r = await request(ctx.app, method, `/notifications/unsubscribe?token=${token}`);
+        expect(r.status, `${method} ${token}`).toBe(400);
+        expect(r.body.error.code).toBe('invalid_token');
+      }
+    }
+    const none = await request(ctx.app, 'POST', '/notifications/unsubscribe');
+    expect(none.body.error.code).toBe('invalid_token');
+    expect(await prefsEmail()).toBe(true);
   });
 });

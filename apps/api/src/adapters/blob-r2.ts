@@ -18,6 +18,9 @@ export interface R2BucketLike {
   delete(key: string | string[]): Promise<void>;
 }
 
+/** Keys per R2 `delete(keys[])` call (binding limit). */
+export const R2_DELETE_BATCH = 1_000;
+
 export function createR2BlobStore(bucket: R2BucketLike): BlobStore {
   const meta = (o: R2ObjectLike) => ({
     key: o.key, size: o.size, uploadedAt: o.uploaded,
@@ -45,6 +48,11 @@ export function createR2BlobStore(bucket: R2BucketLike): BlobStore {
     async delete(key: string) {
       assertSafeKey(key);
       await bucket.delete(key);
+    },
+    /** R2's `delete(keys[])` takes up to 1,000 keys per call. */
+    async deleteMany(keys: string[]) {
+      keys.forEach(assertSafeKey);
+      for (let i = 0; i < keys.length; i += R2_DELETE_BATCH) await bucket.delete(keys.slice(i, i + R2_DELETE_BATCH));
     },
   };
 }

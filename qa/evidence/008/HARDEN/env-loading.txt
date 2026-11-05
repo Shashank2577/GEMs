@@ -1,0 +1,7 @@
+$ README env loading as written (bash -c, in a temp dir)
+DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot
+MAIL_FROM=TenderPilot <alerts@tenderpilot.in>
+AUTO_MIGRATE=1
+$ old form with the new example (documents why it was replaced)
+bash: line 1: export: `<alerts@tenderpilot.in>': not a valid identifier
+MAIL_FROM=TenderPilot

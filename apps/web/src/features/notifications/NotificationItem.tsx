@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { AtSign, BellRing, CalendarClock, Info, Mail, MessageCircle, ShieldAlert, Sparkles, UserPlus, type LucideIcon } from 'lucide-react';
+import { AtSign, BellRing, CalendarClock, Info, Mail, MessageCircle, ShieldAlert, Sparkles, Trophy, TriangleAlert, UserPlus, type LucideIcon } from 'lucide-react';
 import type { NotificationDto } from '@tp/core/contracts/identify';
 import { Tooltip } from '@/components/ui';
 import { formatDateIST, relativeTime } from '@/lib/format';
@@ -12,6 +12,8 @@ const KIND: Record<NotificationDto['kind'], { icon: LucideIcon; cls: string; lab
   expiry: { icon: ShieldAlert, cls: 'bg-danger-soft text-danger', label: 'Document expiry' },
   assignment: { icon: UserPlus, cls: 'bg-info-soft text-info', label: 'Assignment' },
   mention: { icon: AtSign, cls: 'bg-info-soft text-info', label: 'Mention' },
+  corrigendum: { icon: TriangleAlert, cls: 'bg-warning-soft text-[hsl(32_90%_32%)] dark:text-warning', label: 'Corrigendum' },
+  result: { icon: Trophy, cls: 'bg-success-soft text-success', label: 'Result' },
   digest: { icon: BellRing, cls: 'bg-muted text-muted-foreground', label: 'Digest' },
   system: { icon: Info, cls: 'bg-muted text-muted-foreground', label: 'System' },
 };
@@ -57,11 +59,11 @@ export function NotificationItem({ n, compact, onNavigate }: { n: NotificationDt
         compact ? 'px-4 py-3 hover:bg-muted/60' : 'rounded-xl border bg-card p-4 shadow-xs hover:border-foreground/15',
         !n.read && (compact ? 'bg-primary-soft/30' : 'border-primary/25'),
       )}
-      aria-label={`${n.read ? '' : 'Unread: '}${n.title}`}
     >
       <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', k.cls)}><k.icon className="size-4" aria-hidden /></span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">
+          {!n.read && <span className="sr-only">Unread: </span>}
           <span className={cn('line-clamp-2 text-[13px] leading-snug', n.read ? 'font-medium text-foreground/85' : 'font-semibold')}>{n.title}</span>
           {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-hidden />}
         </span>

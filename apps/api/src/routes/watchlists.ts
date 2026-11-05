@@ -11,11 +11,14 @@ import {
 } from '@tp/core/contracts/identify';
 import { uuidSchema } from '@tp/core/contracts/common';
 import { canonicalState } from '@tp/core/gem/states';
-import { matchTender } from '@tp/core/match/matcher';
+import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
+import { assertWithinPlan } from '../lib/plan';
+import { WATCHLIST_LIMIT } from '@tp/core/contracts/plans';
 import { HttpError, notFound, validationError } from '../lib/errors';
 import { visibleTenderSource } from '../lib/tender-scope';
+import { anyKeywordCondition } from '../lib/tender-search';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
@@ -28,8 +31,8 @@ export const watchlistsRoutes = new Hono<AppEnv>();
 const CANDIDATE_PAGE = 2000;
 /** Rows per `tender_matches` insert / `in (…)` list. */
 const BATCH = 500;
-/** FR-027: maximum watchlists per organization, paused ones included. */
-export const WATCHLIST_LIMIT = 50;
+/** FR-027: maximum watchlists per organization, paused ones included (shared with the web meter, 008 review S5). */
+export { WATCHLIST_LIMIT };
 
 /** Only the columns the matcher reads (never `raw`), so scanning 50k open tenders stays small (NFR-003). */
 const MATCH_COLUMNS = {
@@ -65,8 +68,9 @@ export const byPreviewOrder = (a: Candidate, b: Candidate) =>
   || b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
- * Open tenders that match the criteria: a cheap SQL pre-filter (state, value, bid type, keyword / category /
- * ministry ILIKE — always a superset of what the matcher accepts) followed by the exact matcher in JS.
+ * Open tenders that match the criteria: a cheap SQL pre-filter (state, value, bid type, keyword full-text match via
+ * `anyKeywordCondition`, category / ministry ILIKE — each a superset of what the matcher accepts; the keyword one is
+ * property-tested against the matcher in identify.test.ts) followed by the exact matcher in JS.
  * Scans keyset pages ordered by `id` until exhausted (FR-028) and keeps only `{id, relevance, reasons, endAt,
  * createdAt}` per match (NFR-003).
  */
@@ -80,14 +84,10 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
   if (criteria.minValue != null) conds.push(or(isNull(tenders.estimatedValue), gte(tenders.estimatedValue, criteria.minValue))!);
   if (criteria.maxValue != null) conds.push(or(isNull(tenders.estimatedValue), sql`${tenders.estimatedValue} <= ${criteria.maxValue}`)!);
   if (criteria.bidTypes.length) conds.push(inArray(tenders.bidType, criteria.bidTypes));
-  // Each dimension: title first (cheapest, most hits), then the other text columns, then item names.
+  // Keywords: GIN-backed full-text pre-filter (008/FR-073) over title, category, buyer fields and item names; the
+  // matcher below applies the exact word-boundary rules.
   const keywords = clean(criteria.keywords);
-  if (keywords.length) {
-    const likes = keywords.map(phraseLike);
-    conds.push(or(ilikeAny(sql`${tenders.title}`, likes),
-      ilikeAny(joined(tenders.category, tenders.department, tenders.ministry, tenders.organisation, tenders.buyerOffice), likes),
-      itemsLikeAny(likes))!);
-  }
+  if (keywords.length) conds.push(anyKeywordCondition(keywords));
   // Categories substring-match category, item names and title.
   const categories = clean(criteria.categories);
   if (categories.length) {
@@ -111,6 +111,7 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
     return p;
   };
   const out: Candidate[] = [];
+  const compiled = compileCriteria(criteria); // 008/FR-074: regexes built once, not once per candidate row
   let next = page(null);
   for (;;) {
     const rows = await next;
@@ -118,7 +119,7 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
     const more = rows.length === CANDIDATE_PAGE;
     if (more) next = page(rows[rows.length - 1].id);
     for (const row of rows) {
-      const r = matchTender(row, criteria, { now });
+      const r = matchTender(row, compiled, { now });
       if (r.matched) out.push({ id: row.id, relevance: r.relevance, reasons: r.reasons, endAt: row.endAt, createdAt: row.createdAt });
     }
     if (!more) break;
@@ -140,10 +141,11 @@ async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect, 
   const existing = await deps.db.select({ id: tenderMatches.id, tenderId: tenderMatches.tenderId }).from(tenderMatches)
     .where(eq(tenderMatches.watchlistId, w.id));
   const stale: string[] = [];
+  const compiled = compileCriteria(w.criteria);
   for (let i = 0; i < existing.length; i += BATCH) {
     const chunk = existing.slice(i, i + BATCH);
     const rows = await deps.db.select(MATCH_COLUMNS).from(tenders).where(and(scope, inArray(tenders.id, chunk.map((e) => e.tenderId))));
-    const keep = new Set(rows.filter((t) => t.status !== 'open' || matchTender(t, w.criteria, { now: new Date(0) }).matched).map((t) => t.id));
+    const keep = new Set(rows.filter((t) => t.status !== 'open' || matchTender(t, compiled, { now: new Date(0) }).matched).map((t) => t.id));
     for (const e of chunk) if (!keep.has(e.tenderId)) stale.push(e.id);
   }
   for (let i = 0; i < stale.length; i += BATCH) await deps.db.delete(tenderMatches).where(inArray(tenderMatches.id, stale.slice(i, i + BATCH)));
@@ -236,9 +238,10 @@ watchlistsRoutes.post('/watchlists', requireRole('analyst'), async (c) => {
   requireCriteria(body.criteria);
   const org = orgId(c);
   const now = deps.clock.now();
-  // Lock the org row so concurrent creates can't both pass the count (FR-027).
+  // Lock the org row so concurrent creates can't both pass the count (FR-027) — nor the plan limit (008/FR-036).
   const w = await deps.db.transaction(async (tx) => {
     await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for('update');
+    await assertWithinPlan(deps, org, 'watchlists', 1, { db: tx });
     const [{ n }] = await tx.select({ n: count() }).from(watchlists).where(eq(watchlists.orgId, org));
     if (n >= WATCHLIST_LIMIT) {
       throw new HttpError(409, 'watchlist_limit', `You can have up to ${WATCHLIST_LIMIT} watchlists — delete one first.`, { limit: WATCHLIST_LIMIT });

@@ -29,6 +29,8 @@ export interface BlobStore {
   head(key: string): Promise<BlobMeta | null>;
   /** Idempotent: deleting a missing key is not an error. */
   delete(key: string): Promise<void>;
+  /** Delete many keys in as few calls as possible (R2: ≤ 1,000 keys per call). Same semantics as `delete`. */
+  deleteMany?(keys: string[]): Promise<void>;
 }
 
 // ───────────── LLM ─────────────
@@ -49,6 +51,11 @@ export interface LlmResult {
   usage: { inputTokens: number; outputTokens: number };
 }
 
+export interface LlmCallOptions {
+  /** Called once the provider answered, with its token usage (also when the reply is not valid JSON; 008/FR-039). */
+  onUsage?: (r: Pick<LlmResult, 'model' | 'usage'>) => void;
+}
+
 export interface LlmClient {
   readonly model: string;
   complete(req: LlmRequest): Promise<LlmResult>;
@@ -56,7 +63,7 @@ export interface LlmClient {
    * Ask for JSON and parse it (tolerates ```json fences and leading prose).
    * Throws `LlmError` when the reply is not valid JSON. Validate the result with zod.
    */
-  completeJson<T = unknown>(req: LlmRequest): Promise<T>;
+  completeJson<T = unknown>(req: LlmRequest, opts?: LlmCallOptions): Promise<T>;
 }
 
 // ───────────── Messaging ─────────────
@@ -74,12 +81,28 @@ export interface EmailMessage {
   html?: string;
   text?: string;
   replyTo?: string;
+  /** Extra headers, e.g. List-Unsubscribe / List-Unsubscribe-Post (RFC 8058). */
+  headers?: Record<string, string>;
 }
 
 export interface Mailer {
   /** False when no provider key is configured; `send` then logs and returns `{skipped:true}`. */
   readonly configured: boolean;
-  send(msg: EmailMessage): Promise<SendResult>;
+  send(msg: EmailMessage, opts?: SendOptions): Promise<SendResult>;
+  /**
+   * 008/FR-074: send many messages in as few provider calls as possible (Resend `/emails/batch`, ≤ 100 per call).
+   * Results are in input order. A failed provider call rejects (every message of that call counts as failed).
+   * Optional so simple test doubles need only `send`; callers fall back to one `send` per message.
+   */
+  sendMany?(msgs: EmailMessage[], opts?: SendOptions): Promise<SendResult[]>;
+}
+
+export interface SendOptions {
+  /**
+   * Provider idempotency key (Resend `Idempotency-Key`, kept 24 h): a retry of a call the provider already accepted —
+   * e.g. the response was lost to a timeout — is not delivered twice. Same key ⇒ same messages.
+   */
+  idempotencyKey?: string;
 }
 
 export interface WhatsAppMessage {

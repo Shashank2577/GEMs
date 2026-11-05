@@ -19,7 +19,7 @@ const EVID_DIR = join('qa', 'evidence', '007', STORY);
 const H1 = 'Win more GeM bids. Spend minutes, not nights, on each one.';
 const TITLE = 'TenderPilot — GeM tender co-pilot for Indian sellers';
 const MAILTO = 'mailto:sales@tenderpilot.in?subject=TenderPilot%20Enterprise';
-const NOTE = 'Prices exclude 18% GST. Every plan starts with a 14-day free trial of Pro.';
+const NOTE = 'Prices exclude 18% GST. Every plan starts with a 14-day free trial — 10 analyses and 1 GB of vault included.'; // 008 review S6
 const FAQ_Q = 'Will TenderPilot submit bids on GeM for me?';
 
 test.afterEach(async ({ page }) => { await collectRunArtifacts('007', STORY, page); });
@@ -43,6 +43,11 @@ const topOf = async (page: Page, sel: string) => page.locator(sel).first().evalu
 
 test('US6-1 signed-in users never see /, /login, /signup — they are redirected to /dashboard or a safe ?next=', async ({ page }) => {
   await signupViaApi(page); // owner session cookie on this context
+  // A brand-new org is sent from /dashboard to /onboarding once per browser session (007/US3). Take that detour first so
+  // the redirects below are not raced by it.
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('tp:onboarding-redirected'))).not.toBeNull();
   const trace: Record<string, string> = {};
   const cases: [string, RegExp, string][] = [
     ['/', /\/dashboard$/, 'plain /'],
@@ -432,7 +437,7 @@ test('US6-11 Pro CTA → /signup?plan=pro shows the trial note; Starter passes ?
   await pro.click();
   await expect(page).toHaveURL(/\/signup\?plan=pro$/);
   const note = page.getByTestId('plan-trial-note');
-  await expect(note).toHaveText('You’re starting a 14-day free trial of Pro — no card needed.');
+  await expect(note).toHaveText('You’re starting a 14-day free trial of Pro — no card needed. The trial includes 10 analyses and 1 GB of vault; Pro’s limits apply once you move to it.');
   await evidence007(page, STORY, 'us6-11-signup-pro-trial-note');
 
   // Starter
@@ -440,7 +445,7 @@ test('US6-11 Pro CTA → /signup?plan=pro shows the trial note; Starter passes ?
   await expect(page.locator('#lp-shell')).toHaveCount(0);
   await page.locator('#pricing div.rounded-2xl', { has: page.getByRole('heading', { name: 'Starter', exact: true }) }).getByRole('link', { name: 'Start free trial' }).click();
   await expect(page).toHaveURL(/\/signup\?plan=starter$/);
-  await expect(page.getByTestId('plan-trial-note')).toHaveText('You’re starting a 14-day free trial of Starter — no card needed.');
+  await expect(page.getByTestId('plan-trial-note')).toHaveText('You’re starting a 14-day free trial of Starter — no card needed. The trial includes 10 analyses and 1 GB of vault; Starter’s limits apply once you move to it.');
 
   // Unknown / enterprise / empty are ignored.
   for (const v of ['gold', 'enterprise', '', '%3Cscript%3E', '__proto__']) {

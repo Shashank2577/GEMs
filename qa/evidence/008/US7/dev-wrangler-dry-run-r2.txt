@@ -1,0 +1,21 @@
+# Review round 1 rework (S3): wrangler.toml as committed — no [[hyperdrive]] placeholder, no bare [[env.staging.hyperdrive]]; the Worker uses DATABASE_URL until an operator enables Hyperdrive
+$ pnpm exec wrangler deploy --dry-run --outdir out
+
+
+
+ ⛅️ wrangler 4.157.0
+────────────────────
+✨ Read 114 files from the assets directory /home/user/GEMs-us7/apps/web/dist
+Total Upload: 5015.48 KiB / gzip: 1175.67 KiB
+Your Worker has access to the following bindings:
+Binding                                                                 Resource                  
+env.BLOBS (tenderpilot-blobs)                                           R2 Bucket                 
+env.ASSETS                                                              Assets                    
+env.APP_URL ("https://tenderpilot.workers.dev")                         Environment Variable      
+env.GEM_BASE_URL ("https://bidplus.gem.gov.in")                         Environment Variable      
+env.LLM_MODEL ("claude-sonnet-5-5")                                     Environment Variable      
+env.MAIL_FROM ("TenderPilot <alerts@tenderpilot.in>")                   Environment Variable      
+env.PACKET_MAX_INPUT_BYTES ("41943040")                                 Environment Variable      
+env.TRUST_PROXY ("cloudflare")                                          Environment Variable      
+
+--dry-run: exiting now.

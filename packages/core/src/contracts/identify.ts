@@ -209,16 +209,20 @@ export interface IngestionRunsResponse {
 
 // ───────────── Notifications ─────────────
 
+/** Notification kinds — single source of truth: `notifications.kind` in @tp/db is typed from this (asserted in apps/api routes/notifications.ts). */
+export const NOTIFICATION_KINDS = ['tender_match', 'expiry', 'deadline', 'assignment', 'mention', 'digest', 'system', 'corrigendum', 'result'] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
 export const notificationsQuerySchema = z.object({
   unread: flag,
-  kind: z.string().optional(),
+  kind: z.enum(NOTIFICATION_KINDS).optional(), // 003/FR-049
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
 export interface NotificationDto {
   id: string;
-  kind: 'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system';
+  kind: NotificationKind;
   title: string;
   body: string;
   link: string | null;

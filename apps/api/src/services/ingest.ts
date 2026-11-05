@@ -10,7 +10,8 @@
  *    `response.response.docs` fails the run as format drift and logs `ingestion.format_drift` (FR-014).
  * 2. Upsert tenders by (source, bidNumber); unchanged content hash → only `fetchedAt` moves.
  * 3. Record tender_events: created / updated / corrigendum / closed / cancelled with a field diff.
- *    A corrigendum (end date, quantity, EMD, …) marks existing analyses `stale`.
+ *    A corrigendum (end date, quantity, EMD, …) marks existing analyses `stale`, in the same transaction as
+ *    the tender update and its event, stamped with the clock at that write (FR-043, FR-045).
  * 4. Match new & changed tenders against every active watchlist (all orgs) → tender_matches (unique).
  * 5. Queue notifications per org member and their prefs: in-app (sent immediately), email / WhatsApp
  *    (pending → services/alerts.ts). Deduped by (user, channel, `tender:<tenderId>:<orgId>`).
@@ -18,15 +19,17 @@
  */
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import {
-  analyses, ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
+  ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
   type WatchlistCriteria,
 } from '@tp/db';
 import { INGESTION_RUN_BUDGET_MS } from '@tp/core/contracts/caps';
 import { GemClient } from '@tp/core/gem/client';
+import { summariseChanges } from '@tp/core/gem/changes';
 import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
-import { matchTender } from '@tp/core/match/matcher';
+import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { REAL_ONLY } from '../lib/tender-scope';
+import { lockTenderInputs, markStale } from './staleness';
 
 export interface RunIngestionOptions {
   trigger?: 'cron' | 'manual' | 'seed';
@@ -179,7 +182,8 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
 
     // 2–3. Upsert + events.
     const changedIds: string[] = [];
-    const corrigendumIds: string[] = [];
+    const corrigenda = new Map<string, Record<string, { from: unknown; to: unknown }>>();
+    const cancelledIds: string[] = [];
     const list = [...fetched.values()];
     for (let i = 0; i < list.length; i += 200) {
       const chunk = list.slice(i, i + 200);
@@ -191,7 +195,7 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
           const prev = byBid.get(t.bidNumber);
           const r = await upsertTender(deps, t as Insertable, prev ?? null, now);
           if (r.kind === 'created') { stats.tendersCreated++; changedIds.push(r.id); }
-          if (r.kind === 'updated') { stats.tendersUpdated++; changedIds.push(r.id); if (r.corrigendum) corrigendumIds.push(r.id); }
+          if (r.kind === 'updated') { stats.tendersUpdated++; changedIds.push(r.id); if (r.corrigendum && r.changes) corrigenda.set(r.id, r.changes); if (r.cancelled) cancelledIds.push(r.id); }
         } catch (e) {
           errors.push(`${t.bidNumber}: ${errMsg(e)}`);
           logger.error('ingestion: upsert failed', { bidNumber: t.bidNumber, error: errMsg(e) });
@@ -204,7 +208,8 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
       const m = await matchAndNotify(deps, changedIds, now);
       stats.matchesCreated = m.matchesCreated;
     }
-    if (corrigendumIds.length) await notifyCorrigenda(deps, corrigendumIds, now);
+    if (corrigenda.size) await notifyCorrigenda(deps, corrigenda, now);
+    if (cancelledIds.length) await notifyCancelled(deps, cancelledIds, now);
     // Bids whose deadline passed since we last saw them.
     await db.update(tenders).set({ status: 'closed', updatedAt: now }).where(and(eq(tenders.status, 'open'), lt(tenders.endAt, now)));
 
@@ -305,7 +310,7 @@ function driftFailure(deps: AppDeps, e: unknown, where: Record<string, unknown>)
 
 async function upsertTender(
   deps: AppDeps, t: Insertable, prev: TenderRow | null, now: Date,
-): Promise<{ id: string; kind: 'created' | 'updated' | 'unchanged'; corrigendum?: boolean }> {
+): Promise<{ id: string; kind: 'created' | 'updated' | 'unchanged'; corrigendum?: boolean; cancelled?: boolean; changes?: Record<string, { from: unknown; to: unknown }> }> {
   const { db } = deps;
   const values = {
     source: t.source, bidNumber: t.bidNumber, gemBidId: t.gemBidId, bidType: t.bidType, title: t.title, items: t.items,
@@ -345,13 +350,25 @@ async function upsertTender(
   const kind = corrigendum ? 'corrigendum'
     : changes.status?.to === 'closed' ? 'closed'
       : changes.status?.to === 'cancelled' ? 'cancelled' : 'updated';
-  await db.update(tenders).set({ ...merged, updatedAt: now }).where(eq(tenders.id, prev.id));
-  await db.insert(tenderEvents).values({ tenderId: prev.id, kind, changes, createdAt: now });
-  if (corrigendum) {
-    // The reason matters: a corrigendum needs a full re-analysis, Re-score refuses it (FR-037, FR-043).
-    await db.update(analyses).set({ stale: true, staleReason: 'corrigendum', staleAt: now, updatedAt: now }).where(eq(analyses.tenderId, prev.id));
-  }
-  return { id: prev.id, kind: 'updated', corrigendum };
+  // One transaction: the tender change, its event and the stale flags commit together, so a crash or a markStale
+  // failure can never leave a committed corrigendum without its flags (review S2).
+  await db.transaction(async (tx) => {
+    // A run reads the tender in the transaction that inserts its running row, under the shared side of this lock:
+    // it either sees the new values or is already visible to markStale below (review S4).
+    if (corrigendum) await lockTenderInputs(tx, prev.id, 'exclusive');
+    // Stamped when written, not when the run started (up to the run budget earlier): analyses and GeM copies
+    // created during the run carry their own write times and are compared with these (FR-045, FR-046; review B1).
+    const at = deps.clock.now();
+    await tx.update(tenders).set({ ...merged, updatedAt: at }).where(eq(tenders.id, prev.id));
+    await tx.insert(tenderEvents).values({ tenderId: prev.id, kind, changes, createdAt: at });
+    if (corrigendum) {
+      // Every org's analyses (FR-041). The reason matters: a corrigendum needs a full re-analysis, Re-score
+      // refuses it (FR-037, FR-043). markStale flags done and running rows (a running one completes as
+      // stale, FR-045) and locks them in id order, so it cannot deadlock with Re-score or another markStale.
+      await markStale(tx, { tenderIds: [prev.id] }, 'corrigendum', at);
+    }
+  });
+  return { id: prev.id, kind: 'updated', corrigendum, cancelled: changes.status?.to === 'cancelled', changes };
 }
 
 // ───────────── matching & notifications ─────────────
@@ -400,6 +417,29 @@ export function tenderAlertBody(t: Pick<TenderRow, 'ministry' | 'department' | '
   return `${parts.join(' · ')}${watchlistNames.length ? ` — matched “${watchlistNames.join('”, “')}”` : ''}`;
 }
 
+/** 008/FR-074: most rows one `INSERT … ON CONFLICT DO NOTHING` into tender_matches may carry. */
+export const MATCH_INSERT_BATCH = 500;
+
+/**
+ * Insert match rows in statements of at most `MATCH_INSERT_BATCH` rows (Postgres' 65,535 bind-parameter limit and
+ * bounded statement size); returns the pairs that were new.
+ *
+ * Known gap (pre-existing, unchanged by 008/US7 — the single INSERT had it too): the statements are not one
+ * transaction with the notification inserts in `matchAndNotify`. If the process dies after a batch commits but before
+ * its notifications are queued, those matches exist without an alert, and a re-run sees them as "not new" (ON CONFLICT
+ * DO NOTHING) so it never alerts for them. The match itself is still listed in the feed.
+ */
+export async function insertMatchesBatched(
+  db: AppDeps['db'], rows: (typeof tenderMatches.$inferInsert)[],
+): Promise<{ tenderId: string; watchlistId: string }[]> {
+  const out: { tenderId: string; watchlistId: string }[] = [];
+  for (let i = 0; i < rows.length; i += MATCH_INSERT_BATCH) {
+    out.push(...await db.insert(tenderMatches).values(rows.slice(i, i + MATCH_INSERT_BATCH)).onConflictDoNothing()
+      .returning({ tenderId: tenderMatches.tenderId, watchlistId: tenderMatches.watchlistId }));
+  }
+  return out;
+}
+
 /**
  * Match the given tenders against all active watchlists (every org), store new matches and queue
  * notifications for each new (org, tender) pair. Safe to call repeatedly (unique indexes).
@@ -424,22 +464,20 @@ export async function matchAndNotify(
     rows.push(...(await db.select().from(tenders).where(and(REAL_ONLY, inArray(tenders.id, tenderIds.slice(i, i + 500))))));
   }
 
+  // 008/FR-074: each watchlist's regexes are compiled once per run, not once per (tender, watchlist) pair.
+  const compiled = lists.map((w) => ({ w, c: compileCriteria(w.criteria as WatchlistCriteria) }));
   const hits: { t: TenderRow; w: (typeof lists)[number]; reasons: string[]; relevance: number }[] = [];
   for (const t of rows) {
-    for (const w of lists) {
-      const r = matchTender(t, w.criteria as WatchlistCriteria, { now });
+    for (const { w, c } of compiled) {
+      const r = matchTender(t, c, { now });
       if (r.matched) hits.push({ t, w, reasons: r.reasons, relevance: r.relevance });
     }
   }
-  // Insert in batches; only pairs that were actually new (not already stored) count and notify.
+  // Insert in batches of ≤ MATCH_INSERT_BATCH rows per statement; only pairs that were actually new (not already
+  // stored) count and notify.
   const inserted = new Set<string>();
-  for (let i = 0; i < hits.length; i += 500) {
-    const ins = await db.insert(tenderMatches)
-      .values(hits.slice(i, i + 500).map((h) => ({ orgId: h.w.orgId, tenderId: h.t.id, watchlistId: h.w.id, reasons: h.reasons, relevance: h.relevance, createdAt: now })))
-      .onConflictDoNothing()
-      .returning({ tenderId: tenderMatches.tenderId, watchlistId: tenderMatches.watchlistId });
-    for (const x of ins) inserted.add(`${x.watchlistId}:${x.tenderId}`);
-  }
+  const rowsToInsert = hits.map((h) => ({ orgId: h.w.orgId, tenderId: h.t.id, watchlistId: h.w.id, reasons: h.reasons, relevance: h.relevance, createdAt: now }));
+  for (const x of await insertMatchesBatched(db, rowsToInsert)) inserted.add(`${x.watchlistId}:${x.tenderId}`);
 
   // (orgId, tenderId) → watchlist names that newly matched
   const fresh = new Map<string, { orgId: string; tender: TenderRow; names: string[]; reasons: string[] }>();
@@ -481,29 +519,63 @@ export async function matchAndNotify(
   return { matchesCreated, notificationsCreated };
 }
 
-/** In-app heads-up for orgs that track a tender which just received a corrigendum. */
-async function notifyCorrigenda(deps: AppDeps, tenderIds: string[], now: Date): Promise<void> {
+/**
+ * Alert every member of each org that tracks a tender (has a match) on their chosen channels: in-app is created `sent`,
+ * email/WhatsApp `pending` for the dispatcher (WhatsApp `skipped` without a phone), same as match alerts. Deduped per
+ * (user, channel, dedupeKey), so a repeat sync never re-alerts.
+ */
+async function notifyTracking(
+  deps: AppDeps, tenderIds: string[], now: Date,
+  make: (t: TenderRow, orgId: string) => { kind: 'corrigendum' | 'system'; title: string; body: string; dedupeKey: string } | null,
+): Promise<void> {
   const { db } = deps;
   const tracked = await db.selectDistinct({ orgId: tenderMatches.orgId, tenderId: tenderMatches.tenderId })
-    .from(tenderMatches).where(inArray(tenderMatches.tenderId, tenderIds));
+    .from(tenderMatches).where(and(inArray(tenderMatches.tenderId, tenderIds), eq(tenderMatches.dismissed, false)));
   if (!tracked.length) return;
-  const rows = await db.select().from(tenders).where(inArray(tenders.id, [...new Set(tracked.map((t) => t.tenderId))]));
+  const rows = await db.select().from(tenders).where(and(REAL_ONLY, inArray(tenders.id, [...new Set(tracked.map((t) => t.tenderId))])));
   const byId = new Map(rows.map((r) => [r.id, r]));
   const recipients = await orgRecipients(deps, [...new Set(tracked.map((t) => t.orgId))]);
   const values: (typeof notifications.$inferInsert)[] = [];
   for (const tr of tracked) {
     const t = byId.get(tr.tenderId);
-    if (!t) continue;
+    const msg = t && make(t, tr.orgId);
+    if (!t || !msg) continue;
     for (const u of recipients.get(tr.orgId) ?? []) {
-      if (!u.prefs.inApp) continue;
-      values.push({
-        orgId: tr.orgId, userId: u.userId, channel: 'in_app', kind: 'deadline', status: 'sent', sentAt: now, createdAt: now,
-        title: `Corrigendum: ${t.title}`.slice(0, 200),
-        body: `${t.bidNumber} was amended on GeM — now closes ${fmtIstDate(t.endAt)} IST. Re-check the analysis before you bid.`,
-        link: `/tenders/${t.id}`,
-        dedupeKey: `corrigendum:${t.id}:${t.contentHash}:${tr.orgId}`,
-      });
+      const base = { orgId: tr.orgId, userId: u.userId, ...msg, title: msg.title.slice(0, 200), link: `/tenders/${t.id}`, createdAt: now };
+      if (u.prefs.inApp) values.push({ ...base, channel: 'in_app', status: 'sent', sentAt: now });
+      if (u.prefs.email) values.push({ ...base, channel: 'email', status: 'pending' });
+      if (u.prefs.whatsapp) {
+        values.push(u.phone
+          ? { ...base, channel: 'whatsapp', status: 'pending' }
+          : { ...base, channel: 'whatsapp', status: 'skipped', error: 'Add a mobile number in your account to receive WhatsApp alerts' });
+      }
     }
   }
-  if (values.length) await db.insert(notifications).values(values).onConflictDoNothing();
+  for (let i = 0; i < values.length; i += 500) await db.insert(notifications).values(values.slice(i, i + 500)).onConflictDoNothing();
+}
+
+/** Corrigendum alert (FR-051..053): kind `corrigendum`, body names every changed field (summariseChanges). */
+async function notifyCorrigenda(deps: AppDeps, changesById: Map<string, Record<string, { from: unknown; to: unknown }>>, now: Date): Promise<void> {
+  await notifyTracking(deps, [...changesById.keys()], now, (t, orgId) => {
+    const summary = summariseChanges(changesById.get(t.id) ?? {});
+    if (!summary) return null; // nothing material in substance: no alert
+    return {
+      kind: 'corrigendum',
+      title: `Corrigendum: ${t.title}`,
+      body: `${t.bidNumber} was amended on GeM — now closes ${fmtIstDate(t.endAt)} IST.${summary ? ` Changed: ${summary}.` : ''} Re-check the analysis before you bid.`,
+      // Edge: keyed on the content hash, so an A→B→A revert re-uses A's hash and is deduped against the earlier alert.
+      dedupeKey: `corrigendum:${t.id}:${t.contentHash}:${orgId}`,
+    };
+  });
+}
+
+/** A tracked tender was cancelled on GeM (FR-054). */
+async function notifyCancelled(deps: AppDeps, tenderIds: string[], now: Date): Promise<void> {
+  await notifyTracking(deps, tenderIds, now, (t, orgId) => ({
+    kind: 'system',
+    title: `Cancelled on GeM: ${t.title}`,
+    body: `${t.bidNumber} was cancelled by the buyer on GeM. Stop work on this bid unless it is re-issued.`,
+    // Edge: dedupe is per (tender, org), so a re-cancel after A→B→A (cancelled, re-issued, cancelled again) does not re-alert.
+    dedupeKey: `cancelled:${t.id}:${orgId}`,
+  }));
 }

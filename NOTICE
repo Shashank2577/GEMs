@@ -6,7 +6,9 @@ constitution (.cairn/workflow/memory/constitution.md) requires every external re
 listed here with its licence.
 
 1. india-government-tenders-scraper — https://github.com/erenmyeager15/india-government-tenders-scraper
-   Licence: Apache License 2.0
+   Copyright 2024 Apify Actor (verbatim from the upstream LICENSE appendix; upstream has no NOTICE file)
+   Licence: Apache License 2.0 (this product's use is a modified adaptation; changes are listed below)
+   Verified against upstream commit 46925c6928ae5be716ac6e722a1e80b0f1befbf9 (2026-11-04).
    Used in: packages/core/src/gem/client.ts (BidPlus /all-bids → /all-bids-data request shape and CSRF
    bootstrap), packages/core/src/gem/parse.ts (field names and the bid-type → document-route mapping),
    packages/core/src/gem/normalize.ts (Solr response unwrapping approach), packages/core/src/vault/status.ts
@@ -20,6 +22,10 @@ listed here with its licence.
    - packages/core/src/gem/client.ts fetchBidDocument byte cap (25 MB, GemError code 'too_large') —
      approach adapted from src/http.ts fetchBoundedResource({maxBytes}) (content-length check, then
      streamed byte count with cancel), with its test idea from src/http.test.ts.
+   Spec 003 Identify & Alerts (US5, 2026-11-05; upstream LICENSE re-checked: Apache-2.0):
+   - packages/core/src/gem/changes.ts summariseChanges — the material-field comparison (case-insensitive, whitespace-
+     tolerant string equality so re-cased text is not reported as an amendment) is adapted from src/monitoring.ts.
+     The IST date and ₹ formatting and the field labels are TenderPilot's own. Test: packages/core/test/gem/changes.test.ts.
    Spec 008 Operations & Scale (US4, 2026-11-05; upstream LICENSE re-checked: Apache-2.0):
    - packages/core/src/gem/http.ts — SourceHttpError, SourceBodyLimitError, canRetrySource, waitForSourceDelay,
      fetchBoundedResource and isPdfBody ported from src/http.ts. Modified: Fetch API instead of undici,
@@ -27,6 +33,8 @@ listed here with its licence.
      packages/core/src/gem/client.ts for the bid-document byte cap, an optional beforeAttempt hook (cluster-wide
      GeM lease), status/url on the result.
    - packages/core/src/gem/http.test.ts — cases adapted from src/http.test.ts (node:test → vitest).
+   Spec 008 Operations & Scale (US7, 2026-11-05): apps/api/src/services/housekeeping.ts — pattern only (named,
+   test-pinned retention/bounds constants, cf. RETENTION_DAYS in src/monitoring.ts); no code copied.
    - Planned (spec 008 US1, not yet in this repository): .github/workflows/ci.yml and dod.yml will adapt the
      structure of .github/workflows/ci.yml (minimal permissions, timeouts, production-dependency audit step).
    Spec 004 Analyse US2 extraction (ported at commit 46925c6, 2026-11-05), packages/core/src/analyse/rules.ts:
@@ -53,33 +61,55 @@ listed here with its licence.
    gem.py: the bid-result view route /bidding/bid/getBidResultView/<b_id> and the bidder-row / categories
    regular expressions), with the test fixture packages/core/test/fixtures/gem/bid-result.html built to the
    same markup (spec 007, T004/T032).
+   Verified against upstream commit 315a968f381eb233100af1e17222c930c946b2cc (2026-08-16).
    Licence text: https://opensource.org/license/mit
 
-3. GEM-SCRAPER — https://github.com/IshanMaheshwari-777/GEM-SCRAPER
-   Licence: none. The upstream repository has no licence file, so no licence is claimed or granted here; the
-   heuristics were ported with THIS project's owner's approval (not the upstream author's;
-   docs/delivery/TEAM_PLAYBOOK.md reference-scrapers list; specs/006-apply-packet-assist/plan.md, T092). This is an
-   exception to .cairn/workflow/memory/constitution.md (Apache-2.0/MIT only) awaiting human ratification.
-   Used in: packages/core/src/gem/award.ts (parseAwardResult — TypeScript port of the table heuristics of
-   scrape_ra_schedule() in scraper.py: financial-table header keywords, rank / seller / last-numeric-cell price
-   column rules, trophy/winner row marker, trailing portal-tag stripping), spec 006 T092. The fixture
-   packages/core/test/fixtures/gem/ra-result.html is synthetic, built to that structure (the reference
-   ra_page_dump.html is a GeM home page without an evaluation table).
-   Differs from upstream: the rank cell is never used as the price, amount cells are never used as seller
-   names, rows without a price are skipped, and the first winner-marked row is taken (upstream: the last).
+   MIT License
 
-4. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
+   Copyright (c) 2026 Aarush Jain
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
    Licence: MIT License
    Used in: CONVENTIONS.md and .aisdlc/ (review and QA process templates only; no runtime code).
 
-Other reference repositories in the owner's reference set (Giridar33/gem-tender-tracker,
-PranavTamada/Tender_Scraper, Mujahid-Alam/gem-tender-pdf-extractor,
-Giri-Aayush/gem, rounittxx/gem-bid-scraper) were consulted for portal behaviour but no code or text from
-them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.
+Project notes: parseAwardResult (packages/core/src/gem/award-result.ts) was rewritten in #537 from a project-authored
+behaviour spec (specs/006-apply-packet-assist/award-parser-spec.md) without access to GEM-SCRAPER source. It replaces an
+earlier port of GEM-SCRAPER's scrape_ra_schedule() heuristics (IshanMaheshwari-777/GEM-SCRAPER, no licence). The spec was
+derived from our plan, tests and fixture, which describe those heuristics (header keyword list; winner = marked row, else
+rank 1, else first row), and the authors had seen the earlier port. No GEM-SCRAPER code or text is included.
 
-Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
-copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for our own label table
-(spec 004, packages/core/src/analyse/rules.ts; asserted in packages/core/test/analyse/corpus.test.ts).
+Referenced for ideas only (no licence, no code copied)
+-----------------------------------------------------
+These repositories in the owner's reference set were consulted for portal behaviour and coverage checklists. No
+code or text from them is present in the current tree as of 2026-11-05. An earlier GEM-SCRAPER port was removed
+in #537 and remains in git history. Add an entry above before copying from any of them.
+
+- Giridar33/gem-tender-tracker — https://github.com/Giridar33/gem-tender-tracker
+- PranavTamada/Tender_Scraper — https://github.com/PranavTamada/Tender_Scraper
+- IshanMaheshwari-777/GEM-SCRAPER — https://github.com/IshanMaheshwari-777/GEM-SCRAPER
+- Mujahid-Alam/gem-tender-pdf-extractor — https://github.com/Mujahid-Alam/gem-tender-pdf-extractor. Its page-1
+  field list (gem3.py) serves only as a coverage checklist for our own label table (spec 004,
+  packages/core/src/analyse/rules.ts; asserted in packages/core/test/analyse/corpus.test.ts).
+- Giri-Aayush/gem — https://github.com/Giri-Aayush/gem
+- rounittxx/gem-bid-scraper — https://github.com/rounittxx/gem-bid-scraper
 
 Test fixtures packages/core/test/fixtures/bids/real-*.pdf embed subsets of GNU FreeSans
 (https://www.gnu.org/software/freefont/), GPLv3 with the font exception, which permits embedding the

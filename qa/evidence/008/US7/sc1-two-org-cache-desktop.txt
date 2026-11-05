@@ -1,0 +1,20 @@
+# sc1-two-org-cache — project desktop — 2026-11-05T10:30:05.395Z
+tender GEM/2026/B/6421019 (04ae8c61-c377-4ce2-9299-3b981fbc6866), gemBidId 7421019
+### org A analyses
+> POST /api/tenders/04ae8c61-c377-4ce2-9299-3b981fbc6866/analyse (org A b7581976-462f-4c83-867c-997a63b0872c, owner)
+< 201
+{"id":"db3690a4-024a-475e-888f-2d8f9083fda0","orgId":"b7581976-462f-4c83-867c-997a63b0872c","tenderId":"04ae8c61-c377-4ce2-9299-3b981fbc6866","status":"done","method":"rules+llm","requirements":[{"key":"bid_published_at","label":"Bid published on","value":"2026-11-09T00:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Dated: 09-11-2026 Bid Document Bid Details","fileName":"GEM-2026-B-64210
+
+fake LLM calls during org A's analysis: 1
+tender_documents (id | org_id | extracted_method | extractor_version):
+  7837a387-d83b-4a52-9ac0-9acf8fbff062|null|LLM|llm-extract-2026-11-v1
+### org B analyses the same tender
+> POST /api/tenders/04ae8c61-c377-4ce2-9299-3b981fbc6866/analyse (org B 83a0211c-9fbb-4a4b-84c7-d4c75de5fc72, owner)
+< 201
+{"id":"dace1139-15fd-40ae-ac9a-1dc9a163046e","orgId":"83a0211c-9fbb-4a4b-84c7-d4c75de5fc72","tenderId":"04ae8c61-c377-4ce2-9299-3b981fbc6866","status":"done","method":"rules+llm","requirements":[{"key":"bid_published_at","label":"Bid published on","value":"2026-11-09T00:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Dated: 09-11-2026 Bid Document Bid Details","fileName":"GEM-2026-B-64210
+
+fake LLM calls during org B's analysis: 0
+org A LLM requirements: [{"label":"QA cached licence: extracted once for every org","documentId":"7837a387-d83b-4a52-9ac0-9acf8fbff062","page":1}]
+org B LLM requirements: [{"label":"QA cached licence: extracted once for every org","documentId":"7837a387-d83b-4a52-9ac0-9acf8fbff062","page":1}]
+same requirements with provenance (documentId/page): true
+total fake LLM calls for the tender across both orgs: 1

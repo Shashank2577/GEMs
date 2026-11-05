@@ -15,8 +15,10 @@ winners as competitive intel) as P2/P3 stories where valuable."
 **Parent spec**: [`specs/001-gem-tender-copilot/spec.md`](../001-gem-tender-copilot/spec.md) — User Story 1 ("Discover
 matching GeM bids and get alerted"), FR-001…FR-007, SC-001. This spec refines that story into independently testable
 slices, describes what is **built today** (verified against the code on 2026-11-05) and adds requirements for the gaps
-that matter. Requirements marked *(gap)* are not implemented yet; everything else is implemented and covered by
-unit/API tests.
+that matter. Requirements still marked *(gap)* (US6, FR-060…064) are not
+implemented yet (planned); US5 (FR-050…055) is delivered; everything else is implemented and covered by unit/API tests. Hardening items that started
+as gaps (FR-011…014, FR-027/028, FR-035…037, FR-047…049) were delivered by tasks T018–T021, T030–T031, T038–T043,
+T050–T054 and no longer carry the marker.
 
 ## Personas affected
 
@@ -90,13 +92,13 @@ outage produces a `failed` run without losing data.
 9. **Given** the sync popover is open, **Then** it lists up to 6 recent runs with IST start time, "Manual"/"Scheduled",
    "<created> new · <updated> updated · <matches> matches" (or the error for failed runs) and a status badge
    (`success`/`partial`/`failed`/`running`), plus the footer "Public listings only · ≤ 1 request/sec".
-10. *(gap)* **Given** the previous successful run was more than 2 hours ago (e.g. after an outage), **When** the next run
+10. **Given** the previous successful run was more than 2 hours ago (e.g. after an outage), **When** the next run
     starts, **Then** it pages until it reaches a page containing only already-known, unchanged bids or the catch-up cap
     of 20 pages, whichever comes first, and `pagesFetched` reflects that.
-11. *(gap)* **Given** a Bid Manager triggered a manual sync less than 2 minutes ago that finished, **When** they click
+11. **Given** a Bid Manager triggered a manual sync less than the cooldown ago (10 minutes by default, 008/FR-026; 2 minutes when first built) that finished, **When** they click
     **Sync now** again, **Then** the API returns `429` with `error.code:"sync_cooldown"` and a message stating when the next
     manual sync is allowed; the button shows that as a tooltip.
-12. *(gap)* **Given** a listing page where more than 50 % of the docs lack `b_bid_number` or the response lacks
+12. **Given** a listing page where more than 50 % of the docs lack `b_bid_number` or the response lacks
     `response.response.docs`, **When** a sync runs, **Then** the run ends `failed` with error starting "GeM response
     format changed" and an `error`-level log entry `ingestion.format_drift` is emitted.
 
@@ -163,9 +165,9 @@ Maharashtra), confirm the preview shows 2 bids before saving, save, and confirm 
     "New matches this week" (links to `/tenders?matched=1&unseen=1`), "Open matched bids" (links to `/tenders?matched=1`) —
     and each card shows its criteria chips plus "Open bids", "This week", "All time" counts and a **View matches** action
     linking to `/tenders?watchlistId=<id>&matched=1`.
-14. *(gap)* **Given** an org already has 50 watchlists, **When** a user creates another, **Then** the API returns `409`
+14. **Given** an org already has 50 watchlists, **When** a user creates another, **Then** the API returns `409`
     `watchlist_limit` "You can have up to 50 watchlists — delete one first." (paused watchlists count toward the limit)
-15. *(gap)* **Given** more than 5,000 open tenders satisfy the cheap SQL pre-filter, **When** a preview or back-fill runs,
+15. **Given** more than 5,000 open tenders satisfy the cheap SQL pre-filter, **When** a preview or back-fill runs,
     **Then** every matching open tender is still found (no silent truncation at 5,000).
 
 ---
@@ -227,13 +229,13 @@ verify its "New" dot is gone; dismiss it and undo.
     remembered in localStorage `tp.feed.layout`); on a 375 px viewport the toggle is hidden and cards are always used, with
     no horizontal scroll.
 13. **Given** `GET /api/tenders?status=bogus` or `pageSize=500`, **Then** the API returns `400` `validation_error`.
-14. *(gap)* **Given** a Bid Manager has a filtered feed (e.g. Maharashtra + Closing ≤ 7 days + Highest value), **When** they
+14. **Given** a Bid Manager has a filtered feed (e.g. Maharashtra + Closing ≤ 7 days + Highest value), **When** they
     click **Save view** and name it "MH urgent", **Then** a personal tab "MH urgent" appears after the built-in views,
     persists across devices (server-side), re-applies the exact filters when clicked, and can be renamed or deleted from the
     tab's menu.
-15. *(gap)* **Given** the status selector, **When** the user picks "Closed" or "Awarded", **Then** the feed lists bids with
+15. **Given** the status selector, **When** the user picks "Closed" or "Awarded", **Then** the feed lists bids with
     that status (the API already supports `status=closed|cancelled|awarded|all`).
-16. *(gap)* **Given** the search box contains a full bid number such as `GEM/2026/B/6421001`, **When** the user presses
+16. **Given** the search box contains a full bid number such as `GEM/2026/B/6421001`, **When** the user presses
     Enter, **Then** the app navigates directly to that tender's page if exactly one tender has that bid number.
 
 ---
@@ -294,11 +296,12 @@ delivery status is visible, and that a second sync sends nothing new.
    `POST /api/notifications/<other user's id>/read` returns `404` "Notification not found".
 10. **Given** a user turned off in-app alerts, **Then** no in-app row is created for them but email/WhatsApp still follow
     their settings.
-11. *(gap)* **Given** an email or WhatsApp send fails with a transient error (network, 429, 5xx), **Then** the row is retried
+11. **Given** an email or WhatsApp send fails with a transient error (network, 429, 5xx), **Then** the row is retried
     on the next 2 dispatches with back-off and only marked `failed` after 3 attempts; the attempt count is stored.
-12. *(gap)* **Given** an alert email, **Then** it carries `List-Unsubscribe` / `List-Unsubscribe-Post` headers whose one-click
-    link turns off email match alerts for that user/org and shows "You won’t get match emails from <org> any more."
-13. *(gap)* **Given** `GET /api/notifications?kind=bogus`, **Then** the API returns `400` `validation_error` (today the value is
+12. **Given** an alert email, **Then** it carries `List-Unsubscribe` / `List-Unsubscribe-Post` headers; the one-click
+    POST turns off email (alerts, digests, reminders) for that user/org, while opening the link (GET) only shows a
+    confirmation page whose button does the same and then confirms "You are unsubscribed".
+13. **Given** `GET /api/notifications?kind=bogus`, **Then** the API returns `400` `validation_error` (today the value is
     passed through unvalidated).
 
 ---
@@ -338,12 +341,12 @@ on the card, and an alert that names the change.
    is kept and no corrigendum is recorded for it.
 6. **Given** an open bid whose end date passes, **Then** the next sync sets `status:"closed"`; **given** GeM marks it
    cancelled, **Then** a `cancelled` event is recorded and the History tab shows "Bid cancelled".
-7. *(gap)* **Given** scenario 1 for a user with email (and/or WhatsApp) enabled and **Instant** frequency, **Then** a
+7. **Given** scenario 1 for a user with email (and/or WhatsApp) enabled and **Instant** frequency, **Then** a
    corrigendum email/WhatsApp is queued and sent with the same dedupe semantics, and in-app/email bodies contain a human
    summary of every changed field, e.g. "Bid end date: 19 Nov, 3:00 pm → 26 Nov, 3:00 pm IST · Quantity: 75 → 90".
-8. *(gap)* **Given** a corrigendum notification, **Then** its `kind` is `corrigendum` (not `deadline`), it shows a
+8. **Given** a corrigendum notification, **Then** its `kind` is `corrigendum` (not `deadline`), it shows a
    "Corrigendum" label and warning icon in the bell and `/notifications`, and can be filtered with `?kind=corrigendum`.
-9. *(gap)* **Given** a tracked tender is cancelled on GeM (`b_is_cancelled`), **Then** tracking orgs get an alert "Cancelled on
+9. **Given** a tracked tender is cancelled on GeM (`b_is_cancelled`), **Then** tracking orgs get an alert "Cancelled on
    GeM: <title>" on their chosen channels, and any bid workspace for it shows a "Cancelled on GeM" banner.
 
 ---
@@ -395,7 +398,7 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **GeM "no results"** is a JSON body with `code:404` — treated as an empty page, not an error.
 - **HTML instead of JSON** (portal change, block page): run `failed` with "GeM returned HTML instead of JSON (portal changed or
   blocked)".
-- **Docs without a bid number** are dropped; *(gap)* > 50 % such docs on a page is treated as format drift.
+- **Docs without a bid number** are dropped; > 50 % such docs on a page is treated as format drift.
 - **Concurrent runs** (cron + manual): single-flight via a `running` row younger than 15 minutes; a concurrent insert of the
   same bid is absorbed by `ON CONFLICT DO NOTHING` on `(source, bid_number)`.
 - **Amounts** "₹ 5 Lakh" → 500000, "1.2 Crore" → 12000000, "12,34,567" → 1234567, "Rs. 25,000/-" → 25000; non-numeric → null.
@@ -412,6 +415,8 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **Creating/editing a watchlist** never sends alerts for existing bids (silent back-fill).
 - **User without phone but WhatsApp on** (phone removed later): WhatsApp row `skipped` with a reason.
 - **Daily digest timing** uses the IST calendar day; rows created before 08:00 IST wait for that day's digest.
+  Rows already held for the digest stay held until the next 08:00 IST even if the user switches Daily → Instant meanwhile
+  (only rows queued after the switch go out instantly).
 - **Notification for a deleted tender**: email falls back to a plain card with title/body.
 - **Large feed**: pagination 25 per page (max 100); facets limited to 60 values per dimension.
 - **Org isolation**: tenders are global public data; matches, seen/dismissed, analyses, notifications are always scoped to
@@ -452,14 +457,15 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **FR-010**: `tools/mock-gem` MUST emulate `/all-bids`, `/all-bids-data` (paging, search, 404-no-results), the three document
   routes (generated PDFs) and admin endpoints `publish`, `corrigendum`, `fail`, `reset`, `state`, with fixture dates rebased
   to "now".
-- **FR-011** *(gap)*: Ingestion MUST page incrementally: stop early when a full page contains only known, unchanged bids;
+- **FR-011**: Ingestion MUST page incrementally: stop early when a full page contains only known, unchanged bids;
   after a gap of > 2 h since the last success, continue up to a catch-up cap of 20 pages.
-- **FR-012** *(gap)*: Each scheduled run SHOULD add a targeted search pass: for up to 10 distinct active watchlist keywords
+- **FR-012**: Each scheduled run SHOULD add a targeted search pass: for up to 10 distinct active watchlist keywords
   (rotating across runs), fetch 1 page of GeM `fullText` results, so that matching bids beyond the newest pages are found.
   GeM search is token-OR, so results MUST still go through the exact matcher.
-- **FR-013** *(gap)*: Manual sync MUST enforce a 2-minute cooldown per platform after a finished manual run (`429
-  sync_cooldown`, message includes the time the next manual sync is allowed).
-- **FR-014** *(gap)*: A page where > 50 % of docs lack a bid number, or a response missing `response.response.docs`, MUST fail
+- **FR-013**: Manual sync MUST enforce a cooldown per platform after a finished manual run (`429 sync_cooldown`, message
+  includes the time the next manual sync is allowed). Built with 2 minutes; spec 008 FR-026 superseded the length:
+  `MANUAL_SYNC_COOLDOWN_MIN`, default 10 minutes, shared across orgs and read from `ingestion_runs`.
+- **FR-014**: A page where > 50 % of docs lack a bid number, or a response missing `response.response.docs`, MUST fail
   the run with "GeM response format changed: <detail>" and log `ingestion.format_drift` at error level.
 
 **Watchlists & matching (US2)**
@@ -485,9 +491,9 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
   have since closed are kept).
 - **FR-026**: The watchlist list MUST return per watchlist: `matchCount`, `newThisWeek` (last 7 days), `openCount`,
   `lastMatchAt`, `createdBy`.
-- **FR-027** *(gap)*: An org MUST NOT exceed 50 watchlists, paused ones included (`409 watchlist_limit` "You can have up to 50
+- **FR-027**: An org MUST NOT exceed 50 watchlists, paused ones included (`409 watchlist_limit` "You can have up to 50
   watchlists — delete one first.").
-- **FR-028** *(gap)*: Preview and back-fill MUST find all matching open tenders regardless of volume (no silent cap at
+- **FR-028**: Preview and back-fill MUST find all matching open tenders regardless of volume (no silent cap at
   5,000 candidates); the SQL pre-filter SHOULD also narrow by categories and ministries.
 
 **Feed (US3)**
@@ -510,10 +516,10 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
   built-in views My matches / New / Closing this week / Go verdicts / All open bids, cards and (desktop only) table layouts,
   infinite pagination with a **Load more** fallback, active-filter chips with **Clear all**, and **Save as watchlist**
   (Analyst+) that pre-fills the builder from the current filters.
-- **FR-035** *(gap)*: Users MUST be able to save, rename and delete personal saved views (name ≤ 40 chars, ≤ 20 per user per
+- **FR-035**: Users MUST be able to save, rename and delete personal saved views (name ≤ 40 chars, ≤ 20 per user per
   org) stored server-side and shown as tabs after the built-in views.
-- **FR-036** *(gap)*: The feed MUST offer a status selector (Open / Closed / Awarded / All).
-- **FR-037** *(gap)*: Entering an exact bid number and pressing Enter MUST open that tender directly when exactly one exists.
+- **FR-036**: The feed MUST offer a status selector (Open / Closed / Awarded / All).
+- **FR-037**: Entering an exact bid number and pressing Enter MUST open that tender directly when exactly one exists.
 
 **Alerts (US4)**
 
@@ -538,11 +544,11 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **FR-046**: The UI MUST provide a bell with unread badge (polling ≤ 60 s), a popover of the latest items with **Mark all
   read**, the `/notifications` page (All/Unread, day groups, Load older, delivery chips) and **Settings → Notifications**
   (In-app, Email, WhatsApp + Indian mobile number, Instant/Daily, Expiry reminders).
-- **FR-047** *(gap)*: Transient send failures MUST be retried up to 3 attempts across dispatches with back-off before the
+- **FR-047**: Transient send failures MUST be retried up to 3 attempts across dispatches with back-off before the
   row is marked `failed`; attempts MUST be recorded.
-- **FR-048** *(gap)*: Alert emails MUST include RFC 8058 one-click unsubscribe headers that disable email match alerts for
+- **FR-048**: Alert emails MUST include RFC 8058 one-click unsubscribe headers that disable email match alerts for
   that user and org.
-- **FR-049** *(gap)*: The `kind` query parameter MUST be validated against the notification kinds.
+- **FR-049**: The `kind` query parameter MUST be validated against the notification kinds.
 
 **Corrigenda (US5)**
 
@@ -551,11 +557,11 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
   the tender for 7 days and "Re-check" on stale scores.
 - **FR-051**: Orgs that track a tender MUST get an in-app notification per member when a corrigendum is ingested, deduped per
   tender content hash per org.
-- **FR-052** *(gap)*: Corrigendum alerts MUST also go to email/WhatsApp per user preferences (instant; included in the daily
+- **FR-052**: Corrigendum alerts MUST also go to email/WhatsApp per user preferences (instant; included in the daily
   digest for daily users) and MUST contain a human-readable summary of each changed field with IST dates and ₹ amounts.
-- **FR-053** *(gap)*: Corrigendum notifications MUST use a dedicated kind `corrigendum`, rendered with its own label and icon.
-- **FR-054** *(gap)*: Cancellation of a tracked tender on GeM MUST alert tracking orgs on their channels.
-- **FR-055** *(gap)*: mock-gem MUST support `POST /__admin/cancel/<bidNumber>` and corrigendum changes to quantity and EMD
+- **FR-053**: Corrigendum notifications MUST use a dedicated kind `corrigendum`, rendered with its own label and icon.
+- **FR-054**: Cancellation of a tracked tender on GeM MUST alert tracking orgs on their channels.
+- **FR-055**: mock-gem MUST support `POST /__admin/cancel/<bidNumber>` and corrigendum changes to quantity and EMD
   for E2E tests.
 
 **Results & intelligence (US6)**
@@ -638,7 +644,7 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - Keyboard: `/` focuses search; all chips, toggles and menus reachable by Tab with visible focus rings; sheets trap focus and
   close on Escape.
 - Colour is never the only signal: countdown text, status badges and "New" label accompany colour.
-- *(gap)* An automated axe scan of `/tenders`, `/watchlists`, `/notifications` and `/settings/notifications` reports no
+- An automated axe scan of `/tenders`, `/watchlists`, `/notifications` and `/settings/notifications` reports no
   serious/critical violations in both themes.
 
 ### Key Entities *(include if feature involves data)*
@@ -652,7 +658,7 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **Notification** (`notifications`): per user, org and channel; kind, title, body, link, dedupe key, status, error, sent/read
   timestamps; doubles as the outbox for email/WhatsApp.
 - **Notification preferences** (`notification_prefs`): per `(org, user)` in-app/email/WhatsApp, frequency, expiry reminders.
-- *(gap)* **Saved view** (`saved_views`): per `(org, user)` name + feed filter params + position.
+- **Saved view** (`saved_views`): per `(org, user)` name + feed filter params + position.
 - *(gap)* **Tender result** (`tender_results`): per tender evaluation status, bidders `[{rank, seller, price, level}]`, source
   URL, fetched at.
 
@@ -669,8 +675,11 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **SC-004**: A new user creates their first watchlist with a non-zero preview in under 2 minutes from opening `/watchlists`
   (template or manual).
 - **SC-005**: Feed filter/search changes render updated results in < 1 s at p95 with 50,000 tenders.
-- **SC-006**: 100 % of email/WhatsApp alert rows reach a terminal status (`sent`/`skipped`/`failed`) within 2 dispatch cycles;
-  none stay `pending` for instant users.
+- **SC-006**: 100 % of email/WhatsApp alert rows reach a terminal status (`sent`/`skipped`/`failed`) within at most 3
+  delivery attempts. A transient failure is retried no earlier than +5 min, then +25 min, after the previous attempt
+  (FR-047); retries run on the next dispatch, which is the 30-minute cron or the next manual sync, so a row that keeps
+  failing is terminal after about 3 dispatches. A row that is `pending` after a failure always has a `next_attempt_at`;
+  instant-alert rows are first attempted in the dispatch that follows the sync that created them.
 - **SC-007**: 100 % of end-date corrigenda on tracked tenders produce a history entry, a stale flag on existing analyses and an
   alert naming the new date.
 - **SC-008**: Each user story US1–US6 has a passing Playwright E2E with screenshots, video and trace in `qa/evidence/003/US<n>/`

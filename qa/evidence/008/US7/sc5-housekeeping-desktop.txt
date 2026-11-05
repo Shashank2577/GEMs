@@ -1,0 +1,19 @@
+# sc5-housekeeping — project desktop — 2026-11-05T10:30:54.887Z
+$ TEST_DATABASE_URL=… pnpm --filter @tp/api exec vitest run test/housekeeping.test.ts
+ ✓ test/housekeeping.test.ts > RETENTION table (FR-070) > is pinned: these values are what production deletes
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > before 02:00 IST the step does nothing
+{"level":"info","msg":"housekeeping finished","job":"housekeeping","day":"2026-11-06","deleted":{"sessions":1,"invitations":2,"notifications":4,"tenderEvents":1,"tenderRaw":1,"rateLimits":0,"packets":2,"packetBlobs":2}}
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > the scheduled step deletes exactly the expired rows and R2 objects and logs the JSON summary
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > runs once per IST day: a later tick the same day skips; a forced second run deletes 0 (idempotent)
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > the rate_limits rule on its own: windows older than 1 day go, newer ones stay
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > a failed R2 delete keeps the packet row (no orphaned object) and a failed run releases its day claim
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > review S4: raw is never nulled on a demo row whose source was lost (raw.demo marker / demo- content hash)
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > review S5: an unfinished claim older than an hour (run died) is taken over the same day; a fresh one is not
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > review R2-N3: a run whose claim was taken over neither finishes nor releases the new owner’s claim
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > review S6: packet blobs go in deleteMany calls of ≤ 1,000 keys, at most HOUSEKEEPING_MAX_PACKET_BLOBS per run
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+
+The test pins (housekeeping.test.ts): sessions expired > 7 d, read/sent/skipped notifications > 180 d, tender_events > 365 d of closed
+tenders, tenders.raw nulled > 90 d after close, packets beyond the newest 5 per workspace (row + blob), rate_limits; exact counts per table
+and the remaining rows are asserted, the summary log line {job:"housekeeping", deleted:{…}} is checked, and a second run returns 0 for every table.

@@ -1,0 +1,7 @@
+# sc3b-starter-seats — project desktop — 2026-11-05T09:31:14.391Z
+members: 2, pending invitations: 1
+### 4th seat
+> POST /api/org/invitations (owner, Starter)
+< 402
+{"error":{"code":"plan_limit_reached","message":"Your Starter plan includes 3 seats (members and pending invitations). You're using 3. Talk to us to upgrade, or remove a member or invitation.","details":{"limit":"seats","used":3,"max":3,"plan":"starter"}}}
+

@@ -17,3 +17,9 @@ export function dateTimeIST(d: Date | string | null | undefined): string {
   h = h % 12 || 12;
   return `${t.getUTCDate()} ${MONTHS[t.getUTCMonth()]} ${t.getUTCFullYear()}, ${h}:${String(t.getUTCMinutes()).padStart(2, '0')} ${ampm} IST`;
 }
+
+/** The IST calendar day of an instant, `YYYY-MM-DD` (job_runs days, digest dedupe keys). */
+export const istDay = (d: Date): string => new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+
+/** The IST hour (0–23) of an instant. */
+export const istHour = (d: Date): number => new Date(d.getTime() + IST_OFFSET_MS).getUTCHours();

@@ -9,20 +9,28 @@ const E2E_PORT = Number(process.env.E2E_PORT || 8788);
 const GEM_PORT = Number(process.env.E2E_GEM_PORT || 4011);
 export const E2E_DB = process.env.E2E_DATABASE_URL || 'postgres://tp:tp@localhost:5433/tenderpilot_e2e';
 
+// CI shards (scripts/e2e-ci.sh) run one file per invocation: E2E_RUN_TAG keeps each run's traces/videos in their own
+// folder (Playwright empties outputDir at start), E2E_BLOB_DIR swaps the html/json reporters for a blob report that the
+// `e2e` job merges into qa/.runs/<port>/results.json + report/.
+const RUN_TAG = process.env.E2E_RUN_TAG;
+const BLOB_DIR = process.env.E2E_BLOB_DIR;
+
 export default defineConfig({
   testDir: 'e2e',
   testMatch: /.*\.e2e\.ts/,
-  outputDir: `qa/.runs/${E2E_PORT}/artifacts`,
+  outputDir: `qa/.runs/${E2E_PORT}/artifacts` + (RUN_TAG ? `/${RUN_TAG}` : ''),
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   timeout: 90_000,
   expect: { timeout: 10_000 },
-  reporter: [
-    ['list'],
-    ['html', { outputFolder: `qa/.runs/${E2E_PORT}/report`, open: 'never' }],
-    ['json', { outputFile: `qa/.runs/${E2E_PORT}/results.json` }],
-  ],
+  reporter: BLOB_DIR
+    ? [['list'], ['blob', { outputDir: BLOB_DIR }]]
+    : [
+      ['list'],
+      ['html', { outputFolder: `qa/.runs/${E2E_PORT}/report`, open: 'never' }],
+      ['json', { outputFile: `qa/.runs/${E2E_PORT}/results.json` }],
+    ],
   use: {
     baseURL: `http://localhost:${E2E_PORT}`,
     trace: 'on',
@@ -43,7 +51,8 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: 'e2e/support/start-api.sh',
+      // E2E_TEST_HOOKS=1 mounts GET /api/__test/mail; with reuseExistingServer a locally running API started without it is reused and that route 404s.
+      command: 'E2E_TEST_HOOKS=1 e2e/support/start-api.sh',
       url: `http://localhost:${E2E_PORT}/api/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

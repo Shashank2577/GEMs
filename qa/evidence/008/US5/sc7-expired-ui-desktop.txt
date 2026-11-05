@@ -1,0 +1,10 @@
+# sc7-expired-ui — project desktop — 2026-11-05T09:31:25.730Z
+banner visible after reload; no dismiss control
+Analyse: plan dialog opened; writes so far: []
+observation: the plan dialog opened by itself when the watchlist builder requested its live preview (a POST outside the allow-list)
+Watchlist live preview: plan dialog opened; writes so far: []
+Save watchlist: plan dialog opened; writes so far: []
+Upload: plan dialog opened; writes so far: []
+Build packet: plan dialog opened; writes so far: []
+Invite: plan dialog opened; writes so far: []
+mutating /api requests observed: 0

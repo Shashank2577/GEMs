@@ -4,6 +4,7 @@
  */
 import { sql } from 'drizzle-orm';
 import type { AnalysisWarning } from '@tp/core/contracts/analyse';
+import type { NotificationKind } from '@tp/core/contracts/identify';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -33,6 +34,8 @@ export const organizations = pgTable('organizations', {
   plan: text('plan').notNull().default('trial'), // trial | starter | pro | enterprise
   onboardingState: jsonb('onboarding_state').$type<Record<string, boolean>>().notNull().default({}),
   scoringWeights: jsonb('scoring_weights').$type<Record<string, number>>(),
+  /** End of the free trial (008/FR-035): created + 14 days at sign-up; null for paid plans and pre-trial seeds. */
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => ({ slugUq: uniqueIndex('org_slug_uq').on(t.slug) }));
 
@@ -276,6 +279,10 @@ export const tenders = pgTable('tenders', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({
+  // 008/FR-073: `tenders.search` (generated tsvector) + GIN `tenders_search_gin` and `tenders_bid_number_prefix_idx`
+  // exist in the database but are deliberately NOT declared here: a declared column would be read by every
+  // `select().from(tenders)` and leak into API responses. They are created by the hand-written non-transactional
+  // migration `*_tenders_search.sql`; queries reach them through `lib/tender-search.ts`.
   bidUq: uniqueIndex('tenders_source_bid_uq').on(t.source, t.bidNumber),
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
@@ -321,6 +328,15 @@ export const tenderDocuments = pgTable('tender_documents', {
   text: text('text'), // extracted text, pages separated by \f
   sourceUrl: text('source_url'),
   textSource: text('text_source').$type<'pdf' | 'ocr'>().notNull().default('pdf'), // FR-052
+  /**
+   * 008/FR-072 shared extraction cache. Written and read ONLY for GeM-fetched documents (`org_id IS NULL`, public
+   * data): one LLM extraction serves every org. An org's own upload never gets these columns set, so nothing derived
+   * from one tenant's document can reach another (services/analyse.ts#cachedExtraction).
+   */
+  requirements: jsonb('requirements').$type<Requirement[]>(),
+  extractorVersion: text('extractor_version'),
+  extractedAt: timestamp('extracted_at', { withTimezone: true }),
+  extractedMethod: text('extracted_method').$type<'LLM'>(),
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_docs_tender_idx').on(t.tenderId) }));
 
@@ -354,6 +370,18 @@ export const gemThrottle = pgTable('gem_throttle', {
   id: text('id').primaryKey(),
   nextSlotAt: timestamp('next_slot_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Once-per-day job claims (008/FR-070): the first scheduled tick after 02:00 IST inserts `(job, day)`; every other
+ * tick that day — on any isolate — conflicts and skips. A failed run deletes its claim so the next tick retries.
+ */
+export const jobRuns = pgTable('job_runs', {
+  job: text('job').notNull(),
+  day: date('day').notNull(), // IST calendar day
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  summary: jsonb('summary').$type<Record<string, unknown>>(),
+}, (t) => ({ pk: primaryKey({ columns: [t.job, t.day] }) }));
 
 // ───────────── Identify: watchlists & matches ─────────────
 
@@ -464,6 +492,11 @@ export const analyses = pgTable('analyses', {
   notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
   /** Machine-readable caveats rendered by the web (008/FR-031: `llm_budget_exhausted`, `llm_quota_reached`). */
   warnings: jsonb('warnings').$type<AnalysisWarning[]>().notNull().default([]),
+  /**
+   * Inserted by the demo seeder (007/FR-065), not by a user. Only these rows are left out of the monthly analyses
+   * quota (008/FR-036); anything a user runs counts, whatever the tender's source.
+   */
+  seeded: boolean('seeded').notNull().default(false),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -565,6 +598,17 @@ export const packets = pgTable('packets', {
   createdAt: createdAt(),
 }, (t) => ({ wsIdx: index('packets_ws_idx').on(t.workspaceId) }));
 
+/**
+ * One row per packet a user built (008/FR-036), written with the `packets` row and removed only when that build fails.
+ * `packet_id` has no foreign key, so deleting the packet (e.g. with its demo workspace by `DELETE /demo`) does not give
+ * the monthly packet back: `packetsPerMonth` counts this ledger, not `packets`.
+ */
+export const packetLedger = pgTable('packet_ledger', {
+  packetId: uuid('packet_id').primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('packet_ledger_org_idx').on(t.orgId, t.createdAt) }));
+
 // ───────────── Notifications & activity ─────────────
 
 export const notifications = pgTable('notifications', {
@@ -572,13 +616,17 @@ export const notifications = pgTable('notifications', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   channel: text('channel').$type<'in_app' | 'email' | 'whatsapp'>().notNull(),
-  kind: text('kind').$type<'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system'>().notNull(),
+  kind: text('kind').$type<NotificationKind>().notNull(), // derived from NOTIFICATION_KINDS in @tp/core
   title: text('title').notNull(),
   body: text('body').notNull(),
   link: text('link'),
   dedupeKey: text('dedupe_key'),
   status: text('status').$type<'pending' | 'sent' | 'failed' | 'skipped' | 'read'>().notNull().default('pending'),
   error: text('error'),
+  /** Delivery attempts made so far (email / WhatsApp); FR-047 retries transient failures up to 3. */
+  attempts: integer('attempts').notNull().default(0),
+  /** Earliest time the dispatcher may (re)try this row; also the claim lease while a dispatcher holds it. */
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
   sentAt: timestamp('sent_at', { withTimezone: true }),
   readAt: timestamp('read_at', { withTimezone: true }),
   createdAt: createdAt(),
@@ -602,3 +650,40 @@ export const activityLog = pgTable('activity_log', {
   orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt),
   orgTypeIdx: index('activity_org_type_idx').on(t.orgId, t.entityType, t.createdAt),
 }));
+
+// ───────────── Plans & metering (spec 008 US5) ─────────────
+
+/** Plan changes made by TenderPilot staff via `POST /api/admin/orgs/:id/plan` (008/FR-042). */
+export const subscriptions = pgTable('subscriptions', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  plan: text('plan').notNull(), // trial | starter | pro | enterprise
+  status: text('status').$type<'active' | 'cancelled'>().notNull().default('active'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  note: text('note'),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('subscriptions_org_idx').on(t.orgId, t.createdAt.desc()) }));
+
+/** One row per LLM call (008/FR-039): tokens as reported by the provider. */
+export const llmUsage = pgTable('llm_usage', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  analysisId: uuid('analysis_id').references(() => analyses.id, { onDelete: 'set null' }),
+  /**
+   * The analysis this row was metered for, with no foreign key so it survives the analysis being deleted (e.g. by
+   * `DELETE /demo`). The monthly AI quota (008/FR-037) counts distinct values of this column, never `analysis_id`.
+   */
+  analysisRef: uuid('analysis_ref'),
+  kind: text('kind').$type<'extract' | 'assist'>().notNull(),
+  model: text('model').notNull(),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  /**
+   * A 0-token reservation of an analysis's AI slot not yet filled in by a metered call (review S1/NEW-B1). Lets the
+   * timeout sweep release reservations a crashed run left behind without touching filled 0-token rows (aborted calls).
+   */
+  reserved: boolean('reserved').notNull().default(false),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('llm_usage_org_idx').on(t.orgId, t.createdAt) }));

@@ -1,0 +1,19 @@
+# sc7-hyperdrive — project desktop — 2026-11-05T10:31:06.139Z
+package.json: @neondatabase/serverless absent; pg -
+packages/db/package.json: @neondatabase/serverless absent; pg ^8.13.1
+apps/api/package.json: @neondatabase/serverless absent; pg -
+$ git grep -n -e createNeonDb -e @neondatabase/serverless -- apps packages → (no matches)
+pnpm-lock.yaml importers declaring @neondatabase/serverless directly: none; autoInstallPeers: true
+wrangler deploy --dry-run bundle (/tmp/claude-0/-home-user-GEMs/0c8c4288-1d58-571e-ab58-46adf40160da/scratchpad/wr): occurrences of @neondatabase/serverless, drizzle-orm/neon*, neonConfig, node_modules/@neondatabase = 0
+apps/api/src/worker.ts uses createNodeDb with HYPERDRIVE: true
+wrangler.toml hyperdrive lines:
+  # Hyperdrive (binding HYPERDRIVE) once enabled below, else the DATABASE_URL secret (Neon pooled `-pooler` URL), which
+  # 008/FR-075, ADR-0002: Postgres via Hyperdrive. NOT ENABLED YET — the binding needs a real config id, which only an
+  # operator can create (docs/runbook.md § Hyperdrive → "Enable Hyperdrive"). Until then the Worker connects with the
+  #   wrangler hyperdrive create tenderpilot-db --connection-string="$NEON_POOLED_URL" --caching-disabled
+  # [[hyperdrive]]
+  # binding = "HYPERDRIVE"
+  # id = "<id from wrangler hyperdrive create>"
+
+UNVERIFIABLE here: "50 concurrent feed requests on staging → 0 connection errors" needs a real Hyperdrive config id and the
+staging Worker (operator task T111 #468, runbook § Hyperdrive "Enable Hyperdrive"). The [[hyperdrive]] binding ships commented out.

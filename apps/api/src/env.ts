@@ -34,6 +34,13 @@ export interface RuntimeEnv {
   NODE_ENV?: string;
   /** Operator token for /api/admin/* (008/FR-042). Unset → admin routes answer 404. */
   ADMIN_TOKEN?: string;
+  /**
+   * HMAC key for one-click email unsubscribe links (003/FR-048). Unset in production → no unsubscribe headers (a warning
+   * is logged when email is configured); development uses a random per-process key, tests a fixed one.
+   */
+  UNSUBSCRIBE_SECRET?: string;
+  /** "1" mounts the test-only GET /api/__test/mail (003/NFR-008). Never set on the Worker. */
+  E2E_TEST_HOOKS?: string;
   /** Sentry DSN; unset → error reporter is a no-op (008/FR-046). */
   SENTRY_DSN?: string;
   /** Sentry environment tag: "production" | "staging" | "development" (default from NODE_ENV). */
@@ -59,8 +66,10 @@ export interface AppConfig {
   trustProxy: TrustProxy;
   /** Max Σ stored input size of a packet build before it is refused with 413 (006/FR-056, NFR-003). */
   packetMaxInputBytes: number;
-  /** Null when ADMIN_TOKEN is unset. */
+  /** Null when ADMIN_TOKEN is unset or shorter than ADMIN_TOKEN_MIN_LENGTH. */
   adminToken: string | null;
+  /** UNSUBSCRIBE_SECRET; when unset: null in production, a random per-process key in development, a fixed key in test. */
+  unsubscribeSecret: string | null;
   /** Null when SENTRY_DSN is unset. */
   sentryDsn: string | null;
   logLevel: LogLevel;
@@ -98,6 +107,21 @@ const positiveInt = (v: string | undefined, d: number) => {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : d;
 };
 
+/** ADMIN_TOKEN shorter than this is treated as unset: the operator endpoint must not hang off a guessable token (review N4). */
+export const ADMIN_TOKEN_MIN_LENGTH = 32;
+
+export function parseAdminToken(v: string | undefined): string | null {
+  return v && v.length >= ADMIN_TOKEN_MIN_LENGTH ? v : null;
+}
+
+/** The startup warning for a set-but-too-short ADMIN_TOKEN (createDeps logs it once per process/isolate). */
+export function adminTokenWarning(env: RuntimeEnv): string | null {
+  const v = env.ADMIN_TOKEN;
+  return v && v.length < ADMIN_TOKEN_MIN_LENGTH
+    ? `ADMIN_TOKEN is shorter than ${ADMIN_TOKEN_MIN_LENGTH} characters and is ignored: POST /api/admin/* stays disabled`
+    : null;
+}
+
 export function loadConfig(env: RuntimeEnv): AppConfig {
   const environment = env.NODE_ENV === 'production' ? 'production' : env.NODE_ENV === 'test' ? 'test' : 'development';
   return {
@@ -109,12 +133,29 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     packetMaxInputBytes: positiveInt(env.PACKET_MAX_INPUT_BYTES, DEFAULT_PACKET_MAX_INPUT_BYTES),
-    adminToken: env.ADMIN_TOKEN || null,
+    adminToken: parseAdminToken(env.ADMIN_TOKEN),
+    unsubscribeSecret: env.UNSUBSCRIBE_SECRET || fallbackUnsubscribeSecret(environment),
     sentryDsn: env.SENTRY_DSN || null,
     logLevel: parseLogLevel(env.LOG_LEVEL),
     healthIngestionMaxAgeMin: nonNegativeInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),
     manualSyncCooldownMin: nonNegativeInt(env.MANUAL_SYNC_COOLDOWN_MIN, MANUAL_SYNC_COOLDOWN_MIN),
   };
+}
+
+/** Fixed key for the test environment only (deterministic tokens in tests). */
+export const TEST_UNSUBSCRIBE_SECRET = 'tp-test-unsubscribe-secret';
+let devUnsubscribeSecret: string | undefined;
+
+/**
+ * Unsubscribe key when UNSUBSCRIBE_SECRET is unset: none in production (no List-Unsubscribe headers), the fixed test
+ * key in tests, and a random key per process in development (generated lazily — Workers forbid randomness at module
+ * scope), so a well-known key can never forge links on a real deployment that forgot to set NODE_ENV.
+ */
+function fallbackUnsubscribeSecret(environment: AppConfig['environment']): string | null {
+  if (environment === 'production') return null;
+  if (environment === 'test') return TEST_UNSUBSCRIBE_SECRET;
+  devUnsubscribeSecret ??= `dev-${crypto.randomUUID()}-${crypto.randomUUID()}`;
+  return devUnsubscribeSecret;
 }
 
 /** Like positiveInt but 0 is allowed (e.g. MANUAL_SYNC_COOLDOWN_MIN=0 turns the cooldown off). */

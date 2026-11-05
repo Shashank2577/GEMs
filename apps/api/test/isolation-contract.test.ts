@@ -16,8 +16,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq, isNotNull } from 'drizzle-orm';
-import { bidWorkspaces, notifications, tenderMatches, tenders } from '@tp/db';
+import { and, eq, isNotNull, or } from 'drizzle-orm';
+import { bidWorkspaces, notifications, tenderDocuments, tenderMatches, tenders } from '@tp/db';
 import { createTestContext, request, signup, type SignedUp, type TestContext, type TestResponse } from './helpers';
 import { NOW, file, pdf, seedApply } from './workspace-fixtures';
 
@@ -141,16 +141,20 @@ const FOREIGN: Record<string, () => Call> = {
   'DELETE /org/invitations/:id': () => asB('DELETE', `/org/invitations/${ids.invitation}`),
   'POST /org/invitations/:id/resend': () => asB('POST', `/org/invitations/${ids.invitation}/resend`),
   'DELETE /me/sessions/:id': () => asB('DELETE', `/me/sessions/${ids.session}`),
-};
-
-/** Implemented routes not (yet) in the contract, swept the same way. */
-const FOREIGN_EXTRA: Record<string, () => Call> = {
   'PATCH /views/:id': () => asB('PATCH', `/views/${ids.view}`, { name: 'Hijack' }),
   'DELETE /views/:id': () => asB('DELETE', `/views/${ids.view}`),
 };
 
+/** Implemented routes not (yet) in the contract, swept the same way. */
+const FOREIGN_EXTRA: Record<string, () => Call> = {
+};
+
 /** Parameter is public/global data; the call may succeed but must only affect org B. Run after the foreign sweep. */
 const GLOBAL: Record<string, { why: string; call: () => Call }> = {
+  'POST /admin/orgs/:id/plan': {
+    why: 'operator-only (Bearer ADMIN_TOKEN, 008/FR-042): a member session gets the same 404 as an unknown path and changes nothing (plan.test.ts)',
+    call: () => asB('POST', `/admin/orgs/${A.org.orgId}/plan`, { plan: 'enterprise', note: 'self-upgrade attempt' }),
+  },
   'GET /auth/invite/:token': { why: 'public invitation preview by secret token; no org data without the token', call: () => async () => request(ctx.app, 'GET', '/auth/invite/not-a-real-token', {}) },
   'GET /tenders/:id': { why: 'GeM tenders are public', call: () => asB('GET', `/tenders/${ids.tender}`) },
   'POST /tenders/:id/seen': { why: 'marks B’s own matches', call: () => asB('POST', `/tenders/${ids.tender}/seen`) },
@@ -322,5 +326,14 @@ describe('cross-org isolation sweep (contracts/api.md)', () => {
       expect(r.status, `${route}: ${r.text.slice(0, 200)}`).toBeLessThan(500);
     }
     expect(await snapshotOrgA()).toBe(before);
+  });
+
+  it('008/US7 FR-072: the shared extraction cache never holds an org-owned document (invariant after the sweep)', async () => {
+    const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(tenderDocuments)
+      .where(and(isNotNull(tenderDocuments.orgId), or(isNotNull(tenderDocuments.requirements), isNotNull(tenderDocuments.extractorVersion), isNotNull(tenderDocuments.extractedMethod))));
+    expect(n).toBe(0);
+    // Org A's uploaded tender document exists (positive control) and is not cached.
+    const [own] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.id, ids.tenderDoc!));
+    expect(own).toMatchObject({ orgId: A.org.orgId, requirements: null, extractedMethod: null });
   });
 });

@@ -1,0 +1,69 @@
+# Review round 1 rework gate (after merging origin/main 7524ed7)
+$ pnpm -r typecheck
+tools/mock-gem typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+tools/mock-gem typecheck: Done
+apps/extension typecheck: Done
+packages/db typecheck: Done
+apps/web typecheck: Done
+apps/api typecheck$ tsc --noEmit
+apps/api typecheck: Done
+
+$ pnpm --filter @tp/core exec vitest run
+ Test Files  26 passed (26)
+      Tests  487 passed (487)
+
+$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run
+ ✓ test/vault.test.ts (96 tests) 6583ms
+ ✓ test/analyse.test.ts (70 tests) 7696ms
+ ✓ test/identify.test.ts (43 tests) 8127ms
+ ✓ test/ingest.test.ts (34 tests) 3070ms
+ ✓ test/workspace.test.ts (56 tests) 7157ms
+ ✓ test/demo.test.ts (28 tests) 4247ms
+ ✓ test/auth.test.ts (34 tests) 5275ms
+ ✓ test/packet.test.ts (25 tests) 1453ms
+ ✓ test/dashboard.test.ts (20 tests) 2518ms
+ ✓ test/ops-limits.test.ts (31 tests) 10598ms
+ ✓ test/isolation-contract.test.ts (8 tests) 2365ms
+ ✓ test/health.test.ts (33 tests) 4964ms
+ ✓ test/tokens.test.ts (23 tests) 2422ms
+ ✓ test/housekeeping.test.ts (9 tests) 645ms
+ ✓ test/foundation.test.ts (24 tests) 1027ms
+ ✓ test/isolation.test.ts (4 tests) 1848ms
+ ✓ test/staleness.test.ts (18 tests) 1509ms
+ ✓ test/rate-limit.test.ts (19 tests) 5580ms
+ ✓ test/security.test.ts (16 tests) 934ms
+ ✓ test/gem-lease.test.ts (16 tests) 11670ms
+ ✓ test/activity.test.ts (12 tests) 1701ms
+ ✓ test/prefs.test.ts (12 tests) 1626ms
+ ✓ test/perf-indexes.test.ts (14 tests) 8346ms
+ ✓ test/roles-matrix.test.ts (69 tests) 2576ms
+ ✓ test/secrets-leak.test.ts (1 test) 1416ms
+ ✓ test/extraction-cache.test.ts (7 tests) 2466ms
+ ✓ test/migrate.test.ts (8 tests) 860ms
+ ✓ test/assist.test.ts (13 tests) 1786ms
+ ✓ test/views.test.ts (7 tests) 2331ms
+ ✓ test/password-reset.test.ts (10 tests) 1869ms
+ ✓ test/sessions.test.ts (8 tests) 1174ms
+ ✓ test/email-batch.test.ts (6 tests) 651ms
+ ✓ test/gem-documents.test.ts (7 tests) 1312ms
+ ✓ test/analyse-large.test.ts (4 tests) 2071ms
+ ✓ test/worker.test.ts (9 tests) 153ms
+ ↓ test/perf/dashboard.perf.test.ts (1 test | 1 skipped)
+ ✓ test/perf-auth.test.ts (4 tests) 1326ms
+ ✓ test/match-batch.test.ts (3 tests) 2975ms
+ ✓ test/vault.perf.test.ts (4 tests) 958ms
+ ↓ test/perf/watchlists-preview.perf.test.ts (1 test | 1 skipped)
+ ✓ test/analyse-perf.test.ts (4 tests) 1492ms
+ ✓ test/test-hooks.test.ts (4 tests) 316ms
+ ✓ test/packet-proposed.test.ts (2 tests) 3ms
+ ✓ test/blob-r2.test.ts (1 test) 24ms
+ Test Files  45 passed | 2 skipped (47)
+      Tests  834 passed | 2 skipped (836)
+
+$ pnpm --filter @tp/web exec vitest run
+ Test Files  42 passed (42)
+      Tests  298 passed (298)
+
+$ cd packages/db && pnpm exec drizzle-kit check
+Everything's fine

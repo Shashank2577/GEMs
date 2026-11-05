@@ -1,0 +1,46 @@
+03:00:27    × crypto > hashes and verifies passwords with PBKDF2 32ms
+03:00:27      → expected true to be false // Object.is equality
+03:00:28  ✓ test/assist.test.ts (6 tests) 383ms
+03:00:28 
+03:00:28 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+03:00:28 
+03:00:28  FAIL  test/foundation.test.ts > crypto > hashes and verifies passwords with PBKDF2
+03:00:28 AssertionError: expected true to be false // Object.is equality
+03:00:28 
+03:00:28 - Expected
+03:00:28 + Received
+03:00:28 
+03:00:28 - false
+03:00:28 + true
+03:00:28 
+03:00:28  ❯ test/foundation.test.ts:21:52
+03:00:28      19|     const h = await hashPassword('s3cret-pass');
+03:00:28      20|     expect(h).toMatch(/^pbkdf2_sha256\$100000\$[\w-]+\$[\w-]+$/);
+03:00:28      21|     expect(await verifyPassword('s3cret-pass', h)).toBe(false); // QA …
+03:00:28        |                                                    ^
+03:00:28      22|     expect(await verifyPassword('s3cret-pasS', h)).toBe(false);
+03:00:28      23|     expect(await verifyPassword('x', 'garbage')).toBe(false);
+03:00:28 
+03:00:28 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+03:00:28 
+03:00:28  Test Files  1 failed | 10 passed (11)
+03:00:28       Tests  1 failed | 163 passed (164)
+03:00:28    Start at  03:00:16
+03:00:28    Duration  11.85s (transform 567ms, setup 0ms, collect 4.27s, tests 6.15s, environment 1ms, prepare 435ms)
+03:00:28 
+03:00:28 
+03:00:28 ##[error]AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/foundation.test.ts:21:52
+
+
+03:00:28 /home/runner/work/GEMs/GEMs/apps/api:
+03:00:28  ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @tp/api@0.1.0 test: `vitest run`
+03:00:28 Exit status 1
+03:00:28 ##[error]Process completed with exit code 1.
