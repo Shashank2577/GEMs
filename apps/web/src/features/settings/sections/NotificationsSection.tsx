@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { BellRing, CalendarClock, Mail, MessageCircle, Phone } from 'lucide-react';
+import { BellRing, CalendarClock, Mail, MessageCircle, Phone, Send } from 'lucide-react';
 import type { NotificationPrefs } from '@tp/core/contracts/auth';
 import { toE164IndianMobile } from '@tp/core/vault/validators';
 import { Button, ErrorState, Field, Input, Segmented, SkeletonList, Switch, toast } from '@/components/ui';
-import { errorMessage } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { usePrefs, useSavePrefs, useUpdateMe } from '../api';
+import { usePrefs, useSavePrefs, useSendTestAlert, useUpdateMe } from '../api';
+import { testAlertToast } from '../notification-copy';
 import { displayMobile } from './AccountSection';
 import { Panel } from './Panel';
 
@@ -27,6 +28,7 @@ export default function NotificationsSection() {
   const q = usePrefs();
   const save = useSavePrefs();
   const updateMe = useUpdateMe();
+  const testAlert = useSendTestAlert();
   const [p, setP] = useState<NotificationPrefs | null>(null);
   const [phone, setPhone] = useState(displayMobile(me?.user.phone));
   const [phoneErr, setPhoneErr] = useState<string | null>(null);
@@ -51,9 +53,27 @@ export default function NotificationsSection() {
     }
   };
 
+  // T067 (002/FR-034): the server uses the SAVED preferences, so ask for a save first when there are edits.
+  const sendTest = () => {
+    if (dirty) { toast.info('Save your changes first', { description: 'The test alert uses your saved preferences.' }); return; }
+    testAlert.mutate(undefined, {
+      onSuccess: (r) => {
+        const t = testAlertToast(r, !!me?.user.phone);
+        toast[t.kind](t.title, { description: t.lines.join(' · ') });
+      },
+      onError: (e) => {
+        const retry = e instanceof ApiError && e.status === 429 ? Number((e.details as { retryAfter?: number } | undefined)?.retryAfter) : NaN;
+        toast.error(Number.isFinite(retry) ? `You can send one test alert a minute. Try again in ${retry} s.` : errorMessage(e));
+      },
+    });
+  };
+
   return (
     <Panel title="Notifications" description="Choose how TenderPilot tells you about new matches, deadlines and expiring documents. These settings are personal."
-      footer={<Button onClick={submit} disabled={!dirty} loading={save.isPending || updateMe.isPending}>Save preferences</Button>}>
+      footer={<>
+        <Button variant="secondary" onClick={sendTest} loading={testAlert.isPending}><Send /> Send a test alert</Button>
+        <Button onClick={submit} disabled={!dirty} loading={save.isPending || updateMe.isPending}>Save preferences</Button>
+      </>}>
       <div className="divide-y">
         <Row htmlFor="n-inapp" icon={<BellRing />} title="In-app" description="The bell in the top bar and the Notifications page.">
           <Switch id="n-inapp" checked={p.inApp} onCheckedChange={(v) => set('inApp', v)} />
