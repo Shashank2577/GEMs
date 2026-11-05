@@ -1,0 +1,808 @@
+{
+  "url": "http://localhost:8788/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9?step=submit",
+  "timestamp": "2026-11-05T06:17:05.984Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "18.0pt (24px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "3:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h1 class=\"break-words text-xl font-semibold leading-snug tracking-tight sm:text-2xl\">Supply of Laptops batch 1</h1>",
+          "target": [
+            "h1"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">Indian Oil Corporation Limited · Ministry of Petroleum and Natural Gas</span>",
+          "target": [
+            ".gap-1\\.5.min-w-0.inline-flex > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular inline-flex items-center gap-1 whitespace-nowrap font-medium text-muted-foreground text-sm\" data-state=\"closed\">",
+          "target": [
+            ".tabular.gap-1[data-state=\"closed\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>EMD <span class=\"tabular font-medium text-foreground\">₹1,50,000</span></span>",
+          "target": [
+            ".gap-x-4 > span:nth-child(3)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-medium text-foreground\">₹1,50,000</span>",
+          "target": [
+            "span:nth-child(3) > .tabular.text-foreground.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Est. <span class=\"tabular font-medium text-foreground\">₹32 L</span></span>",
+          "target": [
+            "span:nth-child(4)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-medium text-foreground\">₹32 L</span>",
+          "target": [
+            "span:nth-child(4) > .tabular.text-foreground.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.8pt (14.4px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" class=\"-rotate-90\">",
+                  "target": [
+                    ".-rotate-90"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 14.4px;\">78</span>",
+          "target": [
+            ".tracking-tight.tabular.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" class=\"flex shrink-0 items-center gap-3 self-start rounded-xl border bg-card/80 p-2.5 pr-4 text-left shadow-xs backdrop-blur hover:border-primary/30 focus-ring\">",
+                  "target": [
+                    ".self-start"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-2xs font-medium uppercase tracking-wider text-muted-foreground\">Eligibility</div>",
+          "target": [
+            ".self-start > div:nth-child(2) > .uppercase.tracking-wider.text-2xs"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"relative inline-flex...\" href=\"/tenders/7cf1ee5c-44...\">",
+          "target": [
+            ".\\[\\&_svg\\]\\:size-4.h-8.transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\]:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.05]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-primary\\/\\[0\\.07\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a href=\"https://bidplus.gem....\" target=\"_blank\" rel=\"noreferrer\" class=\"relative inline-flex...\">",
+          "target": [
+            "a[target=\"_blank\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"text-[15px] font-semibold tracking-tight\">Human-only steps</h3>",
+          "target": [
+            "div:nth-child(2) > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-xs text-muted-foreground\">TenderPilot never does these — they keep your GeM account safe and the bid legally yours.</p>",
+          "target": [
+            ".gap-2\\.5.flex > div:nth-child(2) > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-[13px] font-semibold\">Enter your price on GeM</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(1) > .min-w-0 > .text-\\[13px\\].font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-xs text-muted-foreground\">Type the unit price yourself in the GeM price schedule.</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(1) > .min-w-0 > .text-xs.text-muted-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-[13px] font-semibold\">Upload the documents</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(2) > .min-w-0 > .text-\\[13px\\].font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-xs text-muted-foreground\">Attach the merged packet and documents listed below.</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(2) > .min-w-0 > .text-xs.text-muted-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-[13px] font-semibold\">Authenticate with OTP / DSC / e-Sign</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(3) > .min-w-0 > .text-\\[13px\\].font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-xs text-muted-foreground\">Aadhaar OTP, e-Sign or your Digital Signature Certificate.</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(3) > .min-w-0 > .text-xs.text-muted-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-[13px] font-semibold\">Click Final Submit</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(4) > .min-w-0 > .text-\\[13px\\].font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<li class=\"flex gap-3 rounded-xl border bg-card/80 p-3 backdrop-blur\">",
+                  "target": [
+                    ".bg-card\\/80.backdrop-blur.p-3:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"text-xs text-muted-foreground\">Review the GeM summary and submit — then mark it here.</div>",
+          "target": [
+            ".bg-card\\/80.backdrop-blur.p-3:nth-child(4) > .min-w-0 > .text-xs.text-muted-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/[0.12] via-warning/[0.04] to-transparent\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".from-warning\\/\\[0\\.12\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mt-3 flex items-center gap-1.5 text-xs font-medium\">",
+          "target": [
+            ".sm\\:p-5 > .mt-3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<kbd class=\"inline-flex h-5 min-w-5 items-center justify-center rounded border border-b-2 bg-card px-1 font-sans text-[10px] font-medium text-muted-foreground\">⌘</kbd>",
+          "target": [
+            "kbd:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        }
+      ]
+    }
+  ],
+  "passes": 29
+}

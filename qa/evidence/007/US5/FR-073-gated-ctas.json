@@ -1,0 +1,18 @@
+{
+  "bid_manager": {
+    "exploreDemo": 1,
+    "createWatchlist": 3,
+    "askText": false
+  },
+  "analyst": {
+    "exploreDemo": 0,
+    "createWatchlist": 2,
+    "askText": false
+  },
+  "viewer": {
+    "exploreDemo": 0,
+    "createWatchlist": 0,
+    "askText": true
+  },
+  "viewerCreateWatchlistApi": 403
+}

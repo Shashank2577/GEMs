@@ -117,6 +117,11 @@ export const apiTokens = pgTable('api_tokens', {
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
   /** Null = never expires (002/FR-037). Expired tokens are rejected by resolveAuth. */
   expiresAt: timestamp('expires_at', { withTimezone: true }),
+  /**
+   * 006/FR-074: `'read'` = "Extension (read-only)" — refused (403) on every non-GET request (middleware/auth.ts).
+   * Fixed at creation; there is no route to change it. Existing rows default to `'full'`.
+   */
+  scope: text('scope').$type<'full' | 'read'>().notNull().default('full'),
   createdAt: createdAt(),
 }, (t) => ({
   tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash),
@@ -311,7 +316,8 @@ export const tenderDocuments = pgTable('tender_documents', {
   fileName: text('file_name').notNull(),
   blobKey: text('blob_key').notNull(),
   sizeBytes: integer('size_bytes').notNull(),
-  pageCount: integer('page_count'),
+  pageCount: integer('page_count'), // pages actually read (capped, 004/NFR-005)
+  totalPages: integer('total_pages'), // the PDF's real page count; null for rows that predate the column
   text: text('text'), // extracted text, pages separated by \f
   sourceUrl: text('source_url'),
   textSource: text('text_source').$type<'pdf' | 'ocr'>().notNull().default('pdf'), // FR-052

@@ -36,7 +36,7 @@ import { logActivity } from '../lib/activity';
 import { HttpError, conflict, forbidden, notFound, validationError } from '../lib/errors';
 import { hit, rateLimited, release, type LimitOptions } from '../lib/rate-limit';
 import { parseJson, parseWith } from '../lib/validate';
-import { orgId, requireAuth, requireRole, roleAtLeast, userId } from '../middleware/auth';
+import { orgId, refuseReadOnlyToken, requireAuth, requireRole, roleAtLeast, userId } from '../middleware/auth';
 import {
   asMappable, orgMembers, getTenderRow, getWorkspace, latestAnalysis, listComments, listWorkspaceCards, readinessFor, vaultRows, workspaceDetail,
   workspaceDto, type WorkspaceRow,
@@ -412,6 +412,7 @@ export const HINT_TTL_MS = 15 * 60_000;
  * decides whether to use it; nothing is entered on GeM. Requires a workspace for the tender in the caller's org.
  */
 workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (c) => {
+  refuseReadOnlyToken(c); // 006/FR-074: outbound GeM call + cache write + org quota => not a pure read
   const { deps } = c.var;
   const org = orgId(c);
   const t = await getTenderRow(deps, c.req.param('id'), c.var.org);

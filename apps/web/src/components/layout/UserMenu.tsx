@@ -21,6 +21,7 @@ export function UserMenu({ compact, className }: { compact?: boolean; className?
     // Non-modal: a modal menu aria-hides the whole shell while its links stay focusable (axe aria-hidden-focus).
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
+        data-testid="user-menu"
         className={cn('flex items-center gap-2 rounded-full focus-ring', !compact && 'rounded-lg p-1 pr-2 hover:bg-muted', className)}
         // The name starts with the visible avatar initials (and first name) — WCAG 2.5.3 label-in-name (axe).
         aria-label={`${initials(me.user.name)}${compact ? '' : ` ${me.user.name.split(' ')[0]}`} Account menu`}

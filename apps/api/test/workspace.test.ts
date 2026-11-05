@@ -300,6 +300,20 @@ describe('readiness without an analysis (T021; 006/FR-009)', () => {
     expect(other.body.readiness.analysed).toBe(true);
   });
 
+  it('a failed re-analysis does not hide the previous done analysis from readiness (FR-029)', async () => {
+    const t = await seedTender(ctx, 61);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const c = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    expect(c.status).toBe(201);
+    const before = await request(ctx.app, 'GET', `/workspaces/${c.body.id}`, { cookie: s.org.viewer.cookie });
+    expect(before.body.readiness.analysed).toBe(true);
+    await ctx.db.insert(analyses).values({ orgId: s.org.orgId, tenderId: t.id, status: 'failed', method: 'rules', error: 'boom', createdAt: new Date(NOW.getTime() + 60_000) });
+    const after = await request(ctx.app, 'GET', `/workspaces/${c.body.id}`, { cookie: s.org.viewer.cookie });
+    expect(after.body.readiness).toMatchObject({ analysed: true, total: before.body.readiness.total });
+    expect(after.body.readiness.total).toBeGreaterThan(0);
+    expect(after.body.analysis).toMatchObject({ status: 'done' });
+  });
+
   it('treats a running (unfinished) analysis as not analysed', async () => {
     const t = await seedTender(ctx, 5);
     const a = await seedAnalysis(ctx, s.org.orgId, t.id);

@@ -1,0 +1,378 @@
+[
+  {
+    "label": "forbidden unit_price",
+    "request": "PUT assist-values {\"unit_price\":\"1000\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"unit_price\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "unit_price": "\"unit_price\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "unit_price"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden totalBidValue",
+    "request": "PUT assist-values {\"totalBidValue\":\"5\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"totalBidValue\" looks like a bid value field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "totalBidValue": "\"totalBidValue\" looks like a bid value field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "totalBidValue"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden otp",
+    "request": "PUT assist-values {\"otp\":\"1234\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"otp\" looks like a otp field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "otp": "\"otp\" looks like a otp field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "otp"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden captcha",
+    "request": "PUT assist-values {\"captcha\":\"x\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"captcha\" looks like a captcha field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "captcha": "\"captcha\" looks like a captcha field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "captcha"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden dsc_pin",
+    "request": "PUT assist-values {\"dsc_pin\":\"1\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"dsc_pin\" looks like a dsc field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "dsc_pin": "\"dsc_pin\" looks like a dsc field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "dsc_pin"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden final_submit",
+    "request": "PUT assist-values {\"final_submit\":\"yes\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"final_submit\" looks like a submit field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "final_submit": "\"final_submit\" looks like a submit field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "final_submit"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden Unit Price",
+    "request": "PUT assist-values {\"Unit Price\":\"1\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"Unit Price\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "Unit Price": "\"Unit Price\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "Unit Price"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden unitPrice",
+    "request": "PUT assist-values {\"unitPrice\":\"1\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"unitPrice\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "unitPrice": "\"unitPrice\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "unitPrice"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden bid_value",
+    "request": "PUT assist-values {\"bid_value\":\"1\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"bid_value\" looks like a bid value field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "bid_value": "\"bid_value\" looks like a bid value field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "bid_value"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden rate",
+    "request": "PUT assist-values {\"rate\":\"1\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"rate\" looks like a rate field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "rate": "\"rate\" looks like a rate field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "rate"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden amount",
+    "request": "PUT assist-values {\"amount\":\"1\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"amount\" looks like a amount field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "amount": "\"amount\" looks like a amount field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "amount"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden password",
+    "request": "PUT assist-values {\"password\":\"p\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"password\" looks like a password field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "password": "\"password\" looks like a password field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "password"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden aadhaar",
+    "request": "PUT assist-values {\"aadhaar\":\"1\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"aadhaar\" looks like a aadhaar field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "aadhaar": "\"aadhaar\" looks like a aadhaar field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "aadhaar"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden esign",
+    "request": "PUT assist-values {\"esign\":\"y\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"esign\" looks like a e-sign field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "esign": "\"esign\" looks like a e-sign field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "esign"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "forbidden UNIT_PRICE",
+    "request": "PUT assist-values {\"UNIT_PRICE\":\"9\"}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"UNIT_PRICE\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "UNIT_PRICE": "\"UNIT_PRICE\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "UNIT_PRICE"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "mixed",
+    "request": "PUT {model, unit_price}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "forbidden_field",
+        "message": "\"unit_price\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions.",
+        "details": {
+          "fields": {
+            "unit_price": "\"unit_price\" looks like a price field. TenderPilot never stores or fills prices, OTP, CAPTCHA, DSC/e-Sign or submit actions."
+          },
+          "forbidden": [
+            "unit_price"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "label": "unknown key",
+    "request": "PUT {foo}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "validation_error",
+        "message": "\"foo\" is not an allow-listed field",
+        "details": {
+          "fields": {
+            "foo": "\"foo\" is not an allow-listed field"
+          },
+          "forbidden": []
+        }
+      }
+    }
+  },
+  {
+    "label": "non-text",
+    "request": "PUT {make:5}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "validation_error",
+        "message": "Must be text",
+        "details": {
+          "fields": {
+            "make": "Must be text"
+          },
+          "forbidden": []
+        }
+      }
+    }
+  },
+  {
+    "label": "2001 chars",
+    "request": "PUT {model: 2001x}",
+    "status": 400,
+    "response": {
+      "error": {
+        "code": "validation_error",
+        "message": "Keep it under 2000 characters",
+        "details": {
+          "fields": {
+            "model": "Keep it under 2000 characters"
+          },
+          "forbidden": []
+        }
+      }
+    }
+  },
+  {
+    "label": "2000 chars (boundary)",
+    "request": "PUT {model: 2000y}",
+    "status": 200,
+    "response": {
+      "assistValues": {
+        "model": "yyyyyyyyyy…(2000)"
+      }
+    }
+  },
+  {
+    "label": "viewer",
+    "request": "PUT {model} as viewer",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "forbidden",
+        "message": "You need to be at least an Analyst to do that"
+      }
+    }
+  }
+]

@@ -1,6 +1,6 @@
 {
-  "id": "231243d2-133a-42c3-bf42-fcdee0d19619",
-  "prevId": "0362bf57-14e1-418a-9436-6a9a95aeb0c5",
+  "id": "c2c94126-b3ab-4eb1-ab09-902d398a756a",
+  "prevId": "e33b22fb-4969-41cd-a781-7bc3c0d030eb",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -480,6 +480,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'full'"
         },
         "created_at": {
           "name": "created_at",
@@ -2385,6 +2392,12 @@
         },
         "page_count": {
           "name": "page_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_pages": {
+          "name": "total_pages",
           "type": "integer",
           "primaryKey": false,
           "notNull": false

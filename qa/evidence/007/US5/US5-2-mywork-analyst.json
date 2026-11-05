@@ -1,0 +1,106 @@
+{
+  "setup": [
+    {
+      "workspaceId": "2c598ff5-ba2b-473e-8eb8-611c7e1cd160",
+      "tenderId": "db2bc191-35d7-4fb1-9bf3-2545a176cc07",
+      "bidNumber": "GEM/2026/B/6472608",
+      "title": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
+      "stage": "preparing",
+      "dueAt": "2026-11-06T06:28:31.095Z",
+      "endAt": "2026-11-06T22:30:00.000Z",
+      "readiness": {
+        "percent": 100,
+        "blockers": 0,
+        "analysed": true
+      }
+    },
+    {
+      "workspaceId": "d98136b7-8620-4b74-a006-4cb81121bb2d",
+      "tenderId": "4c944efe-fe10-4346-8f88-1c03318838f2",
+      "bidNumber": "GEM/2026/B/6480527",
+      "title": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
+      "stage": "go",
+      "dueAt": "2026-11-08T06:28:31.095Z",
+      "endAt": "2026-11-07T10:30:00.000Z",
+      "readiness": {
+        "percent": 100,
+        "blockers": 0,
+        "analysed": true
+      }
+    }
+  ],
+  "afterAssigningMany": [
+    {
+      "workspaceId": "c6844bbf-7fae-4576-99a5-d09eb1db0800",
+      "tenderId": "f078c5ef-70c0-4965-8e8e-a717ae04f532",
+      "bidNumber": "GEM/2026/B/6448851",
+      "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+      "stage": "ready",
+      "dueAt": "2026-11-04T11:28:00.000Z",
+      "endAt": "2026-11-05T11:28:00.000Z",
+      "readiness": {
+        "percent": 100,
+        "blockers": 0,
+        "analysed": true
+      }
+    },
+    {
+      "workspaceId": "85b50050-3a28-4997-a5ff-110139a24f22",
+      "tenderId": "3b699966-ac30-456a-91bc-5cff9c6920a8",
+      "bidNumber": "GEM/2026/B/6464689",
+      "title": "Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor",
+      "stage": "preparing",
+      "dueAt": "2026-11-05T08:30:00.000Z",
+      "endAt": "2026-11-06T08:30:00.000Z",
+      "readiness": {
+        "percent": 89,
+        "blockers": 1,
+        "analysed": true
+      }
+    },
+    {
+      "workspaceId": "2c598ff5-ba2b-473e-8eb8-611c7e1cd160",
+      "tenderId": "db2bc191-35d7-4fb1-9bf3-2545a176cc07",
+      "bidNumber": "GEM/2026/B/6472608",
+      "title": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
+      "stage": "preparing",
+      "dueAt": "2026-11-06T06:28:31.095Z",
+      "endAt": "2026-11-06T22:30:00.000Z",
+      "readiness": {
+        "percent": 100,
+        "blockers": 0,
+        "analysed": true
+      }
+    },
+    {
+      "workspaceId": "ea6afe8d-f8cc-40ad-942c-43de80d48611",
+      "tenderId": "b5c0263c-9e04-45d8-b7ff-0bfa4cd76733",
+      "bidNumber": "GEM/2026/B/6488446",
+      "title": "Multifunction Machine MFM (Q2) – A3 mono laser, 35 ppm, duplex",
+      "stage": "analysing",
+      "dueAt": "2026-11-07T04:30:00.000Z",
+      "endAt": "2026-11-08T04:30:00.000Z",
+      "readiness": {
+        "percent": 100,
+        "blockers": 0,
+        "analysed": true
+      }
+    },
+    {
+      "workspaceId": "d98136b7-8620-4b74-a006-4cb81121bb2d",
+      "tenderId": "4c944efe-fe10-4346-8f88-1c03318838f2",
+      "bidNumber": "GEM/2026/B/6480527",
+      "title": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
+      "stage": "go",
+      "dueAt": "2026-11-08T06:28:31.095Z",
+      "endAt": "2026-11-07T10:30:00.000Z",
+      "readiness": {
+        "percent": 100,
+        "blockers": 0,
+        "analysed": true
+      }
+    }
+  ],
+  "excludedStagesAssignedToAnalyst": "5",
+  "ownerMyWorkCount": 5
+}
