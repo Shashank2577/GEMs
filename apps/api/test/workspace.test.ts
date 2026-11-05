@@ -232,6 +232,23 @@ describe('POST /workspaces/:id/submitted & outcome', () => {
   });
 });
 
+describe('POST /workspaces/:id/submitted logs the open blockers (T091; 006/FR-084)', () => {
+  it('records openBlockers = the checklist items still missing/expired, and does not block the submission', async () => {
+    const t = await seedTender(ctx, 9);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const created = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    const id = created.body.id as string;
+    const detail = await request(ctx.app, 'GET', `/workspaces/${id}`, { cookie: s.org.analyst.cookie });
+    const blockers = detail.body.readiness.blockers.length as number;
+    expect(blockers).toBeGreaterThan(0); // the seeded vault has no document for one mandatory item
+    const r = await request(ctx.app, 'POST', `/workspaces/${id}/submitted`, { cookie: s.org.analyst.cookie, json: { note: 'Done' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('submitted');
+    const [act] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, id), eq(activityLog.action, 'workspace.submitted')));
+    expect(act.meta).toMatchObject({ note: 'Done', openBlockers: blockers });
+  });
+});
+
 describe('PATCH /workspaces/:id — won/lost only after submission (T020; 006/FR-008)', () => {
   let goId: string;
   beforeAll(async () => {

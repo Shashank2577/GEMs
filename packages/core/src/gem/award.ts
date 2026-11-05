@@ -11,6 +11,10 @@
  * The bidder-row regex keeps the original structure (row number → company span → `bid_price` span → `L<n>`);
  * the only extensions are Indian digit grouping in prices ("29,50,000.00"), HTML entity decoding in company
  * names and the derived `l1Price`.
+ *
+ * `parseAwardResult` (T092; 006/FR-085) is the second, looser reader: it takes any saved GeM RA / bid-result
+ * page and finds the rank/price evaluation table by its header words. Ported from `scrape_ra_schedule()` in
+ * IshanMaheshwari-777/GEM-SCRAPER (scraper.py; no licence file, owner-approved) — see NOTICE.
  */
 
 export interface BidResultBidder {
@@ -108,4 +112,103 @@ export function parseBidResult(input: string): BidResult {
   const categories = cat ? cat[1]!.split(',').map((c) => decodeEntities(c).trim()).filter(Boolean) : [];
   const l1 = bidders.filter((b) => b.level === 'L1').map((b) => b.price);
   return { categories, bidders, l1Price: l1.length ? Math.min(...l1) : null };
+}
+
+// ───────────── parseAwardResult (006/FR-085) ─────────────
+
+export interface AwardBidder {
+  /** Rank from the table ("L1" / "1" → 1); 0 when the table has no rank column. */
+  rank: number;
+  name: string;
+  /** Quoted price in rupees (> 0). */
+  price: number;
+}
+
+export interface AwardResult {
+  /** Price of the winning / first-ranked row, in rupees. */
+  l1Price: number;
+  l1Seller: string;
+  bidders: AwardBidder[];
+}
+
+// scrape_ra_schedule(): a table is the financial / evaluation table when its first row mentions one of these.
+const FINANCIAL_HEADER = ['rank', 'price', 'l1', 'financial', 'amount', 'total'];
+// ...and a row is the winner's when its markup carries one of these (fa-trophy, "winner", 🏆).
+const WINNER_MARK = ['trophy', 'winner', '🏆'];
+const MAX_CELL_LENGTH = 2 * 1024;
+
+/** Cell text as BeautifulSoup `get_text(strip=True)` would give it (tags dropped, entities decoded, spaces collapsed). */
+function cellText(inner: string): string {
+  return decodeEntities(inner.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+}
+
+/** Cells of one `<tr>` chunk, found with indexOf so no pattern can backtrack on hostile markup. */
+function cellsOf(row: string): string[] {
+  const lower = row.toLowerCase();
+  const out: string[] = [];
+  let i = 0;
+  for (;;) {
+    const td = lower.indexOf('<td', i);
+    const th = lower.indexOf('<th', i);
+    const start = td < 0 ? th : th < 0 ? td : Math.min(td, th);
+    if (start < 0) break;
+    const open = lower.charAt(start + 3);
+    const gt = lower.indexOf('>', start);
+    if (gt < 0) break;
+    if (open !== '>' && open !== ' ' && open !== '\t' && open !== '\n' && open !== '\r' && open !== '/') { i = start + 3; continue; }
+    const close = lower.indexOf('</t', gt);
+    const end = close < 0 ? lower.length : close;
+    const inner = row.slice(gt + 1, end);
+    out.push(inner.length > MAX_CELL_LENGTH ? '' : cellText(inner));
+    i = end + 1;
+  }
+  return out;
+}
+
+/** "₹ 29,50,000.00", "Rs. 2950000", "INR 29,50,000" → rupees; null when the cell is not a plain positive amount. */
+function parseAmount(cell: string): number | null {
+  const cleaned = cell.replace(/,/g, '').replace(/₹|INR|Rs\.?/gi, '').trim();
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** "Acme Traders (Pvt Ltd Seller ID 123)" → "Acme Traders" (strip_portal_tags: one trailing parenthesis). */
+const stripPortalTags = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+/**
+ * Reads the rank/price evaluation table of a public GeM RA / bid-result page the user saved as HTML.
+ * Pure and DOM-free; returns null when no table with a priced seller row is found.
+ */
+export function parseAwardResult(input: string): AwardResult | null {
+  const html = input.length > MAX_RESULT_HTML ? input.slice(0, MAX_RESULT_HTML) : input;
+  const bidders: (AwardBidder & { winner: boolean })[] = [];
+  for (const table of html.split(/<table\b/i).slice(1)) {
+    const body = table.split(/<\/table>/i)[0]!;
+    const rows = body.split(/<tr\b/i).slice(1).map((r) => r.split(/<\/tr>/i)[0]!);
+    if (rows.length < 2) continue;
+    const header = cellsOf(rows[0]!).join(' ').toLowerCase();
+    if (!FINANCIAL_HEADER.some((k) => header.includes(k))) continue;
+    for (const row of rows.slice(1)) {
+      if (row.length > MAX_ROW_LENGTH) continue;
+      const cells = cellsOf(row);
+      if (cells.length < 2) continue;
+      const lowerRow = row.toLowerCase();
+      let rank = '';
+      let name = '';
+      let rankAt = -1;
+      cells.forEach((ct, i) => {
+        if (!rank && /^l?\d{1,3}$/i.test(ct)) { rank = ct.replace(/^l/i, ''); rankAt = i; }
+        else if (!name && ct.length > 2 && !/^\d+$/.test(ct) && parseAmount(ct) === null) name = stripPortalTags(ct);
+      });
+      // Price: the last numeric cell (never the rank cell).
+      let price: number | null = null;
+      for (let i = cells.length - 1; i >= 0 && price === null; i--) if (i !== rankAt) price = parseAmount(cells[i]!);
+      if (!name || price === null) continue;
+      bidders.push({ rank: rank ? Number(rank) : 0, name, price, winner: WINNER_MARK.some((m) => lowerRow.includes(m)) });
+    }
+  }
+  if (!bidders.length) return null;
+  const win = bidders.find((b) => b.winner) ?? bidders.find((b) => b.rank === 1) ?? bidders[0]!;
+  return { l1Price: win.price, l1Seller: win.name, bidders: bidders.map(({ rank, name, price }) => ({ rank, name, price })) };
 }

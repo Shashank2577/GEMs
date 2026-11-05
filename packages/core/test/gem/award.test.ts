@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { bidResultPath, parseBidResult } from '../../src/gem/award';
+import { bidResultPath, parseAwardResult, parseBidResult, MAX_RESULT_HTML } from '../../src/gem/award';
 import { GemClient, GemError, readTextCapped } from '../../src/gem/client';
 
 const html = readFileSync(join(__dirname, '../fixtures/gem/bid-result.html'), 'utf8');
@@ -134,5 +134,54 @@ describe('readTextCapped (result page body cap)', () => {
 
   it('returns small bodies whole', async () => {
     expect(await readTextCapped(new Response('<html>ok</html>'), 1024)).toBe('<html>ok</html>');
+  });
+});
+
+describe('parseAwardResult (T092; 006/FR-085) — scrape_ra_schedule table heuristics', () => {
+  const ra = readFileSync(join(__dirname, '../fixtures/gem/ra-result.html'), 'utf8');
+
+  it('reads the rank/price table: L1 price and seller, every bidder, Indian digit grouping, portal tags stripped', () => {
+    expect(parseAwardResult(ra)).toEqual({
+      l1Price: 2_840_500,
+      l1Seller: 'Kaveri Systems & Services Pvt Ltd',
+      bidders: [
+        { rank: 1, name: 'Kaveri Systems & Services Pvt Ltd', price: 2_840_500 },
+        { rank: 2, name: 'Aarav Infotech Pvt Ltd', price: 2_950_000 },
+        { rank: 3, name: 'Dhruv Traders', price: 3_125_000 },
+      ],
+    });
+  });
+
+  it('ignores the technical-evaluation and RA-details tables', () => {
+    expect(parseAwardResult(ra)!.bidders.map((b) => b.name)).not.toContain('Northline Computers');
+  });
+
+  it('picks the trophy/winner row, else rank 1, else the first row', () => {
+    const t = (rows: string) => `<table><tr><th>Rank</th><th>Seller</th><th>Price</th></tr>${rows}</table>`;
+    expect(parseAwardResult(t('<tr><td>2</td><td>Beta Co</td><td>200</td></tr><tr><td>1</td><td>Alpha Co</td><td>100</td></tr>'))).toMatchObject({ l1Seller: 'Alpha Co', l1Price: 100 });
+    expect(parseAwardResult(t('<tr><td>1</td><td>Alpha Co</td><td>100</td></tr><tr><td>2</td><td class="winner">Beta Co</td><td>200</td></tr>'))).toMatchObject({ l1Seller: 'Beta Co', l1Price: 200 });
+    expect(parseAwardResult(t('<tr><td>Gamma Co</td><td>Rs. 1,50,000</td></tr>'))).toMatchObject({ l1Seller: 'Gamma Co', l1Price: 150_000, bidders: [{ rank: 0, name: 'Gamma Co', price: 150_000 }] });
+  });
+
+  it('a row whose only number is the rank has no price (rank is never taken as the price)', () => {
+    expect(parseAwardResult('<table><tr><th>Rank</th><th>Name</th></tr><tr><td>L1</td><td>Alpha Co</td></tr></table>')).toBeNull();
+  });
+
+  it('returns null when there is no price table (other tables, plain text, empty input)', () => {
+    expect(parseAwardResult('')).toBeNull();
+    expect(parseAwardResult('<p>Rank 1: Alpha 100</p>')).toBeNull();
+    expect(parseAwardResult('<table><tr><th>Name</th><th>City</th></tr><tr><td>Alpha Co</td><td>Pune</td></tr></table>')).toBeNull();
+  });
+
+  it('skips rows without a seller name or a positive price', () => {
+    const r = parseAwardResult('<table><tr><th>Rank</th><th>Seller</th><th>Price</th></tr><tr><td>1</td><td>Alpha Co</td><td>0</td></tr><tr><td>2</td><td>Beta Co</td><td>abc</td></tr><tr><td>3</td><td>Delta Co</td><td>5,000</td></tr></table>');
+    expect(r?.bidders).toEqual([{ rank: 3, name: 'Delta Co', price: 5000 }]);
+  });
+
+  it('stays linear on hostile markup (unclosed cells, huge input)', () => {
+    const t0 = Date.now();
+    expect(parseAwardResult('<table><tr><th>Price</th>' + '<td'.repeat(50_000))).toBeNull();
+    expect(parseAwardResult('<table><tr><th>Price</th></tr>' + '<tr><td>1</td><td>A'.repeat(MAX_RESULT_HTML / 16))).toBeNull();
+    expect(Date.now() - t0).toBeLessThan(2000);
   });
 });
