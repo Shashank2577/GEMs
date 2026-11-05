@@ -190,7 +190,7 @@ description: "Task list for 004 Analyse — bid documents, eligibility extractio
 
 - [x] T068 [P] [US5] `checklistReadiness(items, vaultDocs, now)` → per item `ready | expiring(days) | expired | missing | n/a` sharing the scoring validity rule (export `isValidDoc` from score.ts); unit tests in `packages/core/src/analyse/checklist.ts`, `packages/core/src/analyse/score.ts`, `packages/core/test/analyse/checklist.test.ts` FR-040 (#235)
 - [x] T069 [US5] Web: readiness chips "In vault" / "Expires in N days" / "Expired" / "Missing" on checklist rows using the vault list query, with text + icon (not colour only) in `apps/web/src/features/tender/ChecklistCard.tsx`, `apps/web/src/features/tender/AnalysisPanel.tsx` FR-040 NFR-006 (#236)
-- [ ] T070 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in qa/evidence/004/US5/ — 13 items/4 generated order for demo + `go-it-services.pdf`, reasons with page refs, non-MSE EMD optional item, "Certificates requested in the ATC", workspace hint switch after Start bid, ids stable after ATC re-analysis (API), readiness chips (ISO 9001 "Expires in 10 days"); desktop + `@mobile` in `e2e/004-analyse/US5-checklist.e2e.ts`, `qa/evidence/004/US5/VERDICT.md` FR-038..FR-040 (#238)
+- [x] T070 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in qa/evidence/004/US5/ — 13 items/4 generated order for demo + `go-it-services.pdf`, reasons with page refs, non-MSE EMD optional item, "Certificates requested in the ATC", workspace hint switch after Start bid, ids stable after ATC re-analysis (API), readiness chips (ISO 9001 "Expires in 10 days"); desktop + `@mobile` in `e2e/004-analyse/US5-checklist.e2e.ts`, `qa/evidence/004/US5/VERDICT.md` FR-038..FR-040 (#238)
 
 ---
 
