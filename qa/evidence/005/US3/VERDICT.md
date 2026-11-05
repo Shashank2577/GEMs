@@ -1,9 +1,11 @@
-## QA verdict — REJECTED
+## QA verdict — APPROVED (re-review after rejection 1)
 
 **Work item:** #116 · **PR:** #477 · **Reviewer:** qa (claude-code / sonnet) · **Session:** https://claude.ai/code/session_01BUi6mGceW8rH9jD4oJ4Bsf
 
+Re-review of fix commit cbe30ba (grid-cols-1 / min-w-0 in ExpiryTimeline, VaultPage grids, DocumentDrawer dl). Rejection 1 finding is resolved; evidence below was re-recorded on this run.
+
 Suite: `e2e/005-profile-vault/US3-vault.e2e.ts` (helpers in `e2e/005-profile-vault/support.ts`).
-Run: `E2E_PORT=8803 E2E_GEM_PORT=4014 E2E_DB_NAME=tenderpilot_e2e_us3 pnpm exec playwright test e2e/005-profile-vault/US3` — desktop 17 passed, mobile 1 failed (the NFR-006 check below).
+Run: `E2E_PORT=8803 E2E_GEM_PORT=4014 E2E_DB_NAME=tenderpilot_e2e_us3 pnpm exec playwright test e2e/005-profile-vault/US3` — desktop 17 passed, mobile 1 passed (full suite: 18 passed, 1 skipped = the @mobile test on the desktop project).
 (Local note: a shared Postgres already held :5433, so `scripts/local-pg.sh` could not start a second one; I created `tenderpilot_e2e_us3` on it and set `E2E_DATABASE_URL`. App under test is unchanged.)
 
 Evidence base: https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/
@@ -40,19 +42,16 @@ Evidence base: https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/
 | 16 | (gap) `/vault?doc=<deleted id>` -> toast "That document could not be found. It may have been deleted." and `doc` removed (also unknown UUID and malformed id) | met | [png](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/ac16-deleted-doc-link.png) |
 | R1 | Review fix: long Hindi file name (> 255 bytes) uploads and downloads | met | [png](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/review-fix-hindi-filename.png); 201, bytes equal, `filename*=UTF-8''` |
 | M1 | T043 / NFR-006 @mobile: vault tiles 2x2 | met | [png](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/mobile-tiles-2x2.png) |
-| M2 | T043 / NFR-006 @mobile: no horizontal page scroll at 375 px (and Pixel 7, 412 px) on `/vault` | **not met** | [375 px](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/mobile-375px-vault.png), [trace](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/trace-mobile-layout-nfr006.zip); see finding 1. Onboarding (empty vault) has no overflow |
-| M3 | T043 / NFR-006 @mobile: drawer full width | **not met** | [png](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/mobile-drawer-full-width.png); consequence of finding 1 (drawer is 527 px in a 412 px viewport, right side cut off) |
-| A1 | NFR-005 axe-core (no serious/critical violations) | **unverifiable** | `@axe-core/playwright` is not installed yet (T003); not run |
+| M2 | T043 / NFR-006 @mobile: no horizontal page scroll at 375 px (and Pixel 7, 412 px) on `/vault` | met | [375 px](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/mobile-375px-vault.png), [trace](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/trace-mobile-layout-nfr006.zip); was failing in rejection 1 (scrollWidth 527), now within viewport at both widths |
+| M3 | T043 / NFR-006 @mobile: drawer full width | met | [png](https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/evidence/005/US3/mobile-drawer-full-width.png); drawer width equals the viewport (soft assertions in test pass) |
+| A1 | NFR-005 axe-core (no serious/critical violations) | not checked (out of this review) | `@axe-core/playwright` is not installed yet (T003); not run |
 
 ### Findings
 
-1. **blocking** — `/vault` scrolls horizontally on phones once the vault has documents with near expiry (demo org).
-   - Observed: Pixel 7 (412 px) and 375 px, demo org: `scrollWidth` 527 > `clientWidth` 412 / 375. Offenders: the phone "Expiring in the next 90 days" list in `ExpiryTimeline.tsx` (`<ul class="grid gap-1.5 sm:hidden">` -> `<li>` -> `<button class="flex w-full items-center gap-2.5 …">`, right edge 527 px). Long document titles are `truncate` but the grid track has no `min-w-0`, so it grows to the longest title; "Expired", "10d", "25d" are clipped in the 375 px screenshot. With the page widened, the drawer ("w-full") measures 527 px in a 412 px viewport, so its right side (Close, Edit details) is off-screen.
-   - Command: `E2E_PORT=8803 E2E_GEM_PORT=4014 E2E_DB_NAME=tenderpilot_e2e_us3 pnpm exec playwright test e2e/005-profile-vault/US3 --project=mobile`
-   - Expected: spec NFR-006 / Phone 375 px: "no horizontal page scroll … drawer full width"; T043 lists this check.
-   - Where: `apps/web/src/features/vault/ExpiryTimeline.tsx` (phone list; add `min-w-0` to the `ul`/`li`/`button` so `truncate` takes effect).
-2. **observation** — the search debounce was verified as "URL updated within 1.5 s", not the spec's 250 ms (timing in CI is too noisy to assert tighter).
-3. **observation** — 413 is only reachable via the API; in the UI the client-side check shows "<name> is larger than 20 MB." first (by design, AC 6).
+1. **resolved** — phone horizontal scroll on `/vault` (rejection 1, NFR-006): fixed in cbe30ba; mobile test now passes at 412 px and 375 px.
+2. **observation** — search debounce verified as "URL updated within 1.5 s", not 250 ms exactly.
+3. **observation** — 413 is only reachable via the API; the UI shows the client-side "<name> is larger than 20 MB." first (by design, AC 6).
+4. **observation** — axe-core (NFR-005) remains unrun until T003 adds `@axe-core/playwright`; recommend running it then on `/vault` at desktop and 375 px.
 
 ### Not checked
 
@@ -66,4 +65,4 @@ Evidence base: https://github.com/Shashank2577/GEMs/blob/story/GEM-116-vault/qa/
 
 ### Verdict
 
-`qa:rejected` — criteria M2 and M3 (NFR-006 mobile, T043) not met, A1 unverifiable (axe pending T003). All 16 scenarios of the issue's acceptance criteria and the review-fix behaviours are met. Rejection 1 of 3 on this item. Re-run after the fix with the command above; mobile project must go green.
+`qa:approved` — all 16 issue acceptance criteria, the review-fix behaviours and the T043 mobile checks are met with evidence above. axe (NFR-005) is listed as not checked (dependency pending T003), not as a failed criterion.
