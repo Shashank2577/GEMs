@@ -124,6 +124,14 @@ describe('POST /api/demo/seed', () => {
     // Before seeding, the other org sees none of the first org's data.
     expect((await request(ctx.app, 'GET', '/workspaces', { cookie: other.cookie })).body.total).toBe(0);
     expect((await request(ctx.app, 'GET', '/vault', { cookie: other.cookie })).body.items).toHaveLength(0);
+    // Demo tenders reach total + facets (one GROUPING SETS scan) only for an org that loaded the demo (008/FR-016).
+    const open = (await ctx.db.select({ id: tenders.id }).from(tenders).where(and(eq(tenders.status, 'open'), sql`coalesce(${tenders.endAt}, 'infinity'::timestamptz) >= ${NOW}`))).length;
+    expect(open).toBeGreaterThan(0);
+    const demoFeed = await request(ctx.app, 'GET', '/tenders?pageSize=100', { cookie: org.viewer.cookie });
+    expect(demoFeed.body.total).toBe(open);
+    expect(demoFeed.body.facets.states.length).toBeGreaterThan(0);
+    const plainFeed = await request(ctx.app, 'GET', '/tenders?pageSize=100', { cookie: other.cookie });
+    expect(plainFeed.body).toMatchObject({ total: 0, items: [], facets: { states: [], ministries: [], categories: [] } });
 
     const r = await request(ctx.app, 'POST', '/demo/seed', { cookie: other.cookie });
     expect(r.status).toBe(201);

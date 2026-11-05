@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { ChevronDown, FileCheck2, Sparkles, Upload } from 'lucide-react';
+import { CheckCircle2, ChevronDown, CircleAlert, CircleX, FileCheck2, FileX2, Sparkles, Upload, type LucideIcon } from 'lucide-react';
 import type { ChecklistItem } from '@tp/core/contracts/analyse';
+import type { ChecklistReadiness } from '@tp/core/analyse/checklist';
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, EmptyState, Tooltip } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { DOC_TYPE_LABEL, docTypeIcon } from './labels';
+import { rowReadinessChip, type ReadinessIcon } from './readiness';
+
+const READINESS_ICON: Record<ReadinessIcon, LucideIcon> = { ok: CheckCircle2, warn: CircleAlert, bad: CircleX, missing: FileX2 };
 
 /** "Required documents" checklist produced by the analysis (FR-015). */
-export function ChecklistCard({ items, hasWorkspace }: { items: ChecklistItem[]; hasWorkspace: boolean }) {
+export function ChecklistCard({ items, hasWorkspace, readiness, vaultUnavailable }: { items: ChecklistItem[]; hasWorkspace: boolean; vaultUnavailable?: boolean; /** Vault readiness per item id (FR-040); omitted when unavailable or a workspace is attached. */ readiness?: Record<string, ChecklistReadiness> | null }) {
   const [showOptional, setShowOptional] = useState(false);
   const mandatory = items.filter((i) => i.mandatory);
   const optional = items.filter((i) => !i.mandatory);
@@ -22,6 +26,7 @@ export function ChecklistCard({ items, hasWorkspace }: { items: ChecklistItem[];
         <CardDescription>
           {mandatory.length} to submit · {generated} we generate for you.{' '}
           {hasWorkspace ? 'Map them to your vault in the bid workspace.' : 'Start a bid to auto-match them with your vault.'}
+          {vaultUnavailable && <span className="mt-1 block text-xs text-muted-foreground">Vault status unavailable</span>}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -30,7 +35,7 @@ export function ChecklistCard({ items, hasWorkspace }: { items: ChecklistItem[];
         ) : (
           <>
             <ul className="divide-y border-t">
-              {mandatory.map((i) => <Row key={i.id} item={i} />)}
+              {mandatory.map((i) => <Row key={i.id} item={i} readiness={readiness} />)}
             </ul>
             {optional.length > 0 && (
               <div className="border-t">
@@ -38,7 +43,7 @@ export function ChecklistCard({ items, hasWorkspace }: { items: ChecklistItem[];
                   Optional & informational ({optional.length})
                   <ChevronDown className={cn('size-3.5 transition-transform', showOptional && 'rotate-180')} aria-hidden />
                 </button>
-                {showOptional && <ul className="divide-y border-t">{optional.map((i) => <Row key={i.id} item={i} />)}</ul>}
+                {showOptional && <ul className="divide-y border-t">{optional.map((i) => <Row key={i.id} item={i} readiness={readiness} />)}</ul>}
               </div>
             )}
           </>
@@ -48,8 +53,10 @@ export function ChecklistCard({ items, hasWorkspace }: { items: ChecklistItem[];
   );
 }
 
-function Row({ item }: { item: ChecklistItem }) {
+function Row({ item, readiness }: { item: ChecklistItem; readiness?: Record<string, ChecklistReadiness> | null }) {
   const Icon = docTypeIcon(item.docType, item.generated);
+  const chip = rowReadinessChip(readiness, item.id);
+  const ChipIcon = chip ? READINESS_ICON[chip.icon] : null;
   return (
     <li className="flex items-start gap-3 px-5 py-3">
       <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', item.generated ? 'bg-accent-soft text-[hsl(26_90%_38%)] dark:text-accent' : 'bg-primary-soft text-primary')}>
@@ -70,6 +77,7 @@ function Row({ item }: { item: ChecklistItem }) {
           ) : (
             <Badge tone="neutral" size="sm">Action on GeM</Badge>
           )}
+          {chip && ChipIcon && <Badge tone={chip.tone} size="sm"><ChipIcon aria-hidden /> {chip.label}</Badge>}
           {!item.mandatory && <Badge tone="neutral" size="sm">Optional</Badge>}
         </div>
       </div>

@@ -25,6 +25,16 @@ per PR. Secrets: `wrangler secret put`, `.dev.vars`/`.env` git-ignored, no scann
    drops in the same release as code that stops using a column) so the old Worker keeps working during the minute
    between migrate and deploy. `drizzle-kit generate` is the only way to create migrations (`db:push` is forbidden
    by a `package.json` script that does not exist).
+   **Exception — non-transactional index migrations (008/FR-027, 2026-11-05):** `CREATE INDEX CONCURRENTLY` cannot
+   run in a transaction, and drizzle-kit neither emits `CONCURRENTLY` nor a way to opt out of the transaction. Such
+   a migration is still generated with `drizzle-kit generate` (so the snapshot/journal stay drizzle's), then
+   hand-edited: first line `-- tp:non-transactional` (`migrate.ts` runs the file statement by statement outside a
+   transaction, drops an INVALID leftover of a failed build first and refuses to record an index that is still
+   INVALID), `CONCURRENTLY`, `IF [NOT] EXISTS` on every statement. Hand-edited so far: `0016_gem_lease_single_run`
+   (seed row, duplicate reap and `IF NOT EXISTS` added to the generated DDL), `0017_capacity_indexes`,
+   `0018_open_closing_idx` (drops the index it supersedes) and `0019_open_state_created_idx`. Dropping a superseded
+   index (0018) is allowed in the same release: the old Worker's
+   queries stay correct, only their plan changes for the minute between migrate and deploy.
 2. **Staging (SHOULD)** — a Neon branch `staging` + a second Worker environment (`[env.staging]` in `wrangler.toml`,
    `name = "tenderpilot-staging"`, its own R2 bucket and secrets) deployed from `main` first; production deploy is a
    manual approval step on the same workflow. PR preview branches on Neon are LATER.

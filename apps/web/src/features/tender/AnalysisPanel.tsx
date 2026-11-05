@@ -10,9 +10,11 @@ import { apiUrl, errorMessage } from '@/lib/api';
 import { useCan } from '@/lib/auth';
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { checklistReadiness } from '@tp/core/analyse/checklist';
+import { useVault } from '@/features/vault/api';
 import { useOverride } from './api';
 import { ChecklistCard } from './ChecklistCard';
-import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, failedAttemptCopy, friendlyAnalysisError, isAnalysisRunning, truncatedDocuments } from './labels';
+import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, analysisWarningText, failedAttemptCopy, friendlyAnalysisError, isAnalysisRunning, truncatedDocuments } from './labels';
 
 const eff = (f: ScoreFactor): FactorStatus => f.overridden?.status ?? f.status;
 
@@ -74,6 +76,14 @@ export function AnalysisPanel({
     for (const r of analysis.requirements) if (!m.has(r.key)) m.set(r.key, r);
     return m;
   }, [analysis.requirements]);
+
+  // Vault readiness for checklist rows (FR-040): only without a workspace; hidden if the vault query fails.
+  const vault = useVault({}, { enabled: !hasWorkspace });
+  const vaultItems = vault.data?.items;
+  const readiness = useMemo(
+    () => (hasWorkspace || vault.isError || !vaultItems ? null : checklistReadiness(analysis.checklist, vaultItems.map((d) => ({ type: d.type, title: d.title, expiryDate: d.expiryDate, tags: d.tags })), new Date())),
+    [hasWorkspace, vault.isError, vaultItems, analysis.checklist],
+  );
 
   const running = isAnalysisRunning(analysis);
   const failedCopy = failedAttemptCopy(analysis);
@@ -139,7 +149,7 @@ export function AnalysisPanel({
       </div>
 
       <div className="grid content-start gap-6">
-        <ChecklistCard items={analysis.checklist} hasWorkspace={hasWorkspace} />
+        <ChecklistCard items={analysis.checklist} hasWorkspace={hasWorkspace} readiness={readiness} vaultUnavailable={!hasWorkspace && vault.isError} />
       </div>
 
       <OverrideDialog analysis={analysis} factor={overrideFor} tenderId={tenderId} onClose={() => setOverrideFor(null)} />
@@ -179,6 +189,7 @@ function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse, disabled }:
             {analysis.stale && <Badge tone="warning"><History /> Outdated</Badge>}
           </div>
           <p className="mt-3 text-[15px] leading-relaxed text-foreground/90">{analysis.summary}</p>
+          <AnalysisWarnings analysis={analysis} />
           {blockers.length > 0 && (
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-soft/60 px-3 py-2 text-sm text-danger">
               <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -208,6 +219,23 @@ function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse, disabled }:
         </div>
       </div>
     </Card>
+  );
+}
+
+/** Caveats of this analysis: AI budget/quota (008/FR-031, FR-037) and documents that could not be read. */
+function AnalysisWarnings({ analysis }: { analysis: AnalysisDto }) {
+  const lines = [...(analysis.warnings ?? []).map(analysisWarningText), ...(analysis.notes ?? [])];
+  if (!lines.length) return null;
+  return (
+    <ul role="status" aria-label="Analysis warnings" data-testid="analysis-warnings"
+      className="mt-3 grid gap-1.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
+      {lines.map((line) => (
+        <li key={line} className="flex items-start gap-2">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
+          <span>{line}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

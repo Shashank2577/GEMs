@@ -17,6 +17,7 @@ const GEM = 'http://mock-gem.test';
 const TEST_APP = 'http://tp.test';
 
 let ctx: TestContext;
+let mock: ReturnType<typeof createMockGem>;
 let team: Awaited<ReturnType<typeof seedOrgWithRoles>>;
 let other: SignedUp;
 let laptopWatchlistId: string;
@@ -25,7 +26,7 @@ const get = (path: string, who: SignedUp = team.analyst) => request(ctx.app, 'GE
 const tenderId = async (bid: string) => (await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, bid)))[0].id;
 
 beforeAll(async () => {
-  const mock = createMockGem({ now: () => REF, token: 'b'.repeat(32) });
+  mock = createMockGem({ now: () => REF, token: 'b'.repeat(32) });
   ctx = await createTestContext({ now: REF, gemBaseUrl: GEM, fetch: async (input, init) => mock.app.fetch(new Request(input as string, init)) });
   team = await seedOrgWithRoles(ctx.app, 'Sharma Infotech Pvt Ltd');
   other = await signup(ctx.app, { orgName: 'Rival Traders' });
@@ -53,6 +54,56 @@ describe('GET /tenders', () => {
     expect(r.body.facets.states.find((f: { value: string }) => f.value === 'Maharashtra').count).toBe(6);
     expect(r.body.facets.ministries.length).toBeGreaterThan(15);
     expect(r.body.facets.categories.length).toBeGreaterThan(20);
+  });
+
+  it('facets from the shared GROUPING SETS query equal one GROUP BY per facet (count desc, value asc, non-null)', async () => {
+    // Reference: what a per-facet query returns over open, still-open tenders (this fixture has no demo rows and no
+    // dismissals, so the scope / dismissed conditions are no-ops here).
+    const expected = async (col: 'state' | 'ministry' | 'category', extra = sql`true`) =>
+      ((await ctx.db.execute(sql`select ${sql.raw(col)} as value, count(*)::int as count from tenders
+        where status = 'open' and coalesce(end_at, 'infinity'::timestamptz) >= ${REF} and ${sql.raw(col)} is not null and ${extra}
+        group by 1 order by 2 desc, 1 asc limit 60`)) as unknown as { rows: { value: string; count: number }[] }).rows;
+    const all = await get('/tenders');
+    expect(all.body.facets).toEqual({ states: await expected('state'), ministries: await expected('ministry'), categories: await expected('category') });
+    // With ?state=X the state facet leaves its own filter out; total, ministries and categories keep it.
+    const mh = await get('/tenders?state=Maharashtra');
+    expect(mh.body.total).toBe(6);
+    expect(mh.body.facets).toEqual({
+      states: await expected('state'),
+      ministries: await expected('ministry', sql`state = 'Maharashtra'`),
+      categories: await expected('category', sql`state = 'Maharashtra'`),
+    });
+    // One shared key (state + ministry): each facet leaves only its own filter out; total keeps both.
+    const mini = (await ctx.db.execute(sql`select ministry from tenders where state = 'Maharashtra' and status = 'open' and ministry is not null limit 1`)) as unknown as { rows: { ministry: string }[] };
+    const M = mini.rows[0]!.ministry;
+    const both = await get(`/tenders?state=Maharashtra&ministry=${encodeURIComponent(M)}`);
+    const msql = sql`ministry = ${M}`;
+    expect(both.body.facets).toEqual({
+      states: await expected('state', msql),
+      ministries: await expected('ministry', sql`state = 'Maharashtra'`),
+      categories: await expected('category', sql`state = 'Maharashtra' and ministry = ${M}`),
+    });
+    // Zero shared keys (all three filters set): every facet drops exactly its own filter.
+    const cat = ((await ctx.db.execute(sql`select category from tenders where state = 'Maharashtra' and ministry = ${M} and status = 'open' and category is not null limit 1`)) as unknown as { rows: { category: string }[] }).rows[0]!.category;
+    const trio = await get(`/tenders?state=Maharashtra&ministry=${encodeURIComponent(M)}&category=${encodeURIComponent(cat)}`);
+    expect(trio.body.facets).toEqual({
+      states: await expected('state', sql`ministry = ${M} and category = ${cat}`),
+      ministries: await expected('ministry', sql`state = 'Maharashtra' and category = ${cat}`),
+      categories: await expected('category', sql`state = 'Maharashtra' and ministry = ${M}`),
+    });
+    // NULL facet values: an open tender with a null state counts in total but is never a facet value.
+    await ctx.db.insert(tenders).values({
+      source: 'gem', sourceUrl: 'https://example.test/null-state-1', contentHash: 'null-state-hash', bidNumber: 'GEM/2026/B/9990001', title: 'Null state tender', ministry: M,
+      status: 'open', endAt: new Date(REF.getTime() + 10 * 86_400_000), state: null,
+    } as typeof tenders.$inferInsert);
+    const withNull = await get('/tenders');
+    expect(withNull.body.total).toBe(37);
+    expect(withNull.body.facets).toEqual({ states: await expected('state'), ministries: await expected('ministry'), categories: await expected('category') });
+    expect(withNull.body.facets.states.every((f: { value: unknown }) => f.value !== null && f.value !== '')).toBe(true);
+    await ctx.db.delete(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/9990001'));
+    // Nothing matches: total 0 and empty facets (the () grouping set still yields its row).
+    const none = await get('/tenders?q=zzzz-no-such-tender');
+    expect(none.body).toMatchObject({ total: 0, items: [], facets: { states: [], ministries: [], categories: [] } });
   });
 
   it('paginates without overlap', async () => {
@@ -268,7 +319,7 @@ describe('ingestion routes', () => {
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.viewer.cookie, json: {} })).status).toBe(403);
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 99 } })).status).toBe(400);
     ctx.clock.advance(60_000);
-    // FR-013: the setup's manual run finished < 2 min ago → cooldown; allowed again from retryAt.
+    // 008/FR-026: the setup's manual run finished < 10 min ago → cooldown; allowed again from retryAt.
     const cool = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.owner.cookie, json: { pages: 1 } });
     expect(cool.status).toBe(429);
     ctx.clock.set(new Date(cool.body.error.details.retryAt));
@@ -282,20 +333,32 @@ describe('ingestion routes', () => {
   });
 });
 
-describe('manual sync cooldown (FR-013)', () => {
+describe('manual sync cooldown (008/FR-026, supersedes 003 FR-013)', () => {
   const runCount = async () => Number((await ctx.db.select({ n: sql<number>`count(*)::int` }).from(ingestionRuns))[0].n);
 
-  it('rejects a manual sync within 2 min of a finished manual run with 429 sync_cooldown and retryAt', async () => {
+  it('rejects a manual sync within 10 min of a finished manual run with 429 sync_cooldown and retryAt, without calling GeM', async () => {
     // Own fixture: a manual run that finished just now (later than any earlier one), so order doesn't matter.
     ctx.clock.advance(60_000);
     const finishedAt = ctx.clock.now();
     await ctx.db.insert(ingestionRuns).values({ trigger: 'manual', status: 'success', startedAt: new Date(finishedAt.getTime() - 5_000), finishedAt });
     const baseline = await runCount();
-    const retryAt = new Date(finishedAt.getTime() + 2 * 60_000);
+    const retryAt = new Date(finishedAt.getTime() + 10 * 60_000);
+
+    // Scenario 3: finished at T, clicked at T+4 min → retryAt = T+10 min, and GeM sees nothing.
+    ctx.clock.set(new Date(finishedAt.getTime() + 4 * 60_000));
+    const gemRequests = mock.state.requestLog.length;
+    const at4 = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
+    expect(at4.status).toBe(429);
+    expect(at4.body.error.details.retryAt).toBe(retryAt.toISOString());
+    expect(mock.state.requestLog.length).toBe(gemRequests);
+    // Everyone sees when the next manual sync is allowed (drives the disabled Sync now + helper text).
+    const health = await get('/ingestion/runs', team.viewer);
+    expect(health.body).toMatchObject({ nextManualSyncAt: retryAt.toISOString(), manualSyncCooldownMin: 10 });
 
     ctx.clock.set(new Date(retryAt.getTime() - 1_000));
     const r = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
     expect(r.status).toBe(429);
+    expect(mock.state.requestLog.length).toBe(gemRequests);
     expect(r.body.error).toMatchObject({ code: 'sync_cooldown', details: { retryAt: retryAt.toISOString() } });
     const ist = retryAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
     expect(r.body.error.message).toBe(`GeM was synced moments ago. Next manual sync at ${ist} IST.`);
@@ -305,6 +368,7 @@ describe('manual sync cooldown (FR-013)', () => {
 
     // A scheduled run neither starts nor extends the cooldown.
     ctx.clock.set(retryAt);
+    expect((await get('/ingestion/runs', team.viewer)).body.nextManualSyncAt).toBeNull();
     const cron = await runIngestion(ctx.deps, { trigger: 'cron', pages: 1 });
     expect(cron.status).toBe('success');
     const ok = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 1 } });
@@ -316,7 +380,22 @@ describe('manual sync cooldown (FR-013)', () => {
     expect(rival.status).toBe(429);
     expect(rival.body.error.code).toBe('sync_cooldown');
     expect(await runCount()).toBe(baseline + 2);
-    ctx.clock.advance(2 * 60_000);
+    ctx.clock.advance(10 * 60_000);
+  });
+
+  it('honours MANUAL_SYNC_COOLDOWN_MIN', async () => {
+    const short = await createTestContext({ now: ctx.clock.now(), keepData: true, gemBaseUrl: GEM, env: { MANUAL_SYNC_COOLDOWN_MIN: '3' } });
+    try {
+      const finishedAt = short.clock.now();
+      await short.db.insert(ingestionRuns).values({ trigger: 'manual', status: 'success', startedAt: finishedAt, finishedAt });
+      short.clock.advance(2 * 60_000);
+      const r = await request(short.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
+      expect(r.status).toBe(429);
+      expect(r.body.error.details.retryAt).toBe(new Date(finishedAt.getTime() + 3 * 60_000).toISOString());
+    } finally {
+      await short.close();
+    }
+    ctx.clock.advance(10 * 60_000);
   });
 });
 

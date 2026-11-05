@@ -38,6 +38,8 @@ export interface LlmRequest {
   prompt: string;
   /** Default 2048. */
   maxTokens?: number;
+  /** Aborts the provider request (008/FR-031: a timed-out call stops spending tokens and isolate time). */
+  signal?: AbortSignal;
 }
 
 export interface LlmResult {

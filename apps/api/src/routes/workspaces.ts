@@ -30,6 +30,7 @@ import { autoMap } from '@tp/core/packet/mapping';
 import { parseMentions } from '@tp/core/packet/mentions';
 import { parseBidResult, type BidResultHint } from '@tp/core/gem/award';
 import { GemClient } from '@tp/core/gem/client';
+import { GEM_LEASE_MAX_WAIT_MS } from '@tp/core/contracts/caps';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, conflict, forbidden, notFound, validationError } from '../lib/errors';
@@ -432,6 +433,9 @@ workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
     maxRetries: 1, backoffMs: Math.min(1000, Math.max(10, deps.gem.minIntervalMs)), timeoutMs: 15_000,
+    // 008/FR-024: every GeM request takes the cluster-wide lease. A 503 gem_busy lands in the catch below, which
+    // gives the per-bid slot back and degrades to { available: false, reason: 'gem_unavailable' }.
+    beforeRequest: () => deps.gemLease.acquire(GEM_LEASE_MAX_WAIT_MS),
   });
   let hint: BidResultHint;
   try {

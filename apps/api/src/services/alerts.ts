@@ -21,6 +21,22 @@ import type { AppDeps } from '../deps';
 import { unsubscribeHeaders } from '../lib/unsubscribe';
 
 type NotificationRow = typeof notifications.$inferSelect;
+
+/**
+ * The dispatcher's work queue: oldest pending email/WhatsApp rows. Served by the partial index
+ * `notifications_pending_idx (created_at) WHERE status='pending' AND channel IN ('email','whatsapp')` (008/FR-029).
+ */
+export function pendingNotificationsQuery(db: AppDeps['db'], limit: number) {
+  return db
+    .select({ n: notifications, email: users.email, phone: users.phone, name: users.name, frequency: notificationPrefs.frequency, orgName: organizations.name })
+    .from(notifications)
+    .innerJoin(users, eq(users.id, notifications.userId))
+    .innerJoin(organizations, eq(organizations.id, notifications.orgId))
+    .leftJoin(notificationPrefs, and(eq(notificationPrefs.orgId, notifications.orgId), eq(notificationPrefs.userId, notifications.userId)))
+    .where(and(eq(notifications.status, 'pending'), inArray(notifications.channel, ['email', 'whatsapp'])))
+    .orderBy(notifications.createdAt)
+    .limit(limit);
+}
 type TenderRow = typeof tenders.$inferSelect;
 
 /** `retried`: transient failures left `pending` with a back-off (FR-047); `failed` is terminal. */
