@@ -4,14 +4,15 @@
  * Test alert (002/FR-034): `POST /me/notifications/test` across the user's enabled channels.
  */
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { Hono } from 'hono';
-import { notificationPrefs, notifications } from '@tp/db';
-import { notificationsQuerySchema, type NotificationDto } from '@tp/core/contracts/identify';
+import { Hono, type Context } from 'hono';
+import { memberships, notificationPrefs, notifications, organizations, users } from '@tp/db';
+import { notificationsQuerySchema, type NotificationDto, type NotificationKind } from '@tp/core/contracts/identify';
 import {
   DEFAULT_NOTIFICATION_PREFS, TEST_ALERT_TITLE, type TestAlertOutcome, type TestAlertResult, type TestAlertSkipReason,
 } from '@tp/core/contracts/auth';
 import { uuidSchema } from '@tp/core/contracts/common';
-import { notFound } from '../lib/errors';
+import { HttpError, notFound } from '../lib/errors';
+import { unsubscribeHeaders, verifyUnsubscribeToken } from '../lib/unsubscribe';
 import { TEST_ALERT_LIMIT, hit, rateLimited } from '../lib/rate-limit';
 import { parseQuery } from '../lib/validate';
 import { orgId, requireAuth, requireSession, userId } from '../middleware/auth';
@@ -27,7 +28,7 @@ notificationsRoutes.get('/notifications', requireAuth, async (c) => {
   const where = and(
     scope,
     q.unread ? ne(notifications.status, 'read') : undefined,
-    q.kind ? eq(notifications.kind, q.kind as NotificationDto['kind']) : undefined,
+    q.kind ? eq(notifications.kind, q.kind) : undefined,
   );
   const [rows, [{ total }], [{ unread }]] = await Promise.all([
     db.select().from(notifications).where(where).orderBy(desc(notifications.createdAt)).limit(q.pageSize).offset((q.page - 1) * q.pageSize),
@@ -48,6 +49,65 @@ notificationsRoutes.get('/notifications', requireAuth, async (c) => {
   }));
   return c.json({ items, unreadCount: Number(unread), total: Number(total) });
 });
+
+/**
+ * One-click unsubscribe (003/FR-048, RFC 8058). PUBLIC: the signed `?token=` is the credential (lib/unsubscribe.ts).
+ *  - `GET` is side-effect free (link scanners and previews open it): it only shows a confirmation page whose button
+ *    POSTs back to the same URL;
+ *  - `POST` switches email off for that user in that org (`notification_prefs.email = false` — every alert and reminder
+ *    email for the org, not just match alerts) and marks their queued email rows `skipped` ("unsubscribed"). A mail
+ *    client's one-click POST (body `List-Unsubscribe=One-Click`) gets JSON; the page's form gets the HTML confirmation.
+ * Idempotent. Tampered/unknown token, or the user is no longer a member of the org → 400 `invalid_token`.
+ */
+async function unsubscribeTarget(c: Context<AppEnv>) {
+  const { db, config } = c.var.deps;
+  const who = await verifyUnsubscribeToken(config.unsubscribeSecret, c.req.query('token') ?? '');
+  const [member] = who
+    ? await db.select({ email: users.email, orgName: organizations.name })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+      .where(and(eq(memberships.userId, who.userId), eq(memberships.orgId, who.orgId)))
+    : [];
+  if (!who || !member) throw new HttpError(400, 'invalid_token', 'This unsubscribe link is invalid');
+  return { ...who, ...member };
+}
+
+const page = (title: string, body: string) =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escHtml(title)}</title></head>`
+  + `<body style="font-family:system-ui,sans-serif;max-width:34rem;margin:4rem auto;padding:0 1rem;color:#0f172a;line-height:1.5"><h1 style="font-size:1.4rem">${escHtml(title)}</h1>${body}</body></html>`;
+const escHtml = (v: string) => v.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+
+notificationsRoutes.get('/notifications/unsubscribe', async (c) => {
+  const t = await unsubscribeTarget(c);
+  const action = `/api/notifications/unsubscribe?token=${encodeURIComponent(c.req.query('token') ?? '')}`;
+  return c.html(page(`Stop TenderPilot emails from ${t.orgName}?`,
+    `<p>This turns off <strong>all</strong> TenderPilot emails to <strong>${escHtml(t.email)}</strong> for <strong>${escHtml(t.orgName)}</strong>: new-tender match alerts, daily digests and bid deadline reminders. In-app and WhatsApp alerts are not affected.</p>`
+    + `<form method="post" action="${escHtml(action)}"><button type="submit" style="padding:.6rem 1.2rem;border:0;border-radius:8px;background:#4f46e5;color:#fff;font-weight:600;cursor:pointer">Unsubscribe from these emails</button></form>`
+    + '<p style="color:#64748b;font-size:.9rem">You can turn email back on any time in Settings &rarr; Notifications.</p>'));
+});
+
+notificationsRoutes.post('/notifications/unsubscribe', async (c) => {
+  const { db, logger } = c.var.deps;
+  const t = await unsubscribeTarget(c);
+  await db.insert(notificationPrefs).values({ orgId: t.orgId, userId: t.userId, email: false })
+    .onConflictDoUpdate({ target: [notificationPrefs.orgId, notificationPrefs.userId], set: { email: false } });
+  // Already-queued emails (instant alerts, held digest rows, reminders) must not go out after this (N8).
+  await db.update(notifications).set({ status: 'skipped', error: 'unsubscribed', nextAttemptAt: null })
+    .where(and(eq(notifications.orgId, t.orgId), eq(notifications.userId, t.userId), eq(notifications.channel, 'email'),
+      eq(notifications.status, 'pending'), ne(notifications.kind, 'digest')));
+  logger.info('email unsubscribed', { userId: t.userId, orgId: t.orgId });
+  const form = await c.req.parseBody().catch(() => ({} as Record<string, unknown>));
+  if (form['List-Unsubscribe'] === 'One-Click') return c.json({ ok: true, email: false });
+  return c.html(page('You are unsubscribed',
+    `<p>TenderPilot will no longer email <strong>${escHtml(t.email)}</strong> about <strong>${escHtml(t.orgName)}</strong> — no match alerts, digests or deadline reminders. In-app and WhatsApp alerts are unchanged.</p>`
+    + '<p>You can turn email back on in Settings &rarr; Notifications.</p>'));
+});
+
+// 003/FR-049: the `?kind=` enum (core contract) must list exactly the kinds the schema allows.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+export type NotificationKindsMatchSchema = Assert<Same<NotificationKind, (typeof notifications.$inferSelect)['kind']>>;
+type Assert<T extends true> = T;
 
 notificationsRoutes.post('/notifications/read-all', requireAuth, async (c) => {
   const { db, clock } = c.var.deps;
@@ -123,6 +183,7 @@ notificationsRoutes.post('/me/notifications/test', requireSession, async (c) => 
     const r = await mailer.send({
       to: user.email,
       subject: TEST_ALERT_TITLE,
+      headers: await unsubscribeHeaders(config, userId(c), orgId(c)),
       html: renderAlertEmail({ heading: TEST_ALERT_TITLE, intro: body, rows: [], appUrl: config.appUrl, orgName: c.var.org.name, now }),
       text: `${TEST_ALERT_TITLE}\n${body}\n\nManage alerts: ${url}`,
     });

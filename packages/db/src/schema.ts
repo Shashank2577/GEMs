@@ -579,6 +579,10 @@ export const notifications = pgTable('notifications', {
   dedupeKey: text('dedupe_key'),
   status: text('status').$type<'pending' | 'sent' | 'failed' | 'skipped' | 'read'>().notNull().default('pending'),
   error: text('error'),
+  /** Delivery attempts made so far (email / WhatsApp); FR-047 retries transient failures up to 3. */
+  attempts: integer('attempts').notNull().default(0),
+  /** Earliest time the dispatcher may (re)try this row; also the claim lease while a dispatcher holds it. */
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
   sentAt: timestamp('sent_at', { withTimezone: true }),
   readAt: timestamp('read_at', { withTimezone: true }),
   createdAt: createdAt(),
