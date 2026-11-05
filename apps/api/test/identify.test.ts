@@ -504,4 +504,50 @@ describe('watchlist SQL helpers and batched matching', () => {
       await ctx.db.delete(notifications).where(eq(notifications.orgId, org.me.org.id));
     }
   });
+
+  it('matchAndNotify dedupes repeated tender ids: one match, the watchlist name once in the alert', async () => {
+    const org = await signup(ctx.app, { orgName: 'Dedupe Match Pvt Ltd' });
+    await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Ornithopters', criteria: { keywords: ['ornithopter'] } } });
+    const bid = 'GEM/2099/B/7700001';
+    try {
+      const [{ id }] = await ctx.db.insert(tenders).values({
+        bidNumber: bid, title: 'Ornithopter wing set', endAt: new Date(ctx.clock.now().getTime() + 30 * 86_400_000), status: 'open',
+        sourceUrl: `${GEM}/bid/7700001`, contentHash: 'ornithopter-1',
+      }).returning({ id: tenders.id });
+      // 501 copies span two `in (…)` chunks of 500, so without the dedupe the tender row is loaded twice.
+      const r = await matchAndNotify(ctx.deps, Array(501).fill(id), ctx.clock.now(), { orgId: org.me.org.id });
+      expect(r.matchesCreated).toBe(1);
+      const alerts = await ctx.db.select({ body: notifications.body, channel: notifications.channel }).from(notifications)
+        .where(eq(notifications.orgId, org.me.org.id));
+      expect(alerts.length).toBe(r.notificationsCreated);
+      const inApp = alerts.find((a) => a.channel === 'in_app')!;
+      expect(inApp.body.match(/Ornithopters/g)).toHaveLength(1);
+    } finally {
+      await ctx.db.delete(tenders).where(eq(tenders.bidNumber, bid));
+      await ctx.db.delete(notifications).where(eq(notifications.orgId, org.me.org.id));
+    }
+  });
+
+  it('preview tolerates a tender whose items jsonb is not an array (no 500)', async () => {
+    const prefix = 'GEM/2099/B/7800';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7800${n}`, contentHash: `quokka-${n}`,
+    });
+    try {
+      await ctx.db.insert(tenders).values([row(1, 'Quokka feeder'), row(2, 'Unrelated stationery'), row(3, 'Another unrelated lot')]);
+      // Title matches but items is an object; the others only reach the item scan, with an object and a scalar.
+      await ctx.db.execute(sql`update tenders set items = '{"name":"quokka feeder"}'::jsonb where bid_number in (${`${prefix}1`}, ${`${prefix}2`})`);
+      await ctx.db.execute(sql`update tenders set items = '"quokka"'::jsonb where bid_number = ${`${prefix}3`}`);
+      const p = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { keywords: ['quokka'] } } });
+      expect(p.status).toBe(200);
+      expect(p.body.count).toBe(1);
+      expect(p.body.sample[0].title).toBe('Quokka feeder');
+      const cat = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { categories: ['quokka'] } } });
+      expect(cat.status).toBe(200);
+      expect(cat.body.count).toBe(1);
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
 });

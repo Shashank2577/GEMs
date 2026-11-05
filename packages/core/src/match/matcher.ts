@@ -76,7 +76,8 @@ function buildKeywordRegex(keyword: string): RegExp {
 }
 
 function haystacks(t: MatchableTender) {
-  const items = (t.items ?? []).map((i) => i.name).join(' · ');
+  // `items` is jsonb: tolerate a non-array value or malformed entries in stored data rather than throwing.
+  const items = (Array.isArray(t.items) ? t.items : []).map((i) => i?.name ?? '').filter(Boolean).join(' · ');
   return {
     title: t.title ?? '',
     other: [items, t.category ?? ''].join(' · '),

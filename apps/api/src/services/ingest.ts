@@ -372,6 +372,9 @@ export async function matchAndNotify(
   opts: { orgId?: string; watchlistId?: string; notify?: boolean } = {},
 ): Promise<{ matchesCreated: number; notificationsCreated: number }> {
   const { db } = deps;
+  // Duplicate ids (e.g. a tender both created and updated in one run) would otherwise yield duplicate rows across
+  // `in (…)` chunks, inflating `matchesCreated` and repeating watchlist names in the alert body.
+  tenderIds = [...new Set(tenderIds)];
   const conds = [eq(watchlists.active, true)];
   if (opts.orgId) conds.push(eq(watchlists.orgId, opts.orgId));
   if (opts.watchlistId) conds.push(eq(watchlists.id, opts.watchlistId));

@@ -47,9 +47,13 @@ export const escapeLike = (s: string) => s.replace(/[%_\\]/g, (m) => `\\${m}`);
 export const phraseLike = (s: string) => `%${s.trim().split(/\s+/).map(escapeLike).join('%')}%`;
 /** `ilike any (array[…])`: one scan of the value for several patterns. */
 const ilikeAny = (expr: SQL, patterns: string[]) => sql`${expr} ilike any (array[${sql.join(patterns.map((p) => sql`${p}`), sql`, `)}]::text[])`;
-/** Any item name matches any pattern — one `jsonb_array_elements` pass per row, not one per pattern. */
+/**
+ * Any item name matches any pattern — one `jsonb_array_elements` pass per row, not one per pattern. A row whose
+ * `items` is not a JSON array (bad legacy data) is treated as having no items rather than failing the whole query;
+ * the `case` guarantees the guard is evaluated before `jsonb_array_elements` sees the value.
+ */
 const itemsLikeAny = (patterns: string[]) =>
-  sql`exists (select 1 from jsonb_array_elements(${tenders.items}) e where ${ilikeAny(sql`e->>'name'`, patterns)})`;
+  sql`exists (select 1 from jsonb_array_elements(case when jsonb_typeof(${tenders.items}) = 'array' then ${tenders.items} else '[]'::jsonb end) e where ${ilikeAny(sql`e->>'name'`, patterns)})`;
 /** Several text columns as one haystack (a cross-field hit only widens the pre-filter; the matcher decides). */
 const joined = (...cols: unknown[]) => sql`concat_ws(' · ', ${sql.join(cols.map((c) => sql`${c}`), sql`, `)})`;
 
@@ -94,13 +98,20 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
     conds.push(ilikeAny(joined(tenders.ministry, tenders.department, tenders.organisation, tenders.buyerOffice), likes));
   }
   const where = (after: string | null): SQL => (after ? and(...conds, gt(tenders.id, after))! : and(...conds)!);
-  const page = (after: string | null) =>
-    deps.db.select(MATCH_COLUMNS).from(tenders).where(where(after)).orderBy(asc(tenders.id)).limit(CANDIDATE_PAGE);
+  // At most two pages of lean MATCH_COLUMNS rows are alive at once (the one being matched and the prefetch).
+  // Drizzle query builders are lazy: `.execute()` actually starts the query, so the prefetch overlaps matching.
+  // The no-op `.catch` marks the promise handled, so if matching throws while a prefetch is in flight its later
+  // rejection is not reported as unhandled; `await next` below still sees (and throws) any rejection.
+  const page = (after: string | null) => {
+    const p = deps.db.select(MATCH_COLUMNS).from(tenders).where(where(after)).orderBy(asc(tenders.id)).limit(CANDIDATE_PAGE).execute();
+    p.catch(() => {});
+    return p;
+  };
   const out: Candidate[] = [];
   let next = page(null);
   for (;;) {
     const rows = await next;
-    // Ask for the following page before matching this one, so the database works while we match.
+    // Start the following page before matching this one, so the database works while we match.
     const more = rows.length === CANDIDATE_PAGE;
     if (more) next = page(rows[rows.length - 1].id);
     for (const row of rows) {
