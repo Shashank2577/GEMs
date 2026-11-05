@@ -569,7 +569,7 @@ page.
   announcements for pick-up, over, drop and cancel; Viewers MUST get a static board.
   *Spec amendment (#527):* Analysts cannot move a card into **Go** or **Dropped** (Bid Manager+ owns the Go / No-Go call); the
   Go and Dropped columns show a lock and refuse the drop gracefully (card returns, same message as the API).
-- **FR-023**: `PATCH /api/workspaces/:id` (analyst+; 403 below; 404 cross-org) MUST persist `stage` and `position`
+- **FR-023**: `PATCH /api/workspaces/:id` (analyst+; 403 below; go/dropped bid_manager+ (#527); 404 cross-org) MUST persist `stage` and `position`
   (fractional; `positionAt()` between neighbours, append at end when only `stage` is sent), set `submittedAt` on first
   move to submitted, set `outcome {result, at}` on move to won/lost without an outcome, and log
   `workspace.stage_changed {from, to, fromLabel, toLabel}`.
@@ -678,8 +678,8 @@ page.
   *Spec amendment (#527):* the read-only state for analysts is now also enforced by the API (403 `forbidden` on a move into
   `go`/`dropped`).
   *As delivered (T080):* the confirmation applies to **Drop only**; "Go" is one tap with no dialog (scenario US5-5 and the
-  landing promise "Approve Go / No-Go in one tap"). Role gating is UI-only: the workspace PATCH is analyst+ at the API
-  (#527 item 5 asks whether Go/No-Go should be bid_manager+ there).
+  landing promise "Approve Go / No-Go in one tap"). *Amended (#527):* Role gating of the Go/No-Go call is no longer UI-only: a move into `go`/`dropped` is
+  bid_manager+ at the API too (403 `forbidden`; see the amendment to FR-023/FR-029); every other stage move stays analyst+.
 - **FR-073** *(gap)*: Role-gated CTAs on the dashboard MUST be hidden for roles that would get 403 ("Create a watchlist"
   for viewers; "Finish setting up" card for analysts and viewers).
 

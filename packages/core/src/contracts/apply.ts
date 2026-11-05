@@ -50,9 +50,13 @@ export function canTransition(from: StageName, to: StageName): TransitionCheck {
  * "Dropped" is the No-Go outcome ("Drop" on the dashboard's Awaiting-your-decision card).
  */
 export const DECISION_STAGES: readonly StageName[] = ['go', 'dropped'];
-export const DECISION_FORBIDDEN_MESSAGE = 'Only a Bid Manager or Owner can make the Go / No-Go decision.';
+export const DECISION_FORBIDDEN_MESSAGE = 'Only a Bid Manager or Owner can make the Go/No-Go call.';
 /** Tooltip / toast copy the web shows where an Analyst's Go or Dropped target is disabled or refused (#527). */
 export const DECISION_TOOLTIP = 'Only a Bid Manager can make the Go/No-Go call';
+/** Screen-reader copy when a keyboard/pointer drag over a decision column is refused (#527). */
+export function decisionLockedAnnouncement(stageLabel: string): string {
+  return `${stageLabel} is locked: only a Bid Manager can make the Go/No-Go call.`;
+}
 
 /** True for the stages that ARE the Go / No-Go decision (moving a bid into them). */
 export function isDecisionStage(stage: StageName): boolean {

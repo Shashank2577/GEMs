@@ -83,6 +83,7 @@ newly assigned people get an in-app notification.
 
 > **Spec amendment (#527):** "Any stage can be chosen" except the Go / No-Go decision: moving a bid **into `go` or `dropped`** is
 > Bid Manager+ (001 personas, 004 roles table); an Analyst gets 403 `forbidden` and the UI shows those targets disabled.
+> Deliberate (#527): an Analyst still reverses a No-Go (moves a bid out of `dropped`/`go`) and may skip Go (identified → preparing), as for every other move.
 
 **Why this priority**: The workspace is the container for every other Apply story; the stage guard is the single most
 important safety net against uploading an incomplete bid (a missing mandatory document is the commonest cause of
@@ -579,8 +580,9 @@ anywhere and never used to fill GeM.
 - **FR-001**: The system MUST provide `POST /api/tenders/:id/workspace` (Analyst+) that creates-or-gets the single workspace
   per (org, tender) — 201 `{…WorkspaceDto, created: true}` on create, 200 `created: false` when it exists or a concurrent
   create won — enforced by the unique index `workspace_org_tender_uq`.
-- **FR-002**: On create the system MUST set `stage` to `go` when the latest analysis verdict is `go`, `analysing` when the
-  analysis is running, else `identified`; `ownerId` = the caller; `dueAt` = tender `endAt`; `position` = max position in that
+- **FR-002**: On create the system MUST set `stage` to `go` when the latest analysis verdict is `go` **and the caller is Bid Manager+**
+  (*Spec amendment (#527):* auto-Go is the Go/No-Go call, so an Analyst's workspace on a Go verdict starts in `analysing`, in the Bid Manager's
+  "Awaiting your decision" queue), `analysing` when the analysis is running, else `identified`; `ownerId` = the caller; `dueAt` = tender `endAt`; `position` = max position in that
   stage + 1; and store an empty `doc_mapping` — automatic picks are resolved at read time (FR-014) so they keep the **Auto-matched**
   badge and fall back when a document is deleted; the `workspace.created` activity records the auto-match count.
 - **FR-003**: The stage set MUST be exactly `identified, analysing, go, preparing, ready, submitted, won, lost, dropped` with the
@@ -588,7 +590,7 @@ anywhere and never used to fill GeM.
 - **FR-004**: `PATCH /api/workspaces/:id` (Analyst+) MUST accept only `stage, ownerId, assigneeIds (≤20, de-duplicated), dueAt
   (ISO with offset or null), position, outcome` (strict schema; unknown keys → 400) and return the updated `WorkspaceDto`.
   *Spec amendment (#527):* a move **into `go` or `dropped`** (the Go / No-Go decision) additionally requires Bid Manager+ → **403** `forbidden`
-  "Only a Bid Manager or Owner can make the Go / No-Go decision."; every other stage move stays Analyst+.
+  "Only a Bid Manager or Owner can make the Go/No-Go call."; every other stage move stays Analyst+.
 - **FR-005**: Moving to `ready` MUST be refused with **409** `not_ready` and `details.blockers` while any mandatory item is
   missing or expired and not overridden, and with **409** `conflict` (`details.reason = "not_analysed"`) when the tender has no
   analysis.

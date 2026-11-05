@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Role } from '@tp/db';
 import { DECISION_FORBIDDEN_MESSAGE } from '@tp/core/contracts/apply';
 import { createTestContext, request, seedOrgWithRoles, type RequestOptions, type SignedUp, type TestContext } from './helpers';
-import { seedTender } from './workspace-fixtures';
+import { seedAnalysis, seedTender } from './workspace-fixtures';
 
 type Min = Role | 'session' | 'public';
 interface Entry {
@@ -200,6 +200,22 @@ const FIELD_GATES: FieldGate[] = [
   { method: 'PATCH', path: '/api/workspaces/:id', json: { stage: 'analysing' }, min: 'analyst', message: FORBIDDEN_MESSAGE.analyst },
   { method: 'PATCH', path: '/api/workspaces/:id', json: { stage: 'preparing' }, min: 'analyst', message: FORBIDDEN_MESSAGE.analyst },
 ];
+
+/**
+ * The create path is a field gate too (#527): a Go verdict starts a new workspace in "go" (006/FR-002) — itself the
+ * Go/No-Go call — so only Bid Manager+ gets "go"; an Analyst's waits in "analysing". Viewers are stopped by the route gate.
+ */
+describe('field-level role gate: POST /api/tenders/:id/workspace on a Go verdict (#527)', () => {
+  let n = 300;
+  it.each(ROLES.map((role) => [role] as const))('%s', async (role) => {
+    const t = await seedTender(ctx, n++);
+    await seedAnalysis(ctx, org.orgId, t.id);
+    const r = await request(ctx.app, 'POST', `/api/tenders/${t.id}/workspace`, { cookie: userFor(org, role).cookie });
+    if (RANK[role] < RANK.analyst) { expect(r.status, r.text).toBe(403); return; }
+    expect(r.status, r.text).toBe(201);
+    expect(r.body.stage, role).toBe(RANK[role] >= RANK.bid_manager ? 'go' : 'analysing');
+  });
+});
 
 describe('field-level role gates (inside handlers)', () => {
   let n = 100;

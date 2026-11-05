@@ -6,7 +6,7 @@
 import { Fragment } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import type { StageName } from '@tp/core/contracts/apply';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Tooltip } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { moveTargets } from './moves';
 import { useAuth } from '@/lib/auth';
@@ -27,12 +27,15 @@ export function MoveToMenu({ title, stage, onMove, className }: { title: string;
         {targets.map((t) => (
           <Fragment key={t.stage}>
             {t.stage === 'dropped' && <DropdownMenuSeparator />}
-            <DropdownMenuItem disabled={t.disabled && !t.reason} aria-disabled={t.disabled || undefined} title={t.reason}
-              className={cn(t.reason && 'cursor-not-allowed opacity-50')} destructive={t.stage === 'dropped'}
-              onSelect={(ev) => { if (t.reason) { ev.preventDefault(); return; } onMove(t.stage); }}>
-              {t.label}
-              {t.hint && <span className="ml-auto text-2xs text-muted-foreground">{t.hint}</span>}
-            </DropdownMenuItem>
+            {/* aria-disabled (not `disabled`) keeps the item focusable, so the focusable Tooltip explains it to keyboard and touch users too. */}
+            <Tooltip content={t.reason} side="left">
+              <DropdownMenuItem disabled={t.disabled && !t.reason} aria-disabled={t.disabled || undefined}
+                className={cn(t.reason && 'cursor-not-allowed opacity-50')} destructive={t.stage === 'dropped'}
+                onSelect={(ev) => { if (t.reason) { ev.preventDefault(); return; } onMove(t.stage); }}>
+                {t.label}
+                {t.hint && <span className="ml-auto text-2xs text-muted-foreground">{t.hint}</span>}
+              </DropdownMenuItem>
+            </Tooltip>
           </Fragment>
         ))}
       </DropdownMenuContent>

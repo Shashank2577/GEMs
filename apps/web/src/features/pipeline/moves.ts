@@ -13,7 +13,7 @@ export interface MoveTarget { stage: StageName; label: string; disabled: boolean
 /** Every stage except the current one (Dropped included), in pipeline order; Won/Lost need a recorded submission. */
 export function moveTargets(from: StageName, role?: RoleName | null): MoveTarget[] {
   return STAGES.filter((s) => s !== from).map((stage) => {
-    if (role !== undefined && !canMoveToStage(role, from, stage)) return { stage, label: STAGE_LABELS[stage], disabled: true, hint: 'Bid Manager', reason: DECISION_TOOLTIP };
+    if (role !== undefined && !canMoveToStage(role, from, stage)) return { stage, label: STAGE_LABELS[stage], disabled: true, hint: 'Bid Manager only', reason: DECISION_TOOLTIP };
     const ok = canTransition(from, stage).ok;
     return { stage, label: STAGE_LABELS[stage], disabled: !ok, ...(ok ? {} : { hint: 'After Submitted' }) };
   });

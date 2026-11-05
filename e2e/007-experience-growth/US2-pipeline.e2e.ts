@@ -759,15 +759,11 @@ test('a11y (observational): axe on the pipeline board and table; violations are 
   }
 });
 
-
 // ───────────── #527: the Go / No-Go call is Bid Manager+ ─────────────
 
 const NO_GO_TIP = 'Only a Bid Manager can make the Go/No-Go call';
-const FIX_DIR = join('qa', 'evidence', 'fix-527');
-async function devShot(page: Page, name: string) {
-  mkdirSync(FIX_DIR, { recursive: true });
-  await page.screenshot({ path: join(FIX_DIR, `dev-${name}.png`), fullPage: true });
-}
+/** Developer evidence for #527: lands in qa/evidence/007/US2/ like every other screenshot of this spec. */
+const devShot = (page: Page, name: string) => evidence007(page, STORY, `dev-527-${name}`);
 
 test('US2-13 (#527): an Analyst keyboard-dropping a card on Go is refused, the card goes back and no PATCH is sent; other columns still work', async ({ page, browser }) => {
   await demoOwner(page);
@@ -782,9 +778,13 @@ test('US2-13 (#527): an Analyst keyboard-dropping a card on Go is refused, the c
   const title = (await first.locator('p.line-clamp-2').innerText()).trim();
   await keyboardDrag(ap, handleOf(first), 2); // Identified -> Analysing -> Go
   await expect(ap.getByText(NO_GO_TIP).first()).toBeVisible();
-  await expect(ap.getByText('Only a Bid Manager or Owner can make the Go / No-Go decision.')).toBeVisible();
+  await expect(ap.getByText('Only a Bid Manager or Owner can make the Go/No-Go call.')).toBeVisible();
   await expect(cardByTitle(ap, 'identified', title)).toBeVisible();
   await expect(colCards(ap, 'go')).toHaveCount(2);
+  // a11y (#527): the screen-reader announcement says the column is locked, never "Dropped in Go."
+  const live = (await ap.locator('[aria-live]').allInnerTexts()).join(' ');
+  expect(live).toContain('Go is locked: only a Bid Manager can make the Go/No-Go call.');
+  expect(live).not.toContain('Dropped in Go');
   expect(patches).toEqual([]);
   await devShot(ap, 'analyst-kanban-go-locked-desktop');
   // A non-decision move is untouched.
@@ -805,7 +805,8 @@ test('US2-16 (#527): the Analyst "Move to…" menu shows Go and Dropped disabled
   for (const name of [/^Go/, /^Dropped/]) {
     const item = ap.getByRole('menuitem', { name });
     await expect(item).toHaveAttribute('aria-disabled', 'true');
-    await expect(item).toHaveAttribute('title', NO_GO_TIP);
+    await item.focus(); // keyboard focus (no hover) must reveal the reason: a focusable Tooltip, not a `title` (#527 N1)
+    await expect(ap.getByRole('tooltip').filter({ hasText: NO_GO_TIP }).first()).toBeVisible();
   }
   await expect(ap.getByRole('menuitem', { name: /^Analysing/ })).not.toHaveAttribute('aria-disabled', 'true');
   const patches: string[] = [];
@@ -822,7 +823,7 @@ test('US2-16 (#527): the Analyst "Move to…" menu shows Go and Dropped disabled
     expect(r.status()).toBe(403);
     const b = await r.json();
     expect(b.error.code).toBe('forbidden');
-    expect(b.error.message).toBe('Only a Bid Manager or Owner can make the Go / No-Go decision.');
+    expect(b.error.message).toBe('Only a Bid Manager or Owner can make the Go/No-Go call.');
   }
   expect((await analyst.api.patch(`/api/workspaces/${id}`, { data: { stage: 'analysing' } })).status()).toBe(200);
   expect((await bm.api.patch(`/api/workspaces/${id}`, { data: { stage: 'go' } })).status()).toBe(200);
@@ -860,7 +861,8 @@ test('US2-18 (#527): an Analyst cannot Drop a bid (menu item disabled, API 403);
   for (const name of [/Go/, /Dropped/]) {
     const item = ap.getByRole('menuitem', { name }).first();
     await expect(item).toHaveAttribute('aria-disabled', 'true');
-    await expect(item).toHaveAttribute('title', NO_GO_TIP);
+    await item.focus();
+    await expect(ap.getByRole('tooltip').filter({ hasText: NO_GO_TIP }).first()).toBeVisible();
   }
   await devShot(ap, 'analyst-workspace-stage-menu-disabled-desktop');
   expect(((await analyst.api.get(`/api/workspaces/${id}`)).status())).toBe(200);

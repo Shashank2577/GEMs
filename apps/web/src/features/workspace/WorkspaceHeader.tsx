@@ -79,14 +79,16 @@ export function WorkspaceHeader({ data, onGoToStep }: { data: WorkspaceDetail; o
                   const blocked = noDecision || (s !== w.stage && !canTransition(w.stage, s).ok);
                   return (
                   // aria-disabled (not `disabled`) keeps the item focusable so screen readers reach the hint.
-                  <DropdownMenuItem key={s} disabled={update.isPending} aria-disabled={blocked || undefined} title={noDecision ? DECISION_TOOLTIP : undefined}
+                  <Tooltip key={s} content={noDecision ? DECISION_TOOLTIP : undefined} side="left">
+                  <DropdownMenuItem disabled={update.isPending} aria-disabled={blocked || undefined}
                     onSelect={(ev) => { if (blocked) { ev.preventDefault(); return; } void setStage(s); }}
                     className={cn('justify-between', blocked && 'cursor-not-allowed opacity-50')}>
                     <StageBadge stage={s as Stage} size="sm" />
-                    {blocked && <span className="text-2xs text-muted-foreground">{noDecision ? 'Bid Manager' : 'Mark as submitted first'}</span>}
+                    {blocked && <span className="text-2xs text-muted-foreground">{noDecision ? 'Bid Manager only' : 'Mark as submitted first'}</span>}
                     {s === 'ready' && data.readiness.blockers.length > 0 && <span className="text-2xs text-danger">{data.readiness.blockers.length} blocker{data.readiness.blockers.length === 1 ? '' : 's'}</span>}
                     {s === w.stage && <Check className="size-4 text-primary" aria-hidden />}
                   </DropdownMenuItem>
+                  </Tooltip>
                   );
                 })}
               </DropdownMenuContent>

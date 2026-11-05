@@ -22,11 +22,15 @@ describe('moveTargets by role (#527: Go/No-Go is Bid Manager+)', () => {
     const t = byStage('analyst');
     expect(t.go).toMatchObject({ disabled: true, reason: 'Only a Bid Manager can make the Go/No-Go call' });
     expect(t.dropped).toMatchObject({ disabled: true, reason: 'Only a Bid Manager can make the Go/No-Go call' });
+    expect(t.go!.hint).toBe('Bid Manager only');
     expect(t.analysing!.disabled).toBe(false);
     expect(t.preparing!.disabled).toBe(false);
   });
   it('leaves Go and Dropped open for Bid Manager and Owner', () => {
-    for (const r of ['bid_manager', 'owner'] as const) expect(byStage(r).go).toMatchObject({ disabled: false }), expect(byStage(r).dropped!.reason).toBeUndefined();
+    for (const r of ['bid_manager', 'owner'] as const) {
+      expect(byStage(r).go).toMatchObject({ disabled: false });
+      expect(byStage(r).dropped!.reason).toBeUndefined();
+    }
   });
   it('lets an Analyst move a bid OUT of Go', () => {
     expect(byStage('analyst', 'go').identified!.disabled).toBe(false);
