@@ -599,7 +599,8 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
 - **FR-027** *(gap)*: `tenders` MUST have partial indexes `WHERE status = 'open'`: `tenders_open_created_idx
   (created_at desc)`, `tenders_open_closing_idx (coalesce(end_at, 'infinity'))` (the feed's "still open" expression,
   so expired-but-open rows fall outside the range), `tenders_open_value_idx (estimated_value)`,
-  `tenders_open_state_idx (state)`, `tenders_open_ministry_idx (ministry)`, `tenders_open_category_idx (category)`;
+  `tenders_open_state_idx (state, created_at desc, coalesce(end_at, 'infinity'))` (so `?state=` reads it for the page,
+  count and facets), `tenders_open_ministry_idx (ministry)`, `tenders_open_category_idx (category)`;
   `analyses` MUST have `analyses_org_tender_created_idx (org_id, tender_id, created_at desc)`.
 - **FR-028** *(gap)*: Feed, watchlist preview and dashboard list queries MUST select a shared projection
   `tenderListColumns` (no `raw`, no document text); `candidateTenders` MUST be limited to open tenders with

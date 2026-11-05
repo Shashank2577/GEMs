@@ -53,7 +53,10 @@ const NEW_WINDOW_MS = 7 * 86_400_000;
 function buildFilters(q: TenderQuery, org: string, now: Date, scope: SQL, omit?: 'state' | 'ministry' | 'category'): SQL[] {
   const conds: SQL[] = [scope];
   const status = q.status ?? 'open';
-  if (status !== 'all') conds.push(eq(tenders.status, status));
+  // `status = 'open'` as a literal, exactly the open-tender partial indexes' predicate, so the planner can prove the
+  // index applies even under a generic (parameter-agnostic) plan, e.g. behind a statement-caching pooler (008/FR-027).
+  if (status === 'open') conds.push(sql`${tenders.status} = 'open'`);
+  else if (status !== 'all') conds.push(eq(tenders.status, status));
   // Same as `end_at IS NULL OR end_at >= now`, written so the planner does not treat "open" and "still open" as
   // independent (it would then over-trust a closing-date index); it is also tenders_open_closing_idx's expression, so
   // the closing-date sort reads only still-open rows. Every open-feed query stays on the open-tender
@@ -170,10 +173,55 @@ export async function decorateTenders(deps: AppDeps, org: string, rows: TenderLi
   });
 }
 
-async function facet(deps: AppDeps, column: typeof tenders.state | typeof tenders.ministry | typeof tenders.category, conds: SQL[]): Promise<Facet[]> {
+type FacetKey = 'state' | 'ministry' | 'category';
+const FACET_KEYS: FacetKey[] = ['state', 'ministry', 'category'];
+const FACET_COLUMNS = { state: tenders.state, ministry: tenders.ministry, category: tenders.category } as const;
+const FACET_LIMIT = 60;
+
+/** One facet with its own filter left out: non-null values, count desc then value asc, top 60. */
+async function facet(deps: AppDeps, key: FacetKey, conds: SQL[]): Promise<Facet[]> {
+  const column = FACET_COLUMNS[key];
   const rows = await deps.db.select({ value: column, count: sql<number>`count(*)::int` })
-    .from(tenders).where(and(isNotNull(column), ...conds)).groupBy(column).orderBy(desc(sql`count(*)`), asc(column)).limit(60);
+    .from(tenders).where(and(isNotNull(column), ...conds)).groupBy(column).orderBy(desc(sql`count(*)`), asc(column)).limit(FACET_LIMIT);
   return rows.map((r) => ({ value: String(r.value), count: Number(r.count) }));
+}
+
+/**
+ * The total and every facet whose own filter is NOT set share the request's WHERE, so they come from one scan of the
+ * matching tenders (`GROUP BY GROUPING SETS ((state), (ministry), (category), ())`) instead of one scan each
+ * (008/FR-033, US4 scenario 4 — PR #515 QA finding 2: on the 500k fixture every scan of the 30k open tenders costs
+ * ~15–20 ms of Postgres CPU, and four of them per feed request were what queued at concurrency 10). Each facet is the
+ * same as `facet()`: non-null values, count desc then value asc, top 60 (ranked in SQL, so the collation is the same).
+ */
+async function totalAndFacets(deps: AppDeps, where: SQL, keys: FacetKey[]): Promise<{ total: number; facets: Partial<Record<FacetKey, Facet[]>> }> {
+  if (!keys.length) {
+    const [{ total }] = await deps.db.select({ total: sql<number>`count(*)::int` }).from(tenders).where(where);
+    return { total: Number(total), facets: {} };
+  }
+  const cols = keys.map((k) => FACET_COLUMNS[k]);
+  const grouping = sql`grouping(${sql.join(cols, sql`, `)})`;
+  // Inside a facet's grouping set the other facet columns are NULL, so coalesce() is that facet's value.
+  const value = cols.length === 1 ? sql`${cols[0]}` : sql`coalesce(${sql.join(cols, sql`, `)})`;
+  const sets = sql.join([...cols.map((col) => sql`(${col})`), sql`()`], sql`, `);
+  const res = await deps.db.execute(sql`select g, v, n from (
+      select ${grouping} as g, ${value} as v, count(*)::int as n,
+             row_number() over (partition by ${grouping} order by ${value} is null, count(*) desc, ${value}) as rn
+        from ${tenders} where ${where} group by grouping sets (${sets})
+    ) x where rn <= ${FACET_LIMIT + 1} order by g, rn`);
+  const rows = (res as unknown as { rows: { g: number | string; v: string | null; n: number | string }[] }).rows;
+  // grouping(a, b, c) has a 1-bit per column NOT in the row's set (first column = highest bit); () is all ones.
+  const all = (1 << keys.length) - 1;
+  const maskOf = (i: number) => all & ~(1 << (keys.length - 1 - i));
+  const facets: Partial<Record<FacetKey, Facet[]>> = Object.fromEntries(keys.map((k) => [k, []]));
+  let total = 0;
+  for (const r of rows) {
+    const g = Number(r.g);
+    if (g === all) { total = Number(r.n); continue; }
+    const i = keys.findIndex((_, j) => maskOf(j) === g);
+    const list = i >= 0 ? facets[keys[i]!]! : null;
+    if (list && r.v !== null && list.length < FACET_LIMIT) list.push({ value: String(r.v), count: Number(r.n) });
+  }
+  return { total, facets };
 }
 
 /** GET /tenders */
@@ -183,18 +231,22 @@ tendersRoutes.get('/tenders', requireAuth, async (c) => {
   const org = orgId(c);
   const now = deps.clock.now();
   const scope = visibleTenderSource(c.var.org);
-  const where = and(...buildFilters(q, org, now, scope));
+  const where = and(...buildFilters(q, org, now, scope))!;
   const offset = (q.page - 1) * q.pageSize;
+  // A facet whose own filter is set (e.g. ?state=X → the state facet) leaves that filter out, so it needs its own query.
+  const filtered = FACET_KEYS.filter((k) => q[k].length > 0);
+  const shared = FACET_KEYS.filter((k) => !filtered.includes(k));
 
-  const [rows, [{ total }], states, ministries, categories] = await Promise.all([
-    deps.db.select(tenderListColumns).from(tenders).where(where).orderBy(...orderBy(q, org)).limit(q.pageSize).offset(offset),
-    deps.db.select({ total: sql<number>`count(*)::int` }).from(tenders).where(where),
-    facet(deps, tenders.state, buildFilters(q, org, now, scope, 'state')),
-    facet(deps, tenders.ministry, buildFilters(q, org, now, scope, 'ministry')),
-    facet(deps, tenders.category, buildFilters(q, org, now, scope, 'category')),
+  // The page's org decoration runs as soon as the page is in, alongside the total/facet aggregation.
+  const [items, summary, ...own] = await Promise.all([
+    deps.db.select(tenderListColumns).from(tenders).where(where).orderBy(...orderBy(q, org)).limit(q.pageSize).offset(offset)
+      .then((rows) => decorateTenders(deps, org, rows)),
+    totalAndFacets(deps, where, shared),
+    ...filtered.map((k) => facet(deps, k, buildFilters(q, org, now, scope, k))),
   ]);
-  const items = await decorateTenders(deps, org, rows);
-  return c.json({ items, total: Number(total), facets: { states, ministries, categories } });
+  const byKey: Partial<Record<FacetKey, Facet[]>> = { ...summary.facets };
+  filtered.forEach((k, i) => { byKey[k] = own[i] as Facet[]; });
+  return c.json({ items, total: summary.total, facets: { states: byKey.state ?? [], ministries: byKey.ministry ?? [], categories: byKey.category ?? [] } });
 });
 
 async function loadTender(c: Context<AppEnv>): Promise<TenderRow> {

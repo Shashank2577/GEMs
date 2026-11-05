@@ -6,14 +6,15 @@
 #   scripts/load/feed.sh [BASE_URL]                      # default http://localhost:8787
 #   N=200 C=10 P95_BUDGET_MS=300 COOKIE='tp_session=…' scripts/load/feed.sh http://localhost:8791
 #
-# Without COOKIE a fresh owner is signed up. For the 500k-tender check, load the fixture first:
+# Without COOKIE a fresh owner is signed up per variant, so N requests per variant stay under the per-user API limit
+# (`api.user`, 600/min; one cookie for all 4×200 requests trips it on a fast host). For the 500k-tender check, load
+# the fixture first:
 #   DATABASE_URL=… pnpm --filter @tp/db exec tsx src/fixtures/bulk-tenders.ts --count 500000
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./lib.sh
 BASE="${1:-${BASE_URL:-http://localhost:8787}}"
 N="${N:-200}"; C="${C:-10}"; BUDGET="${P95_BUDGET_MS:-300}"
-COOKIE="${COOKIE:-$(signup "$BASE" feed)}"
 VARIANTS=(
   "/api/tenders"
   "/api/tenders?sort=endAt"
@@ -24,13 +25,14 @@ echo "feed.sh  base=$BASE  requests/variant=$N  concurrency=$C  p95 budget=${BUD
 printf '%-34s %6s %9s %9s %9s %7s %s\n' variant n p50_ms p95_ms max_ms non2xx verdict
 fail=0
 for v in "${VARIANTS[@]}"; do
-  out="$(seq "$N" | xargs -P "$C" -I{} curl -sS -o /dev/null -H "cookie: $COOKIE" -w '%{http_code} %{time_total}\n' "$BASE$v" || true)"
+  cookie="${COOKIE:-$(signup "$BASE" feed)}"
+  out="$(seq "$N" | xargs -P "$C" -I{} curl -sS -o /dev/null -H "cookie: $cookie" -w '%{http_code} %{time_total}\n' "$BASE$v" || true)"
   non2xx="$(awk '$1 !~ /^2/ {n++} END {print n+0}' <<<"$out")"
   read -r n p50 p95 max < <(awk '$1 ~ /^2/ {print $2}' <<<"$out" | percentiles)
   verdict=ok
   if [ "$non2xx" -gt 0 ] || awk -v p="$p95" -v b="$BUDGET" 'BEGIN{exit !(p=="NaN" || p+0 > b+0)}'; then verdict=FAIL; fail=1; fi
   printf '%-34s %6s %9s %9s %9s %7s %s\n' "${v#/api}" "$n" "$p50" "$p95" "$max" "$non2xx" "$verdict"
 done
-total="$(curl -sS -H "cookie: $COOKIE" "$BASE/api/ingestion/runs" | json 'j.openTenders + " open / " + j.totalTenders + " total tenders"')"
+total="$(curl -sS -H "cookie: $cookie" "$BASE/api/ingestion/runs" | json 'j.openTenders + " open / " + j.totalTenders + " total tenders"')"
 echo "dataset: $total"
 exit "$fail"

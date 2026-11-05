@@ -85,7 +85,7 @@ describe('feed uses the open-tender partial indexes (FR-027, US4 scenario 4)', (
     ['/tenders', 'tenders_open_created_idx'],
     ['/tenders?sort=endAt', 'tenders_open_closing_idx'],
     ['/tenders?minValue=500000&sort=value', 'tenders_open_value_idx'],
-    ['/tenders?state=Maharashtra', null],
+    ['/tenders?state=Maharashtra', 'tenders_open_state_idx'],
     ['/tenders?state=Maharashtra&ministry=Ministry%20of%20Defence&sort=endAt', null],
   ];
   for (const [path, index] of cases) {
@@ -101,9 +101,27 @@ describe('feed uses the open-tender partial indexes (FR-027, US4 scenario 4)', (
         const scan = nodes((await explain(list.text, list.values)).plan).find((n) => n['Index Name'] === index);
         expect(String(scan?.['Index Cond'] ?? ''), JSON.stringify(scan)).toMatch(/COALESCE\(end_at, 'infinity'/i);
       }
-      // Page, count and the three facet queries.
+      if (index === 'tenders_open_state_idx') {
+        // QA finding 1 (PR #515): the page query AND the count / ministry / category facet queries (all carry the state
+        // filter; the state facet omits it by design) read tenders_open_state_idx with the state and "still open"
+        // conditions as the index range — never the non-partial tenders_state_idx.
+        // Page query + the shared total/ministry/category GROUPING SETS query (the state facet omits the state filter).
+        const withState = qs.filter((q) => /from "tenders"/.test(q.text) && /"state" in \(/.test(q.text));
+        expect(withState.length).toBe(2);
+        for (const q of withState) {
+          const all = nodes((await explain(q.text, q.values)).plan);
+          const scan = all.find((n) => n['Index Name'] === index);
+          expect(String(scan?.['Index Cond'] ?? ''), `${q.text.slice(0, 160)}\n${JSON.stringify(all.map((n) => n['Index Name']))}`)
+            .toMatch(/state = .*Maharashtra.*COALESCE\(end_at, 'infinity'/i);
+          expect(all.map((n) => n['Index Name'])).not.toContain('tenders_state_idx');
+        }
+      }
+      // Page, the shared total + facets query (QA finding 2: one GROUPING SETS scan, not four), and one query per facet
+      // whose own filter is set (it leaves that filter out).
       const tenderQueries = qs.filter((q) => /from "tenders"/.test(q.text));
-      expect(tenderQueries.length).toBe(5);
+      const ownFacets = ['state=', 'ministry=', 'category='].filter((p) => path.includes(p)).length;
+      expect(tenderQueries.length).toBe(2 + ownFacets);
+      expect(tenderQueries.filter((q) => /group by grouping sets/i.test(q.text)).length).toBe(1);
       for (const q of tenderQueries) {
         const all = nodes((await explain(q.text, q.values)).plan);
         expect(all.filter((n) => n['Node Type'] === 'Seq Scan' && n['Relation Name'] === 'tenders'), q.text.slice(0, 160)).toEqual([]);

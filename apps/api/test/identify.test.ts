@@ -54,6 +54,28 @@ describe('GET /tenders', () => {
     expect(r.body.facets.categories.length).toBeGreaterThan(20);
   });
 
+  it('facets from the shared GROUPING SETS query equal one GROUP BY per facet (count desc, value asc, non-null)', async () => {
+    // Reference: what a per-facet query returns over open, still-open tenders (this fixture has no demo rows and no
+    // dismissals, so the scope / dismissed conditions are no-ops here).
+    const expected = async (col: 'state' | 'ministry' | 'category', extra = sql`true`) =>
+      ((await ctx.db.execute(sql`select ${sql.raw(col)} as value, count(*)::int as count from tenders
+        where status = 'open' and coalesce(end_at, 'infinity'::timestamptz) >= ${REF} and ${sql.raw(col)} is not null and ${extra}
+        group by 1 order by 2 desc, 1 asc limit 60`)) as unknown as { rows: { value: string; count: number }[] }).rows;
+    const all = await get('/tenders');
+    expect(all.body.facets).toEqual({ states: await expected('state'), ministries: await expected('ministry'), categories: await expected('category') });
+    // With ?state=X the state facet leaves its own filter out; total, ministries and categories keep it.
+    const mh = await get('/tenders?state=Maharashtra');
+    expect(mh.body.total).toBe(6);
+    expect(mh.body.facets).toEqual({
+      states: await expected('state'),
+      ministries: await expected('ministry', sql`state = 'Maharashtra'`),
+      categories: await expected('category', sql`state = 'Maharashtra'`),
+    });
+    // Nothing matches: total 0 and empty facets (the () grouping set still yields its row).
+    const none = await get('/tenders?q=zzzz-no-such-tender');
+    expect(none.body).toMatchObject({ total: 0, items: [], facets: { states: [], ministries: [], categories: [] } });
+  });
+
   it('paginates without overlap', async () => {
     const p1 = await get('/tenders?pageSize=20&page=1&sort=endAt');
     const p2 = await get('/tenders?pageSize=20&page=2&sort=endAt');

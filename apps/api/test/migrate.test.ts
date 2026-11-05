@@ -153,6 +153,9 @@ describe('repo capacity indexes (T064, T068, T069)', () => {
     expect(found.map((f) => f.name).sort()).toEqual([...names].sort());
     expect(found.every((f) => f.valid)).toBe(true);
     for (const f of found.filter((x) => x.name.startsWith('tenders_open_'))) expect(f.def).toMatch(/WHERE \(status = 'open'::text\)/);
+    // 0015 (US4 scenario 4): state equality, then the default sort, then the "still open" expression.
+    expect(found.find((f) => f.name === 'tenders_open_state_idx')?.def)
+      .toMatch(/\(state, created_at DESC, COALESCE\(end_at, 'infinity'::timestamp with time zone\)\) WHERE \(status = 'open'::text\)/);
     expect(found.find((f) => f.name === 'notifications_pending_idx')?.def).toMatch(/status = 'pending'.*channel = ANY/);
     expect(found.find((f) => f.name === 'ingestion_runs_one_running_uq')?.def).toMatch(/UNIQUE INDEX .*\(true\).*WHERE \(status = 'running'::text\)/);
     const seed = await rows<{ id: string }>(sql`select id from gem_throttle`);
