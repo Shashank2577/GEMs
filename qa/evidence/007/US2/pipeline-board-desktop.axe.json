@@ -1,6 +1,6 @@
 {
   "url": "http://localhost:8788/pipeline",
-  "timestamp": "2026-11-05T04:04:42.878Z",
+  "timestamp": "2026-11-05T04:20:47.542Z",
   "violations": [
     {
       "id": "color-contrast",
@@ -188,7 +188,7 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: own Traders mw30utfo8. Switch organization\">",
+          "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: own Traders mw31fhsl40. Switch organization\">",
           "target": [
             "#radix-\\:r3\\:"
           ],

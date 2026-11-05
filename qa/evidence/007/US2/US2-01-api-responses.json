@@ -4,14 +4,14 @@
     "total": 16,
     "itemCount": 16,
     "byStage": {
-      "go": 2,
-      "identified": 3,
+      "analysing": 2,
       "submitted": 3,
       "preparing": 2,
-      "lost": 1,
+      "identified": 3,
       "ready": 1,
-      "analysing": 2,
-      "won": 2
+      "won": 2,
+      "go": 2,
+      "lost": 1
     }
   },
   "wonLost": {

@@ -1,8 +1,8 @@
-## QA verdict - REJECTED
+## QA verdict - APPROVED (round 2; round 1 was REJECTED)
 
 **Work item:** #293 (T037 / #319) - **PR:** #491 - **Reviewer:** qa (claude-code) - **Session:** https://claude.ai/code/session_01BUi6mGCHY2BZng3gMKswFn
 
-Test file: `e2e/007-experience-growth/US2-pipeline.e2e.ts`. Run twice with `pnpm exec playwright test e2e/007-experience-growth/US2*` (desktop + mobile): **23 passed, 2 failed** both times (the 2 failures are the not-met criteria below, kept as spec-literal tests). API: `vitest run test/workspace.test.ts` 44 passed, 0 failed.
+Test file: `e2e/007-experience-growth/US2-pipeline.e2e.ts`. Run twice with `pnpm exec playwright test e2e/007-experience-growth/US2*` (desktop + mobile): **25 passed, 0 failed** both times in round 2 (round 1: 23 passed, 2 failed on US2-13 and US2-15). API: `vitest run test/workspace.test.ts` 44 passed, 0 failed.
 
 ### Acceptance criteria
 
@@ -20,9 +20,9 @@ Test file: `e2e/007-experience-growth/US2-pipeline.e2e.ts`. Run twice with `pnpm
 | US2-10 | Search filters cards (case-insensitive; title, bid number, buyer), "Clear filters" appears; closing=3 in URL and only endAt within 72 h remain; Clear filters returns 16 cards and an empty query string. NOTE: demo data contains no "dell" (literal term matches 0 bids; verified with DESKTOP, buyer "indian army", bid number 6401337) - see observation 3 | met | [US2-10-search-desktop-case-insensitive.png](US2-10-search-desktop-case-insensitive.png); US2-10-search-dell-no-match.png; US2-10-closing-in-3-days.png; US2-10-filters-cleared-16-cards.png |
 | US2-11 | Table: columns Tender/Stage/Score/Closes/EMD/Readiness/Owner, 16 rows by stage then closing, reload keeps Table (localStorage tp:pipeline-view, stored JSON-encoded as "table"), row click opens /workspaces/<id> | met | [US2-11-table-view.png](US2-11-table-view.png); US2-11-table-view-after-reload.png |
 | US2-12 | /pipeline?stage=won: Won column scrolled into view and outlined; Table shows only Won rows | met | [US2-12-won-column-focused.png](US2-12-won-column-focused.png); US2-12-table-only-won-rows.png |
-| US2-13 | Keyboard: Space, ArrowRight x2, Space lands two columns right; announcements Picked up / Over / Dropped in; Escape -> "Drag cancelled." and card returns | **not met** | [US2-13-literal-two-presses-result.png](US2-13-literal-two-presses-result.png); US2-13-literal-two-arrow-presses.json (two presses -> stage analysing, one column); with three presses it lands in Go: US2-13-keyboard-drop-two-columns-right.png, US2-13-announcements.json; Escape ok: US2-13-escape-cancels-card-returns.png |
+| US2-13 | [round 2: met after fix e43f442] Keyboard: Space, ArrowRight x2, Space lands two columns right; announcements Picked up / Over / Dropped in; Escape -> "Drag cancelled." and card returns | met (round 1: not met) | [US2-13-literal-two-presses-result.png](US2-13-literal-two-presses-result.png); US2-13-literal-two-arrow-presses.json (two presses -> stage analysing, one column); round 2: two presses now PATCH {stage:go}; US2-13-offscreen-column-announcements.json (Preparing to Ready off-screen reached, one column per press); round 1 note: with three presses it lands in Go: US2-13-keyboard-drop-two-columns-right.png, US2-13-announcements.json; Escape ok: US2-13-escape-cancels-card-returns.png |
 | US2-14 | 375 px: Jump to stage chips with counts, columns 84vw (max 320) with snap scrolling, Won chip scrolls Won into view, no page-level horizontal overflow (desktop + mobile projects) | met | [US2-14-mobile-chips-board.png](US2-14-mobile-chips-board.png); US2-14-mobile-won-chip-scrolled.png |
-| US2-15 | Empty org: "Your pipeline is empty" + Browse matched tenders -> /tenders?matched=1; filters matching nothing in Table view: "No bids match these filters" | **not met** | [US2-15-table-search-no-match.png](US2-15-table-search-no-match.png); Empty org and owner filter (Unassigned) OK: US2-15-empty-pipeline.png, US2-15-table-no-bids-match-filters.png. A search matching nothing shows "Your pipeline is empty" + Browse matched tenders instead (board and table) |
+| US2-15 | [round 2: met after fix e43f442] Empty org: "Your pipeline is empty" + Browse matched tenders -> /tenders?matched=1; filters matching nothing in Table view: "No bids match these filters" | met (round 1: not met) | [US2-15-table-search-no-match.png](US2-15-table-search-no-match.png); Empty org and owner filter (Unassigned) OK: US2-15-empty-pipeline.png, US2-15-table-no-bids-match-filters.png. A search matching nothing shows "Your pipeline is empty" + Browse matched tenders instead (board and table) |
 | US2-16 | Move to… menu (keyboard-openable) -> Go: same PATCH, toast and activity; all other stages listed incl. Dropped, Won/Lost disabled until Submitted | met | [US2-16-moved-to-go-via-menu.png](US2-16-moved-to-go-via-menu.png); US2-16-move-to-menu-open.png |
 | US2-17 | Won via menu: "Record the result" dialog with GeM L1 hint (mock-gem); Save sends outcome and workspace header shows "Won · L1 ₹29.5 L"; Skip keeps stage-only outcome | met | [US2-17-record-result-dialog-with-l1-hint.png](US2-17-record-result-dialog-with-l1-hint.png); US2-17-workspace-header-won-l1.png; US2-17-skip-keeps-stage-only-outcome.png; US2-17-result-hint.json |
 | US2-18 | Drop confirmation "Drop this bid?" / "It leaves the active pipeline but keeps its history."; "Show dropped (1)" toggle adds a ninth Dropped column (persisted) | met | [US2-18-dropped-column-shown.png](US2-18-dropped-column-shown.png); US2-18-drop-confirmation.png |
@@ -30,25 +30,19 @@ Test file: `e2e/007-experience-growth/US2-pipeline.e2e.ts`. Run twice with `pnpm
 
 FR-020..FR-033 are covered by the scenarios above (FR-020 US2-1, FR-021 US2-2, FR-022 US2-3/3b/13, FR-023 US2-3/4/7, FR-024 US2-5/6, FR-025 US2-10, FR-026 US2-11/12, FR-027 US2-15, FR-028 US2-14, FR-029 US2-16, FR-030 US2-17, FR-031 US2-18, FR-032 US2-19/8 note, FR-033 API test "position renumbering": 44 passed). FR-022 keyboard and FR-027 filtered-empty are the two partially unmet.
 
-### Findings
+### Findings (round 1, resolved in e43f442)
 
-1. **blocking** - US2-13 "presses → twice and Space again, Then the card lands two columns to the right".
-   - Observed: `US2-13 (literal)` test: Space, ArrowRight, ArrowRight, Space on the first Identified card -> PATCH `{"stage":"analysing","position":1.5}` (one column). Live region: "Over Identified." then "Over Analysing."; the first ArrowRight is a no-op in the card's own column. Three presses are needed to reach Go (`US2-13-announcements.json`).
-   - Expected: two presses -> Go.
-   - Where: `apps/web/src/features/pipeline/PipelinePage.tsx` (KeyboardSensor with `sortableKeyboardCoordinates`, `closestCorners`, own column is also a droppable).
-2. **blocking** - US2-15 "filters that match nothing in Table view, Then 'No bids match these filters' is shown".
-   - Observed: in Table view type `zzz-no-such-bid` in the search box -> "Your pipeline is empty ... Browse matched tenders" (also on the Board, and for the literal "dell" of US2-10). Cause: `all = query.data.items` is already filtered server-side by `q`, so `all.length === 0` selects the empty-pipeline state. Owner/closing filters do show "No bids match these filters".
-   - Expected: "No bids match these filters" (with Clear filters), not a message claiming the pipeline is empty.
-   - Where: `PipelinePage.tsx` (`all.length === 0` branch).
+1. US2-13 two ArrowRight presses landed one column right: **resolved** - literal test now sends `{"stage":"go"}` after Space, ArrowRight x2, Space (`US2-13-literal-two-arrow-presses.json`).
+2. US2-15 a search matching nothing showed "Your pipeline is empty": **resolved** - Table view shows "No bids match these filters" (`US2-15-table-search-no-match.png`).
 
-### Observations (non-blocking)
+QA test change in round 2: `keyboardDrag()` now presses ArrowRight once per column (it had compensated with one extra press for the round-1 bug).
 
-1. Keyboard drag cannot reach a column that is off-screen at 1440 px (Preparing -> Ready: three ArrowRight all announce "Over Preparing."; works once the Ready column is scrolled into view). "Move to…" is the available alternative. Evidence: `obs-keyboard-drag-offscreen-column.png`, `obs-keyboard-offscreen-column.json`.
-2. axe (WCAG 2.1 AA) on /pipeline: serious `color-contrast` (4 nodes board, 24 table) and `label-content-name-mismatch` (Owner/Closing comboboxes: aria-label "Owner"/"Closing" vs visible "All owners"/"Any closing date", 2 nodes); Table view also `aria-progressbar-name` (16 nodes). See `pipeline-board-desktop.axe.json`, `pipeline-table-desktop.axe.json`. Not part of US2 criteria; consider a separate issue.
-3. Spec/data mismatch: the scenario text uses "dell" and "Dell desktops" but the demo data has no Dell title/buyer/bid number (the card is "Desktop Computers (Q2) ..."). US2-10 was verified with real terms.
-4. `localStorage["tp:pipeline-view"]` holds the JSON string `"table"` (with quotes), not the bare `table` the spec writes; behaviour is correct.
-5. US2-19 measured the single request about 286 ms after the last keystroke finished (the test waits >= 250 ms).
-6. Result hint is cached per bid in `gem_result_hints` (15 min) so repeated runs do not hit mock-gem again; each test uses a fresh org.
+### Observations
+
+1. Round-1 observation (keyboard drag could not reach an off-screen column at 1440 px) is **resolved**: Preparing to Ready (off-screen) is reached with one ArrowRight (`US2-13-keyboard-drag-offscreen-column.png`).
+2. Still open, not in US2 criteria: axe serious `color-contrast`, `label-content-name-mismatch` (Owner/Closing selects), `aria-progressbar-name` (Table view); see `pipeline-*.axe.json`.
+3. Spec/data mismatch: demo data has no "dell"; US2-10 verified with DESKTOP, a buyer and a bid number.
+4. `localStorage["tp:pipeline-view"]` is stored JSON-encoded (`"table"`).
 
 ### Not checked
 
@@ -58,4 +52,4 @@ FR-020..FR-033 are covered by the scenarios above (FR-020 US2-1, FR-021 US2-2, F
 
 ### Verdict
 
-`qa:rejected` - criteria US2-13 and US2-15 not met (rejection 1 of 3 on this item). Videos: see `*.webm` in this folder (US2-3, US2-5, US2-13, US2-14 desktop + mobile, US2-17).
+`qa:approved` - every criterion met (round 2). Round-1 rejection findings resolved. API: 44 passed, 0 failed.

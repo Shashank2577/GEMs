@@ -67,18 +67,13 @@ async function openPipeline(page: Page, qs = '') {
   await expect(colCards(page, 'identified').first()).toBeVisible();
 }
 
-/**
- * Keyboard drag: focus the card's "Move <title>" handle, Space to lift, ArrowRight until the card is `columns`
- * columns to the right, Space to drop. NOTE (finding, see US2-13): the first ArrowRight only announces
- * "Over <own stage>." and does not leave the column, so `columns + 1` presses are needed.
- */
+/** Keyboard drag: focus the card's "Move <title>" handle, Space to lift, one ArrowRight per column, Space to drop. */
 async function keyboardDrag(page: Page, handle: Locator, columns: number, revealStage?: string) {
-  // dnd-kit's keyboard sensor only reaches columns that are on screen (see the "off-screen column" observation test).
-  if (revealStage) await col(page, revealStage).evaluate((e) => e.scrollIntoView({ inline: 'center', block: 'nearest' }));
+  void revealStage; // round 2: the board now scrolls off-screen columns into view itself
   await page.waitForTimeout(300);
   await handle.focus();
   await page.keyboard.press('Space');
-  for (let i = 0; i < columns + 1; i++) {
+  for (let i = 0; i < columns; i++) {
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(250);
   }
@@ -522,7 +517,7 @@ test('US2-13 (literal): Space, ArrowRight, ArrowRight, Space on the first Identi
   expect(sent.stage, 'spec: two ArrowRight presses -> two columns to the right (go)').toBe('go');
 });
 
-test('observation: keyboard drag toward a column that is off-screen at 1440 px never leaves the column (Move to… is the workaround)', async ({ page, browser }) => {
+test('US2-13 (off-screen column): keyboard drag from Preparing reaches Ready, which is off-screen at 1440 px, one column per ArrowRight', async ({ page, browser }) => {
   await demoOwner(page);
   const analyst = await inviteAs(page.request, 'analyst');
   const ap = await analyst.newPage(browser);
@@ -532,15 +527,17 @@ test('observation: keyboard drag toward a column that is off-screen at 1440 px n
   await handleOf(card).focus();
   await ap.keyboard.press('Space');
   const seen: string[] = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     await ap.keyboard.press('ArrowRight');
-    await ap.waitForTimeout(300);
+    await ap.waitForTimeout(400);
     seen.push((await ap.locator('[aria-live]').allInnerTexts()).join('').trim());
   }
+  saveJson('US2-13-offscreen-column-announcements', seen);
+  await expect(col(ap, 'ready')).toBeInViewport();
+  await evidence007(ap, STORY, 'US2-13-keyboard-drag-offscreen-column');
   await ap.keyboard.press('Escape');
-  saveJson('obs-keyboard-offscreen-column', { fromStage: 'preparing', announcementsAfterEachArrowRight: seen });
-  test.info().annotations.push({ type: 'observation', description: `3 x ArrowRight from Preparing announced: ${seen.join(' / ')}` });
-  await evidence007(ap, STORY, 'obs-keyboard-drag-offscreen-column');
+  expect(seen[0]).toBe('Over Ready to submit.');
+  expect(seen[1]).toBe('Over Submitted.');
 });
 
 // ───────────── US2-14 (@mobile) ─────────────

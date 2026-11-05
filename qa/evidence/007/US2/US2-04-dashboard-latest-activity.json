@@ -1,22 +1,22 @@
 {
-  "id": "cf00901a-f524-4406-89dd-127c769be8ab",
+  "id": "5e9e6270-a029-4dc5-8fba-b778b0769f34",
   "action": "workspace.stage_changed",
   "entityType": "workspace",
-  "entityId": "4d52ca90-bd4f-45ef-a0a7-45055d6742cb",
+  "entityId": "859d27dc-ba52-4f74-8a58-51263e24a2d3",
   "meta": {
     "to": "analysing",
     "from": "identified",
     "toLabel": "Analysing",
-    "tenderId": "a9c6307d-5257-4bc6-83c2-75dcb4e52a3a",
+    "tenderId": "70fb3117-4a3f-4f35-a4e5-ba55b5c20f02",
     "fromLabel": "Identified"
   },
-  "createdAt": "2026-11-05T04:03:15.652Z",
+  "createdAt": "2026-11-05T04:19:26.578Z",
   "user": {
-    "id": "67394ee9-03d3-4056-b372-e689e964f594",
-    "name": "QA analyst mw30sxvv9"
+    "id": "cc2146fe-d9b4-489b-b817-97e0dec6e708",
+    "name": "QA analyst mw31drau9"
   },
   "target": {
     "label": "Interactive Flat Panel 75\" 4K with OPS module",
-    "href": "/workspaces/4d52ca90-bd4f-45ef-a0a7-45055d6742cb"
+    "href": "/workspaces/859d27dc-ba52-4f74-8a58-51263e24a2d3"
   }
 }
