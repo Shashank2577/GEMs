@@ -1,0 +1,7 @@
+# sc3a-starter-watchlists — project desktop — 2026-11-05T09:31:11.260Z
+watchlists: 5
+### 6th watchlist
+> POST /api/watchlists (bid manager, Starter)
+< 402
+{"error":{"code":"plan_limit_reached","message":"Your Starter plan includes 5 watchlists. You have 5. Talk to us to upgrade, or delete a watchlist you no longer need.","details":{"limit":"watchlists","used":5,"max":5,"plan":"starter"}}}
+

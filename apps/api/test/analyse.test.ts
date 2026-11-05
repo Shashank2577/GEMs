@@ -4,7 +4,7 @@
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { activityLog, analyses, companyProfiles, pastContracts, tenderDocuments, tenderEvents, tenders, vaultDocuments } from '@tp/db';
+import { activityLog, analyses, companyProfiles, organizations, pastContracts, tenderDocuments, tenderEvents, tenders, vaultDocuments } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { createApp } from '../src/app';
 import { ANALYSIS_RUNNING_TIMEOUT_MS, ANALYSIS_TIMED_OUT, analyseTender } from '../src/services/analyse';
@@ -71,6 +71,8 @@ beforeAll(async () => {
   ctx = await createTestContext({ now: '2026-11-04T04:30:00Z', fetch: gemFetch });
   roles = await seedOrgWithRoles(ctx.app, 'Sharma Infotech');
   await seedCompany(roles.orgId);
+  // This suite runs far more than a trial's 10 analyses a month in one org; plan limits are tested in plan.test.ts.
+  await ctx.db.update(organizations).set({ plan: 'pro' }).where(eq(organizations.id, roles.orgId));
 });
 afterAll(() => ctx?.close());
 

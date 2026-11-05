@@ -34,6 +34,8 @@ export const organizations = pgTable('organizations', {
   plan: text('plan').notNull().default('trial'), // trial | starter | pro | enterprise
   onboardingState: jsonb('onboarding_state').$type<Record<string, boolean>>().notNull().default({}),
   scoringWeights: jsonb('scoring_weights').$type<Record<string, number>>(),
+  /** End of the free trial (008/FR-035): created + 14 days at sign-up; null for paid plans and pre-trial seeds. */
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => ({ slugUq: uniqueIndex('org_slug_uq').on(t.slug) }));
 
@@ -465,6 +467,11 @@ export const analyses = pgTable('analyses', {
   notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
   /** Machine-readable caveats rendered by the web (008/FR-031: `llm_budget_exhausted`, `llm_quota_reached`). */
   warnings: jsonb('warnings').$type<AnalysisWarning[]>().notNull().default([]),
+  /**
+   * Inserted by the demo seeder (007/FR-065), not by a user. Only these rows are left out of the monthly analyses
+   * quota (008/FR-036); anything a user runs counts, whatever the tender's source.
+   */
+  seeded: boolean('seeded').notNull().default(false),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -566,6 +573,17 @@ export const packets = pgTable('packets', {
   createdAt: createdAt(),
 }, (t) => ({ wsIdx: index('packets_ws_idx').on(t.workspaceId) }));
 
+/**
+ * One row per packet a user built (008/FR-036), written with the `packets` row and removed only when that build fails.
+ * `packet_id` has no foreign key, so deleting the packet (e.g. with its demo workspace by `DELETE /demo`) does not give
+ * the monthly packet back: `packetsPerMonth` counts this ledger, not `packets`.
+ */
+export const packetLedger = pgTable('packet_ledger', {
+  packetId: uuid('packet_id').primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('packet_ledger_org_idx').on(t.orgId, t.createdAt) }));
+
 // ───────────── Notifications & activity ─────────────
 
 export const notifications = pgTable('notifications', {
@@ -607,3 +625,40 @@ export const activityLog = pgTable('activity_log', {
   orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt),
   orgTypeIdx: index('activity_org_type_idx').on(t.orgId, t.entityType, t.createdAt),
 }));
+
+// ───────────── Plans & metering (spec 008 US5) ─────────────
+
+/** Plan changes made by TenderPilot staff via `POST /api/admin/orgs/:id/plan` (008/FR-042). */
+export const subscriptions = pgTable('subscriptions', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  plan: text('plan').notNull(), // trial | starter | pro | enterprise
+  status: text('status').$type<'active' | 'cancelled'>().notNull().default('active'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  note: text('note'),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('subscriptions_org_idx').on(t.orgId, t.createdAt.desc()) }));
+
+/** One row per LLM call (008/FR-039): tokens as reported by the provider. */
+export const llmUsage = pgTable('llm_usage', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  analysisId: uuid('analysis_id').references(() => analyses.id, { onDelete: 'set null' }),
+  /**
+   * The analysis this row was metered for, with no foreign key so it survives the analysis being deleted (e.g. by
+   * `DELETE /demo`). The monthly AI quota (008/FR-037) counts distinct values of this column, never `analysis_id`.
+   */
+  analysisRef: uuid('analysis_ref'),
+  kind: text('kind').$type<'extract' | 'assist'>().notNull(),
+  model: text('model').notNull(),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  /**
+   * A 0-token reservation of an analysis's AI slot not yet filled in by a metered call (review S1/NEW-B1). Lets the
+   * timeout sweep release reservations a crashed run left behind without touching filled 0-token rows (aborted calls).
+   */
+  reserved: boolean('reserved').notNull().default(false),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('llm_usage_org_idx').on(t.orgId, t.createdAt) }));
