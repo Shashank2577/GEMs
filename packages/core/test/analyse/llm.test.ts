@@ -54,7 +54,7 @@ describe('LLM extractor (T043)', () => {
     expect(ok.requirements).toHaveLength(2);
     expect(fake).toHaveBeenCalledOnce();
     const bad = await enrichWithLlm(['text'], rules, async () => { throw new Error('rate limited'); });
-    expect(bad).toEqual({ requirements: rules, used: false, error: 'rate limited', inputChars: expect.any(Number) });
+    expect(bad).toEqual({ requirements: rules, used: false, error: 'rate limited', inputChars: expect.any(Number), llmItems: [] });
     expect((await enrichWithLlm(['text'], rules, null)).used).toBe(false);
   });
 });
@@ -74,5 +74,92 @@ describe('LLM prompt character cap (008/FR-031)', () => {
     expect(r.inputChars).toBe(promptChars(buildLlmPrompt([page.repeat(10)])));
     expect(r.inputChars).toBeLessThan(65_000);
     expect((await enrichWithLlm(['text'], [], null)).inputChars).toBe(0);
+  });
+});
+
+// ───────────── 004/FR-051: page-aligned chunks ─────────────
+
+import { applyEscalation, buildEscalationPrompt, chunkPages, escalateWithLlm, escalationCandidates, MAX_LLM_CHUNKS_PER_DOCUMENT, unreadPagesNote } from '../../src/analyse/llm';
+
+describe('chunkPages (T087, FR-051)', () => {
+  const page = (n: number) => 'x'.repeat(n);
+  it('a document within 60k characters is one chunk', () => {
+    expect(chunkPages([page(1000), page(1000)])).toEqual({ chunks: [{ startPage: 1, pages: [page(1000), page(1000)] }] });
+  });
+  it('splits at page boundaries, each chunk ≤ 60,000 characters, numbered from the document page', () => {
+    const pages = Array.from({ length: 7 }, () => page(25_000));
+    const { chunks, unreadFromPage } = chunkPages(pages);
+    expect(chunks.map((c) => [c.startPage, c.pages.length])).toEqual([[1, 2], [3, 2], [5, 2], [7, 1]]);
+    expect(unreadFromPage).toBeUndefined();
+    for (const c of chunks) expect(c.pages.join('').length).toBeLessThanOrEqual(60_000);
+  });
+  it('reads at most 4 chunks and reports where the unread rest starts', () => {
+    const pages = Array.from({ length: 12 }, () => page(25_000));
+    const r = chunkPages(pages);
+    expect(r.chunks).toHaveLength(MAX_LLM_CHUNKS_PER_DOCUMENT);
+    expect(r.unreadFromPage).toBe(9);
+    expect(r.chunks.flatMap((c) => c.pages)).toHaveLength(8);
+  });
+  it('an oversize page gets a chunk of its own; empty input gives no chunk', () => {
+    expect(chunkPages([page(10), page(70_000), page(10)]).chunks.map((c) => c.startPage)).toEqual([1, 2, 3]);
+    expect(chunkPages([])).toEqual({ chunks: [] });
+  });
+  it('later chunks keep the real page numbers in the prompt, and the note reads like the spec', () => {
+    expect(buildLlmPrompt(['a', 'b'], [], 60_000, 181).prompt).toContain('=== Page 182 ===\nb');
+    expect(unreadPagesNote('X.pdf', 181, 240)).toBe('Pages 181–240 of X.pdf were not read by AI');
+    expect(unreadPagesNote('X.pdf', 5, 5)).toBe('Page 5 of X.pdf was not read by AI');
+  });
+});
+
+// ───────────── 004/FR-050: escalation ─────────────
+
+describe('escalation (T088, FR-050, FR-048)', () => {
+  const llmItem = (key: string, value: Requirement['value'], numeric: number | null, page = 3, quote = 'q'): Requirement =>
+    ({ ...rule(key, value, numeric, 0.8), method: 'LLM', source: { page, quote } });
+  const pages = ['p1', 'p2', 'turnover clause here', 'p4'];
+
+  it('candidates: blocking key with rule confidence < 0.75, or a rule/LLM conflict; not when they agree or the key is not blocking', () => {
+    const rules = [rule('turnover_min', '50 Lakh', 5_000_000, 0.7), rule('experience_years', '3', 3), rule('emd', '10,000', 10_000), rule('certificate', 'ISO', null, 0.5), rule('oem_auth', true, null, 0.95)];
+    const llm = [llmItem('experience_years', '5', 5), llmItem('emd', '10,000', 10_000), llmItem('oem_auth', 'Yes', null)];
+    expect(escalationCandidates(rules, llm).map((c) => c.key)).toEqual(['turnover_min', 'experience_years']);
+    expect(escalationCandidates(rules, llm)[1]!.llm).toMatchObject({ numeric: 5 });
+    expect(escalationCandidates([], llm)).toEqual([]);
+  });
+
+  it('the prompt cites the disputed requirements and only the pages involved', () => {
+    const c = escalationCandidates([{ ...rule('turnover_min', '50 Lakh', 5_000_000, 0.7), source: { page: 3 } }], [llmItem('turnover_min', '5 Crore', 50_000_000, 3)]);
+    const p = buildEscalationPrompt(pages, c);
+    expect(p.prompt).toContain('turnover_min');
+    expect(p.prompt).toContain('=== Page 3 ===\nturnover clause here');
+    expect(p.prompt).not.toContain('=== Page 1 ===');
+    expect(p.jsonSchema).toBeDefined();
+  });
+
+  it('the adjudicated item (with a quote) replaces the rule and stays an LLM item capped at 0.9; no quote → ignored', async () => {
+    const rules = [rule('turnover_min', '50 Lakh', 5_000_000, 0.7), rule('emd', '10,000', 10_000)];
+    const reply = { requirements: [{ key: 'turnover_min', label: 'Turnover', value: '5 Crore', numeric: 50_000_000, page: 3, quote: 'average annual turnover of Rs 5 Crore', confidence: 0.99 }] };
+    const ok = await escalateWithLlm(pages, rules, rules, [], async () => reply);
+    expect(ok.used).toBe(true);
+    expect(ok.keys).toEqual(['turnover_min']);
+    expect(ok.requirements.find((r) => r.key === 'turnover_min')).toMatchObject({ method: 'LLM', numeric: 50_000_000, confidence: LLM_MAX_CONFIDENCE, source: { page: 3, quote: expect.stringContaining('5 Crore') } });
+    expect(ok.requirements.find((r) => r.key === 'emd')!.method).toBe('RULE');
+    const noQuote = await escalateWithLlm(pages, rules, rules, [], async () => ({ requirements: [{ ...reply.requirements[0], quote: '' }] }));
+    expect(noQuote.requirements).toEqual(rules);
+  });
+
+  it('a conflict is settled by the adjudicator even when the rule was confident; MANUAL is never replaced; errors and no candidates fall back', async () => {
+    const rules = [rule('experience_years', '3', 3, 0.95)];
+    const llm = [llmItem('experience_years', '5', 5)];
+    const reply = { requirements: [{ key: 'experience_years', label: 'Experience', value: '5', numeric: 5, page: 3, quote: 'five years', confidence: 0.8 }] };
+    expect((await escalateWithLlm(pages, rules, rules, llm, async () => reply)).requirements[0]).toMatchObject({ method: 'LLM', numeric: 5 });
+    const manual = [{ ...rules[0]!, method: 'MANUAL' as const }];
+    expect(applyEscalation(manual, parseLlmRequirements(reply), escalationCandidates(rules, llm))).toEqual(manual);
+    const bad = await escalateWithLlm(pages, rules, rules, llm, async () => { throw new Error('boom'); });
+    expect(bad).toMatchObject({ used: false, error: 'boom', requirements: rules });
+    const fn = vi.fn();
+    const none = await escalateWithLlm(pages, rules, rules, [], fn);
+    expect(none.used).toBe(false);
+    expect(fn).not.toHaveBeenCalled();
+    expect((await escalateWithLlm(pages, rules, rules, llm, null)).used).toBe(false);
   });
 });

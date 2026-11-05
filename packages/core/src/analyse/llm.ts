@@ -61,16 +61,16 @@ export const LLM_REQUIREMENTS_JSON_SCHEMA: Record<string, unknown> = {
 
 /**
  * `maxChars` caps the document text included (default 60,000); an analysis passes what is left of its overall
- * 90,000-character budget (008/FR-031).
+ * character budget (008/FR-031). `startPage` is the document page number of `pages[0]` (chunks after the first, FR-051).
  */
-export function buildLlmPrompt(pages: string[], known: Requirement[] = [], maxChars = MAX_CHARS): LlmPrompt {
+export function buildLlmPrompt(pages: string[], known: Requirement[] = [], maxChars = MAX_CHARS, startPage = 1): LlmPrompt {
   let budget = Math.max(0, Math.min(MAX_CHARS, maxChars));
   const parts: string[] = [];
   pages.forEach((p, i) => {
     if (budget <= 0) return;
     const text = p.replace(/[ \t]+/g, ' ').trim().slice(0, budget);
     budget -= text.length;
-    parts.push(`=== Page ${i + 1} ===\n${text}`);
+    parts.push(`=== Page ${startPage + i} ===\n${text}`);
   });
   const knownList = known
     .filter((r) => r.method === 'RULE')
@@ -168,12 +168,57 @@ export function mergeRequirements(rules: Requirement[], llm: Requirement[]): Req
 /** Characters sent for one prompt (system + user text) — what the 008/FR-031 budget counts. */
 export const promptChars = (p: Pick<LlmPrompt, 'system' | 'prompt'>) => p.system.length + p.prompt.length;
 
+/** A document is read by the model in at most this many page-aligned chunks of ≤ 60,000 characters (FR-051). */
+export const MAX_LLM_CHUNKS_PER_DOCUMENT = 4;
+
+export interface PageChunk {
+  /** 1-based document page number of `pages[0]`. */
+  startPage: number;
+  pages: string[];
+}
+
+/** Characters of a page as `buildLlmPrompt` includes them. */
+const pageChars = (p: string) => p.replace(/[ \t]+/g, ' ').trim().length;
+
+/**
+ * Split a document into page-aligned chunks of ≤ `maxChars` characters of page text (a single page longer than that gets
+ * a chunk of its own and is cut by the prompt builder). At most `maxChunks` chunks are returned; `unreadFromPage` is the
+ * first page of the rest (1-based), or undefined when everything fits (FR-051).
+ */
+export function chunkPages(pages: string[], maxChars = MAX_CHARS, maxChunks = MAX_LLM_CHUNKS_PER_DOCUMENT): { chunks: PageChunk[]; unreadFromPage?: number } {
+  const chunks: PageChunk[] = [];
+  let cur: string[] = [];
+  let curStart = 1;
+  let size = 0;
+  for (let i = 0; i < pages.length; i++) {
+    const n = pageChars(pages[i]!);
+    if (cur.length && size + n > maxChars) {
+      chunks.push({ startPage: curStart, pages: cur });
+      if (chunks.length >= maxChunks) return { chunks, unreadFromPage: i + 1 };
+      cur = []; curStart = i + 1; size = 0;
+    }
+    cur.push(pages[i]!);
+    size += n;
+  }
+  if (cur.length) chunks.push({ startPage: curStart, pages: cur });
+  return { chunks };
+}
+
+/** "Pages 181–240 of X.pdf were not read by AI" (FR-051). `from`/`to` are 1-based and inclusive. */
+export function unreadPagesNote(fileName: string, from: number, to: number): string {
+  return from === to
+    ? `Page ${from} of ${fileName} was not read by AI`
+    : `Pages ${from}–${to} of ${fileName} were not read by AI`;
+}
+
 export interface LlmExtractResult {
   requirements: Requirement[];
   used: boolean;
   error?: string;
   /** Characters sent to the LLM (0 when not called). */
   inputChars: number;
+  /** The validated items the model returned, before merging (escalation compares them with the rules). */
+  llmItems: Requirement[];
 }
 
 /** Run the LLM extractor and merge; on any failure, fall back to the rule results. */
@@ -182,16 +227,121 @@ export async function enrichWithLlm(
   rules: Requirement[],
   completeJson: CompleteJson | null | undefined,
   src: { documentId?: string; fileName?: string } = {},
-  opts: { maxChars?: number } = {},
+  opts: { maxChars?: number; startPage?: number } = {},
 ): Promise<LlmExtractResult> {
-  if (!completeJson || !pages.length) return { requirements: rules, used: false, inputChars: 0 };
-  const prompt = buildLlmPrompt(pages, rules, opts.maxChars);
+  if (!completeJson || !pages.length) return { requirements: rules, used: false, inputChars: 0, llmItems: [] };
+  const prompt = buildLlmPrompt(pages, rules, opts.maxChars, opts.startPage);
   const inputChars = promptChars(prompt);
   try {
     const reply = await completeJson(prompt);
     const llm = parseLlmRequirements(reply, src);
-    return { requirements: mergeRequirements(rules, llm), used: true, inputChars };
+    return { requirements: mergeRequirements(rules, llm), used: true, inputChars, llmItems: llm };
   } catch (e) {
-    return { requirements: rules, used: false, error: (e as Error).message, inputChars };
+    return { requirements: rules, used: false, error: (e as Error).message, inputChars, llmItems: [] };
+  }
+}
+
+// ───────────── Escalation (FR-050) ─────────────
+
+/** Requirements that can turn a verdict into No-Go; an uncertain one is adjudicated by the escalation model. */
+export const BLOCKING_KEYS = ['turnover_min', 'experience_years', 'oem_auth', 'emd'] as const;
+/** A rule result below this confidence is uncertain. */
+export const ESCALATION_CONFIDENCE = 0.75;
+const ESCALATION_MAX_CHARS = 30_000;
+
+/** Yes/No-like values compare as booleans so `true` and "Yes" are not a conflict. */
+const valueKey = (r: Requirement) => {
+  const v = norm(r.value ?? r.label);
+  return /^(true|yes|required|mandatory)\b/.test(v) ? 'true' : /^(false|no|not required)\b/.test(v) ? 'false' : v;
+};
+const sameValue = (a: Requirement, b: Requirement) =>
+  a.numeric != null && b.numeric != null ? a.numeric === b.numeric : valueKey(a) === valueKey(b);
+
+/**
+ * Blocking keys to adjudicate: the rules found it with confidence < 0.75, or the rule and the LLM disagree on its value.
+ * Returns the rule item and, for a conflict, the LLM's competing item.
+ */
+export function escalationCandidates(rules: Requirement[], llmItems: Requirement[]): { key: string; rule: Requirement; llm?: Requirement }[] {
+  const out: { key: string; rule: Requirement; llm?: Requirement }[] = [];
+  for (const key of BLOCKING_KEYS) {
+    const rule = rules.find((r) => r.key === key && r.method === 'RULE');
+    if (!rule) continue;
+    const llm = llmItems.find((r) => r.key === key);
+    const conflict = !!llm && !sameValue(rule, llm);
+    if (rule.confidence < ESCALATION_CONFIDENCE || conflict) out.push({ key, rule, ...(conflict ? { llm } : {}) });
+  }
+  return out;
+}
+
+const ESCALATION_SYSTEM = `You are a senior Indian public-procurement analyst adjudicating ONE disputed or uncertain eligibility requirement
+of a Government e-Marketplace (GeM) bid. Decide from the document text only. Quote the exact supporting text (max 200
+characters) and its page number. If the text does not state the requirement, return no item for that key. Amounts are
+integer rupees (1 lakh = 100000, 1 crore = 10000000). Pages are marked "=== Page N ===".`;
+
+export function buildEscalationPrompt(pages: string[], candidates: ReturnType<typeof escalationCandidates>): LlmPrompt {
+  const cited = new Set<number>();
+  for (const c of candidates) for (const r of [c.rule, c.llm]) if (r?.source.page) cited.add(r.source.page);
+  // Pages the rules / the model cited, then (when nothing was cited) the start of the document.
+  const order = cited.size ? [...cited].sort((a, b) => a - b).filter((n) => n >= 1 && n <= pages.length) : pages.map((_, i) => i + 1);
+  let budget = ESCALATION_MAX_CHARS;
+  const parts: string[] = [];
+  for (const n of order) {
+    if (budget <= 0) break;
+    const text = pages[n - 1]!.replace(/[ \t]+/g, ' ').trim().slice(0, budget);
+    budget -= text.length;
+    parts.push(`=== Page ${n} ===\n${text}`);
+  }
+  const show = (r: Requirement | undefined) => (r ? `${typeof r.value === 'string' ? r.value : JSON.stringify(r.value ?? null)}${r.source.quote ? ` (quote: "${r.source.quote}")` : ''}` : '(none)');
+  const list = candidates.map((c) => `- ${c.key}: rules found ${show(c.rule)} with confidence ${c.rule.confidence}; model found ${show(c.llm)}`).join('\n');
+  const prompt = `Adjudicate these requirements:
+${list}
+
+Return JSON of the form:
+{"requirements":[{"key":"<${candidates.map((c) => c.key).join('|')}>","label":"short human label","value":"string|number|boolean","numeric":number|null,"mandatory":true|false,"page":number,"quote":"exact supporting text, max 200 chars","confidence":0..1}]}
+
+Document text:
+${parts.join('\n\n')}`;
+  return { system: ESCALATION_SYSTEM, prompt, maxTokens: 2048, jsonSchema: LLM_REQUIREMENTS_JSON_SCHEMA };
+}
+
+/**
+ * Merge adjudicated items into `current`: for a candidate key, an item WITH a quote replaces the existing single-valued
+ * requirement (never a MANUAL one) when it contradicts it or is more confident. The result stays an LLM item, capped
+ * at 0.9, and is scored by the deterministic engine like any other (FR-048).
+ */
+export function applyEscalation(current: Requirement[], adjudicated: Requirement[], candidates: ReturnType<typeof escalationCandidates>): Requirement[] {
+  const out = [...current];
+  for (const c of candidates) {
+    const a = adjudicated.find((r) => r.key === c.key && r.source.quote);
+    if (!a) continue;
+    const i = out.findIndex((r) => r.key === c.key);
+    if (i < 0) { out.push(a); continue; }
+    if (out[i]!.method === 'MANUAL') continue;
+    if (!sameValue(out[i]!, a) || a.confidence > out[i]!.confidence) out[i] = a;
+  }
+  return out;
+}
+
+export interface EscalationResult { requirements: Requirement[]; used: boolean; keys: string[]; inputChars: number; error?: string }
+
+/** Ask the escalation model to adjudicate uncertain/conflicting blocking requirements; falls back to `current` on error. */
+export async function escalateWithLlm(
+  pages: string[],
+  current: Requirement[],
+  rules: Requirement[],
+  llmItems: Requirement[],
+  completeJson: CompleteJson | null | undefined,
+  src: { documentId?: string; fileName?: string } = {},
+): Promise<EscalationResult> {
+  const candidates = completeJson ? escalationCandidates(rules, llmItems) : [];
+  if (!completeJson || !candidates.length || !pages.length) return { requirements: current, used: false, keys: [], inputChars: 0 };
+  const prompt = buildEscalationPrompt(pages, candidates);
+  const inputChars = promptChars(prompt);
+  const keys = candidates.map((c) => c.key);
+  try {
+    const adjudicated = parseLlmRequirements(await completeJson(prompt), src).filter((r) => keys.includes(r.key));
+    return { requirements: applyEscalation(current, adjudicated, candidates), used: true, keys, inputChars };
+  } catch (e) {
+    return { requirements: current, used: false, keys, inputChars, error: (e as Error).message };
   }
 }

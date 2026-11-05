@@ -618,7 +618,8 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   Scanned documents (`looksScanned()` true) MUST NOT be analysed: in a mixed set they are skipped with a note, and when
   every document of the analysis is a scan the API returns 422 `scanned_document`.
 - **FR-031** *(gap)*: An analysis MUST make at most `MAX_LLM_CALLS_PER_ANALYSIS = 2` LLM calls, send at most
-  `MAX_LLM_INPUT_CHARS = 90_000` characters in total, set a 60 s per-call timeout and a 120 s overall budget; when a
+  `MAX_LLM_INPUT_CHARS = 90_000` characters in total (amended by 004/FR-051: 8 calls and 480,000 characters, so a long
+  document can be read in up to 4 chunks and an uncertain requirement escalated), set a 60 s per-call timeout and a 120 s overall budget; when a
   budget is exhausted the remaining documents use rules only and the analysis carries a warning
   `llm_budget_exhausted` rendered as "AI review covered X of Y documents; the rest were checked by rules only."
   No LLM call starts or runs past `min(120 s budget, 2-minute running timeout) − 30 s` (`LLM_FINISH_RESERVE_MS`),

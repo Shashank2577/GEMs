@@ -14,7 +14,9 @@ import {
   type Requirement, type ScoreFactor,
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
-import { buildLlmPrompt, enrichWithLlm, promptChars } from '@tp/core/analyse/llm';
+import {
+  buildEscalationPrompt, buildLlmPrompt, chunkPages, enrichWithLlm, escalateWithLlm, escalationCandidates, promptChars, unreadPagesNote,
+} from '@tp/core/analyse/llm';
 import {
   PdfPageLimitError, PdfTextError, extractPdf, isPdf, isScannedDocument, joinPages, looksScanned, splitPages,
 } from '@tp/core/analyse/pdf-text';
@@ -465,6 +467,17 @@ const MIN_LLM_DOC_CHARS = 2_000;
 /** Reserve per page for the "=== Page N ===" header around the page text. */
 const PAGE_HEADER_CHARS = 24;
 
+/** Merge touching or overlapping inclusive page ranges: [[5,8],[9,12]] → [[5,12]]. */
+function coalesceRanges(ranges: [number, number][]): [number, number][] {
+  const out: [number, number][] = [];
+  for (const [a, b] of [...ranges].sort((x, y) => x[0] - y[0])) {
+    const prev = out[out.length - 1];
+    if (prev && a <= prev[1] + 1) prev[1] = Math.max(prev[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+
 /**
  * Run `call` with an AbortSignal that fires after `ms`: the provider request is aborted (review S3), and the race
  * also rejects at once in case the client ignores the signal.
@@ -568,10 +581,17 @@ export async function analyseTender(
   let extractMs = 0;
   let llmMs = 0;
   let pageTotal = 0;
-  const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
+  const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0, escalated: 0 };
+  // FR-051: pages the model did not read (beyond the 4 chunks, or chunks skipped / failed), added to the analysis notes.
+  const docNotes: string[] = [];
   // 008/FR-039: one llm_usage row per call, with the provider's token counts; the first metered call fills the reservation.
   const completeJson = deps.llm && llmAllowed
     ? meteredCompleteJson(deps, { orgId: input.orgId, analysisId: row.id, kind: 'extract', reservationId })
+    : null;
+  // FR-050: the escalation tier, metered like any call (same analysis, so it is not a second AI analysis for the quota).
+  const escalationLlm = completeJson ? deps.llmFor('escalation') : null;
+  const escCompleteJson = escalationLlm
+    ? meteredCompleteJson({ ...deps, llm: escalationLlm }, { orgId: input.orgId, analysisId: row.id, kind: 'extract' })
     : null;
   try {
     const ordered = [...readable].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
@@ -593,26 +613,64 @@ export async function analyseTender(
       extractMs += performance.now() - tx0;
       // 008/FR-037: monthly AI quota used up → this analysis runs on rules only.
       if (!completeJson) { perDoc.push(rules); continue; }
-      const elapsed = elapsedSince(started);
-      const remaining = limits.maxChars - llmUse.chars;
-      const docBudget = remaining - promptChars(buildLlmPrompt([], rules)) - PAGE_HEADER_CHARS * pages.length;
-      const fits = docBudget >= Math.min(MIN_LLM_DOC_CHARS, pages.join('').length)
-        && promptChars(buildLlmPrompt(pages, rules, docBudget)) <= remaining;
-      if (llmUse.calls >= limits.maxCalls || elapsed >= llmDeadlineMs || !fits) {
-        llmUse.skipped++;
-        perDoc.push(rules);
-        continue;
+      // FR-051: page-aligned chunks of ≤ 60k characters, at most 4 per document; each is one call under the analysis budget.
+      const { chunks, unreadFromPage } = chunkPages(pages);
+      const src = { documentId: d.id, fileName: d.fileName };
+      let current = rules;
+      const llmItems: Requirement[] = [];
+      const unread: [number, number][] = unreadFromPage ? [[unreadFromPage, pages.length]] : [];
+      const lastChunkPage = chunks.length ? chunks[chunks.length - 1]!.startPage + chunks[chunks.length - 1]!.pages.length - 1 : 0;
+      let readAny = false;
+      let attempted = false;
+      let complete = true;
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const chunk = chunks[ci]!;
+        const last = chunk.startPage + chunk.pages.length - 1;
+        const elapsed = elapsedSince(started);
+        const remaining = limits.maxChars - llmUse.chars;
+        const chunkBudget = remaining - promptChars(buildLlmPrompt([], current)) - PAGE_HEADER_CHARS * chunk.pages.length;
+        const fits = chunkBudget >= Math.min(MIN_LLM_DOC_CHARS, chunk.pages.join('').length)
+          && promptChars(buildLlmPrompt(chunk.pages, current, chunkBudget, chunk.startPage)) <= remaining;
+        if (llmUse.calls >= limits.maxCalls || elapsed >= llmDeadlineMs || !fits) {
+          // Budget gone: this chunk and the ones after it stay with the rules.
+          complete = false;
+          unread.push([chunk.startPage, lastChunkPage]);
+          break;
+        }
+        attempted = true;
+        llmUse.calls++;
+        const timeoutMs = Math.min(limits.callTimeoutMs, llmDeadlineMs - elapsed);
+        const tl0 = performance.now();
+        const r = await enrichWithLlm(chunk.pages, current, (req) => callWithTimeout((signal) => completeJson({ ...req, signal }), timeoutMs), src, { maxChars: chunkBudget, startPage: chunk.startPage });
+        llmMs += performance.now() - tl0;
+        llmUse.chars += r.inputChars;
+        if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
+        if (r.used) { readAny = true; current = r.requirements; llmItems.push(...r.llmItems); } else { complete = false; unread.push([chunk.startPage, last]); }
       }
-      llmUse.calls++;
-      const timeoutMs = Math.min(limits.callTimeoutMs, llmDeadlineMs - elapsed);
-      const tl0 = performance.now();
-      const r = await enrichWithLlm(pages, rules, (req) => callWithTimeout((signal) => completeJson({ ...req, signal }), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
-      llmMs += performance.now() - tl0;
-      llmUse.chars += r.inputChars;
-      if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
-      if (r.used) llmUse.covered++;
-      usedLlm ||= r.used;
-      perDoc.push(r.requirements);
+      if (!attempted) llmUse.skipped++;
+      if (readAny && unread.length) {
+        for (const [from, to] of coalesceRanges(unread)) docNotes.push(unreadPagesNote(d.fileName, from, to));
+      }
+      // FR-050: a blocking requirement the rules are unsure about (or that the model contradicts) goes to the escalation model.
+      if (escCompleteJson) {
+        const cands = escalationCandidates(rules, llmItems);
+        const elapsed = elapsedSince(started);
+        if (cands.length && llmUse.calls < limits.maxCalls && elapsed < llmDeadlineMs
+          && promptChars(buildEscalationPrompt(pages, cands)) <= limits.maxChars - llmUse.chars) {
+          llmUse.calls++;
+          llmUse.escalated++;
+          const timeoutMs = Math.min(limits.callTimeoutMs, llmDeadlineMs - elapsed);
+          const tl0 = performance.now();
+          const e = await escalateWithLlm(pages, current, rules, llmItems, (req) => callWithTimeout((signal) => escCompleteJson({ ...req, signal }), timeoutMs), src);
+          llmMs += performance.now() - tl0;
+          llmUse.chars += e.inputChars;
+          if (e.error) deps.logger.warn('analyse: LLM escalation failed; keeping the earlier result', { tenderId: tender.id, error: e.error });
+          if (e.used) { current = e.requirements; readAny = true; }
+        }
+      }
+      if (complete && readAny) llmUse.covered++;
+      usedLlm ||= readAny;
+      perDoc.push(current);
     }
     // Any document the LLM did not cover — skipped for budget, or a call that failed/timed out — gets the caveat (S4).
     // 008/FR-037: with the monthly AI quota used up, no document went to the LLM — say why instead.
@@ -642,7 +700,7 @@ export async function analyseTender(
         score: result.score, confidence: result.confidence, verdict: result.verdict, summary: withPrefix(prefix, result.summary), error: null,
         // FR-045: a change made while this run was going (markStale flags running rows) keeps it stale.
         ...keepStaleOnCompletion(),
-        notes, warnings, updatedAt: deps.clock.now(),
+        notes: [...notes, ...docNotes], warnings, updatedAt: deps.clock.now(),
       }).where(ours).returning();
       return done ?? null;
     });
@@ -674,6 +732,7 @@ export async function analyseTender(
     // first) is not an AI analysis — the meter gives the reserved slot back; a metered one keeps it, even when the
     // analysis row was deleted meanwhile (review NEW-B1).
     await completeJson?.finish();
+    await escCompleteJson?.finish();
   }
 }
 

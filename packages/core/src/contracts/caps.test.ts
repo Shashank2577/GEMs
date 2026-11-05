@@ -6,8 +6,8 @@ describe('caps (008 NFR-009)', () => {
   it('pins every value from the spec', () => {
     expect(caps.MAX_TENDER_DOC_PAGES).toBe(300);
     expect(caps.SCANNED_EMPTY_PAGE_RATIO).toBe(0.8);
-    expect(caps.MAX_LLM_CALLS_PER_ANALYSIS).toBe(2);
-    expect(caps.MAX_LLM_INPUT_CHARS).toBe(90_000);
+    expect(caps.MAX_LLM_CALLS_PER_ANALYSIS).toBe(8);
+    expect(caps.MAX_LLM_INPUT_CHARS).toBe(480_000);
     expect(caps.LLM_CALL_TIMEOUT_MS).toBe(60_000);
     expect(caps.ANALYSIS_BUDGET_MS).toBe(120_000);
     expect(caps.PACKET_MAX_ITEMS).toBe(40);
