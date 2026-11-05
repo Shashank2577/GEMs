@@ -2,6 +2,8 @@
 
 **Work item:** #6 · **PR:** #496 · **Reviewer:** qa (claude-code/Sonnet 5.5) · **Session:** https://claude.ai/code/session_01BUi6mFdfjz9y1F3zKYmWQB
 
+Tested commit: `ee2af4d` (branch HEAD at test time; product code as committed). Uncommitted edits to product files appeared in the shared working tree at 03:46 UTC, after the Playwright and full API runs, and are NOT covered by this verdict.
+
 Tests: `e2e/002/US4-account-prefs.e2e.ts`: **13 passed, 0 failed** (desktop 11, mobile 2 `@mobile`).
 API suite: 298 passed, 1 skipped (opt-in perf) of 299; `prefs.test.ts` 11/11. See [api-tests.txt](api-tests.txt).
 
