@@ -22,6 +22,7 @@ export default function UiGallery() {
   const [sel, setSel] = useState('mh');
   const [files, setFiles] = useState<File[]>([]);
   const [confirm, setConfirm] = useState(false);
+  const [leave, setLeave] = useState(false);
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <PageHeader title="Design system" description="TenderPilot UI kit — tokens and components." breadcrumbs={[{ label: 'Dev', to: '/' }, { label: 'UI' }]} actions={<ThemeToggle />} />
@@ -32,6 +33,9 @@ export default function UiGallery() {
           <Button size="sm" onClick={() => toast.success('Watchlist saved', { description: '12 tenders match right now' })}>Toast</Button>
           <Button size="sm" variant="danger" onClick={() => setConfirm(true)}><Trash2 />Delete</Button>
           <ConfirmDialog open={confirm} onOpenChange={setConfirm} title="Delete document?" description="This removes it from all packets." confirmLabel="Delete" onConfirm={() => setConfirm(false)} />
+          <Button size="sm" variant="outline" onClick={() => setLeave(true)}>Leave page</Button>
+          {/* cancelLabel: rename the safe action (it gets initial focus) */}
+          <ConfirmDialog open={leave} onOpenChange={setLeave} title="Discard unsaved changes?" cancelLabel="Stay" confirmLabel="Discard and leave" onConfirm={() => setLeave(false)} />
         </section>
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatTile label="New matches today" value="18" delta={12} deltaLabel="vs yesterday" icon={Radar} sparkline={<Sparkline data={[3, 5, 4, 8, 6, 11, 18]} />} />
