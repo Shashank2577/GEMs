@@ -2,22 +2,26 @@
  * Postgres-backed attempt counters for authentication rate limiting (002/FR-010, FR-011).
  *
  * State lives in `auth_attempts` (not memory) so limits hold across Worker isolates and Node processes
- * (NFR-002). Each (key, kind) row is a fixed window: the first hit opens it at `now`; hits inside the
+ * (NFR-002). Each (key, kind) row is a FIXED window: the first hit opens it at `now`; hits inside the
  * window increment `count`; the first hit after the window has elapsed starts a fresh window at 1.
  *
- *   const limited = await check(db, email, 'login_email', LOGIN_EMAIL_LIMIT, now);
- *   if (limited) throw rateLimited(limited.retryAfterSec);
- *   …on failure:  await hit(db, email, 'login_email', LOGIN_EMAIL_LIMIT, now);
- *   …on success:  await reset(db, email, 'login_email');
+ * Attempts are RESERVED before the expensive check (one atomic upsert per counter), so a parallel burst
+ * cannot get more than `limit` attempts through:
+ *
+ *   const limiter = credentialLimiter(db, email, ip, now);
+ *   await limiter.reserve();        // 429 when this attempt is over the email or IP limit
+ *   …verify password…
+ *   on success: await limiter.succeed();   // email counter cleared, IP reservation released
  *
  * Keys are normalised emails or client IPs — never secrets.
  */
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, lt, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
-import { authAttempts, type Db } from '@tp/db';
+import { authAttempts, passwordResets, type Db } from '@tp/db';
+import type { TrustProxy } from '../env';
 import { HttpError } from './errors';
 
-export type AttemptKind = 'login_email' | 'login_ip' | 'reset_email';
+export type AttemptKind = 'login_email' | 'login_ip' | 'reset_email' | 'reset_ip';
 
 export interface LimitOptions {
   /** Maximum attempts allowed in one window; the attempt after that is rejected. */
@@ -41,6 +45,10 @@ export const LOGIN_EMAIL_LIMIT: LimitOptions = { limit: 10, windowMs: FIFTEEN_MI
 export const LOGIN_IP_LIMIT: LimitOptions = { limit: 30, windowMs: FIFTEEN_MIN };
 /** Password reset requests per email. */
 export const RESET_EMAIL_LIMIT: LimitOptions = { limit: 3, windowMs: 60 * 60 * 1000 };
+/** Password reset requests per client IP. */
+export const RESET_IP_LIMIT: LimitOptions = { limit: 20, windowMs: 60 * 60 * 1000 };
+/** Longest window in use; rows older than this are dead and pruned by the scheduled job. */
+const MAX_WINDOW_MS = 60 * 60 * 1000;
 
 function toState(count: number, windowStart: Date, opts: LimitOptions, now: Date): LimitState {
   const remainingMs = windowStart.getTime() + opts.windowMs - now.getTime();
@@ -54,8 +62,11 @@ export async function check(db: Db, key: string, kind: AttemptKind, opts: LimitO
   return toState(row.count, row.windowStart, opts, now);
 }
 
-/** Record one attempt atomically (single upsert) and return the new state. */
-export async function hit(db: Db, key: string, kind: AttemptKind, opts: LimitOptions, now: Date): Promise<LimitState> {
+/**
+ * Record one attempt atomically (single upsert) and return the new state. `over` is true when this
+ * attempt itself exceeds the limit (count > limit) and must be rejected.
+ */
+export async function hit(db: Db, key: string, kind: AttemptKind, opts: LimitOptions, now: Date): Promise<LimitState & { over: boolean }> {
   const nowIso = now.toISOString();
   const cutoffIso = new Date(now.getTime() - opts.windowMs).toISOString();
   const expired = sql`${authAttempts.windowStart} <= ${cutoffIso}::timestamptz`;
@@ -68,7 +79,13 @@ export async function hit(db: Db, key: string, kind: AttemptKind, opts: LimitOpt
       },
     })
     .returning({ count: authAttempts.count, windowStart: authAttempts.windowStart });
-  return toState(row.count, row.windowStart, opts, now);
+  return { ...toState(row.count, row.windowStart, opts, now), over: row.count > opts.limit };
+}
+
+/** Give one attempt back (e.g. a successful sign-in should not consume the IP budget). */
+export async function release(db: Db, key: string, kind: AttemptKind): Promise<void> {
+  await db.update(authAttempts).set({ count: sql`greatest(${authAttempts.count} - 1, 0)` })
+    .where(and(eq(authAttempts.key, key), eq(authAttempts.kind, kind)));
 }
 
 /** Clear a counter (e.g. after a successful sign-in). */
@@ -86,38 +103,50 @@ export function rateLimited(retryAfterSec: number): HttpError {
 }
 
 /**
- * Client IP: `cf-connecting-ip` (Cloudflare) → first `x-forwarded-for` hop → null.
- * Null means "unknown" (e.g. plain local Node without a proxy); callers skip per-IP limits then, so all
- * such clients do not share one bucket.
+ * Client IP, read only from headers set by a proxy we trust (config `TRUST_PROXY`):
+ * - `cloudflare` (the Worker default): `cf-connecting-ip`, which Cloudflare always overwrites;
+ * - `xff`: the first `x-forwarded-for` hop (Node behind a reverse proxy that sets the header);
+ * - `none` (Node default): null — headers could be forged by the client.
+ * Null means "unknown": callers skip per-IP limits so all such clients do not share one bucket; the
+ * per-email limits still apply.
  */
-export function clientIp(c: Context): string | null {
-  const cf = c.req.header('cf-connecting-ip')?.trim();
-  if (cf) return cf.slice(0, 64);
-  const xff = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
-  return xff ? xff.slice(0, 64) : null;
+export function clientIp(c: Context, trust: TrustProxy): string | null {
+  if (trust === 'cloudflare') return c.req.header('cf-connecting-ip')?.trim().slice(0, 64) || null;
+  if (trust === 'xff') return c.req.header('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 64) || null;
+  return null;
 }
 
 /**
- * Guard for failed-credential flows (login, accept-invite existing user, change password).
- * `assert` throws 429 when the email or IP window is full; `fail` records a failure; `succeed` clears the
- * email counter (the IP counter is kept so one valid account cannot reset an attacker's IP budget).
+ * Guard for credential checks (login, accept-invite existing user, change password).
+ * `reserve` counts this attempt against the email and IP windows BEFORE the password is verified and
+ * throws 429 when either is over the limit (so the 11th attempt fails even with the right password, and
+ * parallel bursts cannot exceed the cap). `succeed` clears the email counter and releases the IP
+ * reservation (the IP counter is not reset, so one valid account cannot clear an attacker's IP budget).
  */
 export function credentialLimiter(db: Db, email: string, ip: string | null, now: Date) {
   return {
-    async assert() {
+    async reserve() {
       const [e, i] = await Promise.all([
-        check(db, email, 'login_email', LOGIN_EMAIL_LIMIT, now),
-        ip ? check(db, ip, 'login_ip', LOGIN_IP_LIMIT, now) : Promise.resolve(null),
+        hit(db, email, 'login_email', LOGIN_EMAIL_LIMIT, now),
+        ip ? hit(db, ip, 'login_ip', LOGIN_IP_LIMIT, now) : Promise.resolve(null),
       ]);
-      const blocked = [e, i].filter((s): s is LimitState => !!s?.limited);
+      const blocked = [e, i].filter((s): s is LimitState & { over: boolean } => !!s?.over);
       if (blocked.length) throw rateLimited(Math.max(...blocked.map((s) => s.retryAfterSec)));
-    },
-    async fail() {
-      await hit(db, email, 'login_email', LOGIN_EMAIL_LIMIT, now);
-      if (ip) await hit(db, ip, 'login_ip', LOGIN_IP_LIMIT, now);
     },
     async succeed() {
       await reset(db, email, 'login_email');
+      if (ip) await release(db, ip, 'login_ip');
     },
   };
+}
+
+/** Scheduled cleanup: dead attempt windows (> 1 h) and reset links used or expired more than a day ago. */
+export async function pruneAuthState(db: Db, now: Date): Promise<{ attempts: number; resets: number }> {
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const attempts = await db.delete(authAttempts)
+    .where(lt(authAttempts.windowStart, new Date(now.getTime() - MAX_WINDOW_MS))).returning({ key: authAttempts.key });
+  const resets = await db.delete(passwordResets)
+    .where(or(and(isNotNull(passwordResets.usedAt), lt(passwordResets.usedAt, dayAgo)), lt(passwordResets.expiresAt, dayAgo)))
+    .returning({ id: passwordResets.id });
+  return { attempts: attempts.length, resets: resets.length };
 }

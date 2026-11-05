@@ -115,6 +115,13 @@ describe('DELETE /api/me/sessions/:id', () => {
     expect(r.body.error.code).toBe('not_found');
     expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: b.cookie })).status).toBe(200);
     expect((await request(ctx.app, 'DELETE', '/api/me/sessions/not-a-uuid', { cookie: a.cookie })).status).toBe(404);
+    // 36 characters that the old /[0-9a-f-]{36}/ check let through to Postgres (→ 500)
+    for (const bad of ['-'.repeat(36), 'a'.repeat(36), '0123456789abcdef0123456789abcdef----']) {
+      const r = await request(ctx.app, 'DELETE', `/api/me/sessions/${bad}`, { cookie: a.cookie });
+      expect(r.status).toBe(404);
+      expect(r.body.error.code).toBe('not_found');
+      expect((await request(ctx.app, 'DELETE', `/api/me/api-tokens/${bad}`, { cookie: a.cookie })).status).toBe(404);
+    }
   });
 
   it('revoking the current session signs you out and clears the cookie', async () => {

@@ -2,18 +2,26 @@
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { passwordResets, users } from '@tp/db';
+import { settleDeferred } from '../src/lib/defer';
 import { createTestContext, request, signup, uniqueEmail, TEST_APP_URL, type TestContext } from './helpers';
 
 let ctx: TestContext;
-beforeAll(async () => { ctx = await createTestContext(); });
+beforeAll(async () => { ctx = await createTestContext({ trustProxy: 'xff' }); });
 afterAll(async () => { await ctx?.close(); });
 beforeEach(() => { ctx.clock.set(new Date()); ctx.mailer.sent.length = 0; });
 
 const MIN = 60_000;
 
+/** forgot-password, then wait for its background work (lookup + token + email). */
+async function forgot(email: string, headers?: Record<string, string>) {
+  const r = await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email }, headers });
+  await settleDeferred(ctx.deps);
+  return r;
+}
+
 /** Request a reset link and return the raw token taken from the logged email. */
 async function requestReset(email: string): Promise<string> {
-  const r = await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email } });
+  const r = await forgot(email);
   expect(r.status).toBe(200);
   const msg = ctx.mailer.sent.at(-1)!;
   const m = String(msg.text).match(/\/reset-password\/([A-Za-z0-9_-]+)/);
@@ -24,7 +32,7 @@ async function requestReset(email: string): Promise<string> {
 describe('POST /api/auth/forgot-password', () => {
   it('always returns 200 {ok:true}; only existing users get an email with a 60-minute link', async () => {
     const a = await signup(ctx.app);
-    const r = await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email: a.email.toUpperCase() } });
+    const r = await forgot(a.email.toUpperCase());
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ ok: true });
     expect(ctx.mailer.sent).toHaveLength(1);
@@ -34,7 +42,7 @@ describe('POST /api/auth/forgot-password', () => {
     expect(msg.text).toContain(`${TEST_APP_URL}/reset-password/`);
     expect(msg.text).toContain('expires in 1 hour');
 
-    const ghost = await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email: uniqueEmail('ghost') } });
+    const ghost = await forgot(uniqueEmail('ghost'));
     expect(ghost.status).toBe(200);
     expect(ghost.body).toEqual({ ok: true });
     expect(ctx.mailer.sent).toHaveLength(1);
@@ -56,13 +64,29 @@ describe('POST /api/auth/forgot-password', () => {
     expect(bad.body.error.details.fields.email).toBeTruthy();
 
     for (const email of [(await signup(ctx.app)).email, uniqueEmail('ghost')]) {
-      for (let i = 0; i < 3; i++) expect((await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email } })).status).toBe(200);
-      const r = await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email } });
+      for (let i = 0; i < 3; i++) expect((await forgot(email)).status).toBe(200);
+      const r = await forgot(email);
       expect(r.status).toBe(429);
       expect(r.body.error.code).toBe('rate_limited');
       expect(r.headers.get('retry-after')).toBe('3600');
     }
     ctx.clock.advance(60 * MIN);
+  });
+
+  it('limits requests per client IP (20 per hour) across emails', async () => {
+    const headers = { 'x-forwarded-for': '198.51.100.99' };
+    for (let i = 0; i < 20; i++) expect((await forgot(uniqueEmail('spray'), headers)).status).toBe(200);
+    const r = await forgot(uniqueEmail('spray'), headers);
+    expect(r.status).toBe(429);
+    expect(r.body.error.code).toBe('rate_limited');
+    expect((await forgot(uniqueEmail('spray'), { 'x-forwarded-for': '198.51.100.100' })).status).toBe(200);
+  });
+
+  it('the account lookup and email happen in the background (same foreground work for unknown emails)', async () => {
+    const a = await signup(ctx.app);
+    await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email: a.email } });
+    await settleDeferred(ctx.deps);
+    expect(ctx.mailer.sent).toHaveLength(1);
   });
 });
 

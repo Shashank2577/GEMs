@@ -118,6 +118,18 @@ export const SESSION_ENDED_MESSAGE = 'Your session ended. Please sign in again.'
 
 let sessionEndPending = false;
 
+const isMeQuery = (key: readonly unknown[]) => key[0] === ME_KEY[0] && key[1] === ME_KEY[1];
+
+/**
+ * Drop every cached query except `ME_KEY`, then set `ME_KEY` to `me` (null = signed out).
+ * Unlike `queryClient.clear()`, this keeps the `ME_KEY` query that AuthProvider observes, so the new value
+ * reaches `useMe()` immediately (RequireAuth redirects, the shell shows the new user/org).
+ */
+export function resetSessionCache<T>(me: T | null): void {
+  queryClient.removeQueries({ predicate: (q) => !isMeQuery(q.queryKey) });
+  queryClient.setQueryData(ME_KEY, me);
+}
+
 /**
  * 002/FR-013: a 401 from any query or mutation while signed in means the session expired or was revoked.
  * Clear every cached query, mark the user signed out (RequireAuth then redirects to `/login?next=<current>`)
@@ -129,8 +141,7 @@ export function handleSessionEnd(err: unknown, meta?: Record<string, unknown>): 
   sessionEndPending = true;
   // Defer so the cache is not cleared while it is notifying about this very error.
   setTimeout(() => {
-    queryClient.clear();
-    queryClient.setQueryData(ME_KEY, null);
+    resetSessionCache(null);
     toast.error(SESSION_ENDED_MESSAGE, { id: 'session-ended' });
     sessionEndPending = false;
   }, 0);

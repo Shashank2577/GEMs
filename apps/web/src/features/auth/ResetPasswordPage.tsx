@@ -1,12 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, LinkIcon } from 'lucide-react';
-import type { Me } from '@tp/core/contracts/auth';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/label';
 import { toast } from '@/components/ui/toaster';
-import { api, ApiError, errorMessage, ME_KEY } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { AuthLayout } from './AuthLayout';
 import { PasswordInput, StrengthMeter } from './PasswordInput';
 import { FormAlert } from './FormAlert';
@@ -14,7 +13,7 @@ import { FormAlert } from './FormAlert';
 /** `/reset-password/:token` — set a new password from the emailed link (002/FR-011). */
 export default function ResetPasswordPage() {
   const { token = '' } = useParams();
-  const qc = useQueryClient();
+  const { resetPassword } = useAuth();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | undefined>();
@@ -29,9 +28,7 @@ export default function ResetPasswordPage() {
     setFormError(null);
     setLoading(true);
     try {
-      const me = await api.post<Me>('/auth/reset-password', { token, newPassword: password });
-      qc.clear();
-      qc.setQueryData(ME_KEY, me);
+      await resetPassword({ token, newPassword: password });
       toast.success('Password updated', { description: 'You’re signed in. Other devices have been signed out.' });
       navigate('/dashboard', { replace: true });
     } catch (err) {

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 const { toast } = await import('sonner');
-const { ApiError, ME_KEY, SESSION_ENDED_MESSAGE, handleSessionEnd, queryClient } = await import('./api');
+const { QueryObserver } = await import('@tanstack/react-query');
+const { ApiError, ME_KEY, SESSION_ENDED_MESSAGE, handleSessionEnd, queryClient, resetSessionCache } = await import('./api');
 
 const ME = { user: { id: 'u1', name: 'Priya', email: 'p@x.in', phone: null }, org: { id: 'o1' }, role: 'owner', orgs: [] };
 const flush = () => new Promise((r) => setTimeout(r, 5));
@@ -22,6 +23,32 @@ describe('handleSessionEnd (002/FR-013)', () => {
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenCalledWith(SESSION_ENDED_MESSAGE, expect.anything());
     expect(SESSION_ENDED_MESSAGE).toBe('Your session ended. Please sign in again.');
+  });
+
+  it('an observer of ME_KEY (as in AuthProvider/RequireAuth) sees null after a session end', async () => {
+    queryClient.setQueryData(ME_KEY, ME);
+    const observer = new QueryObserver(queryClient, { queryKey: ME_KEY, queryFn: () => ME, staleTime: Infinity });
+    const seen: unknown[] = [];
+    const unsubscribe = observer.subscribe((r) => seen.push(r.data));
+    expect(observer.getCurrentResult().data).toEqual(ME);
+    handleSessionEnd(new ApiError(401, 'unauthorized', 'Please sign in to continue'));
+    await flush();
+    expect(observer.getCurrentResult().data).toBeNull();
+    expect(seen.at(-1)).toBeNull();
+    // the observed query is the same one in the cache (not an orphan)
+    expect(queryClient.getQueryCache().find({ queryKey: ME_KEY, exact: true })).toBe(observer.getCurrentQuery());
+    unsubscribe();
+  });
+
+  it('resetSessionCache keeps the observed ME_KEY query and swaps the user (login / reset password)', () => {
+    queryClient.setQueryData(ME_KEY, null);
+    queryClient.setQueryData(['tenders'], { items: [1] });
+    const observer = new QueryObserver(queryClient, { queryKey: ME_KEY, queryFn: () => null, staleTime: Infinity });
+    const unsubscribe = observer.subscribe(() => {});
+    resetSessionCache(ME);
+    expect(observer.getCurrentResult().data).toEqual(ME);
+    expect(queryClient.getQueryData(['tenders'])).toBeUndefined();
+    unsubscribe();
   });
 
   it('ignores 401s when signed out, from auth forms, and non-401 errors', async () => {
