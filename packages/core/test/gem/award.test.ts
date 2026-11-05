@@ -54,6 +54,28 @@ describe('parseBidResult', () => {
     expect(parseBidResult(huge).bidders).toEqual([]);
   });
 
+  it('has no catastrophic backtracking: crafted rows finish in < 100 ms', () => {
+    const many = (n: number, cell: string) => Array.from({ length: n }, () => cell).join('');
+    // The reviewer's case: one ~500 KB row, 10 productDtl cells, 15,000 price spans and no level cell.
+    const crafted = `<table><tr>${many(10, '<td class="productDtl">1</td><td><span>X</span></td>')}${many(15_000, '<span class="bid_price">1</span>')}</tr></table>`;
+    // The same shape kept under the 16 KB row limit, so the stepwise matcher itself is exercised.
+    const small = `<table><tr>${many(10, '<td class="productDtl">1</td><td><span>X</span></td>')}${many(400, '<span class="bid_price">1</span>')}</tr></table>`;
+    // A single 512 KB row of repeated productDtl cells (and an under-limit variant).
+    const dtl = '<td class="productDtl">1</td>   <td><span class="s">   ';
+    const repeated = `<table><tr>${many(Math.ceil((512 * 1024) / dtl.length), dtl)}</tr></table>`;
+    const repeatedSmall = `<table><tr>${many(Math.floor(15_000 / dtl.length), dtl)}</tr></table>`;
+    for (const page of [crafted, small, repeated, repeatedSmall]) {
+      const t0 = performance.now();
+      expect(parseBidResult(page).bidders).toEqual([]);
+      expect(performance.now() - t0).toBeLessThan(100);
+    }
+  });
+
+  it('skips a row whose level cell does not follow the price', () => {
+    const r = parseBidResult('<tr><td class="productDtl">1</td><td><span>A</span></td><td><span class="bid_price">10</span></td><td>pending</td></tr>');
+    expect(r.bidders).toEqual([]);
+  });
+
   it('decodes only valid code points; out-of-range and surrogate entities stay raw', () => {
     const row = (name: string) => `<tr><td class="productDtl">1</td><td><span>${name}</span></td><td><span class="bid_price">1</span></td><td><strong>L1</strong></td></tr>`;
     expect(parseBidResult(row('A &#x41; &#66; &amp; Co')).bidders[0]!.company).toBe('A A B & Co');
@@ -95,7 +117,9 @@ describe('GemClient.fetchBidResultHtml', () => {
 describe('readTextCapped (result page body cap)', () => {
   it('refuses a declared content-length above the cap', async () => {
     const res = new Response('x'.repeat(10), { headers: { 'content-length': String(2 * 1024 * 1024) } });
-    await expect(readTextCapped(res, 1024 * 1024)).rejects.toBeInstanceOf(GemError);
+    const err = await readTextCapped(res, 1024 * 1024).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(GemError);
+    expect((err as GemError).retryable).toBe(false);
   });
 
   it('stops reading an undeclared stream after N bytes', async () => {

@@ -61,7 +61,8 @@ export async function readTextCapped(res: Response, maxBytes: number): Promise<s
   const declared = Number(res.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) {
     await res.body?.cancel().catch(() => {});
-    throw new GemError(`GeM response too large (${declared} bytes)`, res.status);
+    // Not retryable: the same page will be just as large next time.
+    throw new GemError(`GeM response too large (${declared} bytes)`, res.status, false);
   }
   if (!res.body) return '';
   const reader = res.body.getReader();

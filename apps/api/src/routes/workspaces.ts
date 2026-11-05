@@ -19,7 +19,7 @@
 import { and, asc, desc, eq, inArray, max, ne, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { bidWorkspaces, comments, memberships, notifications } from '@tp/db';
+import { bidWorkspaces, comments, gemResultHints, memberships, notifications } from '@tp/db';
 import {
   STAGES, STAGE_LABELS, assistValuesSchema, canTransition, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
   workspaceUpdateSchema, type StageName, type WorkspaceListResponse,
@@ -31,7 +31,7 @@ import { GemClient } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, conflict, notFound, validationError } from '../lib/errors';
-import { hit, rateLimited, type LimitOptions } from '../lib/rate-limit';
+import { hit, rateLimited, release, type LimitOptions } from '../lib/rate-limit';
 import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import {
@@ -367,13 +367,17 @@ workspacesRoutes.post('/workspaces/:id/submitted', requireRole('analyst'), async
 // ───────────── optional L1 hint (007/T033, FR-030) ─────────────
 
 /**
- * GeM traffic for hints is bounded by DB-backed counters (auth_attempts via lib/rate-limit `hit()`), so the limits
- * hold across Worker isolates and Node processes: ≤ 20 lookups per org per hour and ≤ 1 fetch per GeM bid per
- * 15 minutes (any org). Over a limit → the standard 429 `rate_limited`; the web simply shows no hint. The client
- * caches a hint for 10 minutes (react-query staleTime), so nothing is persisted server-side.
+ * GeM traffic for hints is bounded by DB-backed state, so it holds across Worker isolates and Node processes:
+ * - every lookup counts against the org (≤ 20 per hour, lib/rate-limit `hit()`), checked first;
+ * - the last parsed hint per GeM bid is kept in `gem_result_hints` (public data) and served to ANY authorised org
+ *   for 15 minutes, with no GeM call;
+ * - only when GeM really has to be asked is the per-bid slot taken (≤ 1 fetch per bid per 15 minutes); a failed
+ *   fetch gives the slot back so the next lookup may retry (still bounded by the per-org limit).
+ * Over a limit → the standard 429 `rate_limited`; the web then simply shows no hint.
  */
 export const HINT_ORG_LIMIT: LimitOptions = { limit: 20, windowMs: 60 * 60_000 };
 export const HINT_BID_LIMIT: LimitOptions = { limit: 1, windowMs: 15 * 60_000 };
+export const HINT_TTL_MS = 15 * 60_000;
 
 /**
  * Read-only: fetches GeM's PUBLIC result page through the polite GemClient and suggests the L1 price. The user
@@ -387,22 +391,31 @@ workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (
   if (!w) throw notFound('Bid workspace');
   if (!t.gemBidId) return c.json({ available: false, reason: 'no_gem_id' } satisfies BidResultHint);
   const now = deps.clock.now();
-  const bid = await hit(deps.db, t.gemBidId, 'gem_result_bid', HINT_BID_LIMIT, now);
-  if (bid.over) throw rateLimited(bid.retryAfterSec);
   const perOrg = await hit(deps.db, org, 'gem_result_org', HINT_ORG_LIMIT, now);
   if (perOrg.over) throw rateLimited(perOrg.retryAfterSec);
+
+  const [cached] = await deps.db.select().from(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId));
+  if (cached && now.getTime() - cached.fetchedAt.getTime() < HINT_TTL_MS) return c.json(cached.hint as BidResultHint);
+
+  const bid = await hit(deps.db, t.gemBidId, 'gem_result_bid', HINT_BID_LIMIT, now);
+  if (bid.over) throw rateLimited(bid.retryAfterSec);
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
     maxRetries: 1, backoffMs: Math.min(1000, Math.max(10, deps.gem.minIntervalMs)), timeoutMs: 15_000,
   });
+  let hint: BidResultHint;
   try {
     const page = await client.fetchBidResultHtml(t.gemBidId);
     const r = page ? parseBidResult(page.html) : null;
-    return c.json((r && r.bidders.length
+    hint = r && r.bidders.length
       ? { available: true, l1Price: r.l1Price, bidders: r.bidders.map(({ rank, level, price }) => ({ rank, level, price })), sourceUrl: page!.url, fetchedAt: now.toISOString() }
-      : { available: false, reason: 'not_published' }) satisfies BidResultHint);
+      : { available: false, reason: 'not_published' };
   } catch (e) {
     deps.logger.warn('result-hint: GeM fetch failed', { tenderId: t.id, error: (e as Error).message });
+    await release(deps.db, t.gemBidId, 'gem_result_bid');
     return c.json({ available: false, reason: 'gem_unavailable' } satisfies BidResultHint);
   }
+  await deps.db.insert(gemResultHints).values({ gemBidId: t.gemBidId, hint, fetchedAt: now })
+    .onConflictDoUpdate({ target: gemResultHints.gemBidId, set: { hint, fetchedAt: now } });
+  return c.json(hint);
 });

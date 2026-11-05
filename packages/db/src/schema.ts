@@ -388,6 +388,17 @@ export const bidWorkspaces = pgTable('bid_workspaces', {
   orgStageIdx: index('bid_workspaces_org_stage_idx').on(t.orgId, t.stage),
 }));
 
+/**
+ * Last parsed GeM bid-result hint per BidPlus `b_id` (007/T033, FR-030). Public data, not org-scoped: any org with a
+ * workspace for the tender is served from here within the TTL instead of fetching GeM again.
+ * `hint` is a `BidResultHint` from @tp/core/gem/award (available, or not published yet).
+ */
+export const gemResultHints = pgTable('gem_result_hints', {
+  gemBidId: text('gem_bid_id').primaryKey(),
+  hint: jsonb('hint').$type<Record<string, unknown>>().notNull(),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull(),
+});
+
 export const comments = pgTable('comments', {
   id: id(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),

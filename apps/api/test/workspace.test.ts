@@ -1,7 +1,7 @@
 /** Bid workspace API (T063, T067; FR-023, FR-028, US4 acceptance 1–2, US6 activity). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { activityLog, analyses, bidWorkspaces, notifications, tenders, type ChecklistItem } from '@tp/db';
+import { activityLog, analyses, bidWorkspaces, gemResultHints, notifications, tenders, type ChecklistItem } from '@tp/db';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { HINT_ORG_LIMIT } from '../src/routes/workspaces';
 import { hit, reset } from '../src/lib/rate-limit';
@@ -510,10 +510,12 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
       expect((await request(ctx.app, 'GET', '/tenders/not-a-uuid/result-hint', { cookie: demo.analyst.cookie })).status).toBe(404);
     });
 
-    it('reads the public result page through the GeM adapter and returns L1 (no seller names); a repeat within 15 min → 429, no GeM call', async () => {
+    const hint = (tenderId: string, cookie: string, app = ctx.app) => request(app, 'GET', `/tenders/${tenderId}/result-hint`, { cookie });
+
+    it('reads the public result page through the GeM adapter and returns L1 (no seller names); a repeat is served from the DB', async () => {
       const t = await tenderOf('lost');
       const before = mock.state.requests.results;
-      const r = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+      const r = await hint(t.id, demo.analyst.cookie);
       expect(r.status).toBe(200);
       const l1 = 950_000 + (Number(t.gemBidId) % 97) * 25_000;
       expect(r.body).toMatchObject({ available: true, l1Price: l1, sourceUrl: `${GEM}/bidding/bid/getBidResultView/${t.gemBidId}`, fetchedAt: NOW.toISOString() });
@@ -522,57 +524,83 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
       ]);
       expect(JSON.stringify(r.body)).not.toContain('Kaveri');
       expect(mock.state.requests.results).toBe(before + 1);
-      const again = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
-      expect(again.status).toBe(429);
-      expect(again.body.error.code).toBe('rate_limited');
+      const [row] = await ctx.db.select().from(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId!));
+      expect(row.hint).toEqual(r.body);
+      const again = await hint(t.id, demo.analyst.cookie);
+      expect(again.status).toBe(200);
+      expect(again.body).toEqual(r.body);
       expect(mock.state.requests.results).toBe(before + 1);
     });
 
-    it('the per-bid limit is DB-backed: it holds across two separately created app instances (Workers build deps per request)', async () => {
+    it('another org with a workspace for the same bid gets the stored hint (200, no GeM call)', async () => {
+      const t = await tenderOf('lost');
+      const other = await signup(ctx.app, { orgName: 'Second Bidder Org' });
+      expect((await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: other.cookie })).status).toBe(201);
+      const before = mock.state.requests.results;
+      const r = await hint(t.id, other.cookie);
+      expect(r.status).toBe(200);
+      expect(r.body).toMatchObject({ available: true, l1Price: 950_000 + (Number(t.gemBidId) % 97) * 25_000 });
+      expect(mock.state.requests.results).toBe(before);
+    });
+
+    it('limits are DB-backed: they hold across two separately created app instances (Workers build deps per request)', async () => {
       const t = await tenderOf('preparing');
       const second = await createTestContext({ now: NOW, keepData: true, gemBaseUrl: GEM, fetch: async (input, init) => mock.app.fetch(new Request(input as string, init)) });
       try {
         const before = mock.state.requests.results;
-        expect((await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie })).status).toBe(200);
-        const other = await request(second.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.bidManager.cookie });
-        expect(other.status).toBe(429);
-        expect(other.headers.get('retry-after')).toBe(String(15 * 60));
+        expect((await hint(t.id, demo.analyst.cookie)).status).toBe(200);
+        // Instance 2 sees instance 1's stored hint…
+        expect((await hint(t.id, demo.bidManager.cookie, second.app)).status).toBe(200);
         expect(mock.state.requests.results).toBe(before + 1);
-        // 15 minutes later the bid may be fetched again (from either instance).
+        // …and, without it, instance 1's per-bid slot: no second GeM fetch within 15 minutes.
+        await ctx.db.delete(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId!));
+        const limited = await hint(t.id, demo.bidManager.cookie, second.app);
+        expect(limited.status).toBe(429);
+        expect(limited.body.error.code).toBe('rate_limited');
+        expect(limited.headers.get('retry-after')).toBe(String(15 * 60));
+        expect(mock.state.requests.results).toBe(before + 1);
         second.clock.advance(15 * 60_000);
-        expect((await request(second.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.bidManager.cookie })).status).toBe(200);
+        expect((await hint(t.id, demo.bidManager.cookie, second.app)).status).toBe(200);
         expect(mock.state.requests.results).toBe(before + 2);
       } finally {
         await second.close();
       }
     });
 
-    it('caps lookups at 20 per org per hour (429, no GeM call)', async () => {
+    it('caps lookups at 20 per org per hour (429) — checked first, so it never burns the bid slot', async () => {
       const t = await tenderOf('analysing');
       for (let i = 0; i < HINT_ORG_LIMIT.limit; i++) await hit(ctx.db, demo.orgId, 'gem_result_org', HINT_ORG_LIMIT, NOW);
       try {
         const before = mock.state.requests.results;
-        const r = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+        const r = await hint(t.id, demo.analyst.cookie);
         expect(r.status).toBe(429);
         expect(r.body.error.code).toBe('rate_limited');
         expect(mock.state.requests.results).toBe(before);
+        await reset(ctx.db, demo.orgId, 'gem_result_org');
+        // The bid slot is still free: the next lookup fetches GeM.
+        expect((await hint(t.id, demo.analyst.cookie)).status).toBe(200);
+        expect(mock.state.requests.results).toBe(before + 1);
       } finally {
         await reset(ctx.db, demo.orgId, 'gem_result_org');
       }
     });
 
-    it('degrades to { available: false } when GeM is down or the tender has no GeM id', async () => {
+    it('degrades to { available: false } when GeM is down (slot given back) or the tender has no GeM id', async () => {
       const t = await tenderOf('won');
       mock.state.failMode = 'down';
       try {
-        const r = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+        const r = await hint(t.id, demo.analyst.cookie);
         expect(r.status).toBe(200);
         expect(r.body).toEqual({ available: false, reason: 'gem_unavailable' });
       } finally {
         mock.state.failMode = 'off';
       }
+      // A failed fetch does not consume the per-bid slot and is not stored.
+      const retry = await hint(t.id, demo.analyst.cookie);
+      expect(retry.status).toBe(200);
+      expect(retry.body.available).toBe(true);
       // seedApply's tender has no BidPlus b_id.
-      const none = await request(ctx.app, 'GET', `/tenders/${s.tender.id}/result-hint`, { cookie: s.org.analyst.cookie });
+      const none = await hint(s.tender.id, s.org.analyst.cookie);
       expect(none.body).toEqual({ available: false, reason: 'no_gem_id' });
     });
   });
