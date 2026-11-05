@@ -5,6 +5,9 @@ import { activityLog, analyses, bidWorkspaces, gemResultHints, notifications, te
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { HINT_ORG_LIMIT } from '../src/routes/workspaces';
 import { hit, reset } from '../src/lib/rate-limit';
+import { serviceUnavailable } from '../src/lib/errors';
+import { GEM_BUSY_MESSAGE } from '../src/lib/gem-lease';
+import { GEM_LEASE_MAX_WAIT_MS } from '@tp/core/contracts/caps';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
@@ -585,6 +588,33 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
         expect(mock.state.requests.results).toBe(before + 1);
       } finally {
         await reset(ctx.db, demo.orgId, 'gem_result_org');
+      }
+    });
+
+    it('takes the cluster-wide GeM lease before fetching; gem_busy degrades to gem_unavailable and gives the bid slot back (008/FR-024)', async () => {
+      const t = await tenderOf('submitted');
+      await ctx.db.delete(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId!));
+      const waits: number[] = [];
+      let busy = true;
+      const leased = await createTestContext({
+        now: NOW, keepData: true, gemBaseUrl: GEM, fetch: async (input, init) => mock.app.fetch(new Request(input as string, init)),
+        gemLease: { async acquire(maxWaitMs) { waits.push(maxWaitMs); if (busy) throw serviceUnavailable('gem_busy', GEM_BUSY_MESSAGE); } },
+      });
+      try {
+        const before = mock.state.requests.results;
+        const r = await hint(t.id, demo.analyst.cookie, leased.app);
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({ available: false, reason: 'gem_unavailable' });
+        expect(waits).toEqual([GEM_LEASE_MAX_WAIT_MS]);
+        expect(mock.state.requests.results).toBe(before); // refused by the lease: GeM never asked
+        busy = false;
+        const ok = await hint(t.id, demo.analyst.cookie, leased.app); // slot was released, so this may fetch
+        expect(ok.status).toBe(200);
+        expect(ok.body.available).toBe(true);
+        expect(waits).toEqual([GEM_LEASE_MAX_WAIT_MS, GEM_LEASE_MAX_WAIT_MS]);
+        expect(mock.state.requests.results).toBe(before + 1);
+      } finally {
+        await leased.close();
       }
     });
 

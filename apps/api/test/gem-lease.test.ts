@@ -7,7 +7,7 @@ import { eq, sql } from 'drizzle-orm';
 import { createNodeDb, gemThrottle, ingestionRuns, tenders } from '@tp/db';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import type { Logger } from '../src/deps';
-import { acquireGemSlot, ClockOffset, createPgGemLease, GEM_BUSY_MESSAGE, reserveGemSlot } from '../src/lib/gem-lease';
+import { acquireGemSlot, ClockOffset, clockOffsetFor, createPgGemLease, GEM_BUSY_MESSAGE, MAX_CLOCK_SAMPLES, reserveGemSlot } from '../src/lib/gem-lease';
 import { HttpError } from '../src/lib/errors';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import { IngestionBusyError, isOneRunningViolation, runIngestion } from '../src/services/ingest';
@@ -69,6 +69,43 @@ describe('ClockOffset (DB clock → local clock bounds)', () => {
     expect(o.earliestLocal(9011)).toBeLessThanOrEqual(12);
     o.add(5000, 5400, 14_200); // stale bounds dropped: only this (wide) sample counts
     expect(o.width).toBe(402);
+  });
+});
+
+describe('ClockOffset caching and sampling (review S2)', () => {
+  it('add() reports whether a sample narrowed the bounds', () => {
+    const o = new ClockOffset();
+    expect(o.add(1000, 1100, 6050)).toBe(true); // first sample: Infinity → 102
+    expect(o.add(2000, 2010, 7005)).toBe(true); // tighter
+    expect(o.add(3000, 3200, 8100)).toBe(false); // wider sample inside the bounds: no change
+  });
+
+  it('is cached at module scope per DATABASE_URL, so a per-request Db reuses the bounds', async () => {
+    const key = `postgres://clock-key-${Date.now()}`;
+    const perRequestDb = Object.create(ctx.db) as typeof ctx.db; // a distinct Db object, as the Worker builds per request
+    expect(clockOffsetFor(ctx.db, key)).toBe(clockOffsetFor(perRequestDb, key));
+    expect(clockOffsetFor(ctx.db)).not.toBe(clockOffsetFor(perRequestDb));
+    await acquireGemSlot(ctx.db, 10, 1000, { clockKey: key });
+    expect(clockOffsetFor(perRequestDb, key).width).toBeLessThan(Infinity);
+  });
+
+  it('takes at most MAX_CLOCK_SAMPLES extra clock readings per reservation, stopping at the first that does not narrow', async () => {
+    let reserves = 0;
+    let samples = 0;
+    const counting = Object.create(ctx.db) as typeof ctx.db;
+    counting.execute = (async (q: Parameters<typeof ctx.db.execute>[0]) => {
+      const res = await ctx.db.execute(q);
+      const row = (res as unknown as { rows: Record<string, unknown>[] }).rows[0] ?? {};
+      if ('slot_ms' in row) reserves++;
+      if ('db_ms' in row) samples++;
+      return res;
+    }) as typeof ctx.db.execute;
+    // A 2 ms tolerance: the bounds (≥ 2 ms wide from millisecond timestamps) are never tight enough for it, so
+    // only the stop rules end the sampling.
+    await acquireGemSlot(counting, 10, 5000, { lateToleranceMs: 2, clockKey: `k-${Date.now()}` });
+    expect(reserves).toBeGreaterThanOrEqual(1);
+    expect(samples).toBeGreaterThanOrEqual(1);
+    expect(samples).toBeLessThanOrEqual(MAX_CLOCK_SAMPLES * reserves);
   });
 });
 

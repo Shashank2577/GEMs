@@ -36,24 +36,14 @@ export const TEST_APP_URL = 'http://tp.test';
 
 const migrated = new Map<string, Promise<void>>();
 
-/** Run migrations once per process per database, serialised across processes by an advisory lock. */
+/**
+ * Run migrations once per process per database. `runMigrations` itself serialises runs across processes (polled
+ * advisory lock); a blocking lock here would deadlock with the CREATE INDEX CONCURRENTLY of another worker's run.
+ */
 export function ensureMigrated(url = TEST_DATABASE_URL): Promise<void> {
   let p = migrated.get(url);
   if (!p) {
-    p = (async () => {
-      const { db, close } = await createNodeDb(url);
-      // A dedicated connection holds the lock while the migrator runs on its own pool.
-      const pool = (db as unknown as { $client: { connect(): Promise<{ query(q: string): Promise<unknown>; release(): void }> } }).$client;
-      const client = await pool.connect();
-      try {
-        await client.query('select pg_advisory_lock(727001)');
-        await runMigrations(url);
-      } finally {
-        await client.query('select pg_advisory_unlock(727001)').catch(() => {});
-        client.release();
-        await close();
-      }
-    })();
+    p = runMigrations(url).then(() => undefined);
     migrated.set(url, p);
   }
   return p;

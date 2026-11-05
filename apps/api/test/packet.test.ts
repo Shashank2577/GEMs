@@ -274,6 +274,16 @@ describe('packet order, input cap, recovery and download names (US5 gaps)', () =
     expect(loadConfig({ PACKET_MAX_INPUT_BYTES: '-5' }).packetMaxInputBytes).toBe(62_914_560);
   });
 
+  it('the Worker and .dev.vars.example set PACKET_MAX_INPUT_BYTES to 40 MB (008/FR-032: pdf-lib 2–3× peak under 128 MB)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const root = new URL('../../../', import.meta.url);
+    const wrangler = await readFile(new URL('wrangler.toml', root), 'utf8');
+    const vars = wrangler.slice(wrangler.indexOf('[vars]'));
+    expect(vars).toMatch(/^PACKET_MAX_INPUT_BYTES = "41943040"$/m);
+    expect(loadConfig({ PACKET_MAX_INPUT_BYTES: vars.match(/^PACKET_MAX_INPUT_BYTES = "(\d+)"$/m)![1] }).packetMaxInputBytes).toBe(40 * 1024 * 1024);
+    expect(await readFile(new URL('.dev.vars.example', root), 'utf8')).toMatch(/^PACKET_MAX_INPUT_BYTES=41943040$/m);
+  });
+
   it('marks builds stuck in "building" for more than 10 minutes as failed when read (FR-057)', async () => {
     // The cutoff is evaluated in database time (now() - 10 minutes), like created_at itself.
     const at = (min: number) => new Date(Date.now() - min * 60_000);

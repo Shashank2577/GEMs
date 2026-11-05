@@ -559,6 +559,38 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
     expect(over.analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 0, total: 5 }]);
   });
 
+  it('a timed-out call aborts the provider request (AbortSignal through completeJson to fetch; review S3)', async () => {
+    const { analyseTender } = await import('../src/services/analyse');
+    const { createAnthropicClient } = await import('../src/adapters/llm');
+    const signals: AbortSignal[] = [];
+    // The real adapter over a fetch that never answers unless aborted.
+    const llm = createAnthropicClient({
+      apiKey: 'k', model: 'fake',
+      fetch: (async (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        const sig = init!.signal!;
+        signals.push(sig);
+        sig.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      })) as unknown as typeof fetch,
+    });
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} };
+    const r = await analyseTender({ ...ctx.deps, llm }, input, { llmBudget: { callTimeoutMs: 50 } });
+    expect(r.analysis.method).toBe('rules');
+    expect(signals).toHaveLength(2);
+    expect(signals.every((sig) => sig.aborted)).toBe(true);
+  });
+
+  it('a failed LLM call (not a skipped one) still carries the covered-X-of-Y warning (review S4)', async () => {
+    calls.length = 0;
+    const one = (await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9400003', contentHash: 'budget-fail' })).id;
+    await request(ctx.app, 'POST', `/tenders/${one}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services') } });
+    const failing = countingLlm(async () => { throw new Error('provider 529'); });
+    const r = await request(createApp({ ...ctx.deps, llm: failing }), 'POST', `/tenders/${one}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(201);
+    expect(calls.length).toBe(1);
+    expect(r.body.method).toBe('rules');
+    expect(r.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 0, total: 1 }]);
+  });
+
   it('no warning when every document fits the budget; rules-only (no LLM) never warns', async () => {
     calls.length = 0;
     const one = (await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9400002', contentHash: 'budget-1' })).id;

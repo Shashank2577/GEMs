@@ -99,6 +99,13 @@
       "when": 1793855375031,
       "tag": "0013_capacity_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793856132930,
+      "tag": "0014_open_closing_idx",
+      "breakpoints": true
     }
   ]
 }

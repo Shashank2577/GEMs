@@ -25,16 +25,11 @@ export const LLM_CALL_TIMEOUT_MS = 60_000;
 export const ANALYSIS_BUDGET_MS = 120_000;
 
 /**
- * 008/FR-032's packet input target (40 MB). The API enforces 006/FR-056's configurable cap (`PACKET_MAX_INPUT_BYTES`,
- * default 60 MB); set it to this value to apply 008's limit. Spec conflict 006 FR-056 (60 MB) vs 008 FR-032 (40 MB) is open.
+ * Most items in one packet (FR-032); also `packetBuildSchema.items.max`.
+ * Packet input size is not a constant here: it is 006/FR-056's configurable `PACKET_MAX_INPUT_BYTES` (apps/api env),
+ * which the Worker sets to 40 MB in wrangler.toml per 008/FR-032.
  */
-export const PACKET_MAX_BYTES = 40 * MB;
-
-/** Most items in one packet (FR-032); also `packetBuildSchema.items.max`. */
 export const PACKET_MAX_ITEMS = 40;
-
-/** 008/FR-032's size estimate for one generated page (the API uses 006's 50 KB per annexure; kept for the pinned contract). */
-export const PACKET_GENERATED_PAGE_BYTES = 512 * 1024;
 
 /** Largest JSON request body (FR-021). */
 export const JSON_BODY_MAX_BYTES = 1 * MB;
@@ -53,9 +48,6 @@ export const GEM_LEASE_MAX_WAIT_MS = 25_000;
  * reaper (`RUN_LOCK_MS`) so a run never outlives its lock.
  */
 export const INGESTION_RUN_BUDGET_MS = 10 * 60_000;
-
-/** `candidateTenders` (watchlist preview/back-fill) reads at most this many open tenders (FR-028). */
-export const MAX_CANDIDATE_TENDERS = 2_000;
 
 /** Human-readable size for cap messages: "45 MB". */
 export function formatMb(bytes: number): string {

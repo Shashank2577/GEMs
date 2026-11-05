@@ -44,7 +44,8 @@ export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetc
     rateLimiter: createPgRateLimiter(db),
     errors: noopErrorReporter,
     // 008/FR-024: one GeM request per GEM_MIN_INTERVAL_MS across every isolate (0 = unthrottled, local tests only).
-    gemLease: gem.minIntervalMs > 0 ? createPgGemLease(db, gem.minIntervalMs) : noopGemLease,
+    // Clock bounds are cached per DATABASE_URL at module scope, not per request's pool (review S2).
+    gemLease: gem.minIntervalMs > 0 ? createPgGemLease(db, gem.minIntervalMs, { clockKey: env.DATABASE_URL }) : noopGemLease,
   };
 }
 

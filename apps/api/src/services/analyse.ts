@@ -275,17 +275,28 @@ const MIN_LLM_DOC_CHARS = 2_000;
 /** Reserve per page for the "=== Page N ===" header around the page text. */
 const PAGE_HEADER_CHARS = 24;
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+/**
+ * Run `call` with an AbortSignal that fires after `ms`: the provider request is aborted (review S3), and the race
+ * also rejects at once in case the client ignores the signal.
+ */
+export function withTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
+  const ctrl = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`LLM call timed out after ${Math.round(ms / 1000)} s`)), Math.max(0, ms));
+    timer = setTimeout(() => {
+      const err = new Error(`LLM call timed out after ${Math.round(ms / 1000)} s`);
+      ctrl.abort(err);
+      reject(err);
+    }, Math.max(0, ms));
   });
-  return Promise.race([p, expired]).finally(() => clearTimeout(timer));
+  return Promise.race([call(ctrl.signal), expired]).finally(() => clearTimeout(timer));
 }
 
 export async function analyseTender(
   deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }, opts: { llmBudget?: Partial<LlmBudgetLimits> } = {},
 ): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
+  // 008/FR-031's 120 s overall budget is wall-clock from the request, so a slow GeM auto-fetch counts too (review N4).
+  const started = Date.now();
   const tender = await getTender(deps, input.tenderId, input.viewer);
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
@@ -318,7 +329,6 @@ export async function analyseTender(
     let usedLlm = false;
     // 008/FR-031: ≤ 2 LLM calls, ≤ 90k characters, 60 s per call, 120 s overall; the rest is rules-only.
     const limits = { ...DEFAULT_LLM_BUDGET, ...opts.llmBudget };
-    const started = Date.now();
     const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
     for (const d of ordered) {
       const pages = splitPages(d.text);
@@ -340,14 +350,15 @@ export async function analyseTender(
       }
       llmUse.calls++;
       const timeoutMs = Math.min(limits.callTimeoutMs, limits.budgetMs - elapsed);
-      const r = await enrichWithLlm(pages, rules, (req) => withTimeout(llm.completeJson(req), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
+      const r = await enrichWithLlm(pages, rules, (req) => withTimeout((signal) => llm.completeJson({ ...req, signal }), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
       llmUse.chars += r.inputChars;
       if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
       if (r.used) llmUse.covered++;
       usedLlm ||= r.used;
       perDoc.push(r.requirements);
     }
-    const warnings: AnalysisWarning[] = llmUse.skipped
+    // Any document the LLM did not cover — skipped for budget, or a call that failed/timed out — gets the caveat (S4).
+    const warnings: AnalysisWarning[] = deps.llm && llmUse.covered < llmUse.total
       ? [{ code: 'llm_budget_exhausted', covered: llmUse.covered, total: llmUse.total }]
       : [];
     if (deps.llm) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: Date.now() - started });

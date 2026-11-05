@@ -55,7 +55,8 @@ function buildFilters(q: TenderQuery, org: string, now: Date, scope: SQL, omit?:
   const status = q.status ?? 'open';
   if (status !== 'all') conds.push(eq(tenders.status, status));
   // Same as `end_at IS NULL OR end_at >= now`, written so the planner does not treat "open" and "still open" as
-  // independent (it would then over-trust tenders_open_end_idx); every open-feed query stays on the open-tender
+  // independent (it would then over-trust a closing-date index); it is also tenders_open_closing_idx's expression, so
+  // the closing-date sort reads only still-open rows. Every open-feed query stays on the open-tender
   // partial indexes (008/FR-027).
   if (status === 'open') conds.push(sql`coalesce(${tenders.endAt}, 'infinity'::timestamptz) >= ${now}`);
   if (q.q) {
@@ -108,7 +109,9 @@ function orderBy(q: TenderQuery, org: string): SQL[] {
   const score = sql`(select a.score from ${analyses} a where a.org_id = ${org} and a.tender_id = ${tenders.id} order by a.created_at desc limit 1)`;
   const relevance = sql`(select max(m.relevance) from ${tenderMatches} m where m.org_id = ${org} and m.tender_id = ${tenders.id})`;
   switch (q.sort) {
-    case 'endAt': return [sql`${tenders.endAt} asc nulls last`, desc(tenders.createdAt)];
+    // Same order as `end_at asc nulls last`, written as tenders_open_closing_idx's expression so the "still open"
+    // filter above is an index range (008/FR-027, review S5).
+    case 'endAt': return [sql`coalesce(${tenders.endAt}, 'infinity'::timestamptz) asc`, desc(tenders.createdAt)];
     case '-endAt': return [sql`${tenders.endAt} desc nulls last`, desc(tenders.createdAt)];
     case 'score': return [sql`${score} desc nulls last`, asc(tenders.endAt)];
     case '-score': return [sql`${score} asc nulls last`, asc(tenders.endAt)];

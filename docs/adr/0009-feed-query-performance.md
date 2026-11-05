@@ -25,7 +25,8 @@ rows), `matchAndNotify`, `refreshMatches`, `decorateTenders` callers.
 1. **Partial indexes on open tenders (MUST)** — `packages/db/src/schema.ts` + migration:
    ```sql
    CREATE INDEX tenders_open_created_idx ON tenders (created_at DESC) WHERE status = 'open';
-   CREATE INDEX tenders_open_end_idx     ON tenders (end_at)          WHERE status = 'open';
+   CREATE INDEX tenders_open_closing_idx ON tenders (coalesce(end_at, 'infinity')) WHERE status = 'open';
+   -- (was tenders_open_end_idx ON (end_at); 008 migration 0014 indexes the feed's "still open" expression instead)
    CREATE INDEX tenders_open_value_idx   ON tenders (estimated_value) WHERE status = 'open';
    CREATE INDEX tenders_open_state_idx   ON tenders (state)           WHERE status = 'open';
    CREATE INDEX tenders_open_ministry_idx ON tenders (ministry)       WHERE status = 'open';

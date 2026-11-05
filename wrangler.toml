@@ -27,6 +27,8 @@ APP_URL = "https://tenderpilot.workers.dev"
 GEM_BASE_URL = "https://bidplus.gem.gov.in"
 LLM_MODEL = "claude-sonnet-5-5"
 MAIL_FROM = "TenderPilot <alerts@tenderpilot.in>"
+# Packet build input cap (008 FR-032 / 006 FR-056): 40 MB keeps pdf-lib's 2-3x peak (ADR-0007) under the 128 MB isolate.
+PACKET_MAX_INPUT_BYTES = "41943040"
 
 [observability]
 enabled = true

@@ -23,20 +23,24 @@
  Execution Time: 0.105 ms
 (9 rows)
 
--- ?sort=endAt
+-- ?sort=endAt  (re-captured 2026-11-05 after review S5: migration 0014 tenders_open_closing_idx on
+-- coalesce(end_at, 'infinity') WHERE status='open'; same 500k fixture with 5,000 of the 30,000 open tenders
+-- given a past end_at, i.e. expired but not yet flipped to closed. The "still open" filter is now the Index Cond,
+-- so expired rows are never read; before, it was a Filter on tenders_open_end_idx.)
                                              QUERY PLAN                                             
 ----------------------------------------------------------------------------------------------------
  Limit (actual rows=25 loops=1)
    ->  Incremental Sort (actual rows=25 loops=1)
-         Sort Key: end_at, created_at DESC
-         Presorted Key: end_at
+         Sort Key: (COALESCE(end_at, 'infinity'::timestamp with time zone)), created_at DESC
+         Presorted Key: (COALESCE(end_at, 'infinity'::timestamp with time zone))
          Full-sort Groups: 1  Sort Method: top-N heapsort  Average Memory: 28kB  Peak Memory: 28kB
          Pre-sorted Groups: 1  Sort Method: top-N heapsort  Average Memory: 28kB  Peak Memory: 28kB
-         ->  Index Scan using tenders_open_end_idx on tenders (actual rows=127 loops=1)
-               Filter: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
- Planning Time: 0.095 ms
- Execution Time: 0.327 ms
+         ->  Index Scan using tenders_open_closing_idx on tenders (actual rows=209 loops=1)
+               Index Cond: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.891 ms
+ Execution Time: 1.196 ms
 (10 rows)
+
 
 -- ?state=Maharashtra
                                                          QUERY PLAN                                                          

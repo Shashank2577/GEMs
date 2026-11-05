@@ -3,6 +3,7 @@
  * Every org-owned table carries org_id (Constitution IV).
  */
 import { sql } from 'drizzle-orm';
+import type { AnalysisWarning } from '@tp/core/contracts/analyse';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -276,7 +277,10 @@ export const tenders = pgTable('tenders', {
   // 008/FR-027: ~6 % of tenders are open and every feed/dashboard query filters on it. Built CONCURRENTLY by the
   // hand-edited non-transactional migration 0013 (`-- tp:non-transactional`, see migrate.ts).
   openCreatedIdx: index('tenders_open_created_idx').on(t.createdAt.desc().nullsFirst()).where(sql`status = 'open'`),
-  openEndIdx: index('tenders_open_end_idx').on(t.endAt).where(sql`status = 'open'`),
+  // Closing-date sort (review S5): the feed's "still open" filter is `coalesce(end_at, 'infinity') >= now`, so the index
+  // is on that expression — expired-but-not-yet-closed rows are skipped by the range, not read and filtered.
+  // Replaces tenders_open_end_idx (end_at); built CONCURRENTLY by the hand-edited non-transactional migration 0014.
+  openClosingIdx: index('tenders_open_closing_idx').on(sql`coalesce(${t.endAt}, 'infinity'::timestamptz)`).where(sql`status = 'open'`),
   // DESC NULLS LAST = the feed's "highest value" sort; also serves minValue/maxValue ranges.
   openValueIdx: index('tenders_open_value_idx').on(t.estimatedValue.desc().nullsLast()).where(sql`status = 'open'`),
   openStateIdx: index('tenders_open_state_idx').on(t.state).where(sql`status = 'open'`),
@@ -445,10 +449,8 @@ export const analyses = pgTable('analyses', {
   orgTenderCreatedIdx: index('analyses_org_tender_created_idx').on(t.orgId, t.tenderId, t.createdAt.desc().nullsFirst()),
 }));
 
-/** 008/FR-031/FR-037 analysis warnings. `covered`/`total` count documents read by the LLM vs all documents. */
-export type AnalysisWarning =
-  | { code: 'llm_budget_exhausted'; covered: number; total: number }
-  | { code: 'llm_quota_reached' };
+/** 008/FR-031/FR-037 analysis warnings; one definition, in the core contract (review N1). */
+export type { AnalysisWarning };
 
 // ───────────── Apply: workspace & packet ─────────────
 

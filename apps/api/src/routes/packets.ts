@@ -16,9 +16,9 @@ import { annexureTemplates, bidWorkspaces, packets } from '@tp/db';
 import { annexureTemplateInputSchema, packetBuildSchema } from '@tp/core/contracts/apply';
 import { normalizeTemplateKey, unknownPlaceholderMessage, unknownPlaceholders, type TemplateKey } from '@tp/core/packet/templates';
 import { logActivity } from '../lib/activity';
-import { HttpError, notFound } from '../lib/errors';
+import { HttpError, badRequest, notFound } from '../lib/errors';
 import { contentDisposition } from '../lib/http';
-import { parseJson } from '../lib/validate';
+import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
 import { assertPacketItemCount, buildWorkspacePacket, getTenderRow, recoverStuckPackets, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
@@ -123,9 +123,17 @@ packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), rateLimit(
   const org = orgId(c);
   const w = await getWorkspace(deps, org, c.req.param('id'));
   // 008/FR-032: > 40 items is a 413 packet_too_large (not a 400), so count before the schema caps the array.
-  const peek = await c.req.text().then((t) => { try { return JSON.parse(t) as { items?: unknown }; } catch { return null; } });
+  // The body is read and parsed once (review N2); invalid JSON is the usual 400.
+  let raw: unknown;
+  try {
+    const text = await c.req.text();
+    raw = text ? JSON.parse(text) : {};
+  } catch {
+    throw badRequest('Request body must be valid JSON');
+  }
+  const peek = raw as { items?: unknown } | null;
   if (Array.isArray(peek?.items)) assertPacketItemCount(peek.items.length);
-  const body = await parseJson(c, packetBuildSchema);
+  const body = parseWith(packetBuildSchema, raw, 'body');
   const p = await buildWorkspacePacket(deps, org, userId(c), w, body.items);
   await logActivity(deps.db, {
     orgId: org, userId: userId(c), action: p.status === 'ready' ? 'workspace.packet_built' : 'workspace.packet_failed', entityType: 'workspace', entityId: w.id,

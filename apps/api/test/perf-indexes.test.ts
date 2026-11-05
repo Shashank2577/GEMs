@@ -20,7 +20,7 @@ let owner: SignedUp;
 const captured: { text: string; values: unknown[] }[] = [];
 
 type PgPool = { query: (...args: unknown[]) => Promise<unknown> };
-type PlanNode = { 'Node Type': string; 'Index Name'?: string; 'Relation Name'?: string; Plans?: PlanNode[] };
+type PlanNode = { 'Node Type': string; 'Index Name'?: string; 'Relation Name'?: string; 'Index Cond'?: string; Plans?: PlanNode[] };
 
 /** Every node of a plan tree. */
 function nodes(plan: PlanNode): PlanNode[] {
@@ -79,11 +79,11 @@ describe('bulk fixture (T071)', () => {
 });
 
 describe('feed uses the open-tender partial indexes (FR-027, US4 scenario 4)', () => {
-  const OPEN_INDEXES = /^tenders_open_(created|end|value|state|ministry|category)_idx$/;
+  const OPEN_INDEXES = /^tenders_open_(created|closing|value|state|ministry|category)_idx$/;
   // [request, index the page query must use (null = any open-tender partial index — the planner picks by cost)]
   const cases: [string, string | null][] = [
     ['/tenders', 'tenders_open_created_idx'],
-    ['/tenders?sort=endAt', 'tenders_open_end_idx'],
+    ['/tenders?sort=endAt', 'tenders_open_closing_idx'],
     ['/tenders?minValue=500000&sort=value', 'tenders_open_value_idx'],
     ['/tenders?state=Maharashtra', null],
     ['/tenders?state=Maharashtra&ministry=Ministry%20of%20Defence&sort=endAt', null],
@@ -96,6 +96,11 @@ describe('feed uses the open-tender partial indexes (FR-027, US4 scenario 4)', (
       // At least one open-tender partial index bounds the work to open tenders (it may be AND-ed with another index).
       expect(used.some((u) => OPEN_INDEXES.test(u)), JSON.stringify(used)).toBe(true);
       if (index) expect(used).toContain(index);
+      if (index === 'tenders_open_closing_idx') {
+        // Review S5: "still open" is the index range itself, so expired-but-open rows are never read.
+        const scan = nodes((await explain(list.text, list.values)).plan).find((n) => n['Index Name'] === index);
+        expect(String(scan?.['Index Cond'] ?? ''), JSON.stringify(scan)).toMatch(/COALESCE\(end_at, 'infinity'/i);
+      }
       // Page, count and the three facet queries.
       const tenderQueries = qs.filter((q) => /from "tenders"/.test(q.text));
       expect(tenderQueries.length).toBe(5);

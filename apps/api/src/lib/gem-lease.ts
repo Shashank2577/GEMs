@@ -35,6 +35,12 @@ export interface GemLeaseOptions {
    * caller (spec tolerance: 20 ms). Default 20.
    */
   lateToleranceMs?: number;
+  /**
+   * Share the DB↔local clock bounds across every `Db` built for the same database in this isolate/process (review
+   * S2: the Worker builds a new pool per request, so a per-`Db` cache would resample on every request). Pass the
+   * DATABASE_URL; without it the bounds are cached per `Db` object.
+   */
+  clockKey?: string;
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -53,16 +59,19 @@ export class ClockOffset {
   /** Bounds older than `maxAgeMs` are dropped (clock drift); an empty intersection (clock step) restarts too. */
   constructor(private readonly maxAgeMs = 5 * 60_000) {}
 
-  add(sentAt: number, recvAt: number, dbMs: number): void {
+  /** Fold in one sample; returns whether it made the bounds narrower (a restart counts as narrower only if it is). */
+  add(sentAt: number, recvAt: number, dbMs: number): boolean {
+    const before = this.width;
     // ±1 ms: Date.now() has millisecond resolution, the DB clock microseconds.
     const lo = dbMs - recvAt - 1;
     const hi = dbMs - sentAt + 1;
     if (recvAt - this.since > this.maxAgeMs || lo > this.hi || hi < this.lo) {
       this.lo = lo; this.hi = hi; this.since = recvAt;
-      return;
+    } else {
+      this.lo = Math.max(this.lo, lo);
+      this.hi = Math.min(this.hi, hi);
     }
-    this.lo = Math.max(this.lo, lo);
-    this.hi = Math.min(this.hi, hi);
+    return this.width < before;
   }
 
   /** Uncertainty of the offset in ms (Infinity before the first sample). */
@@ -73,20 +82,30 @@ export class ClockOffset {
   latestLocal(dbMs: number): number { return dbMs - this.lo; }
 }
 
-const offsets = new WeakMap<object, ClockOffset>();
-function clockOffsetFor(db: Db): ClockOffset {
-  let o = offsets.get(db);
-  if (!o) { o = new ClockOffset(); offsets.set(db, o); }
+const offsetsByDb = new WeakMap<object, ClockOffset>();
+/** Module scope: one per database for the life of the isolate/process (review S2). */
+const offsetsByKey = new Map<string, ClockOffset>();
+export function clockOffsetFor(db: Db, key?: string): ClockOffset {
+  if (key) {
+    let o = offsetsByKey.get(key);
+    if (!o) { o = new ClockOffset(); offsetsByKey.set(key, o); }
+    return o;
+  }
+  let o = offsetsByDb.get(db);
+  if (!o) { o = new ClockOffset(); offsetsByDb.set(db, o); }
   return o;
 }
 
+/** Extra clock readings per acquire, at most; sampling also stops as soon as one does not narrow the bounds. */
+export const MAX_CLOCK_SAMPLES = 3;
+
 /** One cheap DB clock reading, folded into `offset` (no row lock, so it narrows the bounds under contention). */
-async function sampleClock(db: Db, offset: ClockOffset): Promise<void> {
+async function sampleClock(db: Db, offset: ClockOffset): Promise<boolean> {
   const sentAt = Date.now();
   const res = await db.execute(sql`select (extract(epoch from clock_timestamp()) * 1000)::double precision as db_ms`);
   const recvAt = Date.now();
   const row = (res as unknown as { rows: { db_ms: number | string }[] }).rows[0];
-  if (row) offset.add(sentAt, recvAt, Number(row.db_ms));
+  return row ? offset.add(sentAt, recvAt, Number(row.db_ms)) : false;
 }
 
 /**
@@ -117,15 +136,18 @@ export async function acquireGemSlot(db: Db, minIntervalMs: number, maxWaitMs: n
   const tolerance = opts.lateToleranceMs ?? 20;
   // Injected sleeps (tests) skip the late check unless a tolerance is given explicitly.
   const checkLate = opts.sleep === undefined || opts.lateToleranceMs !== undefined;
-  const offset = clockOffsetFor(db);
+  const offset = clockOffsetFor(db, opts.clockKey);
   const started = Date.now();
   for (;;) {
     const sentAt = Date.now();
     const slot = await reserveGemSlot(db, minIntervalMs, Math.max(0, maxWaitMs - (sentAt - started)));
     if (!slot) throw serviceUnavailable('gem_busy', GEM_BUSY_MESSAGE, { maxWaitMs });
     offset.add(sentAt, Date.now(), slot.dbNowMs);
-    // Too uncertain to place the slot within the tolerance: a few uncontended clock readings narrow it.
-    for (let i = 0; checkLate && offset.width > tolerance / 2 && i < 5; i++) await sampleClock(db, offset);
+    // Too uncertain to place the slot within the tolerance: a few uncontended clock readings narrow it. A reading
+    // that does not narrow the bounds means more will not either (DB latency dominates), so stop there.
+    for (let i = 0; checkLate && offset.width > tolerance / 2 && i < MAX_CLOCK_SAMPLES; i++) {
+      if (!(await sampleClock(db, offset))) break;
+    }
     // Never early: sleep until the LATEST local time the slot can be. Late: past the EARLIEST time + tolerance, the
     // next caller (who also never sends early) may already be sending, so our slot is spent; take a fresh one. If
     // the bounds stay wider than the tolerance (pathological DB latency) only the late wake-up itself is checked.

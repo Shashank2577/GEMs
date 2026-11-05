@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sql } from 'drizzle-orm';
 import { createNodeDb, type Db } from '@tp/db';
-import { isNonTransactional, NON_TRANSACTIONAL_MARKER, runMigrations } from '@tp/db/migrate';
+import { concurrentIndexTarget, isNonTransactional, NON_TRANSACTIONAL_MARKER, runMigrations } from '@tp/db/migrate';
 import { ensureMigrated, TEST_DATABASE_URL } from './helpers';
 
 const tag = `mig_${Date.now().toString(36)}`;
@@ -33,6 +33,8 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await db.execute(sql.raw(`drop schema if exists "${tag}" cascade; drop schema if exists "${data}" cascade`));
+  await db.execute(sql.raw(`drop schema if exists "${tag}_inv" cascade; drop schema if exists "${data}_inv" cascade`));
+  await db.execute(sql.raw(`drop schema if exists "${tag}_lock" cascade; drop schema if exists "${data}_lock" cascade`));
   await close();
   await rm(dir, { recursive: true, force: true });
 });
@@ -80,11 +82,68 @@ describe('non-transactional migrations (T067)', () => {
   });
 });
 
+describe('INVALID indexes and concurrent runs (review S1)', () => {
+  it('parses the index and table of a CREATE INDEX CONCURRENTLY statement', () => {
+    expect(concurrentIndexTarget(`${NON_TRANSACTIONAL_MARKER}\n-- c\nCREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "My_Idx" ON "s".t USING btree (v);`))
+      .toEqual({ index: 'My_Idx', table: '"s".t' });
+    expect(concurrentIndexTarget('create index concurrently Foo_idx on ONLY bar (x)')).toEqual({ index: 'foo_idx', table: 'bar' });
+    expect(concurrentIndexTarget('CREATE INDEX foo ON bar (x)')).toBeNull();
+  });
+
+  it('drops an INVALID index left by a failed CONCURRENTLY build instead of skipping it via IF NOT EXISTS', async () => {
+    const d = `${data}_inv`;
+    const folder = await mkdtemp(join(tmpdir(), 'tp-migrations-inv-'));
+    try {
+      await db.execute(sql.raw(`create schema "${d}"; create table "${d}".t (v int); insert into "${d}".t values (1), (1)`));
+      // Plant the INVALID index: a unique build over duplicates fails and leaves it behind.
+      await expect(db.execute(sql.raw(`CREATE UNIQUE INDEX CONCURRENTLY t_v_uq ON "${d}".t (v)`))).rejects.toThrow();
+      const state = async () => rows<{ valid: boolean }>(sql.raw(
+        `select indisvalid as valid from pg_index where indexrelid = to_regclass('"${d}".t_v_uq')`));
+      expect(await state()).toEqual([{ valid: false }]);
+
+      const body = `${NON_TRANSACTIONAL_MARKER}\nCREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS t_v_uq ON "${d}".t (v);`;
+      await mkdir(join(folder, 'meta'), { recursive: true });
+      await writeFile(join(folder, 'meta', '_journal.json'), JSON.stringify({ version: '7', dialect: 'postgresql', entries: [{ idx: 0, version: '7', when: 1_700_000_000_000, tag: '0000_uq', breakpoints: true }] }));
+      await writeFile(join(folder, '0000_uq.sql'), body);
+      const logs: string[] = [];
+      // Still duplicates: the invalid index is dropped, the rebuild fails again, nothing is recorded.
+      await expect(runMigrations(TEST_DATABASE_URL, { migrationsFolder: folder, migrationsSchema: `${tag}_inv`, log: (l) => logs.push(l) })).rejects.toThrow();
+      expect(logs.some((l) => /dropping INVALID index .*t_v_uq/.test(l))).toBe(true);
+      expect((await rows<{ n: number }>(sql.raw(`select count(*)::int as n from "${tag}_inv".__drizzle_migrations`)))[0].n).toBe(0);
+      // Data fixed: the next run drops the new invalid leftover and builds a valid index, then records the file.
+      await db.execute(sql.raw(`delete from "${d}".t where ctid = (select max(ctid) from "${d}".t)`));
+      expect((await runMigrations(TEST_DATABASE_URL, { migrationsFolder: folder, migrationsSchema: `${tag}_inv` })).applied).toEqual(['0000_uq']);
+      expect(await state()).toEqual([{ valid: true }]);
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  });
+
+  it('two runs at once (advisory lock) apply each migration exactly once', async () => {
+    const d = `${data}_lock`;
+    const folder = await mkdtemp(join(tmpdir(), 'tp-migrations-lock-'));
+    try {
+      await mkdir(join(folder, 'meta'), { recursive: true });
+      const files = [
+        { tag: '0000_t', body: `CREATE SCHEMA "${d}";--> statement-breakpoint\nCREATE TABLE "${d}".t (id int);` },
+        { tag: '0001_idx', body: `${NON_TRANSACTIONAL_MARKER}\nCREATE INDEX CONCURRENTLY IF NOT EXISTS t_id_idx ON "${d}".t (id);` },
+      ];
+      await writeFile(join(folder, 'meta', '_journal.json'), JSON.stringify({ version: '7', dialect: 'postgresql', entries: files.map((f, i) => ({ idx: i, version: '7', when: 1_700_000_000_000 + i, tag: f.tag, breakpoints: true })) }));
+      for (const f of files) await writeFile(join(folder, `${f.tag}.sql`), f.body);
+      const runs = await Promise.all([0, 1, 2].map(() => runMigrations(TEST_DATABASE_URL, { migrationsFolder: folder, migrationsSchema: `${tag}_lock` })));
+      expect(runs.flatMap((r) => r.applied).sort()).toEqual(['0000_t', '0001_idx']);
+      expect((await rows<{ n: number }>(sql.raw(`select count(*)::int as n from "${tag}_lock".__drizzle_migrations`)))[0].n).toBe(2);
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('repo capacity indexes (T064, T068, T069)', () => {
   it('are present and valid after migrating', async () => {
     await ensureMigrated();
     const names = [
-      'tenders_open_created_idx', 'tenders_open_end_idx', 'tenders_open_value_idx', 'tenders_open_state_idx', 'tenders_open_ministry_idx',
+      'tenders_open_created_idx', 'tenders_open_closing_idx', 'tenders_open_value_idx', 'tenders_open_state_idx', 'tenders_open_ministry_idx',
       'tenders_open_category_idx', 'analyses_org_tender_created_idx', 'notifications_pending_idx', 'ingestion_runs_one_running_uq',
     ];
     const found = await rows<{ name: string; valid: boolean; def: string }>(sql`
