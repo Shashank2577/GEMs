@@ -4,7 +4,8 @@
  *   runIngestion(deps, { trigger: 'manual', pages: 3 }) → ingestion_runs row
  *
  * 1. Fetch BidPlus listing pages through the polite GemClient (≤ 1 req/s, back-off): incremental — stop after
- *    a page of known, unchanged bids — with a 20-page catch-up cap after a > 2 h gap (FR-011); scheduled runs
+ *    a page of known, unchanged bids — with a 20-page catch-up cap after a > 2 h gap since the last clean listing,
+ *    or after a run that used up its cap (which then resumes past that depth) (FR-011); scheduled runs
  *    then search up to 10 rotating watchlist keywords (FR-012). > 50 % docs without a bid number or a missing
  *    `response.response.docs` fails the run as format drift and logs `ingestion.format_drift` (FR-014).
  * 2. Upsert tenders by (source, bidNumber); unchanged content hash → only `fetchedAt` moves.
@@ -15,7 +16,7 @@
  *    (pending → services/alerts.ts). Deduped by (user, channel, `tender:<tenderId>:<orgId>`).
  * GeM being down never loses data: the run is recorded as `failed` (or `partial`) with the error.
  */
-import { and, desc, eq, gt, inArray, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import {
   analyses, ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
   type WatchlistCriteria,
@@ -76,6 +77,7 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
 
   const [run] = await db.insert(ingestionRuns).values({ trigger: opts.trigger ?? 'cron', status: 'running', startedAt: now }).returning();
   const stats = { pagesFetched: 0, tendersSeen: 0, tendersCreated: 0, tendersUpdated: 0, matchesCreated: 0 };
+  let listingStop: IngestionRunRow['listingStop'] = null;
   const errors: string[] = [];
 
   const client = opts.client ?? new GemClient(deps.fetch, {
@@ -91,11 +93,13 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
     const fetched = new Map<string, NormalizedTender>();
     const plan = await planPages(deps, opts, now);
     let rawSeen = 0;
+    listingStop = plan.incremental ? 'cap' : 'explicit'; // unless we break out earlier
     for (let page = 1; page <= plan.maxPages; page++) {
       let res: Awaited<ReturnType<typeof client.fetchTenders>>;
       try {
         res = await client.fetchTenders({ page, search: opts.search, now });
       } catch (e) {
+        listingStop = 'error';
         if (isFormatDriftError(e)) throw driftFailure(deps, e, { page });
         errors.push(`page ${page}: ${errMsg(e)}`);
         logger.warn('ingestion: page failed', { page, error: errMsg(e) });
@@ -104,23 +108,31 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
       stats.pagesFetched++;
       for (const t of res.tenders) fetched.set(t.bidNumber, t);
       rawSeen += res.rawCount;
-      if (res.rawCount === 0 || rawSeen >= res.numFound) break;
-      // Stop once a whole page is already known and unchanged — the rest is older news.
-      if (plan.incremental && res.tenders.length && await allKnownUnchanged(deps, res.tenders)) break;
+      if (res.rawCount === 0 || rawSeen >= res.numFound) { listingStop = 'end'; break; }
+      // Stop once a whole page is already known and unchanged — the rest is older news. When resuming after a
+      // run that used up its cap, pages up to that run's depth are expected to be known, so keep going.
+      if (plan.incremental && page >= plan.noStopBefore && res.tenders.length && await allKnownUnchanged(deps, res.tenders)) {
+        listingStop = 'all_known';
+        break;
+      }
     }
-    logger.info('ingestion: listing pages fetched', { runId: run.id, pages: stats.pagesFetched, cap: plan.maxPages, catchUp: plan.catchUp, incremental: plan.incremental });
+    logger.info('ingestion: listing pages fetched', {
+      runId: run.id, pages: stats.pagesFetched, cap: plan.maxPages, catchUp: plan.catchUp, noStopBefore: plan.noStopBefore,
+      incremental: plan.incremental, stop: listingStop,
+    });
 
     // 1b. Targeted keyword search pass (FR-012) on scheduled runs, through the same throttled client.
     if (shouldSearch(opts) && errors.length === 0) {
-      const keywords = await searchKeywordsForRun(deps, run.id);
-      for (const kw of keywords) {
+      const keywords = await searchKeywordsForRun(deps);
+      for (const [i, kw] of keywords.entries()) {
         try {
           const res = await client.fetchTenders({ page: 1, search: kw, now });
           // GeM search is token-OR; results still go through the exact matcher below.
           for (const t of res.tenders) if (!fetched.has(t.bidNumber)) fetched.set(t.bidNumber, t);
         } catch (e) {
           if (isFormatDriftError(e)) throw driftFailure(deps, e, { search: kw });
-          errors.push(`search "${kw}": ${errMsg(e)}`);
+          // Never put the keyword in the run row: GET /ingestion/runs is visible to every org (Constitution IV).
+          errors.push(`keyword search ${i + 1}/${keywords.length}: ${errMsg(e)}`);
           logger.warn('ingestion: keyword search failed', { keyword: kw, error: errMsg(e) });
           break;
         }
@@ -162,13 +174,13 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
 
     const status: IngestionRunRow['status'] = errors.length === 0 ? 'success' : stats.pagesFetched > 0 ? 'partial' : 'failed';
     const [done] = await db.update(ingestionRuns).set({
-      ...stats, status, error: errors.length ? errors.slice(0, 5).join('; ').slice(0, 1000) : null, finishedAt: clock.now(),
+      ...stats, listingStop, status, error: errors.length ? errors.slice(0, 5).join('; ').slice(0, 1000) : null, finishedAt: clock.now(),
     }).where(eq(ingestionRuns.id, run.id)).returning();
     logger.info('ingestion finished', { runId: run.id, status, ...stats });
     return done;
   } catch (e) {
     logger.error('ingestion failed', { runId: run.id, error: errMsg(e) });
-    const [failed] = await db.update(ingestionRuns).set({ ...stats, status: 'failed', error: errMsg(e).slice(0, 1000), finishedAt: clock.now() })
+    const [failed] = await db.update(ingestionRuns).set({ ...stats, listingStop, status: 'failed', error: errMsg(e).slice(0, 1000), finishedAt: clock.now() })
       .where(eq(ingestionRuns.id, run.id)).returning();
     return failed;
   }
@@ -176,24 +188,47 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
 
 const clampPages = (n: number) => Math.max(1, Math.min(CATCH_UP_PAGES, Math.floor(n) || 1));
 
-/** Latest finish time of a successful/partial run (excluding running ones). */
-export async function lastSuccessAt(deps: AppDeps): Promise<Date | null> {
-  const [row] = await deps.db.select({ at: ingestionRuns.finishedAt }).from(ingestionRuns)
-    .where(and(or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial')), isNotNull(ingestionRuns.finishedAt)))
+const CLEAN_LISTING_STOPS = ['all_known', 'end', 'cap', 'explicit'] as const;
+
+/**
+ * The latest run whose *listing* phase completed cleanly (FR-011): status success, or partial for a reason after
+ * listing (keyword search, an upsert). Runs from before `listing_stop` existed count when they fully succeeded.
+ */
+export async function lastCleanListing(deps: AppDeps) {
+  const [row] = await deps.db.select({ finishedAt: ingestionRuns.finishedAt, pagesFetched: ingestionRuns.pagesFetched, listingStop: ingestionRuns.listingStop })
+    .from(ingestionRuns)
+    .where(and(
+      isNotNull(ingestionRuns.finishedAt),
+      or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial')),
+      or(inArray(ingestionRuns.listingStop, [...CLEAN_LISTING_STOPS]), and(isNull(ingestionRuns.listingStop), eq(ingestionRuns.status, 'success'))),
+    ))
     .orderBy(desc(ingestionRuns.finishedAt)).limit(1);
-  return row?.at ?? null;
+  return row ?? null;
+}
+
+export interface PagePlan {
+  maxPages: number;
+  incremental: boolean;
+  catchUp: boolean;
+  /** First page on which an all-known page may end the run (> 1 when resuming after a capped run). */
+  noStopBefore: number;
 }
 
 /**
  * Paging plan (FR-011). Explicit `pages` → fetch up to that many pages, no early stop. Otherwise incremental:
- * stop after a page of known, unchanged bids; normal cap `gem.maxPages`, or CATCH_UP_PAGES when the last
- * success is older than 2 h (or there never was one).
+ * stop after a page of known, unchanged bids; normal cap `gem.maxPages`. Catch-up (cap CATCH_UP_PAGES) when the
+ * last clean listing is older than 2 h (or there is none), or when it used up its page cap without reaching an
+ * all-known page — then this run resumes past that depth before an all-known page may stop it.
  */
-async function planPages(deps: AppDeps, opts: RunIngestionOptions, now: Date): Promise<{ maxPages: number; incremental: boolean; catchUp: boolean }> {
-  if (opts.pages != null) return { maxPages: clampPages(opts.pages), incremental: false, catchUp: false };
-  const last = await lastSuccessAt(deps);
-  const catchUp = !last || now.getTime() - last.getTime() > CATCH_UP_AFTER_MS;
-  return { maxPages: catchUp ? CATCH_UP_PAGES : clampPages(deps.gem.maxPages), incremental: true, catchUp };
+export async function planPages(deps: AppDeps, opts: RunIngestionOptions, now: Date): Promise<PagePlan> {
+  if (opts.pages != null) return { maxPages: clampPages(opts.pages), incremental: false, catchUp: false, noStopBefore: 1 };
+  const last = await lastCleanListing(deps);
+  const gap = !last?.finishedAt || now.getTime() - last.finishedAt.getTime() > CATCH_UP_AFTER_MS;
+  const capped = last?.listingStop === 'cap';
+  const catchUp = gap || capped;
+  // A capped run that already went CATCH_UP_PAGES deep can't be resumed further; fall back to a plain catch-up.
+  const noStopBefore = capped && last.pagesFetched < CATCH_UP_PAGES ? last.pagesFetched + 1 : 1;
+  return { maxPages: catchUp ? CATCH_UP_PAGES : clampPages(deps.gem.maxPages), incremental: true, catchUp, noStopBefore };
 }
 
 /** True when every bid on the page is already stored with the same content hash. */
@@ -208,19 +243,20 @@ async function allKnownUnchanged(deps: AppDeps, page: NormalizedTender[]): Promi
 const shouldSearch = (opts: RunIngestionOptions) => (opts.trigger ?? 'cron') === 'cron' && !opts.search;
 
 /**
- * Up to SEARCH_KEYWORDS_PER_RUN distinct active watchlist keywords (all orgs), rotating across runs.
- * The rotation cursor is derived from the number of earlier scheduled runs that completed (success/partial),
- * so it persists in `ingestion_runs` without extra state: run k searches keywords [10k, 10k + 10) mod n.
+ * Up to SEARCH_KEYWORDS_PER_RUN distinct active watchlist keywords (all orgs, case-folded, sorted), rotating
+ * across runs. The window starts at (number of finished success/partial scheduled runs × 10) mod n; the
+ * current run is still `running`, so it is not counted. Failed runs don't advance the window (their keywords
+ * are retried), and adding/removing keywords shifts it, so coverage is "every keyword within ⌈n/10⌉ healthy
+ * runs" only while the keyword set is stable.
  */
-export async function searchKeywordsForRun(deps: AppDeps, currentRunId: string): Promise<string[]> {
+export async function searchKeywordsForRun(deps: AppDeps): Promise<string[]> {
   const lists = await deps.db.select({ criteria: watchlists.criteria }).from(watchlists).where(eq(watchlists.active, true));
   const all = [...new Set(lists.flatMap((w) => ((w.criteria as WatchlistCriteria).keywords ?? [])
     .map((k) => k.trim().toLowerCase()).filter((k) => k.length >= 2)))].sort();
   if (!all.length) return [];
   if (all.length <= SEARCH_KEYWORDS_PER_RUN) return all;
   const [{ n }] = await deps.db.select({ n: sql<number>`count(*)::int` }).from(ingestionRuns)
-    .where(and(eq(ingestionRuns.trigger, 'cron'), ne(ingestionRuns.id, currentRunId),
-      or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial'))));
+    .where(and(eq(ingestionRuns.trigger, 'cron'), or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial'))));
   const start = (Number(n) * SEARCH_KEYWORDS_PER_RUN) % all.length;
   return Array.from({ length: SEARCH_KEYWORDS_PER_RUN }, (_, i) => all[(start + i) % all.length]);
 }

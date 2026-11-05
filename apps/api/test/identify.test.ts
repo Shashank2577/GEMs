@@ -2,9 +2,9 @@
  * T038 — Identify routes: tender feed filters/facets/sort/pagination, detail, seen/dismiss, watchlists CRUD +
  * preview + roles, ingestion run/runs roles, notifications, and org isolation.
  */
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, bidWorkspaces, tenders } from '@tp/db';
+import { analyses, bidWorkspaces, ingestionRuns, tenders } from '@tp/db';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
@@ -249,31 +249,39 @@ describe('ingestion routes', () => {
 });
 
 describe('manual sync cooldown (FR-013)', () => {
+  const runCount = async () => Number((await ctx.db.select({ n: sql<number>`count(*)::int` }).from(ingestionRuns))[0].n);
+
   it('rejects a manual sync within 2 min of a finished manual run with 429 sync_cooldown and retryAt', async () => {
-    const [last] = (await get('/ingestion/runs', team.viewer)).body.items;
-    expect(last).toMatchObject({ trigger: 'manual', status: 'success' });
-    const retryAt = new Date(Date.parse(last.finishedAt) + 2 * 60_000);
+    // Own fixture: a manual run that finished just now (later than any earlier one), so order doesn't matter.
+    ctx.clock.advance(60_000);
+    const finishedAt = ctx.clock.now();
+    await ctx.db.insert(ingestionRuns).values({ trigger: 'manual', status: 'success', startedAt: new Date(finishedAt.getTime() - 5_000), finishedAt });
+    const baseline = await runCount();
+    const retryAt = new Date(finishedAt.getTime() + 2 * 60_000);
+
     ctx.clock.set(new Date(retryAt.getTime() - 1_000));
     const r = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
     expect(r.status).toBe(429);
     expect(r.body.error).toMatchObject({ code: 'sync_cooldown', details: { retryAt: retryAt.toISOString() } });
     const ist = retryAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
     expect(r.body.error.message).toBe(`GeM was synced moments ago. Next manual sync at ${ist} IST.`);
-    // Nothing was started.
-    expect((await get('/ingestion/runs', team.viewer)).body.items).toHaveLength(2);
+    expect(await runCount()).toBe(baseline); // nothing was started
     // Role checks still come first.
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.analyst.cookie, json: {} })).status).toBe(403);
-    // A scheduled run does not start a manual cooldown, and does not extend it.
+
+    // A scheduled run neither starts nor extends the cooldown.
     ctx.clock.set(retryAt);
     const cron = await runIngestion(ctx.deps, { trigger: 'cron', pages: 1 });
     expect(cron.status).toBe('success');
     const ok = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 1 } });
     expect(ok.status).toBe(200);
     expect(ok.body.trigger).toBe('manual');
+    expect(await runCount()).toBe(baseline + 2);
     // …but this finished manual run does — across orgs (GeM is shared by every tenant).
     const rival = await request(ctx.app, 'POST', '/ingestion/run', { cookie: other.cookie, json: {} });
     expect(rival.status).toBe(429);
     expect(rival.body.error.code).toBe('sync_cooldown');
+    expect(await runCount()).toBe(baseline + 2);
     ctx.clock.advance(2 * 60_000);
   });
 });

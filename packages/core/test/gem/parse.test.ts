@@ -152,6 +152,15 @@ describe('format-drift guard (FR-014)', () => {
     try { assertPageShape({ docs }); } catch (e) { expect(isFormatDriftError(e)).toBe(true); }
   });
 
+  it('counts non-object docs as missing, against the raw length (parseBidPlusResponse runs the guard)', () => {
+    expect(() => assertPageShape({ docs: [ok(1), null, 'x', [1]] })).toThrow(/3 of 4 listing docs lack b_bid_number/);
+    const res = (docs: unknown[]) => ({ code: 200, response: { response: { numFound: docs.length, start: 0, docs } } });
+    // Filtering first would leave 1 of 1 valid doc and hide the drift.
+    expect(() => parseBidPlusResponse(res([ok(1), null, 42]))).toThrow(/^GeM response format changed: 2 of 3 listing docs/);
+    expect(() => parseBidPlusResponse(res([ok(1), ok(2), null]))).not.toThrow();
+    expect(parseBidPlusResponse(res([ok(1), ok(2), null])).docs).toHaveLength(2);
+  });
+
   it('reports a response without response.response.docs as format drift', () => {
     expect(() => parseBidPlusResponse({ code: 200, response: {} })).toThrow(/^GeM response format changed: /);
     expect(() => parseBidPlusResponse({ code: 200, response: { response: { numFound: 3 } } })).toThrow(/response\.response\.docs missing/);

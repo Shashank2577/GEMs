@@ -83,13 +83,14 @@ export function isFormatDriftError(e: unknown): boolean {
 }
 
 /**
- * Format-drift guard (FR-014): fail when more than half of a listing page's docs lack `b_bid_number`.
- * An empty page (GeM "no results") is fine. Throws `GeM response format changed: <detail>`.
+ * Format-drift guard (FR-014): fail when more than half of a listing page's raw docs lack `b_bid_number`
+ * (non-object entries count as missing). An empty page (GeM "no results") is fine.
+ * Throws `GeM response format changed: <detail>`. `parseBidPlusResponse` runs it on the unfiltered docs.
  */
-export function assertPageShape(page: Pick<BidPlusPage, 'docs'>): void {
+export function assertPageShape(page: { docs: readonly unknown[] }): void {
   const total = page.docs.length;
   if (!total) return;
-  const missing = page.docs.filter((d) => !firstText(d, ['b_bid_number'])).length;
+  const missing = page.docs.filter((d) => !d || typeof d !== 'object' || Array.isArray(d) || !firstText(d as BidPlusDoc, ['b_bid_number'])).length;
   if (missing * 2 > total) {
     throw new Error(`${FORMAT_DRIFT_PREFIX} ${missing} of ${total} listing docs lack b_bid_number`);
   }
@@ -107,6 +108,7 @@ export function parseBidPlusResponse(data: unknown): BidPlusPage {
   if (!page || !Array.isArray(page.docs)) {
     throw new Error(`${FORMAT_DRIFT_PREFIX} incomplete search-result shape (response.response.docs missing)`);
   }
+  assertPageShape({ docs: page.docs }); // before dropping non-object entries, so they count as missing
   const docs = page.docs.filter((x): x is BidPlusDoc => !!x && typeof x === 'object' && !Array.isArray(x));
   const numFound = Number(page.numFound ?? docs.length);
   const start = Number(page.start ?? 0);

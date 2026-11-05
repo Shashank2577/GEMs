@@ -6,6 +6,7 @@ import { formatNumberIN, formatTimeIST, formatDateIST, relativeTime } from '@/li
 import { useNow } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { useIngestionRuns, useSyncNow } from './api';
+import { nextManualSyncAt } from './cooldown';
 
 type Health = 'ok' | 'stale' | 'error' | 'never';
 
@@ -14,17 +15,6 @@ function healthOf(lastSuccessAt: string | null, lastRun: IngestionRunDto | null,
   if (lastRun?.status === 'failed') return 'error';
   if (!lastSuccessAt || now.getTime() - Date.parse(lastSuccessAt) > 2 * 3_600_000) return 'stale';
   return 'ok';
-}
-
-/** FR-013: the API refuses manual syncs for 2 min after a finished manual run (any org). */
-const MANUAL_SYNC_COOLDOWN_MS = 2 * 60_000;
-
-/** When the next manual sync is allowed, or null when it is allowed now. */
-export function nextManualSyncAt(items: IngestionRunDto[], now: Date): Date | null {
-  let last = 0;
-  for (const r of items) if (r.trigger === 'manual' && r.finishedAt) last = Math.max(last, Date.parse(r.finishedAt));
-  const at = last + MANUAL_SYNC_COOLDOWN_MS;
-  return last && at > now.getTime() ? new Date(at) : null;
 }
 
 const dot: Record<Health, string> = { ok: 'bg-success', stale: 'bg-warning', error: 'bg-danger', never: 'bg-muted-foreground' };

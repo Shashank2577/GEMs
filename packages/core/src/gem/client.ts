@@ -14,7 +14,7 @@
  * Request shape adapted from erenmyeager15/india-government-tenders-scraper (Apache-2.0) and
  * arush15june/gem-search (MIT) — see NOTICE.
  */
-import { assertPageShape, parseBidPlusDoc, parseBidPlusResponse, type BidPlusPage, type NormalizedTender } from './parse';
+import { parseBidPlusDoc, parseBidPlusResponse, type BidPlusPage, type NormalizedTender } from './parse';
 
 export interface GemClientOptions {
   baseUrl?: string;
@@ -122,10 +122,9 @@ export class GemClient {
     return parseBidPlusResponse(json);
   }
 
-  /** Fetch and normalise one listing page. Docs without a bid number are dropped (but > 50 % missing is format drift). */
+  /** Fetch and normalise one listing page. Docs without a bid number are dropped (> 50 % missing already failed as format drift in parseBidPlusResponse). */
   async fetchTenders(opts: FetchPageOptions & { now?: Date } = {}): Promise<{ tenders: NormalizedTender[]; numFound: number; rawCount: number }> {
     const page = await this.fetchPage(opts);
-    assertPageShape(page); // FR-014: most docs without a bid number → GeM changed its format
     const tenders = page.docs.map((d) => parseBidPlusDoc(d, { baseUrl: this.baseUrl, now: opts.now })).filter((t): t is NormalizedTender => !!t);
     return { tenders, numFound: page.numFound, rawCount: page.docs.length };
   }
