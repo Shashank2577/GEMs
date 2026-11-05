@@ -63,7 +63,7 @@ Layout for 007: `e2e/007-experience-growth/US<n>-*.e2e.ts`, evidence in `qa/evid
 - CI (`.github/workflows/ci.yml`): `e2e-shard` ×8 runs `scripts/e2e-ci.sh <shard> 8` against a `postgres:16` service —
   every spec file is its own `playwright test <file>` run on a freshly recreated database (specs assume a fresh DB, as
   in `pnpm exec playwright test e2e/<NNN>/US<n>*`). A spec that needs extra **server** environment declares it in its
-  header as `@e2e-env KEY=value …` (read by `scripts/e2e-ci.sh`). The `e2e` job merges the shard blob reports, writes
+  header as `@e2e-env KEY=value …` (read by `scripts/e2e-ci.sh` and, for a directly-run `playwright test <spec>`, by `playwright.config.ts`). The `e2e` job merges the shard blob reports, writes
   a pass/fail/flaky summary with `scripts/e2e-summary.ts`, and uploads `qa/evidence/**` + `qa/.runs/**` as artifact
   `e2e-evidence-<run_id>` (30 days).
 
