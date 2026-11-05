@@ -7,7 +7,7 @@
 
 | # | Criterion | Verdict | Evidence |
 |---|---|---|---|
-| 1a | Migration 0020 applies from scratch; indexes `annexure_templates_org_key_uq` UNIQUE(org_id,key), `comments_ws_idx`, `bid_workspaces_org_stage_idx` exist | met | psql `\d` on a fresh DB; e2e test T010 checks `pg_indexes` |
+| 1a | Migration 0020 applies from scratch; indexes `annexure_templates_org_key_uq` UNIQUE(org_id,key), `comments_ws_idx` are created by 0020; `bid_workspaces_org_stage_idx` already existed (migration 0008) and is present | met | psql `\d` on a fresh DB; e2e test T010 checks `pg_indexes` |
 | 1b | Applies on a DB seeded with duplicate annexure_templates rows: dedupe keeps newest, index builds | met | org A key k1 3 rows → 1 ("newest" by updated_at kept); k2, other org's k1 and NULL-org system rows untouched |
 | 1c | Second `drizzle-kit generate` | met | "No schema changes, nothing to migrate" |
 | 1d | Concurrent PUT /annexure-templates/:key → 200s, one row | met | 12 parallel PUTs → [200 ×12], 1 row (T010 test, `concurrent-put-annexure-desktop.png`, webm) |

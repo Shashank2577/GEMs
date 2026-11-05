@@ -11,7 +11,7 @@ All seven user stories plus the cross-cutting HARDEN story are QA-approved. Epic
 | US5 Packet | #186 | #498 | 703301b | approved | [VERDICT](https://github.com/Shashank2577/GEMs/blob/story/GEM-173-hardening/qa/evidence/006/US5/VERDICT.md) |
 | US6 Assisted submission | #188 | #520 | 53aa5e4 | approved (rejected once: axe, DSC outline, copy; fixed) | [VERDICT](https://github.com/Shashank2577/GEMs/blob/story/GEM-173-hardening/qa/evidence/006/US6/VERDICT.md) |
 | US7 Submission outcome | #191 | #529 | 3ffd799 | approved | [VERDICT](https://github.com/Shashank2577/GEMs/blob/story/GEM-173-hardening/qa/evidence/006/US7/VERDICT.md) |
-| HARDEN (T002/T004/T010/T096/T097/T098) | none (epic #173) | #536 | pending merge (head d5cb2b2 plus the QA evidence commit) | approved | [VERDICT](https://github.com/Shashank2577/GEMs/blob/story/GEM-173-hardening/qa/evidence/006/HARDEN/VERDICT.md) |
+| HARDEN (T002/T004/T010/T096/T097/T098) | none (epic #173) | #536 | squash SHA recorded on the merge note on #173 (PR head 2df8407: d5cb2b2 + QA evidence commits f2e5a11, 2df8407) | approved | [VERDICT](https://github.com/Shashank2577/GEMs/blob/story/GEM-173-hardening/qa/evidence/006/HARDEN/VERDICT.md) |
 
 Latest full regression (HARDEN QA): `pnpm exec playwright test e2e/006-apply-packet-assist` → 132 passed, 0 failed.
 
@@ -39,7 +39,7 @@ No price, CAPTCHA, OTP, DSC, e-Sign or final-submit automation in apps/extension
 
 ## Perf and model policy
 - Perf NFR-001: p95 87 ms against the 600 ms budget.
-- Every story was reviewed by cairn on Opus. Opus development escalations: US6 T078/T079.
+- Cairn merge-gate reviews are on the PRs (US3, US6, US7 and HARDEN reviewed on Opus in this lead's session, two rounds each; HARDEN round 2 approved at 2df8407; US1/US2/US4/US5 per the previous lead's handoff). Opus development escalations: US6 T078/T079.
 
 ## Other notes for the human
 - Pre-existing failing 007 test `PATCH /org onboarding state ... durationSec` fails on main; not caused by 006.
