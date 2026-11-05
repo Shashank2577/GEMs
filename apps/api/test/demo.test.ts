@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
 import { activityLog, analyses, bidWorkspaces, comments, companyProfiles, notifications, organizations, pastContracts, tenderDocuments, tenderMatches, tenders, vaultDocuments, watchlists } from '@tp/db';
-import { seedDemo, removeDemo, demoPdf, demoBidNumber, DEMO_COMPANY, DEMO_WATCHLISTS } from '@tp/db/demo';
+import { seedDemo, removeDemo, demoPdf, demoBidNumber, planTenders, DEMO_COMPANY, DEMO_WATCHLISTS } from '@tp/db/demo';
 import { matchAndNotify } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -688,5 +688,28 @@ describe('isDemo on tender DTOs (007/FR-067, US4-13)', () => {
     expect(demoDetail.body).not.toHaveProperty('raw');
     const realDetail = await request(ctx.app, 'GET', `/tenders/${real!.id}`, { cookie: owner.cookie });
     expect(realDetail.body).toMatchObject({ isDemo: false });
+  });
+});
+
+describe('demo tender dates are relative to now (planTenders)', () => {
+  const IST = 330 * 60_000;
+  const istDayEnd = (t: number) => Math.floor((t + IST) / 86_400_000) * 86_400_000 - IST + 86_400_000;
+
+  // US1-4 / US1-6 (007) failed in the evening: +5 h / +9 h from 19:05 IST is after IST midnight, so closingToday was 0.
+  it.each(['00:10', '03:00', '09:30', '15:00', '19:05', '22:30', '23:30'])('two tenders close later today (IST) when loaded at %s IST', (hhmm) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const now = new Date(Date.UTC(2026, 10, 5, h!, m!) - IST);
+    const plan = planTenders(now);
+    const today = plan.filter((t) => t.endAt.getTime() > now.getTime() && t.endAt.getTime() < istDayEnd(now.getTime()));
+    const closingToday = [plan[6]!, plan[7]!];
+    for (const t of closingToday) {
+      expect(t.endAt.getTime(), `tender ${t.idx} closes after load time`).toBeGreaterThan(now.getTime());
+      expect(t.endAt.getTime(), `tender ${t.idx} closes before IST midnight`).toBeLessThan(istDayEnd(now.getTime()));
+    }
+    expect(closingToday[0]!.endAt.getTime()).toBeLessThan(closingToday[1]!.endAt.getTime());
+    expect(today.length).toBeGreaterThanOrEqual(2);
+    // The "this week" tenders and closed history are unaffected by the clamp.
+    expect(plan[8]!.endAt.getTime() - now.getTime()).toBeGreaterThan(24 * 3_600_000);
+    expect(plan[0]!.endAt.getTime()).toBeLessThan(now.getTime());
   });
 });
