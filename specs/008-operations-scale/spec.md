@@ -494,11 +494,15 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
 
 **Deployment, environments, secrets and backups (US2)**
 
-- **FR-007** *(gap)*: `.github/workflows/deploy.yml` MUST run on `push` to `main` after `ci` succeeds (`workflow_run`)
-  and on `workflow_dispatch`, with jobs `staging` (build web → `pnpm db:migrate` with `secrets.STAGING_DATABASE_URL`
+- **FR-007** *(gap)*: `.github/workflows/deploy.yml` MUST run on `push` to `main` after `ci` succeeds — as a reusable
+  workflow (`workflow_call`) invoked by the `deploy` job of `ci.yml`, which needs `ci-gate` and runs only when it
+  succeeded on a push to `main` — and on `workflow_dispatch` (full 40-char SHA of a commit already on `main`). It does
+  not use `workflow_run`, because that only fires for workflow files on the repository's default branch, which is not
+  `main`. Jobs: `staging` (build web → `pnpm db:migrate` with `secrets.STAGING_DATABASE_URL`
   → `wrangler deploy --env staging` → smoke) and `production` (GitHub environment `production` with required reviewer
-  → `pnpm db:migrate` with `secrets.PROD_DATABASE_URL` → `wrangler deploy` → smoke), `concurrency: deploy`
-  (no cancel). `APP_VERSION` MUST be set to the short commit SHA via `--var APP_VERSION:<sha>`.
+  → `pnpm db:migrate` with `secrets.PROD_DATABASE_URL` → `wrangler deploy` → smoke), with per-environment
+  concurrency groups `deploy-staging` / `deploy-production` (no cancel). `APP_VERSION` MUST be set to the short commit
+  SHA via `--var APP_VERSION:<sha>`.
 - **FR-008** *(gap)*: A smoke script (`scripts/smoke.sh <base-url> <version>`) MUST assert `/api/health` 200 with the
   expected `version`, `/` 200 HTML with `<div id="root">`, `/api/nope` 404 JSON `not_found`, and the security headers
   of FR-013; exit non-zero on any mismatch.

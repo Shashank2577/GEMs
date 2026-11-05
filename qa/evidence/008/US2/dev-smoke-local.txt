@@ -1,0 +1,64 @@
+$ scripts/smoke.sh http://localhost:8799 abc1234    # local Node stack, APP_VERSION=abc1234
+smoke: http://localhost:8799 expecting version abc1234 (2026-11-05T03:41:04Z)
+GET /api/health
+  PASS  health status = 200
+  PASS  health version = abc1234
+  PASS  health db = true
+  PASS  health x-content-type-options = nosniff
+  PASS  health referrer-policy = strict-origin-when-cross-origin
+  PASS  health permissions-policy = camera=(), microphone=(), geolocation=()
+  SKIP  health strict-transport-security (http base URL; HSTS is only sent over https)
+GET /
+  PASS  / status = 200
+  PASS  / content-type = text/html; charset=utf-8
+  PASS  / contains <div id="root">
+  PASS  / content-security-policy has default-src 'self'
+  PASS  / content-security-policy has script-src 'self' 'sha256-
+  PASS  / content-security-policy has frame-ancestors 'self'
+  PASS  / content-security-policy has object-src 'none'
+  PASS  root x-content-type-options = nosniff
+  PASS  root referrer-policy = strict-origin-when-cross-origin
+  PASS  root permissions-policy = camera=(), microphone=(), geolocation=()
+  SKIP  root strict-transport-security (http base URL; HSTS is only sent over https)
+GET /api/nope
+  PASS  /api/nope status = 404
+  PASS  /api/nope error.code = not_found
+  PASS  nope x-content-type-options = nosniff
+  PASS  nope referrer-policy = strict-origin-when-cross-origin
+  PASS  nope permissions-policy = camera=(), microphone=(), geolocation=()
+  SKIP  nope strict-transport-security (http base URL; HSTS is only sent over https)
+smoke: OK for http://localhost:8799 (version abc1234)
+exit=0
+
+$ SMOKE_RETRIES=2 SMOKE_RETRY_DELAY=1 scripts/smoke.sh http://localhost:8799 deadbee    # wrong version must fail
+smoke: http://localhost:8799 expecting version deadbee (2026-11-05T03:41:04Z)
+GET /api/health
+  ....  attempt 1: status 200, version abc1234; retrying in 1s
+  PASS  health status = 200
+  FAIL  health version: expected 'deadbee', got 'abc1234'
+  PASS  health db = true
+  PASS  health x-content-type-options = nosniff
+  PASS  health referrer-policy = strict-origin-when-cross-origin
+  PASS  health permissions-policy = camera=(), microphone=(), geolocation=()
+  SKIP  health strict-transport-security (http base URL; HSTS is only sent over https)
+GET /
+  PASS  / status = 200
+  PASS  / content-type = text/html; charset=utf-8
+  PASS  / contains <div id="root">
+  PASS  / content-security-policy has default-src 'self'
+  PASS  / content-security-policy has script-src 'self' 'sha256-
+  PASS  / content-security-policy has frame-ancestors 'self'
+  PASS  / content-security-policy has object-src 'none'
+  PASS  root x-content-type-options = nosniff
+  PASS  root referrer-policy = strict-origin-when-cross-origin
+  PASS  root permissions-policy = camera=(), microphone=(), geolocation=()
+  SKIP  root strict-transport-security (http base URL; HSTS is only sent over https)
+GET /api/nope
+  PASS  /api/nope status = 404
+  PASS  /api/nope error.code = not_found
+  PASS  nope x-content-type-options = nosniff
+  PASS  nope referrer-policy = strict-origin-when-cross-origin
+  PASS  nope permissions-policy = camera=(), microphone=(), geolocation=()
+  SKIP  nope strict-transport-security (http base URL; HSTS is only sent over https)
+smoke: FAILED (1 check(s)) for http://localhost:8799
+exit=1

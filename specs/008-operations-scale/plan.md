@@ -220,7 +220,9 @@ script skips local Postgres and the job creates the DB with `psql` first (task T
 ### 2. Release (US2)
 
 ```text
-main green ─► deploy.yml(workflow_run)
+main push ─► ci.yml: ci-gate green ─► deploy job ─► deploy.yml (workflow_call; also workflow_dispatch)
+  (not workflow_run: it only fires for workflows on the default branch, which is not main)
+  concurrency per environment: deploy-staging / deploy-production, no cancel
   staging:    web build → db:migrate(STAGING_DATABASE_URL) → wrangler deploy --env staging --var APP_VERSION:<sha>
               → scripts/smoke.sh https://staging.<domain> <sha>
   production: [environment approval] → db:migrate(PROD_DATABASE_URL) → wrangler deploy --var APP_VERSION:<sha>

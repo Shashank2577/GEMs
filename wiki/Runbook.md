@@ -18,6 +18,7 @@ pnpm exec playwright test                                                # E2E +
 ```
 
 ## Deploy (Cloudflare Workers + Neon + R2)
-See `docs/deploy.md` (spec 008). In short: create a Neon database and run `pnpm db:migrate` against it, create the R2 bucket,
-`wrangler secret put DATABASE_URL` (and optional `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`),
-set `APP_URL` in `wrangler.toml`, then `pnpm deploy`.
+Releases run only through the GitHub Actions deploy workflow (`.github/workflows/deploy.yml`, called from `ci.yml` after
+`ci-gate` is green on `main`): staging migrate → deploy → smoke → approval → production migrate → deploy → smoke.
+Setup, secrets, rollback, restore drill and the break-glass procedure:
+[docs/runbook.md § Deploy & rollback](https://github.com/Shashank2577/GEMs/blob/main/docs/runbook.md#deploy--rollback).
