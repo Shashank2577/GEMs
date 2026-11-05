@@ -27,6 +27,11 @@ import type { AppEnv } from '../types';
 
 /** A limiter slower than this is treated as unavailable (the request is not held up by a sick database). */
 export const LIMITER_TIMEOUT_MS = 300;
+/**
+ * Fail-closed (auth) rules wait longer: timing out there answers 503, so a merely slow database must not lock people
+ * out of signing up.
+ */
+export const FAIL_CLOSED_TIMEOUT_MS = 3_000;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -66,7 +71,8 @@ export async function applyRateLimit(c: Context<AppEnv>, name: GenericRuleName):
   const { rateLimiter, clock, logger } = c.var.deps;
   let r;
   try {
-    r = await withTimeout(rateLimiter.hit(`${name}:${subject}`, rule.limit, rule.windowSec, clock.now()), LIMITER_TIMEOUT_MS);
+    r = await withTimeout(rateLimiter.hit(`${name}:${subject}`, rule.limit, rule.windowSec, clock.now()),
+      rule.failClosed ? FAIL_CLOSED_TIMEOUT_MS : LIMITER_TIMEOUT_MS);
   } catch (e) {
     const suppressed = sampleWarning(name);
     if (suppressed !== null) logger.warn('rate_limit_unavailable', { rule: name, rid: c.var.requestId, error: (e as Error)?.message, suppressed });

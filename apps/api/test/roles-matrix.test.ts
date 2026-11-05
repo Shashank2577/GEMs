@@ -47,6 +47,7 @@ const MATRIX: Entry[] = [
   { method: 'PATCH', path: '/api/me', min: 'viewer' },
   { method: 'POST', path: '/api/me/password', min: 'session' },
   { method: 'PUT', path: '/api/me/notification-prefs', min: 'viewer' },
+  { method: 'POST', path: '/api/me/notifications/test', min: 'session' },
   { method: 'POST', path: '/api/me/api-tokens', min: 'session' },
   { method: 'DELETE', path: '/api/me/api-tokens/:id', min: 'viewer' },
   { method: 'POST', path: '/api/me/sessions/revoke-others', min: 'session' },

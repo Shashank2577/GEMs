@@ -2,6 +2,9 @@
  * 008/US3 — request rate limits and body limits on real Postgres.
  * FR-017 (Postgres limiter), FR-018 (429 shape), FR-019 (every rule), FR-020 (fail-open / fail-closed), FR-021 (413).
  */
+import { request as httpRequest, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { serve } from '@hono/node-server';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { rateLimits } from '@tp/db';
@@ -288,6 +291,27 @@ describe('limiter unavailable (FR-020, scenario 8)', () => {
     }
   });
 
+  it('R2: a slow (500 ms) limiter does not turn sign-up (fail-closed rule) into 503; a hung one does after 3 s', async () => {
+    const real = ctx.deps.rateLimiter;
+    const slow = (ms: number): typeof real => ({
+      hit: (key, limit, windowSec, now) => new Promise((res) => setTimeout(() => res(real.hit(key, limit, windowSec, now)), ms)),
+      reset: (key) => real.reset(key),
+    });
+    const body = () => ({ name: 'Slow Co Owner', email: uniqueEmail('slow'), password: 'correct-horse-42', orgName: 'Slow Co' });
+    try {
+      ctx.deps.rateLimiter = slow(500);
+      const r = await request(ctx.app, 'POST', '/auth/signup', { headers: { 'x-forwarded-for': '203.0.113.91' }, json: body() });
+      expect(r.status).toBe(201);
+      ctx.deps.rateLimiter = { hit: () => new Promise(() => {}), reset: async () => {} };
+      const t0 = performance.now();
+      const hung = await request(ctx.app, 'POST', '/auth/signup', { headers: { 'x-forwarded-for': '203.0.113.92' }, json: body() });
+      expect(hung.status).toBe(503);
+      expect(performance.now() - t0).toBeGreaterThanOrEqual(2_900);
+    } finally {
+      ctx.deps.rateLimiter = real;
+    }
+  });
+
   it('auth failure counters fail closed: login answers 503 instead of checking the password', async () => {
     const a = await signup(ctx.app);
     await withTableRenamed('auth_attempts', async () => {
@@ -362,6 +386,53 @@ describe('body limits (FR-021, scenario 7)', () => {
     expect(streamed.status).toBe(413);
     // Same for a JSON route that is not an upload route under /vault.
     expect((await send('POST', '/vault/reminders/run', { cookie: org.owner.cookie, contentLength: 5 * MB, contentType: multipart })).res.status).toBe(413);
+  });
+
+  it('R5: chunked uploads through @hono/node-server — under the cap stored, 40 MB over the cap is 413', async () => {
+    const server = serve({ fetch: ctx.app.fetch, port: 0, hostname: '127.0.0.1' }) as Server;
+    await new Promise<void>((r) => (server.listening ? r() : server.once('listening', () => r())));
+    const port = (server.address() as AddressInfo).port;
+    /** POST `body` with Transfer-Encoding: chunked (no content-length), 256 KB per chunk. */
+    const chunked = (path: string, contentType: string, body: Uint8Array) => new Promise<{ status: number; json: any; sent: number }>((resolve, reject) => {
+      let sent = 0;
+      const req = httpRequest({ host: '127.0.0.1', port, path: `/api${path}`, method: 'POST',
+        headers: { cookie: org.analyst.cookie, 'content-type': contentType, 'transfer-encoding': 'chunked' } }, (res) => {
+        let text = '';
+        res.on('data', (d) => (text += d));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, json: JSON.parse(text || 'null'), sent }));
+      });
+      req.on('error', (e: NodeJS.ErrnoException) => { if (e.code !== 'EPIPE' && e.code !== 'ECONNRESET') reject(e); });
+      const CHUNK = 256 * 1024;
+      const pump = (off: number) => {
+        while (off < body.length) {
+          const part = body.subarray(off, off + CHUNK);
+          off += part.length;
+          sent += part.length;
+          if (!req.write(part)) { req.once('drain', () => pump(off)); return; }
+        }
+        req.end();
+      };
+      pump(0);
+    });
+    try {
+      const fd = new FormData();
+      fd.append('file', file(await pdf('chunked ok'), 'chunked.pdf'));
+      fd.append('type', 'gst');
+      const okRes = new Response(fd);
+      const ok = await chunked('/vault', okRes.headers.get('content-type')!, new Uint8Array(await okRes.arrayBuffer()));
+      expect(ok.status).toBe(201);
+      expect(ok.json.fileName).toBe('chunked.pdf');
+
+      const big = new FormData();
+      big.append('file', new File([new Uint8Array(40 * MB)], 'huge.pdf', { type: 'application/pdf' }));
+      const bigRes = new Response(big);
+      const bigBytes = new Uint8Array(await bigRes.arrayBuffer());
+      const r = await chunked(`/tenders/${tenderId}/documents`, bigRes.headers.get('content-type')!, bigBytes);
+      expect(r.status).toBe(413);
+      expect(r.json.error).toMatchObject({ code: 'payload_too_large', message: 'The file is larger than 25 MB' });
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
   });
 
   it('JSON bodies are capped at 1 MB (declared or streamed) and nothing is written', async () => {

@@ -272,8 +272,30 @@ describe('008/FR-016 demo isolation (US3 scenarios 1–2)', () => {
   });
 });
 
-describe('008/T047 data-fix migration 0007_demo_source_datafix (US3 scenario 3)', () => {
-  const MIGRATION = fileURLToPath(new URL('../../../packages/db/migrations/0007_demo_source_datafix.sql', import.meta.url));
+describe('008/FR-016 R3: the seeder fingerprint content_hash = demo-<bid> also hides a row', () => {
+  it('a gem copy of a demo bid without the raw marker is invisible to non-demo orgs and is deleted by the data-fix', async () => {
+    const viewer = await signup(ctx.app, { orgName: 'Fingerprint Viewer' });
+    const bid = demoBidNumber(3);
+    const [copy] = await ctx.db.insert(tenders).values({
+      source: 'gem', bidNumber: bid, title: 'Online UPS 10 kVA (stale demo copy)', category: 'UPS', state: 'Maharashtra',
+      endAt: new Date(NOW.getTime() + 5 * 86_400_000), sourceUrl: 'https://bidplus.gem.gov.in/all-bids', contentHash: `demo-${bid}`, raw: {},
+    }).returning();
+    expect((await request(ctx.app, 'GET', `/tenders/${copy!.id}`, { cookie: viewer.cookie })).status).toBe(404);
+    const feed = await request(ctx.app, 'GET', '/tenders?status=all&q=stale', { cookie: viewer.cookie });
+    expect(feed.body.total).toBe(0);
+    expect((await matchAndNotify(ctx.deps, [copy!.id], NOW)).matchesCreated).toBe(0);
+    // A 'demo' row with the same bid number exists, so step 1 cannot convert the copy: step 1b deletes it.
+    expect((await ctx.db.select().from(tenders).where(and(eq(tenders.source, 'demo'), eq(tenders.bidNumber, bid)))).length).toBe(1);
+    for (const stmt of readFileSync(fileURLToPath(new URL('../../../packages/db/migrations/0009_demo_source_datafix.sql', import.meta.url)), 'utf8').split('--> statement-breakpoint')) {
+      if (stmt.replace(/--.*$/gm, '').trim()) await ctx.db.execute(sql.raw(stmt));
+    }
+    expect(await ctx.db.select().from(tenders).where(eq(tenders.id, copy!.id))).toHaveLength(0);
+    expect((await ctx.db.select().from(tenders).where(and(eq(tenders.source, 'demo'), eq(tenders.bidNumber, bid)))).length).toBe(1);
+  });
+});
+
+describe('008/T047 data-fix migration 0009_demo_source_datafix (US3 scenario 3)', () => {
+  const MIGRATION = fileURLToPath(new URL('../../../packages/db/migrations/0009_demo_source_datafix.sql', import.meta.url));
   const runMigration = async () => {
     for (const stmt of readFileSync(MIGRATION, 'utf8').split('--> statement-breakpoint')) {
       if (stmt.replace(/--.*$/gm, '').trim()) await ctx.db.execute(sql.raw(stmt));

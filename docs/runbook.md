@@ -9,8 +9,8 @@ below reads **pass**. A row passes only when its spec 002 acceptance scenarios h
 `qa/evidence/002/US<n>/VERDICT.md` with every criterion `met`, and the implementing tasks are ticked in
 `specs/002-platform-tenancy/tasks.md`. SHOULD rows are recorded but do not block.
 
-Last checked: 2026-11-05, against `main` at `205fe71` (after 002/US2 #487 and 002/US3 #495 merged), by 008/US3
-(T057, review round 1). Sources are repository files only (QA verdicts and task ticks); re-check them before each paid
+Last checked: 2026-11-05, against `main` at `78ccfe4` (after 002/US2 #487, 002/US3 #495 and 002/US5 #502 merged), by
+008/US3 (T057, review round 2). Sources are repository files only (QA verdicts and task ticks); re-check them before each paid
 activation and update this table.
 
 | 002 requirement | Level | Spec 002 scenarios | Implementing tasks (issue) | QA verdict | Gate |
@@ -20,10 +20,10 @@ activation and update this table.
 | FR-018 invite email binding (403 `invite_email_mismatch`) | MUST | US2 scenario 12 | T042 (#23), QA T045 (#26) ticked | [`qa/evidence/002/US2/VERDICT.md`](../qa/evidence/002/US2/VERDICT.md) `qa:approved` (round 2), rows 12a–12b met | **pass** |
 | FR-028 `bad_origin` (cookie POST with foreign `Origin` → 403; Bearer exempt) | MUST | US3 scenario 11 (also 008/US3 scenario 9) | T055 (#31), QA T057 (#33) ticked | [`qa/evidence/002/US3/VERDICT.md`](../qa/evidence/002/US3/VERDICT.md) `qa:approved` (round 2), rows 11a–11c met | **pass** |
 | FR-012 session list / revoke | SHOULD | US1 scenario 16 | T030–T032 ticked | [`qa/evidence/002/US1/VERDICT.md`](../qa/evidence/002/US1/VERDICT.md) `qa:approved`, rows 16a–16c met | pass |
-| FR-037 API token expiry, hint, 10-token cap | SHOULD | US5 | T074–T077 (#39–#42) open; QA T078 (#43) open | none (`qa/evidence/002/US5/` does not exist) | open (does not block) |
+| FR-037 API token expiry, hint, 10-token cap | SHOULD | US5 | T074–T077 (#39–#42), QA T078 (#43) ticked | [`qa/evidence/002/US5/VERDICT.md`](../qa/evidence/002/US5/VERDICT.md) `qa:approved` | pass |
 
-**Gate status: PASS for the MUST rows** — FR-010, FR-011, FR-018 and FR-028 have approved QA verdicts. FR-037
-(SHOULD) is still open; record the decision to launch without it in the release PR.
+**Gate status: PASS** — every MUST row (FR-010, FR-011, FR-018, FR-028) and both SHOULD rows (FR-012, FR-037) have
+approved QA verdicts.
 
 How to re-check:
 
@@ -31,19 +31,21 @@ How to re-check:
    with no `not met` row for the listed scenarios.
 2. `grep -nE "T042|T055|T074|T075|T076|T077" specs/002-platform-tenancy/tasks.md` — the lines must read `- [x]`.
 3. Run the API suite (`pnpm --filter @tp/api exec vitest run`); `rate-limit.test.ts`, `password-reset.test.ts`,
-   `ops-limits.test.ts` and `isolation.test.ts` must pass.
+   `ops-limits.test.ts`, `isolation-contract.test.ts` (008 contract/app-route sweep, demo tenders) and
+   `isolation.test.ts` (002 resource sweep) must pass.
 4. Update the table and the "Last checked" line above in the release PR.
 
-### Before running migration 0007 (demo data-fix, 008/FR-016)
+### Before running migration 0009 (demo data-fix, 008/FR-016)
 
-`packages/db/migrations/0007_demo_source_datafix.sql` deletes data. Before migrating any environment that has had
+`packages/db/migrations/0009_demo_source_datafix.sql` deletes data. Before migrating any environment that has had
 demo data loaded:
 
 1. Create a Neon branch (or snapshot) of the database and note its name in the release PR; it is the rollback path.
 2. Optionally count what will go: demo-marked tenders (`raw->>'demo' = 'true'` or `content_hash = 'demo-' || bid_number`)
    and, for orgs without `onboarding_state.demo = true`, their `tender_matches`, `notifications`, `analyses`,
    `bid_workspaces` (with comments and packets) and org-uploaded `tender_documents` on those tenders.
-3. Run `db:migrate`. What it does: converts those tenders to `source = 'demo'`; for non-demo orgs deletes the matches
+3. Run `db:migrate`. What it does: converts those tenders to `source = 'demo'` (a demo-marked `gem` row whose bid number
+   already exists as `demo` is a duplicate and is deleted, with its cascades); for non-demo orgs deletes the matches
    and alerts they produced and any analyses, workspaces (comments, packets cascade) and uploaded documents built on
    them (bids on tenders that do not exist on GeM). Demo orgs keep everything. Blobs of deleted packets/documents stay
    in R2 unreferenced.

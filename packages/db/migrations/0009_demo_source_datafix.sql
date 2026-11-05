@@ -12,6 +12,14 @@ WHERE t."source" = 'gem'
   AND (t."raw"->>'demo' = 'true' OR t."content_hash" = 'demo-' || t."bid_number")
   AND NOT EXISTS (SELECT 1 FROM "tenders" AS d WHERE d."source" = 'demo' AND d."bid_number" = t."bid_number");
 --> statement-breakpoint
+-- 1b. A demo-marked 'gem' row whose bid number already exists as 'demo' (the new seeder ran before this fix) cannot
+--     be converted (unique source + bid_number): it is a duplicate of demo data, so delete it (its matches, alerts,
+--     analyses and workspaces cascade).
+DELETE FROM "tenders" AS t
+WHERE t."source" <> 'demo'
+  AND (t."raw"->>'demo' = 'true' OR t."content_hash" = 'demo-' || t."bid_number")
+  AND EXISTS (SELECT 1 FROM "tenders" AS d WHERE d."source" = 'demo' AND d."bid_number" = t."bid_number");
+--> statement-breakpoint
 -- 2. Watchlist matches of non-demo orgs that point at demo tenders.
 DELETE FROM "tender_matches" AS m
 USING "tenders" AS t, "organizations" AS o

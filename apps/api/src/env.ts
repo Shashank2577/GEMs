@@ -27,6 +27,8 @@ export interface RuntimeEnv {
    * by the Node server), "1"/"xff" (right-most x-forwarded-for hop), unset = socket address (lib/client-ip.ts).
    */
   TRUST_PROXY?: string;
+  /** Packet build input cap in bytes (006/FR-056, NFR-003). Default 60 MB. */
+  PACKET_MAX_INPUT_BYTES?: string;
   /** "development" | "production" | "test" */
   NODE_ENV?: string;
   /** Operator token for /api/admin/* (008/FR-042). Unset → admin routes answer 404. */
@@ -52,6 +54,8 @@ export interface AppConfig {
   llmModel: string;
   /** Proxy whose client-IP header is trusted for rate limiting (002/FR-010). */
   trustProxy: TrustProxy;
+  /** Max Σ stored input size of a packet build before it is refused with 413 (006/FR-056, NFR-003). */
+  packetMaxInputBytes: number;
   /** Null when ADMIN_TOKEN is unset. */
   adminToken: string | null;
   /** Null when SENTRY_DSN is unset. */
@@ -80,9 +84,16 @@ export const DEFAULT_LLM_MODEL = 'claude-sonnet-5-5';
 export const DEFAULT_GEM_BASE_URL = 'https://bidplus.gem.gov.in';
 export const DEFAULT_GEM_USER_AGENT = 'TenderPilot/0.1 (+https://tenderpilot.in/bot; public BidPlus listings only)';
 export const APP_VERSION = '0.1.0';
+/** Default packet input cap: 60 MB (006/FR-056). */
+export const DEFAULT_PACKET_MAX_INPUT_BYTES = 60 * 1024 * 1024;
 
 const trimSlash = (s: string) => s.replace(/\/+$/, '');
 const truthy = (v: string | undefined, dflt: boolean) => (v == null || v === '' ? dflt : /^(1|true|yes|on)$/i.test(v));
+
+const positiveInt = (v: string | undefined, d: number) => {
+  const n = v == null || v === '' ? NaN : Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : d;
+};
 
 export function loadConfig(env: RuntimeEnv): AppConfig {
   const environment = env.NODE_ENV === 'production' ? 'production' : env.NODE_ENV === 'test' ? 'test' : 'development';
@@ -94,15 +105,17 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     mailFrom: env.MAIL_FROM || 'TenderPilot <alerts@tenderpilot.in>',
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
+    packetMaxInputBytes: positiveInt(env.PACKET_MAX_INPUT_BYTES, DEFAULT_PACKET_MAX_INPUT_BYTES),
     adminToken: env.ADMIN_TOKEN || null,
     sentryDsn: env.SENTRY_DSN || null,
     logLevel: parseLogLevel(env.LOG_LEVEL),
-    healthIngestionMaxAgeMin: positiveInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),
-    manualSyncCooldownMin: positiveInt(env.MANUAL_SYNC_COOLDOWN_MIN, 10),
+    healthIngestionMaxAgeMin: nonNegativeInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),
+    manualSyncCooldownMin: nonNegativeInt(env.MANUAL_SYNC_COOLDOWN_MIN, 10),
   };
 }
 
-function positiveInt(v: string | undefined, dflt: number): number {
+/** Like positiveInt but 0 is allowed (e.g. MANUAL_SYNC_COOLDOWN_MIN=0 turns the cooldown off). */
+function nonNegativeInt(v: string | undefined, dflt: number): number {
   const n = Number(v);
   return v != null && v !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : dflt;
 }

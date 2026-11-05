@@ -13,10 +13,15 @@ export const DEMO_SOURCE = 'demo';
 
 /**
  * Only real tenders (anything that is not demo data — today `gem`): platform-wide counts and watchlist matching.
- * Rows still marked `raw.demo = true` are excluded whatever their source (a demo row re-seeded by old code after the
- * data-fix stays invisible).
+ * Rows still marked `raw.demo = true` (or carrying the seeder's `content_hash = 'demo-' || bid_number`) are excluded
+ * whatever their source, so a demo row re-seeded by old code after the data-fix stays invisible.
  */
-export const REAL_ONLY: SQL = and(ne(tenders.source, DEMO_SOURCE), sql`coalesce(${tenders.raw}->>'demo', '') <> 'true'`)!;
+export const REAL_ONLY: SQL = and(
+  ne(tenders.source, DEMO_SOURCE),
+  sql`coalesce(${tenders.raw}->>'demo', '') <> 'true'`,
+  // The seeder's other fingerprint (packages/db/src/demo.ts): a demo row whose raw marker was lost.
+  sql`${tenders.contentHash} <> 'demo-' || ${tenders.bidNumber}`,
+)!;
 
 /** The caller's org as far as tender visibility goes (`c.var.org` satisfies it). */
 export type TenderViewer = { onboardingState?: Record<string, boolean> | null };
@@ -31,7 +36,11 @@ export function visibleTenderSource(org: { onboardingState?: Record<string, bool
 }
 
 /** Same rule for one loaded row (detail routes). */
-export function canSeeTender(org: TenderViewer | null | undefined, t: { source: string; raw?: Record<string, unknown> | null }): boolean {
+export function canSeeTender(
+  org: TenderViewer | null | undefined,
+  t: { source: string; raw?: Record<string, unknown> | null; contentHash?: string; bidNumber?: string },
+): boolean {
   if (t.source === DEMO_SOURCE) return orgHasDemo(org);
+  if (t.contentHash !== undefined && t.bidNumber !== undefined && t.contentHash === `demo-${t.bidNumber}`) return false;
   return t.raw?.demo !== true && t.raw?.demo !== 'true';
 }
