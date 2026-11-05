@@ -1,0 +1,17 @@
+[
+  {
+    "label": "hostile files",
+    "request": "setInputFiles big-header.html (~6.5 MB) and many-th.html (~2.6 MB)",
+    "status": 200,
+    "response": {
+      "timingsMs": {
+        "big-header": 118,
+        "many-th": 104
+      },
+      "sizesBytes": {
+        "big": 6500151,
+        "many": 2600097
+      }
+    }
+  }
+]

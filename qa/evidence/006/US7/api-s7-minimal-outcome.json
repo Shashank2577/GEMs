@@ -1,0 +1,30 @@
+[
+  {
+    "label": "PATCH stage won via dropdown",
+    "request": "PATCH /api/workspaces/ff500fb4-0f7b-4b9a-a629-fb23637151e0 {\"stage\":\"won\"}",
+    "status": 200,
+    "response": {
+      "id": "ff500fb4-0f7b-4b9a-a629-fb23637151e0",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "won",
+      "owner": {
+        "id": "306035a9-a2f4-4f5d-b2db-963b1bc519ec",
+        "name": "QA analyst mw37m4q88",
+        "email": "analyst.mw37m4q88@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:53.264Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": {
+        "at": "2026-11-05T07:13:55.603Z",
+        "result": "won"
+      },
+      "submittedAt": "2026-11-05T07:13:54.315Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:54.164Z",
+      "updatedAt": "2026-11-05T07:13:55.603Z"
+    }
+  }
+]

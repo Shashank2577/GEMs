@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useBlocker } from 'react-router-dom';
 import {
-  BadgeIndianRupee, Check, CheckCircle2, Copy, Download, Fingerprint, Hand, KeyRound, MousePointerClick, PartyPopper, PencilLine, Puzzle, Send, Trophy, Upload, XCircle,
+  BadgeIndianRupee, Check, CheckCircle2, Copy, Download, Fingerprint, FileSearch, Hand, KeyRound, MousePointerClick, PartyPopper, PencilLine, Puzzle, Send, Trophy, Upload, XCircle,
 } from 'lucide-react';
+import { parseAwardResult, MAX_RESULT_HTML } from '@tp/core/gem/award';
 import { canTransition, type AssistField, type WorkspaceDetail } from '@tp/core/contracts/apply';
 import {
   Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ErrorState, Field, Input,
@@ -232,6 +233,38 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
   const [l1, setL1] = useState('');
   const [ours, setOurs] = useState('');
   const [notes, setNotes] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  // FR-085: null = nothing suggested yet; 'none' = the picked page has no price table; otherwise the seller that was pre-filled.
+  const [suggestion, setSuggestion] = useState<null | 'none' | 'unreadable' | { seller: string }>(null);
+  // What the last suggestion put into the form, so a re-suggest replaces it and a miss clears it (never touching user edits).
+  const prefilled = useRef<{ l1: string; line: string | null } | null>(null);
+  const NOTE_PREFIX = 'L1 seller (from GeM result): ';
+  const clearPrefill = () => {
+    const p = prefilled.current;
+    prefilled.current = null;
+    if (!p) return;
+    setL1((v) => (v === p.l1 ? '' : v));
+    if (p.line) setNotes((n) => n.split('\n').filter((l) => l !== p.line).join('\n'));
+  };
+  const suggestFrom = async (file: File) => {
+    // Parsed in the browser only; the page is never uploaded. Reads at most what the parser would look at.
+    let text: string;
+    try { text = await file.slice(0, MAX_RESULT_HTML).text(); } catch { clearPrefill(); setSuggestion('unreadable'); return; }
+    const parsed = parseAwardResult(text);
+    clearPrefill();
+    if (!parsed) { setSuggestion('none'); return; }
+    const l1Text = String(Math.round(parsed.l1Price));
+    const line = parsed.l1Seller ? `${NOTE_PREFIX}${parsed.l1Seller}` : null;
+    setL1(l1Text);
+    // Replace (not append) the seller-note line.
+    setNotes((n) => {
+      const kept = n.split('\n').filter((l) => !l.startsWith(NOTE_PREFIX)).join('\n');
+      return (line ? (kept ? `${kept}\n` : '') + line : kept).slice(0, 1000);
+    });
+    prefilled.current = { l1: l1Text, line };
+    setSuggestion({ seller: parsed.l1Seller });
+  };
+  const openBlockers = data.readiness.blockers;
   const allChecked = checks.price && checks.auth && checks.submit;
   const parse = (s: string) => (s.trim() ? Math.round(Number(s.replace(/[,₹\s]/g, ''))) : null);
   const l1Bad = l1.trim() !== '' && !Number.isFinite(parse(l1));
@@ -285,6 +318,11 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
             <DialogDescription>TenderPilot only records this — the submission itself happened on the GeM portal.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-2.5">
+            {openBlockers.length > 0 && (
+              <p role="status" className="rounded-md border border-warning/25 bg-warning-soft px-3 py-2 text-xs text-[hsl(32_90%_28%)] dark:text-warning">
+                {openBlockers.length} checklist item(s) were still open: {openBlockers.map((b) => b.label).join(', ')}
+              </p>
+            )}
             {([['price', 'I entered the price myself on GeM'], ['auth', 'I authenticated with OTP / DSC / e-Sign'], ['submit', 'I clicked Final Submit and saw the confirmation']] as const).map(([k, label]) => (
               <label key={k} className="flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm hover:bg-muted/60">
                 <Checkbox checked={checks[k]} onCheckedChange={(v) => setChecks((c) => ({ ...c, [k]: v === true }))} /> {label}
@@ -302,13 +340,22 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
         </DialogContent>
       </Dialog>
 
-      <Dialog open={outcomeOpen} onOpenChange={setOutcomeOpen}>
+      <Dialog open={outcomeOpen} onOpenChange={(o) => { setOutcomeOpen(o); if (!o) setSuggestion(null); }}>
         <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Record the result</DialogTitle>
             <DialogDescription>Prices here are for your records and analytics only — TenderPilot never enters prices on GeM.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3">
+            <div>
+              <input ref={fileRef} type="file" accept=".html,.htm,text/html" className="sr-only" tabIndex={-1} aria-label="GeM result page (HTML file)"
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void suggestFrom(f); }} />
+              <Button type="button" size="sm" variant="secondary" onClick={() => fileRef.current?.click()}><FileSearch /> Suggest from GeM result</Button>
+              <p className="mt-1 text-xs text-muted-foreground">Pick the public GeM result page you saved as HTML. It is read in your browser only.</p>
+              {suggestion === 'unreadable' && <p role="status" className="mt-1.5 rounded-md border border-danger/20 bg-danger-soft px-2 py-1.5 text-xs text-[hsl(350_74%_38%)] dark:text-danger">Could not read that file.</p>}
+              {suggestion === 'none' && <p role="status" className="mt-1.5 rounded-md border border-danger/20 bg-danger-soft px-2 py-1.5 text-xs text-[hsl(350_74%_38%)] dark:text-danger">No price table found in this page.</p>}
+              {typeof suggestion === 'object' && suggestion && <p role="status" className="mt-1.5 rounded-md border border-info/20 bg-info-soft px-2 py-1.5 text-xs text-[hsl(205_85%_30%)] dark:text-info">Pre-filled the L1 price{suggestion.seller ? ` and seller (${suggestion.seller})` : ''} — check them before saving.</p>}
+            </div>
             <Segmented value={result} onChange={setResult} aria-label="Result" options={[{ value: 'won', label: 'Won', icon: <Trophy /> }, { value: 'lost', label: 'Lost', icon: <XCircle /> }]} />
             <Field label="L1 price (₹)" hint={l1 && !l1Bad ? formatINR(parse(l1)) : 'The lowest price disclosed by GeM'} error={l1Bad ? 'Enter a number' : undefined}>
               <Input inputMode="numeric" value={l1} onChange={(e) => setL1(e.target.value)} placeholder="29,50,000" />
