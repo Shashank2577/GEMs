@@ -1,7 +1,7 @@
 /** Dashboard aggregates (T070; US6 independent test: numbers on seeded data, moving a card updates stage + activity). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
-import { activityLog, bidWorkspaces, tenderMatches, tenders, vaultDocuments, watchlists } from '@tp/db';
+import { activityLog, bidWorkspaces, organizations, tenderMatches, tenders, vaultDocuments, watchlists } from '@tp/db';
 import type { DashboardResponse } from '@tp/core/contracts/experience';
 import { istMidnight } from '../src/routes/dashboard';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
@@ -237,5 +237,35 @@ describe('GET /api/dashboard — boundaries', () => {
     const d = await dash(o.cookie);
     expect(d.tiles.winRate).toBe(0);
     expect(d.stats).toMatchObject({ won: 0, lost: 2 });
+  });
+});
+
+/** FR-007 (QA US1-3 defect): the team step does not block setupComplete for a demo org, but does for real orgs. */
+describe('GET /api/dashboard — setupComplete and the team step', () => {
+  it('a single-member demo org is setup-complete while team stays not done', async () => {
+    const solo = await signup(ctx.app, { orgName: 'Solo Demo Org' });
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: solo.cookie })).status).toBe(201);
+    const d = await dash(solo.cookie);
+    expect(d.demo).toBe(true);
+    expect(d.setup.find((s) => s.key === 'team')!.done).toBe(false);
+    expect(d.setup.filter((s) => s.key !== 'team').every((s) => s.done)).toBe(true);
+    expect(d.setupComplete).toBe(true);
+  });
+
+  it('for a non-demo org the team step still blocks setupComplete (US3-12)', async () => {
+    const solo = await signup(ctx.app, { orgName: 'Solo Real Org' });
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: solo.cookie })).status).toBe(201);
+    // Same data, but the org is no longer flagged as demo: every step except team is done.
+    await ctx.db.update(organizations).set({ onboardingState: { demo: false } }).where(eq(organizations.id, solo.me.org.id));
+    const d = await dash(solo.cookie);
+    expect(d.demo).toBe(false);
+    expect(d.setup.filter((s) => s.key !== 'team').every((s) => s.done)).toBe(true);
+    expect(d.setup.find((s) => s.key === 'team')!.done).toBe(false);
+    expect(d.setupComplete).toBe(false);
+    // Inviting a teammate completes setup.
+    expect((await request(ctx.app, 'POST', '/org/invitations', { cookie: solo.cookie, json: { email: 'mate@example.in', role: 'analyst' } })).status).toBe(201);
+    const d2 = await dash(solo.cookie);
+    expect(d2.setup.find((s) => s.key === 'team')!.done).toBe(true);
+    expect(d2.setupComplete).toBe(true);
   });
 });
