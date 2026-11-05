@@ -9,6 +9,8 @@
  *
  * Server environment this spec needs (set by the runner, not by product code):
  *   ANTHROPIC_API_KEY=qa-fake LLM_BASE_URL=http://127.0.0.1:${E2E_LLM_PORT:-4119}   (this file serves a counting fake Anthropic API)
+ * scripts/e2e-ci.sh (CI) applies them from this line:
+ * @e2e-env ANTHROPIC_API_KEY=qa-fake LLM_BASE_URL=http://127.0.0.1:4119
  * Also used: E2E_DATABASE_URL (psql for state the API cannot create: a stale extractor version, search fixtures),
  * QA_TEST_DATABASE_URL (API vitest runs) and QA_500K_DATABASE_URL (scenario 3 at 500,000 tenders; skipped if unset).
  */

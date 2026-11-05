@@ -1,0 +1,4 @@
+02:57:30 Story: 008/US1 (from PR title)
+02:57:30 FAIL verdict-exists: Missing QA verdict: qa/evidence/008/US1/VERDICT.md
+02:57:30 PASS commit-trailers: 3 commit(s) carry Work-Item/Requirement/Agent-Role/Harness
+02:57:30 Definition of Done: FAILED

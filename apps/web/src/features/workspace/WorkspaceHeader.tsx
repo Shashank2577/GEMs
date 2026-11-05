@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, CalendarClock, Check, ChevronDown, Copy, ExternalLink, UserPlus, Users } from 'lucide-react';
-import { canTransition, type WorkspaceDetail, type StageName } from '@tp/core/contracts/apply';
+import { DECISION_TOOLTIP, canMoveToStage, canTransition, type WorkspaceDetail, type StageName } from '@tp/core/contracts/apply';
 import {
   Avatar, AvatarGroup, Badge, Button, Card, Countdown, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger, Input, Popover, PopoverContent, PopoverTrigger, ScoreRing, StageBadge, Tooltip, VerdictBadge, toast,
 } from '@/components/ui';
-import { useCan } from '@/lib/auth';
+import { useAuth, useCan } from '@/lib/auth';
 import { ApiError, errorMessage } from '@/lib/api';
 import { formatDateIST, formatINR } from '@/lib/format';
 import { STAGE_LABEL, type Stage } from '@/lib/types';
@@ -22,6 +22,7 @@ const fromIstDay = (d: string) => new Date(`${d}T18:00:00+05:30`).toISOString();
 export function WorkspaceHeader({ data, onGoToStep }: { data: WorkspaceDetail; onGoToStep: (step: string) => void }) {
   const { workspace: w, tender: t, analysis } = data;
   const canWrite = useCan('analyst');
+  const { role } = useAuth();
   const update = useUpdateWorkspace(w.id);
   const [copied, setCopied] = useState(false);
 
@@ -74,17 +75,20 @@ export function WorkspaceHeader({ data, onGoToStep }: { data: WorkspaceDetail; o
                 <DropdownMenuLabel>Move to stage</DropdownMenuLabel>
                 {STAGE_ORDER.map((s) => {
                   // FR-008: Won/Lost only after the bid was submitted on GeM (the API enforces it too).
-                  const blocked = s !== w.stage && !canTransition(w.stage, s).ok;
+                  const noDecision = !canMoveToStage(role, w.stage, s); // Go / Dropped are Bid Manager+ (#527)
+                  const blocked = noDecision || (s !== w.stage && !canTransition(w.stage, s).ok);
                   return (
                   // aria-disabled (not `disabled`) keeps the item focusable so screen readers reach the hint.
-                  <DropdownMenuItem key={s} disabled={update.isPending} aria-disabled={blocked || undefined}
+                  <Tooltip key={s} content={noDecision ? DECISION_TOOLTIP : undefined} side="left">
+                  <DropdownMenuItem disabled={update.isPending} aria-disabled={blocked || undefined}
                     onSelect={(ev) => { if (blocked) { ev.preventDefault(); return; } void setStage(s); }}
                     className={cn('justify-between', blocked && 'cursor-not-allowed opacity-50')}>
                     <StageBadge stage={s as Stage} size="sm" />
-                    {blocked && <span className="text-2xs text-muted-foreground">Mark as submitted first</span>}
+                    {blocked && <span className="text-2xs text-muted-foreground">{noDecision ? 'Bid Manager only' : 'Mark as submitted first'}</span>}
                     {s === 'ready' && data.readiness.blockers.length > 0 && <span className="text-2xs text-danger">{data.readiness.blockers.length} blocker{data.readiness.blockers.length === 1 ? '' : 's'}</span>}
                     {s === w.stage && <Check className="size-4 text-primary" aria-hidden />}
                   </DropdownMenuItem>
+                  </Tooltip>
                   );
                 })}
               </DropdownMenuContent>

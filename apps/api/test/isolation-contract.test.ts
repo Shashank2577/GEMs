@@ -142,12 +142,12 @@ const FOREIGN: Record<string, () => Call> = {
   'DELETE /org/invitations/:id': () => asB('DELETE', `/org/invitations/${ids.invitation}`),
   'POST /org/invitations/:id/resend': () => asB('POST', `/org/invitations/${ids.invitation}/resend`),
   'DELETE /me/sessions/:id': () => asB('DELETE', `/me/sessions/${ids.session}`),
+  'PATCH /views/:id': () => asB('PATCH', `/views/${ids.view}`, { name: 'Hijack' }),
+  'DELETE /views/:id': () => asB('DELETE', `/views/${ids.view}`),
 };
 
 /** Implemented routes not (yet) in the contract, swept the same way. */
 const FOREIGN_EXTRA: Record<string, () => Call> = {
-  'PATCH /views/:id': () => asB('PATCH', `/views/${ids.view}`, { name: 'Hijack' }),
-  'DELETE /views/:id': () => asB('DELETE', `/views/${ids.view}`),
 };
 
 /** Parameter is public/global data; the call may succeed but must only affect org B. Run after the foreign sweep. */

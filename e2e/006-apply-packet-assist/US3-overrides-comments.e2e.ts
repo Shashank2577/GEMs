@@ -37,7 +37,8 @@ const detail = async (role: 'analyst' | 'viewer' | 'bid_manager' = 'analyst') =>
 /** Remove the OEM override (if any) and return the workspace to stage `go`. */
 async function reset() {
   await call('bid_manager', 'delete', `/api/workspaces/${wsId}/overrides/${OEM}`);
-  await call('analyst', 'patch', `/api/workspaces/${wsId}`, { stage: 'go' });
+  // Moving into Go is the Bid Manager's call (#527), so the reset runs as a bid_manager.
+  await call('bid_manager', 'patch', `/api/workspaces/${wsId}`, { stage: 'go' });
 }
 async function openDocs(page: Page, context: any, role: 'owner' | 'bid_manager' | 'analyst' | 'viewer') {
   await signInAs(context, fx, role);

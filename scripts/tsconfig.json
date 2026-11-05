@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // e2e/ also drives the browser extension (chrome.*) and builds PDFs with apps/api's pdf-lib; resolve both from
+    // the workspace packages that own them instead of adding root dependencies.
+    "typeRoots": ["../node_modules/@types", "../apps/extension/node_modules/@types"],
+    "types": ["node", "chrome"],
+    "paths": { "pdf-lib": ["../apps/api/node_modules/pdf-lib"] }
+  },
+  "include": ["*.ts", "../e2e/**/*.ts", "../playwright.config.ts"]
+}

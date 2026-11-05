@@ -151,7 +151,7 @@ async function linkTargets(bytes: Buffer, pageNo: number): Promise<number[]> {
     const a = annots.lookup(i, PDFDict);
     if (a.get(PDFName.of('Subtype'))?.toString() !== '/Link') continue;
     const dest = a.lookup(PDFName.of('Dest'), PDFArray);
-    const target = dest.get(0) as InstanceType<typeof PDFRef>;
+    const target = dest.get(0) as import('../../apps/api/node_modules/pdf-lib').PDFRef;
     out.push(pages.findIndex((p) => p.ref.toString() === target.toString()) + 1);
   }
   return out;
@@ -259,7 +259,10 @@ test('S2 reorder by drag, Move up arrow and keyboard; Default order appears; ord
   // (e) keyboard on the grip: Space, ArrowUp, Space
   await panGrip.focus();
   await page.keyboard.press('Space');
+  // wait for the keyboard sensor to pick the row up (and, since 006/HARDEN, announce it) before moving it
+  await expect(panGrip).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(300); // let the sortable transition settle so the drop lands on the new slot
   await page.keyboard.press('Space');
   await expect.poll(async () => (await rowTitles(page)).slice(4, 6), { message: 'keyboard reorder' }).toEqual(['PAN card of the firm', 'GST registration certificate']);
   await expect(page.getByRole('button', { name: 'Default order' })).toBeVisible();
@@ -303,7 +306,8 @@ test('S4 Build: progress texts in the live region, 201 ready (11 pages, start pa
   });
   const respP = page.waitForResponse((r) => /\/api\/workspaces\/[^/]+\/packets$/.test(r.url()) && r.request().method() === 'POST', { timeout: 30_000 });
   await page.getByRole('button', { name: 'Build packet' }).click();
-  const live = page.locator('div[role="status"][aria-live="polite"]');
+  // exclude the global offline banner (007/US7), which is also a polite status region
+  const live = page.locator('div[role="status"][aria-live="polite"]:not([data-testid="offline-banner"])');
   await expect(live).toHaveAttribute('aria-live', 'polite');
   const seen: string[] = [];
   for (const t of ['Rendering annexures…', 'Merging documents…', 'Writing index & bookmarks…', 'Saving the packet…']) {

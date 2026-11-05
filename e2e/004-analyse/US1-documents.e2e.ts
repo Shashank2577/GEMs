@@ -6,7 +6,9 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { APIRequestContext, Page, Playwright } from '@playwright/test';
+import type { APIRequestContext, Page, PlaywrightWorkerArgs } from '@playwright/test';
+
+type Playwright = PlaywrightWorkerArgs['playwright'];
 import { GEM_URL } from '../support/fixtures';
 import {
   SPEC, collectRunArtifacts, evidence, expect, fixturePath, mockGem, signupViaApi, test, uniqueUser, uploadFixture, uploadFixtureViaApi,

@@ -70,20 +70,45 @@ and `conflict` (409):
 Security headers on every response (FR-050): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (`SAMEORIGIN`
 for inline document previews), `Referrer-Policy: no-referrer`, `Strict-Transport-Security` on https, and a CSP for the SPA.
 
-## Identify — owner: Identify module (`routes/tenders.ts`, `routes/watchlists.ts`, `routes/ingestion.ts`, `routes/notifications.ts`)
+## Identify — owner: Identify module (`routes/tenders.ts`, `routes/watchlists.ts`, `routes/views.ts`, `routes/ingestion.ts`, `routes/notifications.ts`)
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | /tenders | `q` is full-text over bid number, title, category, ministry, department, organisation, buyer office, state, city and item names (008/FR-073; `websearch_to_tsquery` syntax: `"phrase"`, `or`, leading `-word`; every word is a prefix match; ASCII punctuation separates words, so `2062` finds `IS-2062`; bid numbers also match by prefix, and a query shaped like a bid number, e.g. `GEM/2026/B/12`, uses only the prefix match). Other params: `state,ministry,category,status,closingWithinDays,minValue,maxValue,matched(0/1),watchlistId,verdict,stage,sort(endAt|-createdAt|score|value),page,pageSize` → `{items: TenderListItem[], total, facets:{states,ministries,categories}}`. `TenderListItem` = tender core fields + `{matches:[{watchlistId,watchlistName,reasons}], analysis?:{score,verdict}, workspace?:{id,stage}, seen, isNew}` |
-| GET | /tenders/:id | `TenderDetail` = tender + `events` + `documents` + `matches` + `analysis` (latest for org) + `workspace` |
-| POST | /tenders/:id/seen, /tenders/:id/dismiss | – |
-| GET/POST | /watchlists | criteria per `WatchlistCriteria` |
+| GET | /tenders | `q` is full-text over bid number, title, category, ministry, department, organisation, buyer office, state, city and item names (008/FR-073; `websearch_to_tsquery` syntax: `"phrase"`, `or`, leading `-word`; every word is a prefix match; ASCII punctuation separates words, so `2062` finds `IS-2062`; bid numbers also match by prefix, and a query shaped like a bid number, e.g. `GEM/2026/B/12`, uses only the prefix match). Other params: `q,state,ministry,category` (comma-separated or repeated),`status(open\|closed\|cancelled\|awarded\|all),closingWithinDays,minValue,maxValue,matched(0/1),watchlistId,verdict(go\|review\|no_go\|none),stage,bidType,unseen(0/1),includeDismissed(0/1),sort(endAt\|-endAt\|-createdAt\|score\|-score\|value\|-value\|relevance),page,pageSize(≤100, default 25)` → `{items: TenderListItem[], total, facets:{states,ministries,categories}}`; a facet ignores its own filter. `TenderListItem` = tender core fields (never `raw` or `content_hash`) + `{isDemo, matches:[{watchlistId,watchlistName,reasons,relevance,createdAt}], analysis?:{score,verdict}, workspace?:{id,stage}, seen, isNew}`. Tenders are global; matches, analysis, workspace and seen/dismissed are the caller's org only |
+| GET | /tenders/:id | `TenderDetail` = tender + `events` + `documents` + `matches` + `analysis` (latest for org) + `workspace`; 404 for an unknown id (and for demo tenders in an org that never loaded the demo) |
+| POST | /tenders/:id/seen, /tenders/:id/dismiss | seen marks this org's matches seen and clears the user's related in-app alerts; dismiss takes `{undo?: boolean}` and hides the tender from the org's feed (`includeDismissed=1` shows it) |
+| GET/POST | /watchlists | criteria per `WatchlistCriteria`; POST (Analyst+) → 201. At most 50 watchlists per org, paused ones included, and fewer on a plan with a lower limit (`starter`: 5, `PLAN_LIMITS` in `packages/core/src/contracts/plans.ts`; over a plan limit POST answers 402 `plan_limit_reached`): 409 `watchlist_limit` "You can have up to 50 watchlists — delete one first." (`details:{limit}`) (003/FR-027) |
 | PATCH/DELETE (W) | /watchlists/:id | – |
-| POST | /watchlists/preview | `{criteria}` → `{count, sample: TenderListItem[]}` |
-| POST (M) | /ingestion/run | `{pages?, search?}` → `IngestionRun` (runs inline, matches, queues alerts). 429 `sync_cooldown` (`details.retryAt`) while the last finished manual run, from any org, is younger than `MANUAL_SYNC_COOLDOWN_MIN` (default 10; 008/FR-026 supersedes 003/FR-013's 2 minutes), checked before GeM is touched; 409 `ingestion_running` (`details.run`) when another run holds the single running slot (cron, manual or another isolate, 008/FR-025) |
-| GET | /ingestion/runs | `{items, lastSuccessAt, lastRun, totalTenders, openTenders, nextManualSyncAt, manualSyncCooldownMin}`: latest runs; `nextManualSyncAt` is the manual-sync cooldown end (null when a sync is allowed), so the UI can disable "Sync now" |
-| GET | /notifications | `unread?` → `{items, unreadCount}` |
+| POST | /watchlists/preview | `{criteria}` → `{count, sample: TenderListItem[] + previewReasons}`; every candidate is scanned (no silent cap, 003/FR-028); 30 requests/min/user then 429 `rate_limited` |
+| GET | /views | Saved feed views of the caller (personal: scoped to org + user) → `{items: SavedView[], total, limit}` (`limit` = 20), ordered by `position` (003/FR-035) |
+| POST | /views | `{name (1–40 chars), params: Record<string,string[]>}` → 201 `SavedView = {id,name,params,position,createdAt,updatedAt}`. 409 `view_exists` for a duplicate name (per user), 409 `view_limit` (`details:{limit:20}`) at 20 views |
+| PATCH/DELETE | /views/:id | PATCH `{name?, params?}` → `SavedView` (409 `view_exists`); DELETE → `{ok:true}`. Another user's or org's view is 404, never 403 |
+| POST (M) | /ingestion/run | `{pages?, search?}` → `IngestionRun` (runs inline, matches, queues alerts, then dispatches instant alerts). 429 `sync_cooldown` (`details:{retryAt}`, message "GeM was synced moments ago. Next manual sync at <time> IST.") for `MANUAL_SYNC_COOLDOWN_MIN` minutes (default 10; 008/FR-026 raised the 2 minutes of 003/FR-013) after a finished manual run of any org, with no request to GeM. 409 `ingestion_running` (`details.run`) when a sync is already running (also a run held by cron or another isolate: single running slot, 008/FR-025). |
+| GET | /ingestion/runs | `{items: IngestionRun[] (latest 20), lastSuccessAt, lastRun, totalTenders, openTenders (both real tenders only, no demo rows; 008/FR-016), nextManualSyncAt \| null, manualSyncCooldownMin}` |
+| GET | /notifications | `unread?(0/1), kind?, page?, pageSize?` → `{items, unreadCount, total}`; `kind` is one of `tender_match, expiry, deadline, assignment, mention, digest, system, corrigendum, result` (`NOTIFICATION_KINDS`; `?kind=corrigendum` is accepted), anything else is 400 `validation_error` (003/FR-049). Each in-app row carries its email/WhatsApp `deliveries` |
 | POST | /notifications/:id/read, /notifications/read-all | – |
+| GET | /notifications/unsubscribe?token= | Public, no side effect: confirmation page whose button POSTs back (RFC 8058, 003/FR-048) |
+| POST | /notifications/unsubscribe?token= | Public; the signed `token` (HMAC of user, org, `email_matches`; does not expire) is the credential. Sets that user's `notification_prefs.email = false` for the org and marks their queued email rows `skipped` ("unsubscribed"). Idempotent. One-click mail clients (`List-Unsubscribe=One-Click`) get `{ok:true,email:false}`, the page's form gets HTML. Tampered token, or the user left the org: 400 `invalid_token`. Alert emails carry `List-Unsubscribe` and `List-Unsubscribe-Post` headers |
+
+Delivered: 003 US5 (corrigendum and cancellation alerts, FR-052..055, T060–T065). Planned, not built yet (003 US6, tasks T066–T076; no route, table or column exists on `main`: `tender_results`, `ingestion_runs.kind`):
+
+- `GET /tenders/:id/result` *(planned, US6, FR-062)*: the stored GeM result for the tender, or `evaluationStatus` with an empty bidder list; reads `tender_results`.
+- `GET /insights/competitors?category=&state=` *(planned, US6, FR-064)*: wins, awarded value and categories per competitor aggregated from `tender_results`.
+
+### Identify error codes
+
+| Code | Status | When |
+|---|---|---|
+| `sync_cooldown` | 429 | A manual sync was requested within the cooldown after a finished manual run; `details.retryAt` is the ISO time the next one is allowed (003/FR-013, 008/FR-026) |
+| `ingestion_running` | 409 | A sync is already running (cluster-wide single flight) |
+| `watchlist_limit` | 409 | The org already has 50 watchlists (003/FR-027) |
+| `view_limit` | 409 | The user already has 20 saved views (003/FR-035) |
+| `view_exists` | 409 | The user already has a saved view with that name |
+| `invalid_token` | 400 | Unsubscribe token tampered, unknown, or the user is no longer in the org (003/FR-048) |
+
+Notification kinds (`NOTIFICATION_KINDS`, all 9): `tender_match, expiry, deadline, assignment, mention, digest, system, corrigendum, result`.
+`corrigendum` is delivered (003/FR-053, US5): amendment and cancellation alerts. `result` is accepted by the filter and the enum but nothing
+emits it until US6 (planned).
 
 ## Analyse — owner: Analyse module (`routes/analysis.ts`, `services/analyse.ts`, `services/staleness.ts`)
 
@@ -181,10 +206,10 @@ DTOs (`packages/core/src/contracts/vault.ts`):
 
 | Method | Path | Notes |
 |---|---|---|
-| POST (W) | /tenders/:id/workspace | create-or-get workspace (stage `identified`, or `go/no_go` hint from analysis) |
+| POST (W) | /tenders/:id/workspace | create-or-get workspace (stage `identified`, or `go/no_go` hint from analysis; a Go verdict starts it in `go` only for bid_manager+, an Analyst's starts in `analysing` — #527) |
 | GET | /workspaces | `stage?` → cards for Kanban: tender summary, score, owner, due, readiness % |
 | GET | /workspaces/:id | workspace + tender + analysis + `readiness` + packets + comments |
-| PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?: {result:'won'\|'lost', l1Price?, ourPrice?, notes?}\|null}`; moving to `ready` is blocked (409 `not_ready`, or `conflict` with `reason:'not_analysed'`) if mandatory items are missing/expired and not overridden; reaching `won`/`lost` (by `stage` or by `outcome`) from any stage other than `submitted`/`won`/`lost` is 409 `invalid_transition` (`details:{from,to}`). A position move renumbers the column in one transaction under a per-(org, stage) advisory lock |
+| PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?: {result:'won'\|'lost', l1Price?, ourPrice?, notes?}\|null}`; moving to `ready` is blocked (409 `not_ready`, or `conflict` with `reason:'not_analysed'`) if mandatory items are missing/expired and not overridden; reaching `won`/`lost` (by `stage` or by `outcome`) from any stage other than `submitted`/`won`/`lost` is 409 `invalid_transition` (`details:{from,to}`); moving a bid **into `go` or `dropped`** (the Go/No-Go call) is bid_manager+, otherwise 403 `forbidden` (#527). A position move renumbers the column in one transaction under a per-(org, stage) advisory lock |
 | PUT (W) | /workspaces/:id/mapping | `{[itemId]: vaultDocId|null}` |
 | POST (M) | /workspaces/:id/overrides | `{itemId, reason}` → 201 `{workspace, readiness}`; only a missing or expired item can be overridden, otherwise 409 `nothing_to_override` (`details:{itemId,state}`); an item not in the checklist is 400 `validation_error` |
 | DELETE (M) | /workspaces/:id/overrides/:itemId | removes an override → `{workspace, readiness}`; 404 when there is none |
@@ -236,7 +261,7 @@ Both arrays hold at most 5 items (`MY_WORK_LIMIT`), are computed for the signed-
   `MyWorkItem` = `{workspaceId, tenderId, bidNumber, title, stage, dueAt, endAt, readiness:{percent, blockers, analysed}}`. `readiness` comes from the same helper as the pipeline cards (`readinessFor`), so the percentage matches the card: `percent` 0–100, `blockers` = number of open blockers (mandatory checklist items missing/expired and not overridden), `analysed:false` (percent 0) while the tender has no finished analysis.
 - `awaitingDecision: DecisionItem[]` — workspaces in stage `analysing` whose **latest** analysis for the tender is `done`; oldest-waiting first (analysis `updated_at`, then workspace `created_at`, then id).
   `DecisionItem` is **flat**: `{tenderId, workspaceId, bidNumber, title, score, verdict, endAt}` (`score` 0–100 or null, `verdict` `go|review|no_go` or null). There is no nested `analysis` object. `workspaceId` is typed `string | null`; the current query always sets it.
-  The web turns a decision into `PATCH /workspaces/:id {stage:'go'}` (one tap, no dialog) or `{stage:'dropped'}` (after a confirmation dialog). The API itself does not restrict that PATCH to bid_manager+ (analyst+ per the workspace contract).
+  The web turns a decision into `PATCH /workspaces/:id {stage:'go'}` (one tap, no dialog) or `{stage:'dropped'}` (after a confirmation dialog). The API enforces it (#527): a move into `go`/`dropped` is bid_manager+, an Analyst gets 403 `forbidden`; every other move stays analyst+ per the workspace contract.
 
 ### `PATCH /org` — onboarding state (007/FR-048, FR-052)
 

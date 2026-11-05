@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { PACKET_MAX_ITEMS } from './caps';
 import type { ActivityItem } from './auth';
+import { roleAtLeast, type RoleName } from './common';
 import type { AnalysisDto, ChecklistItem } from './analyse';
 import type { Readiness, ReadinessItem, ReadinessState } from '../packet/mapping';
 import type { AssistPayload, AssistField } from '../assist/allowlist';
@@ -41,6 +42,35 @@ export function canTransition(from: StageName, to: StageName): TransitionCheck {
     return { ok: false, code: 'invalid_transition', message: INVALID_TRANSITION_MESSAGE };
   }
   return { ok: true };
+}
+
+/**
+ * The Go / No-Go decision (001 personas, 004 roles table: "Bid Manager owns the Go/No-Go decision"; 007/FR-072).
+ * Moving a bid INTO one of these stages is Bid Manager+ at the API (#527 item 5); every other move stays Analyst+.
+ * "Dropped" is the No-Go outcome ("Drop" on the dashboard's Awaiting-your-decision card).
+ */
+export const DECISION_STAGES: readonly StageName[] = ['go', 'dropped'];
+export const DECISION_FORBIDDEN_MESSAGE = 'Only a Bid Manager or Owner can make the Go/No-Go call.';
+/** Tooltip / toast copy the web shows where an Analyst's Go or Dropped target is disabled or refused (#527). */
+export const DECISION_TOOLTIP = 'Only a Bid Manager can make the Go/No-Go call';
+/** Screen-reader copy when a keyboard/pointer drag over a decision column is refused (#527). */
+export function decisionLockedAnnouncement(stageLabel: string): string {
+  return `${stageLabel} is locked: only a Bid Manager can make the Go/No-Go call.`;
+}
+
+/** True for the stages that ARE the Go / No-Go decision (moving a bid into them). */
+export function isDecisionStage(stage: StageName): boolean {
+  return DECISION_STAGES.includes(stage);
+}
+
+/** Who may make the Go / No-Go call: Bid Manager and Owner (single source for the API guard and the web UI). */
+export function canDecideGoNoGo(role: RoleName | null | undefined): boolean {
+  return roleAtLeast(role, 'bid_manager');
+}
+
+/** Can this role move a bid from `from` to `to`? Only the decision stages are gated beyond Analyst; staying put is always fine. */
+export function canMoveToStage(role: RoleName | null | undefined, from: StageName, to: StageName): boolean {
+  return from === to || !isDecisionStage(to) || canDecideGoNoGo(role);
 }
 
 /** Active pipeline columns (Kanban), in order. */

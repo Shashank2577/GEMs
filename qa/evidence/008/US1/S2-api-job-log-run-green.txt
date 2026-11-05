@@ -1,0 +1,26 @@
+02:53:01   TEST_DATABASE_URL: ***localhost:5433/tenderpilot_test
+02:53:01   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+02:53:01 ##[endgroup]
+02:53:02 
+02:53:02 > @tp/api@0.1.0 test /home/runner/work/GEMs/GEMs/apps/api
+02:53:02 > vitest run
+02:53:02 
+02:53:02 
+02:53:02  RUN  v2.1.9 /home/runner/work/GEMs/GEMs/apps/api
+02:53:05 
+02:53:05  ✓ test/auth.test.ts (22 tests) 1769ms
+02:53:07  ✓ test/analyse.test.ts (16 tests) 944ms
+02:53:09  ✓ test/workspace.test.ts (25 tests) 823ms
+02:53:10  ✓ test/identify.test.ts (17 tests) 925ms
+02:53:12  ✓ test/vault.test.ts (20 tests) 750ms
+02:53:13  ✓ test/ingest.test.ts (9 tests) 688ms
+02:53:15  ✓ test/packet.test.ts (10 tests) 883ms
+02:53:16  ✓ test/dashboard.test.ts (7 tests) 486ms
+02:53:18  ✓ test/demo.test.ts (8 tests) 656ms
+02:53:18  ✓ test/foundation.test.ts (10 tests) 90ms
+02:53:20  ✓ test/assist.test.ts (6 tests) 598ms
+02:53:20 
+02:53:20  Test Files  11 passed (11)
+02:53:20       Tests  150 passed (150)
+02:53:20    Start at  02:53:02
+02:53:20    Duration  17.59s (transform 820ms, setup 0ms, collect 6.64s, tests 8.61s, environment 2ms, prepare 790ms)
