@@ -14,6 +14,7 @@
  * Request shape adapted from erenmyeager15/india-government-tenders-scraper (Apache-2.0) and
  * arush15june/gem-search (MIT) — see NOTICE.
  */
+import { bidResultPath } from './award';
 import { isPdfBody, readBoundedBody, SourceBodyLimitError } from './http';
 import { parseBidPlusDoc, parseBidPlusResponse, type BidPlusPage, type NormalizedTender } from './parse';
 
@@ -60,6 +61,42 @@ export class GemError extends Error {
   }
 }
 
+/** Upper bound on a bid-result page body; anything beyond is not read (007/T033). */
+export const MAX_RESULT_BYTES = 1024 * 1024;
+
+/**
+ * Response text, reading at most `maxBytes`: a declared content-length above the cap is refused, an undeclared
+ * oversized body is cut off (the stream is cancelled) and the prefix returned.
+ */
+export async function readTextCapped(res: Response, maxBytes: number): Promise<string> {
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await res.body?.cancel().catch(() => {});
+    // Not retryable: the same page will be just as large next time.
+    throw new GemError(`GeM response too large (${declared} bytes)`, res.status, false);
+  }
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const room = maxBytes - total;
+    if (value.length >= room) {
+      chunks.push(value.subarray(0, room));
+      total += room;
+      await reader.cancel().catch(() => {});
+      break;
+    }
+    chunks.push(value);
+    total += value.length;
+  }
+  const buf = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { buf.set(c, off); off += c.length; }
+  return new TextDecoder().decode(buf);
+}
 /** Default cap for a downloaded bid document — same as the upload limit (FR-008). */
 export const MAX_GEM_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
@@ -171,6 +208,21 @@ export class GemClient {
       throw new GemError('GeM did not return a PDF for this bid document', res.status);
     }
     return { bytes, contentType, url: path.startsWith('http') ? path : `${this.baseUrl}${path}` };
+  }
+
+  /**
+   * Fetch the public bid-result (award) page HTML for a BidPlus `b_id` (007/T033). Read-only, same throttle and
+   * back-off as every other request. 404 → `null` (no result published).
+   */
+  async fetchBidResultHtml(gemBidId: string): Promise<{ html: string; url: string } | null> {
+    const path = bidResultPath(gemBidId);
+    const res = await this.request(path, {
+      method: 'GET',
+      headers: { accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8', referer: `${this.baseUrl}/all-bids`, 'x-requested-with': 'XMLHttpRequest' },
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new GemError(`GeM bid result failed: HTTP ${res.status}`, res.status, res.status >= 500);
+    return { html: await readTextCapped(res, MAX_RESULT_BYTES), url: `${this.baseUrl}${path}` };
   }
 
   // ───────────── internals ─────────────

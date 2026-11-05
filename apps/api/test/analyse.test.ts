@@ -536,7 +536,7 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
   it('caps the total characters across calls (a small budget gives the 2nd call only what is left)', async () => {
     calls.length = 0;
     const { analyseTender } = await import('../src/services/analyse');
-    const { analysis } = await analyseTender({ ...ctx.deps, llm: countingLlm() }, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs },
+    const { analysis } = await analyseTender({ ...ctx.deps, llm: countingLlm() }, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} },
       { llmBudget: { maxChars: 12_000 } });
     expect(calls.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(12_000);
     expect(analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: calls.length, total: 5 }]);
@@ -544,7 +544,7 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
 
   it('a slow LLM call times out and falls back to rules; past the overall budget no call starts', async () => {
     const { analyseTender } = await import('../src/services/analyse');
-    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs };
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} };
     calls.length = 0;
     const hang = countingLlm(() => new Promise(() => {}));
     const t0 = Date.now();
@@ -568,5 +568,51 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
     expect(calls.length).toBe(1);
     const rules = await request(ctx.app, 'POST', `/tenders/${fiveDocs}/analyse`, { cookie: roles.analyst.cookie });
     expect(rules.body.warnings).toEqual([]);
+  });
+});
+
+describe('US2 extraction: new keys and document check (FR-010, FR-019, T036)', () => {
+  const analyse = (id: string) => request(ctx.app, 'POST', `/tenders/${id}/analyse`, { cookie: roles.analyst.cookie });
+  const put = (id: string, file: File) => request(ctx.app, 'POST', `/tenders/${id}/documents`, { cookie: roles.analyst.cookie, form: { file, kind: 'bid' } });
+
+  it('go-it-services.pdf rules-only: 32 requirements incl. bid_published_at and consignee_state; no document check prefix', async () => {
+    const t = await insertTender('go-it-services', { contentHash: 'us2-keys', source: 'us2-keys', state: null });
+    expect((await put(t.id, pdfFile('go-it-services'))).status).toBe(201);
+    const r = await analyse(t.id);
+    expect(r.status).toBe(201);
+    expect(r.body.method).toBe('rules');
+    expect(r.body.requirements).toHaveLength(32);
+    expect(r.body.requirements.every((x: any) => x.method === 'RULE')).toBe(true);
+    const by = (k: string) => r.body.requirements.find((x: any) => x.key === k);
+    expect(by('bid_published_at')).toMatchObject({ value: '2026-11-28T00:00:00+05:30', source: { page: 1, fileName: 'go-it-services.pdf' } });
+    expect(by('consignee_state')).toMatchObject({ value: 'Delhi', confidence: 0.8, source: { page: 3 } });
+    expect(by('contract_period')).toBeUndefined();
+    expect(r.body.summary).not.toMatch(/^Check documents/);
+    // No listing state → delivery uses the consignee state from the PDF (Delhi is an operating state).
+    expect(r.body.factors.find((f: any) => f.key === 'deliveryFeasibility').detail).toBe('Delivery period of 30 days to Delhi looks feasible.');
+  });
+
+  it('a document printed with another bid number: analysis runs, summary starts "Check documents: …" and survives overrides (US2 #13)', async () => {
+    const t = await insertTender('review-hardware-oem', { contentHash: 'us2-mismatch', source: 'us2-mismatch' }); // GEM/2026/B/6133872
+    expect((await put(t.id, pdfFile('go-it-services'))).status).toBe(201); // printed GEM/2026/B/6120451
+    const r = await analyse(t.id);
+    expect(r.status).toBe(201);
+    expect(r.body.status).toBe('done');
+    expect(r.body.summary).toMatch(/^Check documents: go-it-services\.pdf is for GEM\/2026\/B\/6120451\. (Go|Review|No-Go) — \d+\/100/);
+    const got = await request(ctx.app, 'GET', `/tenders/${t.id}/analysis`, { cookie: roles.viewer.cookie });
+    expect(got.body.summary.startsWith('Check documents: go-it-services.pdf is for GEM/2026/B/6120451. ')).toBe(true);
+    const ov = await request(ctx.app, 'POST', `/analyses/${r.body.id}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'timeToClose', status: 'fail', reason: 'Too little time' } });
+    expect(ov.status).toBe(200);
+    expect(ov.body.summary.startsWith('Check documents: go-it-services.pdf is for GEM/2026/B/6120451. ')).toBe(true);
+    expect(ov.body.summary.match(/Check documents/g)).toHaveLength(1);
+  });
+
+  it('several mismatching documents are listed together; matching documents are not', async () => {
+    const t = await insertTender('nogo-experience', { contentHash: 'us2-mismatch2', source: 'us2-mismatch2' }); // GEM/2026/B/6140019
+    await put(t.id, pdfFile('nogo-experience'));
+    await put(t.id, pdfFile('go-it-services', 'old.pdf'));
+    await put(t.id, pdfFile('emd-exempt-mse', 'other.pdf'));
+    const r = await analyse(t.id);
+    expect(r.body.summary).toMatch(/^Check documents: old\.pdf is for GEM\/2026\/B\/6120451; other\.pdf is for GEM\/2026\/B\/6151234\. /);
   });
 });

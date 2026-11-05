@@ -3,7 +3,9 @@ import type { Db } from '@tp/db';
 import type { AppDeps, BlobStore, Clock, GemLease, Logger } from '../deps';
 import { loadConfig, loadGemConfig, type RuntimeEnv } from '../env';
 import { createPgGemLease } from '../lib/gem-lease';
+import { createPgRateLimiter } from '../lib/rate-limiter';
 import { systemClock } from './clock';
+import { noopErrorReporter } from './errors';
 import { createAnthropicClient } from './llm';
 import { consoleLogger } from './logger';
 import { createLogMailer, createResendMailer } from './mailer';
@@ -39,6 +41,8 @@ export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetc
     whatsapp: env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_ID
       ? createMetaWhatsApp({ token: env.WHATSAPP_TOKEN, phoneNumberId: env.WHATSAPP_PHONE_ID, apiVersion: env.WHATSAPP_API_VERSION, fetch: doFetch })
       : createLogWhatsApp(logger),
+    rateLimiter: createPgRateLimiter(db),
+    errors: noopErrorReporter,
     // 008/FR-024: one GeM request per GEM_MIN_INTERVAL_MS across every isolate (0 = unthrottled, local tests only).
     gemLease: gem.minIntervalMs > 0 ? createPgGemLease(db, gem.minIntervalMs) : noopGemLease,
   };
@@ -55,3 +59,5 @@ export { createLogMailer, createResendMailer } from './mailer';
 export { createLogWhatsApp, createMetaWhatsApp } from './whatsapp';
 export { systemClock, createFixedClock } from './clock';
 export { consoleLogger, silentLogger } from './logger';
+export { noopErrorReporter } from './errors';
+export { createMemoryRateLimiter, createPgRateLimiter, noopRateLimiter } from '../lib/rate-limiter';

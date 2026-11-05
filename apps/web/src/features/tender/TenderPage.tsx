@@ -134,7 +134,7 @@ export default function TenderPage() {
           )}
         </TabsContent>
         <TabsContent value="requirements">
-          <RequirementsTab analysis={analysis} tenderId={id} />
+          <RequirementsTab analysis={analysis} tenderId={id} documents={docs.data?.items} bidNumber={t.bidNumber} />
         </TabsContent>
         <TabsContent value="documents">
           <DocumentsTab tenderId={id} hasGemLink={hasGemLink} hasAnalysis={!!analysis} onReanalyse={runAnalyse} />

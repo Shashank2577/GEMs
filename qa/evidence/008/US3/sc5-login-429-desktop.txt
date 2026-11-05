@@ -1,0 +1,10 @@
+# sc5-login-429 — project desktop — 2026-11-05T04:32:03.502Z
+attempts 1..10: 401 each
+### attempt 11 (API)
+> POST /api/auth/login lock.mw31u0mm10@example.in
+< 429
+< retry-after: 900
+< content-type: application/json
+{"error":{"code":"rate_limited","message":"Too many attempts. Try again in 15 minutes.","details":{"rule":"auth.fail.email","retryAfter":900}}}
+
+UI alert text: Too many attempts. Try again in 15 minutes.

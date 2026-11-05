@@ -20,14 +20,16 @@ import { createNodeDb, type Db, type Role } from '@tp/db';
 import { runMigrations } from '@tp/db/migrate';
 import type { Me } from '@tp/core/contracts/auth';
 import { createApp, type App } from '../src/app';
-import type { AppDeps, GemLease, LlmClient } from '../src/deps';
+import type { AppDeps, GemLease, LlmClient, RateLimiter } from '../src/deps';
 import { loadConfig, loadGemConfig } from '../src/env';
 import { createFsBlobStore } from '../src/adapters/blob-fs';
 import { createFixedClock } from '../src/adapters/clock';
 import { silentLogger } from '../src/adapters/logger';
 import { createLogMailer } from '../src/adapters/mailer';
 import { createLogWhatsApp } from '../src/adapters/whatsapp';
+import { noopErrorReporter } from '../src/adapters/errors';
 import { noopGemLease } from '../src/adapters/index';
+import { noopRateLimiter } from '../src/lib/rate-limiter';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://tp:tp@localhost:5433/tenderpilot_test';
 export const TEST_APP_URL = 'http://tp.test';
@@ -78,6 +80,12 @@ export interface TestContextOptions {
   databaseUrl?: string;
   /** TRUST_PROXY for client-IP rate limiting (default unset = no trusted proxy, IP limits skipped). */
   trustProxy?: 'cloudflare' | 'xff';
+  /**
+   * Request rate limiter (008/FR-017). Default: never limits, so suites that are not about limits can make any
+   * number of calls under the fixed clock. Limit tests pass `createMemoryRateLimiter()` or `createPgRateLimiter(db)`
+   * (a function receives the context's db).
+   */
+  rateLimiter?: RateLimiter | ((db: Db) => RateLimiter);
   /** Cluster-wide GeM lease (008/FR-024). Default: never waits. Lease tests pass `(db) => createPgGemLease(db, …)`. */
   gemLease?: GemLease | ((db: Db) => GemLease);
   /** Extra env vars for loadConfig/loadGemConfig (e.g. `MANUAL_SYNC_COOLDOWN_MIN`). */
@@ -105,6 +113,8 @@ export async function createTestContext(opts: TestContextOptions = {}) {
     config: loadConfig(env),
     logger: silentLogger,
     fetch: opts.fetch ?? ((input, init) => fetch(input, init)),
+    rateLimiter: typeof opts.rateLimiter === 'function' ? opts.rateLimiter(db) : opts.rateLimiter ?? noopRateLimiter,
+    errors: noopErrorReporter,
     gemLease: typeof opts.gemLease === 'function' ? opts.gemLease(db) : opts.gemLease ?? noopGemLease,
   };
   const app = createApp(deps);

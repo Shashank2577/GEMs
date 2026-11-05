@@ -18,6 +18,7 @@ import { buildLlmPrompt, enrichWithLlm, promptChars } from '@tp/core/analyse/llm
 import {
   PdfPageLimitError, PdfTextError, extractPages, isPdf, isScannedDocument, joinPages, looksScanned, splitPages,
 } from '@tp/core/analyse/pdf-text';
+import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
@@ -32,6 +33,7 @@ import { GemClient, GemError } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, forbidden, notFound, unprocessable } from '../lib/errors';
+import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
 import { markStale } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
@@ -49,6 +51,20 @@ export function bidNumberMismatch(d: Pick<DocRow, 'text'>, tenderBidNumber: stri
   const expected = normalizeBidNumber(tenderBidNumber);
   return found && expected && found !== expected ? found : null;
 }
+
+/**
+ * "Check documents: a.pdf is for GEM/2026/B/1." prefix for the analysis summary when any analysed
+ * document's printed bid number differs from the tender's (FR-010, US2 #13); '' when all match.
+ */
+export function documentCheckPrefix(docs: Pick<DocRow, 'text' | 'fileName'>[], tenderBidNumber: string | null | undefined): string {
+  const wrong = docs.flatMap((d) => {
+    const found = bidNumberMismatch(d, tenderBidNumber);
+    return found ? [`${d.fileName} is for ${found}`] : [];
+  });
+  return wrong.length ? `Check documents: ${wrong.join('; ')}.` : '';
+}
+
+export const withPrefix = (prefix: string, summary: string) => (prefix ? `${prefix} ${summary}` : summary);
 
 /** `tenderBidNumber` enables `bidNumberFound`; without it the field is null. */
 export function toDocumentDto(d: DocRow, tenderBidNumber?: string | null): TenderDocumentDto {
@@ -76,9 +92,10 @@ export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
   };
 }
 
-export async function getTender(deps: AppDeps, tenderId: string): Promise<TenderRow> {
+/** A tender the caller's org may see: demo tenders do not exist for orgs that never loaded the demo (008/FR-016). */
+export async function getTender(deps: AppDeps, tenderId: string, viewer: TenderViewer): Promise<TenderRow> {
   const [t] = await deps.db.select().from(tenders).where(eq(tenders.id, tenderId));
-  if (!t) throw notFound('Tender');
+  if (!t || !canSeeTender(viewer, t)) throw notFound('Tender');
   return t;
 }
 
@@ -122,11 +139,13 @@ async function extractOrThrow(bytes: Uint8Array): Promise<string[]> {
 
 export interface UploadInput {
   orgId: string; userId: string; tenderId: string; kind: TenderDocKind;
+  /** The caller's org (tender visibility, 008/FR-016). */
+  viewer: TenderViewer;
   file: { name: string; type?: string; bytes: Uint8Array };
 }
 
 export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): Promise<{ doc: DocRow; tender: TenderRow }> {
-  const tender = await getTender(deps, input.tenderId);
+  const tender = await getTender(deps, input.tenderId, input.viewer);
   const { bytes } = input.file;
   if (bytes.length === 0) throw new HttpError(400, 'bad_request', 'The file is empty');
   if (bytes.length > MAX_TENDER_DOC_BYTES) throw new HttpError(413, 'payload_too_large', 'The file is larger than 25 MB');
@@ -150,8 +169,8 @@ export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): P
 
 // ───────────── Remove (FR-009) ─────────────
 
-export async function removeTenderDocument(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; docId: string }): Promise<void> {
-  await getTender(deps, input.tenderId);
+export async function removeTenderDocument(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; docId: string; viewer: TenderViewer }): Promise<void> {
+  await getTender(deps, input.tenderId, input.viewer);
   const doc = await getTenderDocument(deps, input.tenderId, input.docId, input.orgId);
   if (doc.orgId === null) throw forbidden('Documents fetched from GeM are shared and cannot be removed');
   const deleted = await deps.db.delete(tenderDocuments)
@@ -174,8 +193,8 @@ export async function removeTenderDocument(deps: AppDeps, input: { orgId: string
 
 // ───────────── Fetch from GeM ─────────────
 
-export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
-  const tender = await getTender(deps, input.tenderId);
+export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
+  const tender = await getTender(deps, input.tenderId, input.viewer);
   const existing = (await listTenderDocuments(deps, tender.id, input.orgId)).filter((d) => d.orgId === null);
   if (existing.length) return { documents: existing, fetched: 0, tender };
   const ref = tender.gemBidId ?? tender.documentUrl;
@@ -265,9 +284,9 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 export async function analyseTender(
-  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }, opts: { llmBudget?: Partial<LlmBudgetLimits> } = {},
+  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }, opts: { llmBudget?: Partial<LlmBudgetLimits> } = {},
 ): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
-  const tender = await getTender(deps, input.tenderId);
+  const tender = await getTender(deps, input.tenderId, input.viewer);
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
     try {
@@ -340,9 +359,10 @@ export async function analyseTender(
       overrides: overridesOf(previous),
     });
     const checklist = buildChecklist(requirements, company.profile);
+    const summary = withPrefix(documentCheckPrefix(ordered, tender.bidNumber), result.summary);
     const [done] = await deps.db.update(analyses).set({
       status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
-      score: result.score, confidence: result.confidence, verdict: result.verdict, summary: result.summary, error: null, stale: false,
+      score: result.score, confidence: result.confidence, verdict: result.verdict, summary, error: null, stale: false,
       notes, warnings, updatedAt: deps.clock.now(),
     }).where(eq(analyses.id, row.id)).returning();
     await logActivity(deps.db, {
@@ -376,8 +396,9 @@ export async function overrideFactor(
     return input.status === f.status ? rest : { ...rest, overridden: { status: input.status, reason: input.reason, by: input.userName, at } };
   });
   const r = computeScore(factors);
+  const prefix = matchCheckPrefix(a.summary) ?? '';
   const [updated] = await deps.db.update(analyses).set({
-    factors, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: r.summary, updatedAt: deps.clock.now(),
+    factors, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: withPrefix(prefix, r.summary), updatedAt: deps.clock.now(),
   }).where(eq(analyses.id, a.id)).returning();
   await logActivity(deps.db, {
     orgId: input.orgId, userId: input.userId, action: 'analysis.factor_overridden', entityType: 'tender', entityId: a.tenderId,

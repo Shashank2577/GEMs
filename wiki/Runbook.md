@@ -21,3 +21,8 @@ pnpm exec playwright test                                                # E2E +
 See `docs/deploy.md` (spec 008). In short: create a Neon database and run `pnpm db:migrate` against it, create the R2 bucket,
 `wrangler secret put DATABASE_URL` (and optional `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`),
 set `APP_URL` in `wrangler.toml`, then `pnpm deploy`.
+
+`APP_URL` must be exactly the origin users load the app from (scheme + host + port, e.g. `https://app.tenderpilot.in`).
+Signed-in writes whose browser `Origin` differs are refused with 403 `bad_origin` (002/FR-028), so a wrong or stale
+`APP_URL` (custom domain, `www.` vs apex, preview URL) breaks every save. Locally, a loopback `APP_URL` (the default
+`http://localhost:8787`) accepts any loopback origin, so the Vite dev server works.

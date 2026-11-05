@@ -1,5 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { errorToastId } from '@/components/ui/toaster';
 
 /** Error envelope from the API: `{ error: { code, message, details? } }`. */
 export class ApiError extends Error {
@@ -17,6 +18,36 @@ export class ApiError extends Error {
   get isForbidden() { return this.status === 403; }
   get isNotFound() { return this.status === 404; }
   get isConflict() { return this.status === 409; }
+  /** 429 `rate_limited` (008/FR-018) or `sync_cooldown`. */
+  get isRateLimited() { return this.status === 429; }
+  /** Seconds to wait, from `details.retryAfter` of a 429 (null when absent). */
+  get retryAfter(): number | null {
+    const v = (this.details as { retryAfter?: unknown } | undefined)?.retryAfter;
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.ceil(v) : null;
+  }
+  /** Rate-limit rule name from `details.rule` (e.g. `auth.fail.email`). */
+  get rateLimitRule(): string | null {
+    const v = (this.details as { rule?: unknown } | undefined)?.rule;
+    return typeof v === 'string' ? v : null;
+  }
+}
+
+/** "45 s" below two minutes, else "14 min" (008/FR-041d). */
+export function formatRetryAfter(seconds: number): string {
+  const s = Math.max(1, Math.ceil(seconds));
+  return s < 120 ? `${s} s` : `${Math.ceil(s / 60)} min`;
+}
+
+/**
+ * Message for a 429 on an auth form (login, sign-up, forgot password): the server's
+ * "Too many attempts. Try again in N minutes." (002/FR-010, 008/FR-018), rebuilt from `retryAfter` if it is missing.
+ * Null when the error is not a 429.
+ */
+export function tooManyAttemptsMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError) || !err.isRateLimited) return null;
+  if (err.message && /try again/i.test(err.message)) return err.message;
+  const minutes = Math.max(1, Math.ceil((err.retryAfter ?? 60) / 60));
+  return `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 }
 
 export const API_BASE = '/api';
@@ -148,9 +179,25 @@ export function handleSessionEnd(err: unknown, meta?: Record<string, unknown>): 
   return true;
 }
 
+/**
+ * 002/FR-029: a 403 `forbidden` from a mutation usually means the user's role was lowered while the page was open.
+ * Show the server's message and refetch `/auth/me` so role-gated UI (`can()`, `<RoleGate>`, nav) hides what the
+ * new role cannot do. Other 403 codes (`bad_origin`, `no_organization`) are left to their call sites.
+ */
+export function handleForbidden(err: unknown): boolean {
+  if (!(err instanceof ApiError) || err.status !== 403 || err.code !== 'forbidden') return false;
+  if (!queryClient.getQueryData(ME_KEY)) return false;
+  // Same id as `toast.error` from components/ui/toaster, so a call site toasting the same message shows one toast.
+  toast.error(err.message, { id: errorToastId(err.message) });
+  void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
+  return true;
+}
+
 export const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({ onError: (err, query) => { handleSessionEnd(err, query.meta); } }),
-  mutationCache: new MutationCache({ onError: (err, _vars, _ctx, mutation) => { handleSessionEnd(err, mutation.meta); } }),
+  mutationCache: new MutationCache({
+    onError: (err, _vars, _ctx, mutation) => { if (!handleSessionEnd(err, mutation.meta)) handleForbidden(err); },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

@@ -8,7 +8,7 @@
  *
  * One atomic upsert per request (row-locked, DB clock): my slot = greatest(now, next_slot_at); next_slot_at = my slot
  * + interval. If my slot is more than `maxWaitMs` away nothing is reserved and the caller gets 503 `gem_busy`.
- * The upsert also recreates the row if it is missing (the seed row lives in migration 0006; tests truncate it).
+ * The upsert also recreates the row if it is missing (the seed row lives in migration 0011; tests truncate it).
  */
 import { sql } from 'drizzle-orm';
 import type { Db } from '@tp/db';

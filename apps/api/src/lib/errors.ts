@@ -27,6 +27,27 @@ export const conflict = (message: string, details?: unknown) => new HttpError(40
 
 // ───────────── Ops / plan errors (008/FR-018, FR-021, FR-040) ─────────────
 
+/** 402 — plan limits (`plan_limit_reached`, `plan_expired`). */
+export const paymentRequired = (code: string, message: string, details?: unknown) => new HttpError(402, code, message, details);
+
+/**
+ * "Try again in N seconds/minutes." Auth rules (`auth.*`) always speak in minutes ("Too many attempts…", 002/FR-010);
+ * other rules use seconds below two minutes and minutes above.
+ */
+export function rateLimitMessage(rule: string, retryAfterSec: number): string {
+  const secs = Math.max(1, Math.ceil(retryAfterSec));
+  const minutes = Math.max(1, Math.ceil(secs / 60));
+  const inMinutes = `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  if (rule.startsWith('auth.')) return `Too many attempts. Try again in ${inMinutes}.`;
+  return secs < 120 ? `Too many requests. Try again in ${secs} second${secs === 1 ? '' : 's'}.` : `Too many requests. Try again in ${inMinutes}.`;
+}
+
+/** 429 `rate_limited` with `details: {rule, retryAfter}` and a `Retry-After` header (008/FR-018). */
+export function tooManyRequests(rule: string, retryAfterSec: number, message?: string): HttpError {
+  const retryAfter = Math.max(1, Math.ceil(retryAfterSec));
+  return new HttpError(429, 'rate_limited', message ?? rateLimitMessage(rule, retryAfter), { rule, retryAfter }, { 'Retry-After': String(retryAfter) });
+}
+
 /** 413 `payload_too_large` (008/FR-021). */
 export const payloadTooLarge = (message = 'The request is too large.', details?: unknown) => new HttpError(413, 'payload_too_large', message, details);
 

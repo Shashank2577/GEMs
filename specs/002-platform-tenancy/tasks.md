@@ -139,13 +139,13 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T051 [P] [US3] Table-driven role-matrix test: every mutating route in `contracts/api.md` × {viewer, analyst, bid_manager, owner} asserting 403 below the minimum and non-403 at/above, plus a guard that fails when a new route is added without a matrix entry, in `apps/api/test/roles-matrix.test.ts` FR-022 NFR-008 SC-003 (#27)
-- [ ] T052 [P] [US3] Cross-org isolation sweep: create one of each org-scoped resource in org A (tender analysis, watchlist, vault doc, workspace, packet, comment, notification, API token, invitation, member) and assert org B gets 404 on every read/update/delete by id and that A's rows are unchanged, in `apps/api/test/isolation.test.ts` FR-023 NFR-008 SC-003 (#28)
-- [ ] T053 [US3] Add `DELETE /api/org/members/me` (session-only; deletes own membership + own tokens for the org; 409 `last_owner`; `member.left` activity; returns `nextOrgId` and moves the session's active org) with API tests in `apps/api/src/routes/org.ts`, `apps/api/test/auth.test.ts` FR-027 FR-042 (#29)
-- [ ] T054 [P] [US3] "Leave organization" danger panel in Team section with confirm dialog; on success switch to `nextOrgId` or sign out to `/login` with toast "You left <Org>." in `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/features/settings/api.ts`, `apps/web/src/lib/auth.tsx` FR-027 (#30)
-- [ ] T055 [US3] Origin check middleware: cookie-authenticated non-GET/HEAD requests with an `Origin` not equal to `config.appUrl` origin → 403 `bad_origin`; bearer requests and missing Origin pass; tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/test/security.test.ts` FR-028 (#31)
-- [ ] T056 [P] [US3] On a mutation 403 `forbidden`, toast the server message and invalidate `ME_KEY` so role-gated UI refreshes in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-029 (#32)
-- [ ] T057 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in qa/evidence/002/US3/ — viewer/analyst/bid manager/owner walkthroughs showing hidden actions, owner role change taking effect live, member removal, last-owner error, cross-org 404 via `request` context, in `e2e/002-platform/US3-roles-tenancy.e2e.ts`, `qa/evidence/002/US3/VERDICT.md` FR-022..FR-029 (#33)
+- [x] T051 [P] [US3] Table-driven role-matrix test: every mutating route in `contracts/api.md` × {viewer, analyst, bid_manager, owner} asserting 403 below the minimum and non-403 at/above, plus a guard that fails when a new route is added without a matrix entry, in `apps/api/test/roles-matrix.test.ts` FR-022 NFR-008 SC-003 (#27)
+- [x] T052 [P] [US3] Cross-org isolation sweep: create one of each org-scoped resource in org A (tender analysis, watchlist, vault doc, workspace, packet, comment, notification, API token, invitation, member) and assert org B gets 404 on every read/update/delete by id and that A's rows are unchanged, in `apps/api/test/isolation.test.ts` FR-023 NFR-008 SC-003 (#28)
+- [x] T053 [US3] Add `DELETE /api/org/members/me` (session-only; deletes own membership + own tokens for the org; 409 `last_owner`; `member.left` activity; returns `nextOrgId` and moves the session's active org) with API tests in `apps/api/src/routes/org.ts`, `apps/api/test/auth.test.ts` FR-027 FR-042 (#29)
+- [x] T054 [P] [US3] "Leave organization" danger panel in Team section with confirm dialog; on success switch to `nextOrgId` or sign out to `/login` with toast "You left <Org>." in `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/features/settings/api.ts`, `apps/web/src/lib/auth.tsx` FR-027 (#30)
+- [x] T055 [US3] Origin check middleware: cookie-authenticated non-GET/HEAD requests with an `Origin` not equal to `config.appUrl` origin → 403 `bad_origin`; bearer requests and missing Origin pass; tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/test/security.test.ts` FR-028 (#31)
+- [x] T056 [P] [US3] On a mutation 403 `forbidden`, toast the server message and invalidate `ME_KEY` so role-gated UI refreshes in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-029 (#32)
+- [x] T057 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in qa/evidence/002/US3/ — viewer/analyst/bid manager/owner walkthroughs showing hidden actions, owner role change taking effect live, member removal, last-owner error, cross-org 404 via `request` context, in `e2e/002-platform/US3-roles-tenancy.e2e.ts`, `qa/evidence/002/US3/VERDICT.md` FR-022..FR-029 (#33)
 
 **Checkpoint**: US1–US3 (the P1 set) complete
 
@@ -168,11 +168,11 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T064 [P] [US4] API tests: prefs default when no row, full-object PUT round-trip, preferences isolated per org for a two-org user, viewer can edit own prefs in `apps/api/test/prefs.test.ts` FR-031 (#34)
-- [ ] T065 [P] [US4] Account section: when clearing the mobile while WhatsApp alerts are on, show the inline warning "WhatsApp alerts will stop until you add a mobile number." before saving in `apps/web/src/features/settings/sections/AccountSection.tsx` FR-032 (#35)
-- [ ] T066 [US4] Add `POST /api/me/notifications/test` (1/min per user; in-app row "Test alert from TenderPilot"; email/WhatsApp attempted only when enabled; returns per-channel `sent|skipped|failed|off`) with API test using log adapters in `apps/api/src/routes/notifications.ts`, `apps/api/test/prefs.test.ts` FR-034 NFR-007 (#36)
-- [ ] T067 [P] [US4] "Send a test alert" button in Notifications section with per-channel outcome toast in `apps/web/src/features/settings/sections/NotificationsSection.tsx`, `apps/web/src/features/settings/api.ts` FR-034 (#37)
-- [ ] T068 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in qa/evidence/002/US4/ — defaults, WhatsApp without number error, save + reload persistence, profile edit and invalid mobile, `@mobile` layout, axe on account + notifications in `e2e/002-platform/US4-account-prefs.e2e.ts`, `qa/evidence/002/US4/VERDICT.md` FR-030..FR-034 (#38)
+- [x] T064 [P] [US4] API tests: prefs default when no row, full-object PUT round-trip, preferences isolated per org for a two-org user, viewer can edit own prefs in `apps/api/test/prefs.test.ts` FR-031 (#34)
+- [x] T065 [P] [US4] Account section: when clearing the mobile while WhatsApp alerts are on, show the inline warning "WhatsApp alerts will stop until you add a mobile number." before saving in `apps/web/src/features/settings/sections/AccountSection.tsx` FR-032 (#35)
+- [x] T066 [US4] Add `POST /api/me/notifications/test` (1/min per user; in-app row "Test alert from TenderPilot"; email/WhatsApp attempted only when enabled; returns per-channel `sent|skipped|failed|off`) with API test using log adapters in `apps/api/src/routes/notifications.ts`, `apps/api/test/prefs.test.ts` FR-034 NFR-007 (#36)
+- [x] T067 [P] [US4] "Send a test alert" button in Notifications section with per-channel outcome toast in `apps/web/src/features/settings/sections/NotificationsSection.tsx`, `apps/web/src/features/settings/api.ts` FR-034 (#37)
+- [x] T068 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in qa/evidence/002/US4/ — defaults, WhatsApp without number error, save + reload persistence, profile edit and invalid mobile, `@mobile` layout, axe on account + notifications in `e2e/002-platform/US4-account-prefs.e2e.ts`, `qa/evidence/002/US4/VERDICT.md` FR-030..FR-034 (#38)
 
 **Checkpoint**: US4 independently functional
 
@@ -194,11 +194,11 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T074 [US5] Add `api_tokens.expires_at` (nullable) and `api_tokens.token_hint` (last 4 chars) + migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-037 (#39)
-- [ ] T075 [US5] Accept `expiresInDays` (30|90|365|null, default 90), store hint, reject expired tokens in `resolveAuth`, enforce 10 active tokens per user per org (409 `token_limit`), return `expiresAt`/`hint` in summaries, with API tests in `apps/api/src/routes/auth.ts`, `apps/api/src/lib/session.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/tokens.test.ts` FR-037 (#40)
-- [ ] T076 [P] [US5] Create dialog expiry select (30 days / 90 days / 1 year / Never) and list rows showing `tp_…<hint>` and "Expires in N days" (amber < 7 days, red "Expired") in `apps/web/src/features/settings/sections/TokensSection.tsx`, `apps/web/src/features/settings/api.ts` FR-037 (#41)
-- [ ] T077 [P] [US5] API tests: bearer token refused (403 "This action requires signing in on the web app") on `POST /me/api-tokens`, `POST /me/password`, `POST /auth/switch-org`; token stops working after member removal; role change applies to token requests in `apps/api/test/tokens.test.ts` FR-036 (#42)
-- [ ] T078 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in qa/evidence/002/US5/ — create/copy/revoke in UI, bearer calls via `request` context before/after revoke, secret not shown after dialog closes, `@mobile` layout, in `e2e/002-platform/US5-api-tokens.e2e.ts`, `qa/evidence/002/US5/VERDICT.md` FR-035..FR-037 (#43)
+- [x] T074 [US5] Add `api_tokens.expires_at` (nullable) and `api_tokens.token_hint` (last 4 chars) + migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-037 (#39)
+- [x] T075 [US5] Accept `expiresInDays` (30|90|365|null, default 90), store hint, reject expired tokens in `resolveAuth`, enforce 10 active tokens per user per org (409 `token_limit`), return `expiresAt`/`hint` in summaries, with API tests in `apps/api/src/routes/auth.ts`, `apps/api/src/lib/session.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/tokens.test.ts` FR-037 (#40)
+- [x] T076 [P] [US5] Create dialog expiry select (30 days / 90 days / 1 year / Never) and list rows showing `tp_…<hint>` and "Expires in N days" (amber < 7 days, red "Expired") in `apps/web/src/features/settings/sections/TokensSection.tsx`, `apps/web/src/features/settings/api.ts` FR-037 (#41)
+- [x] T077 [P] [US5] API tests: bearer token refused (403 "This action requires signing in on the web app") on `POST /me/api-tokens`, `POST /me/password`, `POST /auth/switch-org`; token stops working after member removal; role change applies to token requests in `apps/api/test/tokens.test.ts` FR-036 (#42)
+- [x] T078 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in qa/evidence/002/US5/ — create/copy/revoke in UI, bearer calls via `request` context before/after revoke, secret not shown after dialog closes, `@mobile` layout, in `e2e/002-platform/US5-api-tokens.e2e.ts`, `qa/evidence/002/US5/VERDICT.md` FR-035..FR-037 (#43)
 
 **Checkpoint**: US5 independently functional
 

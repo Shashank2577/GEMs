@@ -24,13 +24,16 @@ export const LLM_CALL_TIMEOUT_MS = 60_000;
 /** Wall-clock budget of one analysis; no new LLM call starts after it (FR-031). */
 export const ANALYSIS_BUDGET_MS = 120_000;
 
-/** Largest packet input (sum of item files + generated pages) built in one request (FR-032). */
+/**
+ * 008/FR-032's packet input target (40 MB). The API enforces 006/FR-056's configurable cap (`PACKET_MAX_INPUT_BYTES`,
+ * default 60 MB); set it to this value to apply 008's limit. Spec conflict 006 FR-056 (60 MB) vs 008 FR-032 (40 MB) is open.
+ */
 export const PACKET_MAX_BYTES = 40 * MB;
 
 /** Most items in one packet (FR-032); also `packetBuildSchema.items.max`. */
 export const PACKET_MAX_ITEMS = 40;
 
-/** Size assumed for one generated page (cover, index, annexure) in the packet pre-flight (FR-032). */
+/** 008/FR-032's size estimate for one generated page (the API uses 006's 50 KB per annexure; kept for the pinned contract). */
 export const PACKET_GENERATED_PAGE_BYTES = 512 * 1024;
 
 /** Largest JSON request body (FR-021). */

@@ -1,0 +1,59 @@
+<!--
+  Saved GeM BidPlus bid-result view (getBidResultView) for tests of packages/core/src/gem/award.ts.
+  GeM is not reachable from CI, so this page was reconstructed from the markup that
+  arush15june/gem-search (MIT) parses: bidder rows `td.productDtl` (row no.) → company `span` →
+  `span.bid_price` → `<td><strong>L<n></strong>`, and the `categoris` script variable.
+  Company names and prices are fictitious. tools/mock-gem serves the same structure.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bid Result | GeM</title>
+  <script type="text/javascript">
+    var bid_id = "8100037";
+    var categoris = "Desktop Computers (Q2),Monitor (Q2)";
+  </script>
+</head>
+<body>
+<div class="bid_result_container">
+  <h4>Bid Number: GEM/2026/B/6812345</h4>
+  <div class="text-muted">Evaluation status: Financial Evaluation Completed</div>
+  <table class="table table-bordered" id="financial_evaluation">
+    <thead>
+      <tr>
+        <th>S.No.</th>
+        <th>Seller Name</th>
+        <th>Offered Item</th>
+        <th>Total Price (&#8377;)</th>
+        <th>Rank</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="productDtl">1</td>
+        <td><span class="seller_name" title="Seller">  Kaveri Systems &amp; Services Pvt Ltd  </span><br><small>MSE · Karnataka</small></td>
+        <td><span class="item_name">HP Pro Tower 280 G9 + V22 monitor</span></td>
+        <td><span class="bid_price"> 28,40,500.00</span></td>
+        <td><strong>L1</strong></td>
+      </tr>
+      <tr>
+        <td class="productDtl">2</td>
+        <td><span class="seller_name" title="Seller">Aarav Infotech Pvt Ltd</span><br><small>MSE · Maharashtra</small></td>
+        <td><span class="item_name">Dell OptiPlex 7010 Tower + E2223HN</span></td>
+        <td><span class="bid_price">2950000.00</span></td>
+        <td><strong>L2</strong></td>
+      </tr>
+      <tr>
+        <td class="productDtl">3</td>
+        <td><span class="seller_name" title="Seller">Northline Computers</span></td>
+        <td><span class="item_name">Lenovo ThinkCentre neo 50t</span></td>
+        <td><span class="bid_price">3125000</span></td>
+        <td><strong>L3</strong></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">Prices are inclusive of all taxes. Technically disqualified sellers are not listed.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,1243 @@
+{
+  "url": "http://localhost:8788/pipeline",
+  "timestamp": "2026-11-05T04:20:47.542Z",
+  "violations": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#7d8092",
+                "bgColor": "#fafafc",
+                "contrastRatio": 3.74,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<aside class=\"fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out md:block w-[248px]\" aria-label=\"Sidebar\">",
+                  "target": [
+                    "aside"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mb-1.5 mt-6 px-2.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/80\">Organization</p>",
+          "target": [
+            ".mb-1\\.5"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\">",
+                  "target": [
+                    "li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .mt-2\\.5.justify-between.gap-2 > .border-success\\/20.\\[\\&_svg\\]\\:size-3.bg-success-soft"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            "li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .mt-2\\.5.justify-between.gap-2 > .border-success\\/20.\\[\\&_svg\\]\\:size-3.bg-success-soft"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\">",
+                  "target": [
+                    "li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .mt-2\\.5.justify-between.gap-2 > .border-success\\/20.\\[\\&_svg\\]\\:size-3.bg-success-soft"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            "li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .mt-2\\.5.justify-between.gap-2 > .border-success\\/20.\\[\\&_svg\\]\\:size-3.bg-success-soft"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#de2141",
+                "bgColor": "#ffedf0",
+                "contrastRatio": 4.23,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs\">",
+                  "target": [
+                    ".border-danger\\/20"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".border-danger\\/20"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ]
+    },
+    {
+      "id": "label-content-name-mismatch",
+      "impact": "serious",
+      "tags": [
+        "cat.semantics",
+        "wcag21a",
+        "wcag253",
+        "EN-301-549",
+        "EN-9.2.5.3",
+        "RGAAv4",
+        "RGAA-6.1.5"
+      ],
+      "description": "Ensure that elements labelled through their content must have their visible text as part of their accessible name",
+      "help": "Elements must have their visible text as part of their accessible name",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-content-name-mismatch?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "label-content-name-mismatch",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Text inside the element is not included in the accessible name"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: own Traders mw31fhsl40. Switch organization\">",
+          "target": [
+            "#radix-\\:r3\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+        },
+        {
+          "any": [
+            {
+              "id": "label-content-name-mismatch",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Text inside the element is not included in the accessible name"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+          "target": [
+            "#radix-\\:rg\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+        }
+      ]
+    }
+  ],
+  "incomplete": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">OT</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">OT</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"identified\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">96</span>",
+          "target": [
+            "section[data-stage=\"identified\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"identified\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">98</span>",
+          "target": [
+            "section[data-stage=\"identified\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"identified\"] > ol > li:nth-child(3) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">94</span>",
+          "target": [
+            "section[data-stage=\"identified\"] > ol > li:nth-child(3) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"analysing\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">100</span>",
+          "target": [
+            "section[data-stage=\"analysing\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"analysing\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">80</span>",
+          "target": [
+            "section[data-stage=\"analysing\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"go\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">100</span>",
+          "target": [
+            "section[data-stage=\"go\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"go\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">92</span>",
+          "target": [
+            "section[data-stage=\"go\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"preparing\" aria-label=\"Preparing — 2 bids\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"preparing\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular shrink-0 text-2xs font-medium text-muted-foreground\" data-state=\"closed\">EMD ₹1 L</span>",
+          "target": [
+            "section[data-stage=\"preparing\"] > .pt-3 > .shrink-0.text-2xs[data-state=\"closed\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"preparing\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">100</span>",
+          "target": [
+            "section[data-stage=\"preparing\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"preparing\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">82</span>",
+          "target": [
+            "section[data-stage=\"preparing\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"ready\" aria-label=\"Ready to submit — 1 bid\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"ready\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h2 class=\"flex items-center gap-2 text-[13px] font-semibold\"><span class=\"size-2 rounded-full bg-accent\" aria-hidden=\"true\"></span>Ready to submit<span class=\"tabular rounded-full bg-muted px-1.5 text-2xs font-medium text-muted-foreground\">1</span></h2>",
+          "target": [
+            "section[data-stage=\"ready\"] > .pt-3 > .min-w-0 > h2"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"ready\" aria-label=\"Ready to submit — 1 bid\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"ready\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mt-0.5 truncate text-2xs text-muted-foreground\">Packet complete — submit on GeM yourself</p>",
+          "target": [
+            "section[data-stage=\"ready\"] > .pt-3 > .min-w-0 > .mt-0\\.5.truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"ready\" aria-label=\"Ready to submit — 1 bid\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"ready\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular shrink-0 text-2xs font-medium text-muted-foreground\" data-state=\"closed\">EMD ₹19 K</span>",
+          "target": [
+            "section[data-stage=\"ready\"] > .pt-3 > .shrink-0.text-2xs[data-state=\"closed\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"ready\"] > ol > li > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">96</span>",
+          "target": [
+            "section[data-stage=\"ready\"] > ol > li > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"submitted\" aria-label=\"Submitted — 3 bids\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"submitted\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h2 class=\"flex items-center gap-2 text-[13px] font-semibold\"><span class=\"size-2 rounded-full bg-primary\" aria-hidden=\"true\"></span>Submitted<span class=\"tabular rounded-full bg-muted px-1.5 text-2xs font-medium text-muted-foreground\">3</span></h2>",
+          "target": [
+            "section[data-stage=\"submitted\"] > .pt-3 > .min-w-0 > h2"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"submitted\" aria-label=\"Submitted — 3 bids\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"submitted\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mt-0.5 truncate text-2xs text-muted-foreground\">Awaiting result</p>",
+          "target": [
+            "section[data-stage=\"submitted\"] > .pt-3 > .min-w-0 > .mt-0\\.5.truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"submitted\" aria-label=\"Submitted — 3 bids\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"submitted\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular shrink-0 text-2xs font-medium text-muted-foreground\" data-state=\"closed\">EMD ₹2.6 L</span>",
+          "target": [
+            "section[data-stage=\"submitted\"] > .pt-3 > .shrink-0.text-2xs[data-state=\"closed\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"submitted\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">96</span>",
+          "target": [
+            "section[data-stage=\"submitted\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"submitted\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">96</span>",
+          "target": [
+            "section[data-stage=\"submitted\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"submitted\"] > ol > li:nth-child(3) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">89</span>",
+          "target": [
+            "section[data-stage=\"submitted\"] > ol > li:nth-child(3) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"won\" aria-label=\"Won — 2 bids\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"won\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h2 class=\"flex items-center gap-2 text-[13px] font-semibold\"><span class=\"size-2 rounded-full bg-success\" aria-hidden=\"true\"></span>Won<span class=\"tabular rounded-full bg-muted px-1.5 text-2xs font-medium text-muted-foreground\">2</span></h2>",
+          "target": [
+            "section[data-stage=\"won\"] > .pt-3 > .min-w-0 > h2"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"won\" aria-label=\"Won — 2 bids\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"won\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mt-0.5 truncate text-2xs text-muted-foreground\">Contract awarded</p>",
+          "target": [
+            "section[data-stage=\"won\"] > .pt-3 > .min-w-0 > .mt-0\\.5.truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"won\" aria-label=\"Won — 2 bids\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"won\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular shrink-0 text-2xs font-medium text-muted-foreground\" data-state=\"closed\">EMD ₹68 K</span>",
+          "target": [
+            "section[data-stage=\"won\"] > .pt-3 > .shrink-0.text-2xs[data-state=\"closed\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"won\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">96</span>",
+          "target": [
+            "section[data-stage=\"won\"] > ol > li:nth-child(1) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"won\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">96</span>",
+          "target": [
+            "section[data-stage=\"won\"] > ol > li:nth-child(2) > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"lost\" aria-label=\"Lost — 1 bid\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"lost\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h2 class=\"flex items-center gap-2 text-[13px] font-semibold\"><span class=\"size-2 rounded-full bg-danger\" aria-hidden=\"true\"></span>Lost<span class=\"tabular rounded-full bg-muted px-1.5 text-2xs font-medium text-muted-foreground\">1</span></h2>",
+          "target": [
+            "section[data-stage=\"lost\"] > .pt-3 > .min-w-0 > h2"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<section data-stage=\"lost\" aria-label=\"Lost — 1 bid\" class=\"flex w-[84vw] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border bg-subtle/80 sm:w-72\">",
+                  "target": [
+                    "section[data-stage=\"lost\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mt-0.5 truncate text-2xs text-muted-foreground\">Not awarded</p>",
+          "target": [
+            "section[data-stage=\"lost\"] > .pt-3 > .min-w-0 > .mt-0\\.5.truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"34\" height=\"34\" viewBox=\"0 0 34 34\" class=\"-rotate-90\">",
+                  "target": [
+                    "section[data-stage=\"lost\"] > ol > li > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .-rotate-90[width=\"34\"][height=\"34\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 11px;\">89</span>",
+          "target": [
+            "section[data-stage=\"lost\"] > ol > li > .transition-shadow.hover\\:shadow-md.p-3 > .block[draggable=\"false\"] > .pr-12.gap-2\\.5.items-start > .inline-flex.shrink-0[role=\"img\"] > .inset-0.leading-none.flex-col > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        }
+      ]
+    }
+  ],
+  "passes": 29
+}

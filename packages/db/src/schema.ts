@@ -77,6 +77,20 @@ export const authAttempts = pgTable('auth_attempts', {
   count: integer('count').notNull().default(0),
 }, (t) => ({ pk: primaryKey({ columns: [t.key, t.kind] }) }));
 
+/**
+ * Generic fixed-window request counters (008/FR-017): one row per (`<rule>:<subject>`, aligned window start).
+ * Written by `apps/api/src/lib/rate-limiter.ts` with a single upsert; dead windows are pruned by the scheduler.
+ */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.key, t.windowStart] }),
+  // Pruning deletes by window_start (lib/rate-limiter.ts#pruneRateLimits).
+  windowIdx: index('rate_limits_window_idx').on(t.windowStart),
+}));
+
 /** Single-use password reset links (002/FR-011). Only the SHA-256 of the token is stored. */
 export const passwordResets = pgTable('password_resets', {
   id: id(),
@@ -97,9 +111,16 @@ export const apiTokens = pgTable('api_tokens', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   tokenHash: text('token_hash').notNull(),
+  /** Last 4 characters of the secret, shown in the list as `tp_…a1B2` (002/FR-037). Null for tokens created before it existed. */
+  tokenHint: text('token_hint'),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  /** Null = never expires (002/FR-037). Expired tokens are rejected by resolveAuth. */
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: createdAt(),
-}, (t) => ({ tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash) }));
+}, (t) => ({
+  tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash),
+  orgUserIdx: index('api_tokens_org_user_idx').on(t.orgId, t.userId),
+}));
 
 export const notificationPrefs = pgTable('notification_prefs', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -251,7 +272,7 @@ export const tenders = pgTable('tenders', {
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
   // 008/FR-027: ~6 % of tenders are open and every feed/dashboard query filters on it. Built CONCURRENTLY by the
-  // hand-edited non-transactional migration 0007 (`-- tp:non-transactional`, see migrate.ts).
+  // hand-edited non-transactional migration 0012 (`-- tp:non-transactional`, see migrate.ts).
   openCreatedIdx: index('tenders_open_created_idx').on(t.createdAt.desc().nullsFirst()).where(sql`status = 'open'`),
   openEndIdx: index('tenders_open_end_idx').on(t.endAt).where(sql`status = 'open'`),
   // DESC NULLS LAST = the feed's "highest value" sort; also serves minValue/maxValue ranges.
@@ -449,7 +470,22 @@ export const bidWorkspaces = pgTable('bid_workspaces', {
   position: real('position').notNull().default(0), // kanban order within stage
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId) }));
+}, (t) => ({
+  uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId),
+  /** Pipeline/dashboard stage aggregates (007/NFR-001). */
+  orgStageIdx: index('bid_workspaces_org_stage_idx').on(t.orgId, t.stage),
+}));
+
+/**
+ * Last parsed GeM bid-result hint per BidPlus `b_id` (007/T033, FR-030). Public data, not org-scoped: any org with a
+ * workspace for the tender is served from here within the TTL instead of fetching GeM again.
+ * `hint` is a `BidResultHint` from @tp/core/gem/award (available, or not published yet).
+ */
+export const gemResultHints = pgTable('gem_result_hints', {
+  gemBidId: text('gem_bid_id').primaryKey(),
+  hint: jsonb('hint').$type<Record<string, unknown>>().notNull(),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull(),
+});
 
 export const comments = pgTable('comments', {
   id: id(),
@@ -487,6 +523,10 @@ export const packets = pgTable('packets', {
   blobKey: text('blob_key'),
   sizeBytes: integer('size_bytes'),
   pageCount: integer('page_count'),
+  /** Snapshot of the computed default item uids (`kind:refId`) at build time (006/FR-055): items of a later
+   *  computed default whose uid is not in here are "newly required" and appended to the proposed order.
+   *  NULL = built before FR-055: append nothing. Never backfill with [] (that would re-append every item). */
+  defaultUids: jsonb('default_uids').$type<string[]>(),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
 }, (t) => ({ wsIdx: index('packets_ws_idx').on(t.workspaceId) }));
@@ -511,7 +551,7 @@ export const notifications = pgTable('notifications', {
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
-  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0007).
+  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0012).
   pendingIdx: index('notifications_pending_idx').on(t.createdAt).where(sql`status = 'pending' AND channel IN ('email','whatsapp')`),
 }));
 

@@ -1,5 +1,5 @@
 {
-  "id": "bb010ca9-1c5e-42bf-9e81-8a1fdf3a7979",
+  "id": "61cc3232-f656-4349-a6bc-12f5143b051c",
   "prevId": "1e2ea001-0693-42fd-aef6-604f87e57eca",
   "version": "7",
   "dialect": "postgresql",
@@ -226,13 +226,6 @@
         },
         "notes": {
           "name": "notes",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "warnings": {
-          "name": "warnings",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
@@ -1028,32 +1021,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.gem_throttle": {
-      "name": "gem_throttle",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "next_slot_at": {
-          "name": "next_slot_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.ingestion_runs": {
       "name": "ingestion_runs",
       "schema": "",
@@ -1139,24 +1106,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "ingestion_runs_one_running_uq": {
-          "name": "ingestion_runs_one_running_uq",
-          "columns": [
-            {
-              "expression": "(true)",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "status = 'running'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -1744,6 +1694,12 @@
         "page_count": {
           "name": "page_count",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_uids": {
+          "name": "default_uids",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

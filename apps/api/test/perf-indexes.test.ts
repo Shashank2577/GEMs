@@ -124,30 +124,39 @@ describe('dispatcher select uses notifications_pending_idx (FR-029, US4 scenario
 });
 
 describe('list queries read tenderListColumns only (FR-028, US4 scenario 6)', () => {
-  // `raw` / `content_hash` qualified or not; any read of tender_documents.text.
-  const heavy = /(^|[\s,(])("tenders"\.)?"(raw|content_hash)"|"tender_documents"/;
+  // The SELECT list must not read `raw` / `content_hash` (qualified or not). WHERE clauses may still filter on them
+  // (the demo scope of 008/FR-016, lib/tender-scope.ts); no list query may touch tender_documents at all.
+  const heavy = /(^|[\s,(])("tenders"\.)?"(raw|content_hash)"/;
+  const projection = (text: string) => text.slice(0, text.search(/ from "tenders"/i));
+  const lean = (q: { text: string }) => {
+    expect(projection(q.text), q.text).not.toMatch(heavy);
+    expect(q.text).not.toMatch(/"tender_documents"/);
+  };
   const tenderSelects = (qs: { text: string; values: unknown[] }[]) => qs.filter((q) => /from "tenders"|join "tenders"/i.test(q.text));
 
   it('feed', async () => {
     const qs = tenderSelects(await sqlOf('GET', '/tenders?pageSize=25'));
     expect(qs.length).toBeGreaterThan(0);
-    for (const q of qs) expect(q.text).not.toMatch(heavy);
+    for (const q of qs) lean(q);
     expect(listQuery(qs).text).toMatch(/"items"/); // what the list DTO shows stays
   });
 
-  it('watchlist preview — open, end_at > now, at most 2,000 rows', async () => {
+  it('watchlist preview — open, not yet closed, keyset pages of at most 2,000 lean rows', async () => {
+    // 003/FR-028 (merged) forbids a silent overall cap, so memory is bounded per page instead (008/FR-028's intent):
+    // the candidate scan reads lean columns in keyset pages of ≤ 2,000 rows.
     const qs = tenderSelects(await sqlOf('POST', '/watchlists/preview', { criteria: { keywords: ['laptop'] } }));
     expect(qs.length).toBeGreaterThan(0);
-    for (const q of qs) expect(q.text).not.toMatch(heavy);
-    const cand = qs.find((q) => /limit \$\d+$/i.test(q.text.trim()) && /("tenders"\.)?"end_at" > \$\d+/.test(q.text));
+    for (const q of qs) lean(q);
+    const cand = qs.find((q) => /limit \$\d+$/i.test(q.text.trim()) && /("tenders"\.)?"end_at" >= \$\d+/.test(q.text));
     expect(cand, qs.map((q) => q.text).join('\n')).toBeTruthy();
     expect(cand!.values.at(-1)).toBe(2000);
     expect(cand!.text).toMatch(/("tenders"\.)?"status" = \$\d+/);
+    expect(cand!.text).toMatch(/order by "tenders"\."id" asc/i);
   });
 
   it('dashboard', async () => {
     const qs = tenderSelects(await sqlOf('GET', '/dashboard'));
     expect(qs.length).toBeGreaterThan(0);
-    for (const q of qs) expect(q.text).not.toMatch(heavy);
+    for (const q of qs) lean(q);
   });
 });

@@ -22,7 +22,8 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | POST | /auth/accept-invite | `{token,name?,password?}` | `Me` |
 | PATCH | /me | `{name?,phone?}` | `Me` |
 | GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` | prefs |
-| GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name}` | list / `{token}` shown once |
+| POST | /me/notifications/test | – (session only; 1/min per user → 429 `rate_limited` + Retry-After) | `{inApp:'sent',email,whatsapp}`, email/whatsapp each `sent\|skipped\|failed\|off` (002/FR-034) |
+| GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name, expiresInDays?: 30\|90\|365\|null}` (default 90, null = never) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens (002/FR-037) |
 | GET | /org/members | – | `[{userId,name,email,role,joinedAt}]` + pending invites |
 | POST (M) | /org/invitations | `{email,role}` | `{id, inviteUrl}` |
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member |
@@ -54,7 +55,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | GET | /tenders/:id/documents/:docId/download | streams file |
 | POST (W) | /tenders/:id/analyse | runs rules (+LLM if key) → `Analysis` |
 | GET | /tenders/:id/analysis | latest `Analysis` or 404 |
-| POST (W) | /analyses/:id/override | `{factorKey,status,reason}` → re-scored `Analysis` |
+| POST (M) | /analyses/:id/override | `{factorKey,status,reason}` → re-scored `Analysis` |
 | GET/PUT (M) | /scoring-weights | `Record<factorKey, number>` |
 
 ## Profile & Vault — owner: Vault module (`routes/profile.ts`, `routes/vault.ts`)
@@ -80,7 +81,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?}`; moving to `ready` blocked (409) if mandatory items missing/expired and not overridden |
 | PUT (W) | /workspaces/:id/mapping | `{[itemId]: vaultDocId|null}` |
 | POST (M) | /workspaces/:id/overrides | `{itemId, reason}` |
-| GET/POST | /workspaces/:id/comments | – |
+| GET/POST (W) | /workspaces/:id/comments | POST is Analyst+ (002/FR-022) |
 | GET | /annexure-templates | system + org templates |
 | PUT (M) | /annexure-templates/:key | `{title, body}` org override |
 | GET | /workspaces/:id/annexures/:key.pdf | rendered annexure PDF |
@@ -102,3 +103,20 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 1. `runIngestion()` — fetch N pages, upsert tenders, record events, match watchlists, create notifications.
 2. `dispatchNotifications()` — send pending email/WhatsApp (skipped when not configured), daily digests.
 3. `runExpiryReminders()` — 30/7/1-day vault reminders.
+
+## Error codes for limits and capacity (spec 008, FR-018, FR-021, FR-040)
+
+Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/api/src/lib/rate-limit-rules.ts`.
+
+| Status | Code | When | `details` |
+|---|---|---|---|
+| 402 | `plan_limit_reached` | a plan limit (seats, watchlists, analyses, vault bytes, packets) is reached | `{limit, used, max}` |
+| 402 | `plan_expired` | the trial or plan has ended (writes only) | – |
+| 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
+| 413 | `packet_too_large` | packet would exceed 40 MB or 40 items | – |
+| 422 | `document_too_long` | tender document over 300 pages | – |
+| 422 | `scanned_document` | tender document has no extractable text | – |
+| 429 | `rate_limited` | a rate-limit rule is over its limit; header `Retry-After: <s>` | `{rule, retryAfter}` |
+| 429 | `sync_cooldown` | manual "Sync now" within the cooldown | `{retryAt}` |
+| 503 | `gem_busy` | the cluster-wide GeM slot could not be had in time | – |
+| 503 | `service_unavailable` | an auth rate limiter could not be checked (auth rules fail closed) | `{reason}` |

@@ -4,6 +4,7 @@
  *   GET  /all-bids                     HTML page; sets `csrf_gem_cookie` and embeds `csrf_bd_gem_nk`
  *   POST /all-bids-data                form `payload=<json>&csrf_bd_gem_nk=<token>` → Solr-style JSON (10/page)
  *   GET  /showbidDocument/:id          generated GeM-style bid document PDF (also /showradocumentPdf, /showdirectradocumentPdf)
+ *   GET  /bidding/bid/getBidResultView/:id   public bid-result (award) HTML, deterministic per id (007/T033)
  *
  * Admin switches for E2E (not part of GeM):
  *   POST /__admin/publish {count?}     publish N new bids (simulates fresh tenders)
@@ -78,7 +79,7 @@ export function createMockGem(opts: MockGemOptions = {}) {
     nextSyntheticId: 7429001,
     failMode: 'off' as 'off' | 'down' | 'html',
     documentMode: 'normal' as DocumentMode,
-    requests: { listing: 0, documents: 0, bootstrap: 0 },
+    requests: { listing: 0, documents: 0, bootstrap: 0, results: 0 },
     /** Arrival log (ms since epoch, real clock) of the last REQUEST_LOG_MAX non-admin requests. */
     requestLog: [] as { at: number; method: string; path: string }[],
   };
@@ -92,7 +93,7 @@ export function createMockGem(opts: MockGemOptions = {}) {
     state.nextSyntheticId = 7429001;
     state.failMode = 'off';
     state.documentMode = 'normal';
-    state.requests = { listing: 0, documents: 0, bootstrap: 0 };
+    state.requests = { listing: 0, documents: 0, bootstrap: 0, results: 0 };
     state.requestLog = [];
   };
   reset();
@@ -218,6 +219,15 @@ export function createMockGem(opts: MockGemOptions = {}) {
   app.get('/showradocumentPdf/:id', (c) => servePdf(c.req.param('id')));
   app.get('/showdirectradocumentPdf/:id', (c) => servePdf(c.req.param('id')));
 
+  // Public result view (same markup that packages/core/src/gem/award.ts parses; see test/fixtures/gem/bid-result.html).
+  app.get('/bidding/bid/getBidResultView/:id', (c) => {
+    state.requests.results++;
+    if (state.failMode === 'down') return c.text('Service Unavailable', 503);
+    const id = c.req.param('id');
+    if (!/^\d+$/.test(id)) return c.html('<html><body>Bid not found</body></html>', 404);
+    return c.html(renderBidResultHtml(id));
+  });
+
   // ───────────── admin (E2E) ─────────────
   const readJson = async (c: { req: { text(): Promise<string> } }) => {
     try { const t = await c.req.text(); return t ? JSON.parse(t) : {}; } catch { return {}; }
@@ -279,3 +289,24 @@ export function createMockGem(opts: MockGemOptions = {}) {
 }
 
 export type MockGem = ReturnType<typeof createMockGem>;
+
+/** Deterministic GeM-style result page for a numeric b_id: three sellers, L1 = 9,50,000 + (id mod 97) × 25,000. */
+export function renderBidResultHtml(id: string): string {
+  const l1 = 950_000 + (Number(id) % 97) * 25_000;
+  const rows = [
+    ['Kaveri Systems &amp; Services Pvt Ltd', l1, 'L1'],
+    ['Northline Computers', Math.round(l1 * 1.04), 'L2'],
+    ['Deccan Office Automation LLP', Math.round(l1 * 1.09), 'L3'],
+  ] as const;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Bid Result | GeM (mock)</title>
+<script type="text/javascript">var bid_id = "${id}"; var categoris = "Desktop Computers (Q2),Monitor (Q2)";</script></head>
+<body><table class="table table-bordered" id="financial_evaluation"><tbody>
+${rows.map(([name, price, level], i) => `<tr>
+<td class="productDtl">${i + 1}</td>
+<td><span class="seller_name">${name}</span></td>
+<td><span class="item_name">Offered item</span></td>
+<td><span class="bid_price">${price.toFixed(2)}</span></td>
+<td><strong>${level}</strong></td>
+</tr>`).join('\n')}
+</tbody></table></body></html>`;
+}
