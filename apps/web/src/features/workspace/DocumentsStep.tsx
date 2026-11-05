@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, ChevronDown, ExternalLink, FileSignature, Search, ShieldCheck, Sparkles, Upload, Wand2, X } from 'lucide-react';
 import type { ReadinessItem, WorkspaceDetail, WorkspaceVaultDoc } from '@tp/core/contracts/apply';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { DocTypeIcon, ExpiryBadge } from '@/features/vault/doc-ui';
 import { useOverride, useRemoveOverride, useSetMapping } from './api';
 import { StateChip } from './labels';
+import { nextTabIndex, readinessLabel } from './a11y';
 
 type Filter = 'all' | 'attention' | 'ready';
 
@@ -23,6 +24,18 @@ export function DocumentsStep({ data, onNext, onOpenAnnexure }: { data: Workspac
   const docs = useMemo(() => new Map(data.vaultDocs.map((d) => [d.id, d])), [data.vaultDocs]);
   const attention = r.items.filter((i) => i.state === 'missing' || i.state === 'expired' || i.state === 'expiring');
   const shown = filter === 'attention' ? attention : filter === 'ready' ? r.items.filter((i) => !attention.includes(i)) : r.items;
+  const baseId = useId();
+  const panelId = `${baseId}-panel`;
+  const tabId = (k: Filter) => `${baseId}-tab-${k}`;
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const tabs = [['all', `All ${r.items.length}`], ['attention', `Needs attention ${attention.length}`], ['ready', `Covered ${r.items.length - attention.length}`]] as const;
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const next = nextTabIndex(e.key, i, tabs.length);
+    if (next == null) return;
+    e.preventDefault();
+    setFilter(tabs[next][0]);
+    tabRefs.current[next]?.focus();
+  };
 
   if (!data.analysis || !r.analysed) {
     return <EmptyState icon={FileSignature} title="No checklist yet" body="Analyse the tender to get the list of documents this bid needs." action={<Button asChild><Link to={`/tenders/${data.tender.id}`}>Analyse tender <ArrowRight /></Link></Button>} />;
@@ -33,14 +46,14 @@ export function DocumentsStep({ data, onNext, onOpenAnnexure }: { data: Workspac
       <Card className="p-4 sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">
-            <div className="relative flex size-16 items-center justify-center">
+            <div role="img" aria-label={readinessLabel(r.percent)} className="relative flex size-16 items-center justify-center">
               <svg viewBox="0 0 36 36" className="size-16 -rotate-90" aria-hidden>
                 <circle cx="18" cy="18" r="15.5" fill="none" stroke="hsl(var(--muted))" strokeWidth="3.5" />
                 <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="3.5" strokeLinecap="round"
                   stroke={r.percent === 100 ? 'hsl(var(--success))' : r.percent >= 60 ? 'hsl(var(--warning))' : 'hsl(var(--danger))'}
                   strokeDasharray={`${(r.percent / 100) * 97.4} 97.4`} className="transition-[stroke-dasharray] duration-700" />
               </svg>
-              <span className="tabular absolute text-sm font-semibold">{r.percent}%</span>
+              <span aria-hidden className="tabular absolute text-sm font-semibold">{r.percent}%</span>
             </div>
             <div>
               <div className="text-[15px] font-semibold tracking-tight">{r.canMarkReady ? 'All required documents are covered' : `${pluralize(r.blockers.length, 'blocker')} before “Ready to submit”`}</div>
@@ -66,19 +79,22 @@ export function DocumentsStep({ data, onNext, onOpenAnnexure }: { data: Workspac
 
       <div className="flex items-center justify-between gap-2">
         <div role="tablist" aria-label="Filter checklist" className="inline-flex rounded-lg bg-muted p-0.5">
-          {([['all', `All ${r.items.length}`], ['attention', `Needs attention ${attention.length}`], ['ready', `Covered ${r.items.length - attention.length}`]] as const).map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}
+          {tabs.map(([k, label], i) => (
+            <button key={k} ref={(el) => { tabRefs.current[i] = el; }} type="button" role="tab" id={tabId(k)} aria-selected={filter === k} aria-controls={panelId}
+              tabIndex={filter === k ? 0 : -1} onClick={() => setFilter(k)} onKeyDown={(e) => onTabKey(e, i)}
               className={cn('h-7 rounded-md px-2.5 text-xs font-medium focus-ring', filter === k ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{label}</button>
           ))}
         </div>
       </div>
 
-      <ul className="grid grid-cols-1 gap-2.5">
-        {shown.map((it) => (
-          <ChecklistRow key={it.item.id} wsId={data.workspace.id} it={it} doc={it.docId ? docs.get(it.docId) ?? null : null} allDocs={data.vaultDocs} onOpenAnnexure={onOpenAnnexure} />
-        ))}
-        {!shown.length && <li><EmptyState compact icon={Check} title="Nothing here" body="Everything in this view is covered." /></li>}
-      </ul>
+      <div role="tabpanel" id={panelId} aria-labelledby={tabId(filter)} tabIndex={0} className="focus-ring rounded-lg">
+        <ul className="grid grid-cols-1 gap-2.5">
+          {shown.map((it) => (
+            <ChecklistRow key={it.item.id} wsId={data.workspace.id} it={it} doc={it.docId ? docs.get(it.docId) ?? null : null} allDocs={data.vaultDocs} onOpenAnnexure={onOpenAnnexure} />
+          ))}
+          {!shown.length && <li><EmptyState compact icon={Check} title="Nothing here" body="Everything in this view is covered." /></li>}
+        </ul>
+      </div>
     </div>
   );
 }

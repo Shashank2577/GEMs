@@ -535,7 +535,7 @@ page.
   `/profile`, member → `/settings/team`); the web renders a plain-English sentence per action (`describeActivity`) and
   omits the target for self-contained actions.
 - **FR-007**: `setup` MUST contain six steps (company, categories, watchlist, documents, analysis, team) with `done`,
-  `label`, `description`, `href` and `setupComplete = every(done)`.
+  `label`, `description`, `href` and `setupComplete = every(done)`. For a demo org the `team` step does not block `setupComplete` (the sample company has no teammates).
 - **FR-008**: The dashboard page MUST show the IST date, an IST-hour greeting ("Working late" < 05:00, "Good morning"
   < 12:00, "Good afternoon" < 17:00, else "Good evening") with the first name, the summary line rules of US1-6, the
   "Demo data" badge when `demo`, and the buttons "Pipeline" and "Review matches".

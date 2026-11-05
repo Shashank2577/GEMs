@@ -1,0 +1,174 @@
+{
+  "generatedAt": "2026-11-05T03:10:00.919Z",
+  "tiles": {
+    "newMatchesToday": 0,
+    "closingThisWeek": 0,
+    "activeBids": 0,
+    "emdAtStake": 0,
+    "winRate": null,
+    "expiringDocs": 0
+  },
+  "stats": {
+    "newMatchesYesterday": 0,
+    "closingToday": 0,
+    "won": 0,
+    "lost": 0,
+    "expiredDocs": 0,
+    "analysesThisWeek": 0,
+    "openTenders": 34
+  },
+  "closingSoon": [],
+  "pipeline": {
+    "identified": 0,
+    "analysing": 0,
+    "go": 0,
+    "preparing": 0,
+    "ready": 0,
+    "submitted": 0,
+    "won": 0,
+    "lost": 0,
+    "dropped": 0
+  },
+  "pipelineValue": {
+    "identified": 0,
+    "analysing": 0,
+    "go": 0,
+    "preparing": 0,
+    "ready": 0,
+    "submitted": 0,
+    "won": 0,
+    "lost": 0,
+    "dropped": 0
+  },
+  "verdicts": {
+    "go": 0,
+    "review": 0,
+    "no_go": 0
+  },
+  "matchesByDay": [
+    {
+      "date": "2026-10-23",
+      "count": 0
+    },
+    {
+      "date": "2026-10-24",
+      "count": 0
+    },
+    {
+      "date": "2026-10-25",
+      "count": 0
+    },
+    {
+      "date": "2026-10-26",
+      "count": 0
+    },
+    {
+      "date": "2026-10-27",
+      "count": 0
+    },
+    {
+      "date": "2026-10-28",
+      "count": 0
+    },
+    {
+      "date": "2026-10-29",
+      "count": 0
+    },
+    {
+      "date": "2026-10-30",
+      "count": 0
+    },
+    {
+      "date": "2026-10-31",
+      "count": 0
+    },
+    {
+      "date": "2026-11-01",
+      "count": 0
+    },
+    {
+      "date": "2026-11-02",
+      "count": 0
+    },
+    {
+      "date": "2026-11-03",
+      "count": 0
+    },
+    {
+      "date": "2026-11-04",
+      "count": 0
+    },
+    {
+      "date": "2026-11-05",
+      "count": 0
+    }
+  ],
+  "recentMatches": [],
+  "expiringDocuments": [],
+  "activity": [
+    {
+      "id": "e4e32678-d279-445a-a242-085351b0dbbb",
+      "action": "org.created",
+      "entityType": "organization",
+      "entityId": "77f72d25-b4fb-41fc-9288-80f9429e9571",
+      "meta": {
+        "name": "orgb Traders mw2ywiaz17"
+      },
+      "createdAt": "2026-11-05T03:10:00.907Z",
+      "user": {
+        "id": "1be150a4-da90-49ba-8f63-417b80fc2522",
+        "name": "QA orgb mw2ywiaz17"
+      },
+      "target": {
+        "label": "orgb Traders mw2ywiaz17",
+        "href": "/dashboard"
+      }
+    }
+  ],
+  "setup": [
+    {
+      "key": "company",
+      "label": "Add company basics",
+      "description": "Legal name and GSTIN power annexures and eligibility checks.",
+      "done": false,
+      "href": "/profile"
+    },
+    {
+      "key": "categories",
+      "label": "Tell us what you sell",
+      "description": "Categories and HSN codes sharpen your matches.",
+      "done": false,
+      "href": "/profile"
+    },
+    {
+      "key": "watchlist",
+      "label": "Create a watchlist",
+      "description": "Get alerts the moment a matching bid is published.",
+      "done": false,
+      "href": "/watchlists?new=1"
+    },
+    {
+      "key": "documents",
+      "label": "Upload key documents",
+      "description": "GST, PAN and Udyam — the basics every bid asks for.",
+      "done": false,
+      "href": "/vault?upload=1"
+    },
+    {
+      "key": "analysis",
+      "label": "Check eligibility on a tender",
+      "description": "Get a Go/No-Go score with the reasons behind it.",
+      "done": false,
+      "href": "/tenders?matched=1"
+    },
+    {
+      "key": "team",
+      "label": "Invite a teammate",
+      "description": "Bid managers, analysts and compliance can work together.",
+      "done": false,
+      "href": "/settings/team"
+    }
+  ],
+  "setupComplete": false,
+  "demo": false
+}

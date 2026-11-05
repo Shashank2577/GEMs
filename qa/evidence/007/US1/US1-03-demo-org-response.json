@@ -1,0 +1,706 @@
+{
+  "generatedAt": "2026-11-05T03:09:14.075Z",
+  "tiles": {
+    "newMatchesToday": 8,
+    "closingThisWeek": 11,
+    "activeBids": 13,
+    "emdAtStake": 1177000,
+    "winRate": 67,
+    "expiringDocs": 3
+  },
+  "stats": {
+    "newMatchesYesterday": 0,
+    "closingToday": 2,
+    "won": 2,
+    "lost": 1,
+    "expiredDocs": 1,
+    "analysesThisWeek": 14,
+    "openTenders": 34
+  },
+  "closingSoon": [
+    {
+      "id": "477748b8-3c64-4add-8653-b8d387697341",
+      "bidNumber": "GEM/2026/B/6448851",
+      "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+      "buyer": "Maharashtra State Police",
+      "state": "Maharashtra",
+      "endAt": "2026-11-05T08:09:00.000Z",
+      "emdAmount": 19000,
+      "estimatedValue": 962000,
+      "analysis": {
+        "score": 96,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "286ff47c-ecb4-4dc5-a68a-e07d7d7f0167",
+        "stage": "ready"
+      }
+    },
+    {
+      "id": "8ec4b2c3-cb6e-49ec-a157-7ce308be21d3",
+      "bidNumber": "GEM/2026/B/6456770",
+      "title": "LED Monitor 24\" IPS, Full HD (MII Class-I)",
+      "buyer": "Indian Army",
+      "state": "Maharashtra",
+      "endAt": "2026-11-05T12:09:00.000Z",
+      "emdAmount": 0,
+      "estimatedValue": 332000,
+      "analysis": {
+        "score": 96,
+        "verdict": "go"
+      },
+      "workspace": null
+    },
+    {
+      "id": "33f0098e-3e30-4dd2-9928-e38391c0b3ad",
+      "bidNumber": "GEM/2026/B/6464689",
+      "title": "Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor",
+      "buyer": "Indian Army",
+      "state": "Maharashtra",
+      "endAt": "2026-11-06T05:30:00.000Z",
+      "emdAmount": 34000,
+      "estimatedValue": 1690000,
+      "analysis": {
+        "score": 82,
+        "verdict": "no_go"
+      },
+      "workspace": {
+        "id": "187c592c-2457-4d95-9eb2-2816aecb9942",
+        "stage": "preparing"
+      }
+    },
+    {
+      "id": "fefdf31c-9b45-4fd4-84a1-7f9c3d718767",
+      "bidNumber": "GEM/2026/B/6472608",
+      "title": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
+      "buyer": "CRPF",
+      "state": "Gujarat",
+      "endAt": "2026-11-06T19:30:00.000Z",
+      "emdAmount": 66000,
+      "estimatedValue": 2196000,
+      "analysis": {
+        "score": 100,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "efbdb7b6-e7eb-4b70-a1d0-1954eff9edc6",
+        "stage": "preparing"
+      }
+    },
+    {
+      "id": "4615e2ad-88d6-40c9-bade-f0c694e98bae",
+      "bidNumber": "GEM/2026/B/6480527",
+      "title": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
+      "buyer": "Indian Institute of Technology Bombay",
+      "state": "Maharashtra",
+      "endAt": "2026-11-07T07:30:00.000Z",
+      "emdAmount": 89000,
+      "estimatedValue": 2980000,
+      "analysis": {
+        "score": 100,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "f6e46154-1979-4cf1-a5e0-6daada7bbd09",
+        "stage": "go"
+      }
+    },
+    {
+      "id": "cbbc20b6-89ec-489c-9e45-f167bd363f48",
+      "bidNumber": "GEM/2026/B/6488446",
+      "title": "Multifunction Machine MFM (Q2) – A3 mono laser, 35 ppm, duplex",
+      "buyer": "Directorate of Education, Goa",
+      "state": "Goa",
+      "endAt": "2026-11-08T01:30:00.000Z",
+      "emdAmount": 110000,
+      "estimatedValue": 3666000,
+      "analysis": {
+        "score": 100,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "e2528cac-5fc1-4753-99de-4f5c3093266e",
+        "stage": "analysing"
+      }
+    },
+    {
+      "id": "c79fa968-9687-4c27-a403-80f69d43df39",
+      "bidNumber": "GEM/2026/B/6496365",
+      "title": "Network Switch – Layer 2 Managed, 24 x 1G PoE+ with 4 x 10G SFP+",
+      "buyer": "Bharat Petroleum Corporation Limited",
+      "state": "Maharashtra",
+      "endAt": "2026-11-08T21:30:00.000Z",
+      "emdAmount": 54000,
+      "estimatedValue": 1795000,
+      "analysis": {
+        "score": 94,
+        "verdict": "go"
+      },
+      "workspace": null
+    },
+    {
+      "id": "3cd941c8-85c8-41d8-85b9-32a443494a2c",
+      "bidNumber": "GEM/2026/B/6504284",
+      "title": "Next Generation Firewall (NGFW) – 5 Gbps threat protection, 3-year subscription",
+      "buyer": "NIC",
+      "state": "Delhi",
+      "endAt": "2026-11-09T17:30:00.000Z",
+      "emdAmount": 61000,
+      "estimatedValue": 2043000,
+      "analysis": {
+        "score": 92,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "99896ccb-a6fb-4145-b1bb-d93d9169c2db",
+        "stage": "go"
+      }
+    }
+  ],
+  "pipeline": {
+    "identified": 3,
+    "analysing": 2,
+    "go": 2,
+    "preparing": 2,
+    "ready": 1,
+    "submitted": 3,
+    "won": 2,
+    "lost": 1,
+    "dropped": 0
+  },
+  "pipelineValue": {
+    "identified": 16146000,
+    "analysing": 8103000,
+    "go": 5023000,
+    "preparing": 3886000,
+    "ready": 962000,
+    "submitted": 10472000,
+    "won": 3367000,
+    "lost": 395000,
+    "dropped": 0
+  },
+  "verdicts": {
+    "go": 17,
+    "review": 0,
+    "no_go": 3
+  },
+  "matchesByDay": [
+    {
+      "date": "2026-10-23",
+      "count": 0
+    },
+    {
+      "date": "2026-10-24",
+      "count": 1
+    },
+    {
+      "date": "2026-10-25",
+      "count": 1
+    },
+    {
+      "date": "2026-10-26",
+      "count": 0
+    },
+    {
+      "date": "2026-10-27",
+      "count": 2
+    },
+    {
+      "date": "2026-10-28",
+      "count": 0
+    },
+    {
+      "date": "2026-10-29",
+      "count": 2
+    },
+    {
+      "date": "2026-10-30",
+      "count": 5
+    },
+    {
+      "date": "2026-10-31",
+      "count": 0
+    },
+    {
+      "date": "2026-11-01",
+      "count": 2
+    },
+    {
+      "date": "2026-11-02",
+      "count": 1
+    },
+    {
+      "date": "2026-11-03",
+      "count": 1
+    },
+    {
+      "date": "2026-11-04",
+      "count": 0
+    },
+    {
+      "date": "2026-11-05",
+      "count": 8
+    }
+  ],
+  "recentMatches": [
+    {
+      "id": "e63f3f15-811b-48b7-8e79-e2836ff2bd95",
+      "bidNumber": "GEM/2026/B/6630988",
+      "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+      "buyer": "CRPF",
+      "state": "Gujarat",
+      "endAt": "2026-11-25T03:30:00.000Z",
+      "emdAmount": 39000,
+      "estimatedValue": 1299000,
+      "analysis": null,
+      "workspace": null,
+      "watchlistName": "CCTV & surveillance – West India",
+      "reasons": [
+        "Keyword “network video recorder”",
+        "State: Gujarat"
+      ],
+      "matchedAt": "2026-11-05T03:04:13.865Z",
+      "isNew": false
+    },
+    {
+      "id": "0de12cb9-5926-49e8-9c64-ba3d56f01167",
+      "bidNumber": "GEM/2026/B/6654745",
+      "title": "Next Generation Firewall (NGFW) – 5 Gbps threat protection, 3-year subscription",
+      "buyer": "Bharat Petroleum Corporation Limited",
+      "state": "Maharashtra",
+      "endAt": "2026-11-29T03:30:00.000Z",
+      "emdAmount": 12000,
+      "estimatedValue": 584000,
+      "analysis": null,
+      "workspace": null,
+      "watchlistName": "Networking & power (pan-India, ≥ ₹5 L)",
+      "reasons": [
+        "Keyword “firewall”",
+        "Value ₹5.8 L+"
+      ],
+      "matchedAt": "2026-11-05T03:04:13.865Z",
+      "isNew": true
+    },
+    {
+      "id": "7943b6c5-4208-4c68-b79f-938f93640ee2",
+      "bidNumber": "GEM/2026/B/6638907",
+      "title": "Biometric Attendance System – face + fingerprint, Aadhaar enabled (AEBAS)",
+      "buyer": "Directorate of Education, Goa",
+      "state": "Goa",
+      "endAt": "2026-11-26T03:30:00.000Z",
+      "emdAmount": 0,
+      "estimatedValue": 144000,
+      "analysis": null,
+      "workspace": null,
+      "watchlistName": "CCTV & surveillance – West India",
+      "reasons": [
+        "Keyword “biometric”",
+        "State: Goa"
+      ],
+      "matchedAt": "2026-11-05T03:04:13.865Z",
+      "isNew": true
+    },
+    {
+      "id": "21773728-89cb-4230-87f4-5f316ac82047",
+      "bidNumber": "GEM/2026/B/6615150",
+      "title": "Multifunction Machine MFM (Q2) – A3 mono laser, 35 ppm, duplex",
+      "buyer": "Central Board of Indirect Taxes and Customs",
+      "state": "Maharashtra",
+      "endAt": "2026-11-23T03:30:00.000Z",
+      "emdAmount": 0,
+      "estimatedValue": 397000,
+      "analysis": null,
+      "workspace": null,
+      "watchlistName": "IT hardware – Maharashtra & Goa",
+      "reasons": [
+        "Keyword “multifunction machine”",
+        "State: Maharashtra"
+      ],
+      "matchedAt": "2026-11-05T03:04:13.865Z",
+      "isNew": false
+    },
+    {
+      "id": "837ee861-76df-4d63-a1a8-bdcf8bb335c6",
+      "bidNumber": "GEM/2026/B/6559717",
+      "title": "Supply, Installation, Testing & Commissioning of CCTV Surveillance System",
+      "buyer": "Indore Smart City Development Limited",
+      "state": "Madhya Pradesh",
+      "endAt": "2026-11-16T03:30:00.000Z",
+      "emdAmount": 72000,
+      "estimatedValue": 3575000,
+      "analysis": {
+        "score": 98,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "09e1e120-75fb-459f-b6fb-4edb4aca564b",
+        "stage": "identified"
+      },
+      "watchlistName": "CCTV & surveillance – West India",
+      "reasons": [
+        "Keyword “cctv”",
+        "State: Madhya Pradesh"
+      ],
+      "matchedAt": "2026-11-05T02:54:53.159Z",
+      "isNew": true
+    },
+    {
+      "id": "c79fa968-9687-4c27-a403-80f69d43df39",
+      "bidNumber": "GEM/2026/B/6496365",
+      "title": "Network Switch – Layer 2 Managed, 24 x 1G PoE+ with 4 x 10G SFP+",
+      "buyer": "Bharat Petroleum Corporation Limited",
+      "state": "Maharashtra",
+      "endAt": "2026-11-08T21:30:00.000Z",
+      "emdAmount": 54000,
+      "estimatedValue": 1795000,
+      "analysis": {
+        "score": 94,
+        "verdict": "go"
+      },
+      "workspace": null,
+      "watchlistName": "Networking & power (pan-India, ≥ ₹5 L)",
+      "reasons": [
+        "Keyword “network switch”",
+        "Value ₹17.9 L+"
+      ],
+      "matchedAt": "2026-11-05T02:49:15.949Z",
+      "isNew": true
+    }
+  ],
+  "expiringDocuments": [
+    {
+      "id": "e6ec12a5-b3d0-40bc-abb8-069670698053",
+      "title": "OEM authorisation – Dell Technologies (desktops & servers)",
+      "type": "oem_authorization",
+      "expiryDate": "2026-10-31",
+      "daysToExpiry": -5,
+      "status": "expired"
+    },
+    {
+      "id": "307ed800-c167-431d-885c-da1e1c37a70b",
+      "title": "ISO 9001:2015 quality management certificate",
+      "type": "iso",
+      "expiryDate": "2026-11-15",
+      "daysToExpiry": 10,
+      "status": "expiring"
+    },
+    {
+      "id": "4473ca8e-886b-4780-a104-a836b1760b5e",
+      "title": "CA certificate – average turnover (last 3 FYs)",
+      "type": "ca_turnover_certificate",
+      "expiryDate": "2026-11-30",
+      "daysToExpiry": 25,
+      "status": "expiring"
+    }
+  ],
+  "activity": [
+    {
+      "id": "54e77b8c-be51-4dd4-80c2-f06843a96589",
+      "action": "org.created",
+      "entityType": "organization",
+      "entityId": "a3159082-2678-4fdb-986a-5d8c1313ccc6",
+      "meta": {
+        "name": "own Traders mw2yvhz32"
+      },
+      "createdAt": "2026-11-05T03:09:13.838Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "own Traders mw2yvhz32",
+        "href": "/dashboard"
+      }
+    },
+    {
+      "id": "8c568624-2116-49e9-9f23-21bd1f1db670",
+      "action": "demo.seeded",
+      "entityType": "organization",
+      "entityId": "a3159082-2678-4fdb-986a-5d8c1313ccc6",
+      "meta": {
+        "demo": true,
+        "tenders": 40
+      },
+      "createdAt": "2026-11-05T03:08:01.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": null
+    },
+    {
+      "id": "38c9b42b-d759-48a2-9946-a541363bf8e7",
+      "action": "workspace.commented",
+      "entityType": "workspace",
+      "entityId": "efbdb7b6-e7eb-4b70-a1d0-1954eff9edc6",
+      "meta": {
+        "demo": true,
+        "excerpt": "Technical compliance sheet is done. Price sign-off pending with Ananya.",
+        "tenderId": "fefdf31c-9b45-4fd4-84a1-7f9c3d718767"
+      },
+      "createdAt": "2026-11-05T00:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
+        "href": "/workspaces/efbdb7b6-e7eb-4b70-a1d0-1954eff9edc6"
+      }
+    },
+    {
+      "id": "f88ee078-656b-4d2c-890e-1386b584c03e",
+      "action": "workspace.submitted",
+      "entityType": "workspace",
+      "entityId": "9fdbdfc8-622c-438f-a88b-75e4e9f36e65",
+      "meta": {
+        "demo": true,
+        "title": "Supply, Installation, Testing & Commissioning of CCTV Surveillance System",
+        "tenderId": "f93440c8-fb02-4d61-9cc3-0c5691da1cfc"
+      },
+      "createdAt": "2026-11-04T23:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Online UPS 10 kVA with 30 min battery backup",
+        "href": "/workspaces/9fdbdfc8-622c-438f-a88b-75e4e9f36e65"
+      }
+    },
+    {
+      "id": "2c0d5660-44cf-4890-9bac-bf7193d8f029",
+      "action": "workspace.stage_changed",
+      "entityType": "workspace",
+      "entityId": "286ff47c-ecb4-4dc5-a68a-e07d7d7f0167",
+      "meta": {
+        "to": "ready",
+        "demo": true,
+        "from": "preparing",
+        "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+        "tenderId": "477748b8-3c64-4add-8653-b8d387697341"
+      },
+      "createdAt": "2026-11-04T20:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+        "href": "/workspaces/286ff47c-ecb4-4dc5-a68a-e07d7d7f0167"
+      }
+    },
+    {
+      "id": "1782b2c9-1b27-4d9d-a9d0-be7b3499e345",
+      "action": "packet.built",
+      "entityType": "workspace",
+      "entityId": "286ff47c-ecb4-4dc5-a68a-e07d7d7f0167",
+      "meta": {
+        "demo": true,
+        "pages": 34,
+        "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+        "tenderId": "477748b8-3c64-4add-8653-b8d387697341"
+      },
+      "createdAt": "2026-11-04T19:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+        "href": "/workspaces/286ff47c-ecb4-4dc5-a68a-e07d7d7f0167"
+      }
+    },
+    {
+      "id": "0a83785a-decd-4cb1-8d46-3747af6b3bc1",
+      "action": "workspace.stage_changed",
+      "entityType": "workspace",
+      "entityId": "efbdb7b6-e7eb-4b70-a1d0-1954eff9edc6",
+      "meta": {
+        "to": "preparing",
+        "demo": true,
+        "from": "go",
+        "title": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
+        "tenderId": "fefdf31c-9b45-4fd4-84a1-7f9c3d718767"
+      },
+      "createdAt": "2026-11-04T01:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
+        "href": "/workspaces/efbdb7b6-e7eb-4b70-a1d0-1954eff9edc6"
+      }
+    },
+    {
+      "id": "45b50218-0cf6-4e4a-bdc4-2d1c97a49a22",
+      "action": "tender.analysed",
+      "entityType": "tender",
+      "entityId": "33f0098e-3e30-4dd2-9928-e38391c0b3ad",
+      "meta": {
+        "demo": true,
+        "score": 82,
+        "verdict": "no_go",
+        "bidNumber": "GEM/2026/B/6464689"
+      },
+      "createdAt": "2026-11-03T21:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor",
+        "href": "/tenders/33f0098e-3e30-4dd2-9928-e38391c0b3ad"
+      }
+    },
+    {
+      "id": "9b5d54f7-de0c-40e0-9d76-4bdba0bdadbb",
+      "action": "workspace.outcome_recorded",
+      "entityType": "workspace",
+      "entityId": "d238cfbd-e27c-4db0-974b-3a238bfee398",
+      "meta": {
+        "demo": true,
+        "title": "Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor",
+        "result": "won",
+        "tenderId": "07e8c100-eef4-41e0-a9df-bf4f4c1a9299"
+      },
+      "createdAt": "2026-11-03T11:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor",
+        "href": "/workspaces/d238cfbd-e27c-4db0-974b-3a238bfee398"
+      }
+    },
+    {
+      "id": "476d7920-0d66-4199-ab11-e173e8e58664",
+      "action": "workspace.stage_changed",
+      "entityType": "workspace",
+      "entityId": "f6e46154-1979-4cf1-a5e0-6daada7bbd09",
+      "meta": {
+        "to": "go",
+        "demo": true,
+        "from": "analysing",
+        "title": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
+        "tenderId": "4615e2ad-88d6-40c9-bade-f0c694e98bae"
+      },
+      "createdAt": "2026-11-03T03:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
+        "href": "/workspaces/f6e46154-1979-4cf1-a5e0-6daada7bbd09"
+      }
+    },
+    {
+      "id": "c49f25f1-5b2c-4297-a093-04b9a24ffa8d",
+      "action": "tender.analysed",
+      "entityType": "tender",
+      "entityId": "4615e2ad-88d6-40c9-bade-f0c694e98bae",
+      "meta": {
+        "demo": true,
+        "score": 100,
+        "verdict": "go",
+        "bidNumber": "GEM/2026/B/6480527"
+      },
+      "createdAt": "2026-11-03T01:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
+        "href": "/tenders/4615e2ad-88d6-40c9-bade-f0c694e98bae"
+      }
+    },
+    {
+      "id": "ad836b97-23f9-4666-8ec4-6f714486d519",
+      "action": "watchlist.created",
+      "entityType": "watchlist",
+      "entityId": "92ac50e2-4215-4e81-9254-389bbee002c8",
+      "meta": {
+        "demo": true,
+        "name": "CCTV & surveillance – West India"
+      },
+      "createdAt": "2026-11-02T09:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "CCTV & surveillance – West India",
+        "href": "/watchlists"
+      }
+    },
+    {
+      "id": "0ce51d60-fe16-46ef-a3f0-bd1c222b4e61",
+      "action": "vault.uploaded",
+      "entityType": "vault_document",
+      "entityId": null,
+      "meta": {
+        "demo": true,
+        "title": "Audited balance sheet FY 2024-25"
+      },
+      "createdAt": "2026-11-02T05:09:13.865Z",
+      "user": {
+        "id": "0b4ef077-46e9-4775-9d4a-7e24400d8802",
+        "name": "Priya Sharma"
+      },
+      "target": {
+        "label": "Audited balance sheet FY 2024-25",
+        "href": "/vault"
+      }
+    }
+  ],
+  "setup": [
+    {
+      "key": "company",
+      "label": "Add company basics",
+      "description": "Legal name and GSTIN power annexures and eligibility checks.",
+      "done": true,
+      "href": "/profile"
+    },
+    {
+      "key": "categories",
+      "label": "Tell us what you sell",
+      "description": "Categories and HSN codes sharpen your matches.",
+      "done": true,
+      "href": "/profile"
+    },
+    {
+      "key": "watchlist",
+      "label": "Create a watchlist",
+      "description": "Get alerts the moment a matching bid is published.",
+      "done": true,
+      "href": "/watchlists?new=1"
+    },
+    {
+      "key": "documents",
+      "label": "Upload key documents",
+      "description": "GST, PAN and Udyam — the basics every bid asks for.",
+      "done": true,
+      "href": "/vault?upload=1"
+    },
+    {
+      "key": "analysis",
+      "label": "Check eligibility on a tender",
+      "description": "Get a Go/No-Go score with the reasons behind it.",
+      "done": true,
+      "href": "/tenders?matched=1"
+    },
+    {
+      "key": "team",
+      "label": "Invite a teammate",
+      "description": "Bid managers, analysts and compliance can work together.",
+      "done": false,
+      "href": "/settings/team"
+    }
+  ],
+  "setupComplete": true,
+  "demo": true
+}
