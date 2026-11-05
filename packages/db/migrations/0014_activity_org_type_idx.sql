@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "activity_org_type_idx" ON "activity_log" USING btree ("org_id","entity_type","created_at");

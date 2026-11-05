@@ -2,6 +2,7 @@
  * Demo dataset (T075, US7 — "explore with demo data before GeM data arrives").
  *
  *   await seedDemo(db, { orgId, userId, blobs, now })
+ *   await removeDemo(db, { orgId, blobs })   // 007/FR-065 — see removeDemo() for how demo rows are recognised
  *
  * Seeds a realistic Indian IT-hardware / CCTV / networking seller ("Aarav Technologies Pvt Ltd", Pune) into an
  * organization: company profile, past contracts, vault documents (some expiring, one expired; tiny one-page
@@ -11,13 +12,16 @@
  *
  * Idempotent: running it again for the same org never duplicates rows (natural keys / existence checks), and a
  * profile the org already filled in is never overwritten. Tender dates are refreshed on every run.
- * Demo tenders carry `raw.demo = true` so they can be told apart from ingested ones.
+ * Demo tenders are stored with `source = 'demo'` (and `raw.demo = true`), unique by `(source, bid_number)`, so they
+ * never collide with ingested GeM rows. Read paths show them only to orgs with `onboarding_state.demo = true`
+ * (apps/api/src/lib/tender-scope.ts) and watchlist matching skips them; their matches are created here, for the
+ * seeding org only (008/FR-016).
  */
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import {
-  activityLog, analyses, bidWorkspaces, comments, companyProfiles, notifications, pastContracts, tenderMatches, tenders,
-  vaultDocuments, watchlists,
+  activityLog, analyses, bidWorkspaces, comments, companyProfiles, notifications, organizations, packets, pastContracts, tenderDocuments,
+  tenderMatches, tenders, vaultDocuments, vaultDocumentVersions, watchlists,
   type ChecklistItem, type DocType, type Requirement, type ScoreFactor, type Stage, type WatchlistCriteria,
 } from './schema';
 
@@ -31,7 +35,12 @@ export interface SeedDemoOptions {
   /** When given, each vault document gets a small generated one-page PDF. */
   blobs?: DemoBlobSink | null;
   now?: Date;
+  /** Runs inside the seed transaction, after the rows are written (e.g. to set `onboardingState.demo = true`). */
+  afterSeed?: (tx: DemoTx, result: SeedDemoResult) => Promise<void>;
 }
+
+/** The transaction handle `seedDemo` / `removeDemo` pass to their `afterSeed` / `afterRemove` hooks. */
+export type DemoTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export interface SeedDemoResult {
   tenders: number;
@@ -48,6 +57,31 @@ export interface SeedDemoResult {
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const DEMO_MARK = 'demo';
+/** Seeded watchlists are back-dated by exactly this much (created_at = seed time − 16 d, updated_at = seed time). */
+const DEMO_WATCHLIST_AGE_MS = 16 * DAY;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The watchlist ids a `demo.seeded` entry records, or null for an entry written before ids were recorded. */
+function recordedWatchlistIds(meta: unknown): string[] | null {
+  const ids = (meta as { watchlistIds?: unknown } | null)?.watchlistIds;
+  return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string' && UUID_RE.test(x)) : null;
+}
+
+/**
+ * Legacy rule, only for orgs seeded before `demo.seeded` recorded watchlist ids: a `DEMO_WATCHLISTS` name, created by
+ * a user who seeded the demo here, AND the seeder's exact back-dating (updated_at − created_at = 16 days to the
+ * microsecond). A watchlist made through the API has created_at = updated_at (or a later edit time), so it never
+ * matches; a demo watchlist the user later edited stops matching too (kept: the safe direction).
+ */
+async function legacyDemoWatchlistIds(db: DemoTx, orgId: string): Promise<string[]> {
+  const seeders = (await db.selectDistinct({ u: activityLog.userId }).from(activityLog)
+    .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')))).map((r) => r.u).filter((u): u is string => !!u);
+  if (!seeders.length) return [];
+  return (await db.select({ id: watchlists.id }).from(watchlists).where(and(
+    eq(watchlists.orgId, orgId), inArray(watchlists.name, DEMO_WATCHLISTS.map((w) => w.name)), inArray(watchlists.createdBy, seeders),
+    sql`${watchlists.updatedAt} - ${watchlists.createdAt} = ${`${DEMO_WATCHLIST_AGE_MS} milliseconds`}::interval`,
+  ))).map((r) => r.id);
+}
 
 // ───────────── Company ─────────────
 
@@ -261,6 +295,19 @@ function demoDocs(): DemoDoc[] {
   ];
 }
 
+// ───────────── Past contracts ─────────────
+
+/** The five seeded past contracts; `gemContractNo` is their natural key (seed idempotency and removal provenance). */
+function demoPastContracts(now: Date) {
+  return [
+    { buyer: 'Pune Municipal Corporation', buyerType: 'state' as const, title: 'CCTV surveillance for 42 ward offices (supply, installation, 3-year AMC)', category: 'CCTV Cameras', value: 9_640_000, startDate: isoDay(new Date(now.getTime() - 520 * DAY)), endDate: isoDay(new Date(now.getTime() - 420 * DAY)), gemContractNo: 'GEMC-511687712345678' },
+    { buyer: 'Central Railway, Mumbai Division', buyerType: 'central' as const, title: 'Supply of 85 desktop computers with 5-year warranty', category: 'Desktop Computers', value: 5_820_000, startDate: isoDay(new Date(now.getTime() - 330 * DAY)), endDate: isoDay(new Date(now.getTime() - 260 * DAY)), gemContractNo: 'GEMC-511687723456789' },
+    { buyer: 'Bharat Electronics Limited, Pune', buyerType: 'psu' as const, title: 'Managed network switches and structured cabling', category: 'Network Switches', value: 3_150_000, startDate: isoDay(new Date(now.getTime() - 700 * DAY)), endDate: isoDay(new Date(now.getTime() - 640 * DAY)), gemContractNo: 'GEMC-511687734567890' },
+    { buyer: 'Maharashtra State Police', buyerType: 'state' as const, title: 'Online UPS 6 kVA for 18 police stations', category: 'UPS', value: 2_240_000, startDate: isoDay(new Date(now.getTime() - 900 * DAY)), endDate: isoDay(new Date(now.getTime() - 860 * DAY)), gemContractNo: 'GEMC-511687745678901' },
+    { buyer: 'Indian Army – HQ Southern Command', buyerType: 'central' as const, title: 'Multifunction machines (A3) with toner for 3 years', category: 'Multifunction Machines', value: 1_860_000, startDate: isoDay(new Date(now.getTime() - 1100 * DAY)), endDate: isoDay(new Date(now.getTime() - 1060 * DAY)), gemContractNo: 'GEMC-511687756789012' },
+  ];
+}
+
 // ───────────── Analyses ─────────────
 
 const W = { turnover: 20, experience: 18, similarWork: 12, emd: 10, mii: 6, oem: 10, certificates: 8, documents: 8, deliveryFeasibility: 4, timeToClose: 4 } as const;
@@ -364,14 +411,28 @@ const EXTRA_ANALYSES: { idx: number; kind: Profile }[] = [{ idx: 7, kind: 'stron
 
 // ───────────── Seed ─────────────
 
+/**
+ * Seed the demo into one org. Runs in one transaction that first locks the org row — the same lock `removeDemo`
+ * takes — so a seed and a removal never interleave (no demo rows left behind with `onboardingState.demo = false`),
+ * and a failed seed leaves nothing half-written (in particular no watchlist missing from the `demo.seeded` record).
+ */
 export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoResult> {
+  return db.transaction(async (tx) => {
+    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, opts.orgId)).for('no key update');
+    const result = await seedInTx(tx, opts);
+    await opts.afterSeed?.(tx, result);
+    return result;
+  });
+}
+
+async function seedInTx(db: DemoTx, opts: SeedDemoOptions): Promise<SeedDemoResult> {
   const now = opts.now ?? new Date();
   const { orgId, userId } = opts;
 
-  // Tenders (global) — upsert by (source, bid number), refreshing dates so the demo always looks current.
+  // Demo tenders (source 'demo', shared by demo orgs) — upsert by (source, bid number), refreshing dates so the demo always looks current.
   const plan = planTenders(now);
   const tenderRows = plan.map((t) => ({
-    source: 'gem',
+    source: 'demo',
     bidNumber: t.bidNumber,
     gemBidId: String(8_100_000 + t.idx * 37),
     bidType: (t.item.bidType ?? 'bid') as 'bid' | 'ra' | 'service',
@@ -412,7 +473,7 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
   const tid = (idx: number) => tenderId.get(demoBidNumber(idx))!;
 
   // Has this org seen the demo before? (activity marker) — org-scoped rows below are created once.
-  const [marker] = await db.select({ id: activityLog.id }).from(activityLog)
+  const [marker] = await db.select({ id: activityLog.id, meta: activityLog.meta }).from(activityLog)
     .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded'))).limit(1);
   const firstTime = !marker;
 
@@ -447,13 +508,7 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
   else if (!existingProfile.legalName.trim()) await db.update(companyProfiles).set(profile).where(eq(companyProfiles.orgId, orgId));
 
   // Past contracts (natural key: GeM contract number).
-  const pcs = [
-    { buyer: 'Pune Municipal Corporation', buyerType: 'state' as const, title: 'CCTV surveillance for 42 ward offices (supply, installation, 3-year AMC)', category: 'CCTV Cameras', value: 9_640_000, startDate: isoDay(new Date(now.getTime() - 520 * DAY)), endDate: isoDay(new Date(now.getTime() - 420 * DAY)), gemContractNo: 'GEMC-511687712345678' },
-    { buyer: 'Central Railway, Mumbai Division', buyerType: 'central' as const, title: 'Supply of 85 desktop computers with 5-year warranty', category: 'Desktop Computers', value: 5_820_000, startDate: isoDay(new Date(now.getTime() - 330 * DAY)), endDate: isoDay(new Date(now.getTime() - 260 * DAY)), gemContractNo: 'GEMC-511687723456789' },
-    { buyer: 'Bharat Electronics Limited, Pune', buyerType: 'psu' as const, title: 'Managed network switches and structured cabling', category: 'Network Switches', value: 3_150_000, startDate: isoDay(new Date(now.getTime() - 700 * DAY)), endDate: isoDay(new Date(now.getTime() - 640 * DAY)), gemContractNo: 'GEMC-511687734567890' },
-    { buyer: 'Maharashtra State Police', buyerType: 'state' as const, title: 'Online UPS 6 kVA for 18 police stations', category: 'UPS', value: 2_240_000, startDate: isoDay(new Date(now.getTime() - 900 * DAY)), endDate: isoDay(new Date(now.getTime() - 860 * DAY)), gemContractNo: 'GEMC-511687745678901' },
-    { buyer: 'Indian Army – HQ Southern Command', buyerType: 'central' as const, title: 'Multifunction machines (A3) with toner for 3 years', category: 'Multifunction Machines', value: 1_860_000, startDate: isoDay(new Date(now.getTime() - 1100 * DAY)), endDate: isoDay(new Date(now.getTime() - 1060 * DAY)), gemContractNo: 'GEMC-511687756789012' },
-  ];
+  const pcs = demoPastContracts(now);
   const havePc = new Set((await db.select({ n: pastContracts.gemContractNo }).from(pastContracts).where(eq(pastContracts.orgId, orgId))).map((r) => r.n));
   const newPcs = pcs.filter((p) => !havePc.has(p.gemContractNo));
   if (newPcs.length) await db.insert(pastContracts).values(newPcs.map((p) => ({ ...p, orgId, createdAt: now })));
@@ -494,14 +549,25 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
     await db.update(companyProfiles).set({ oemAuthorizations }).where(eq(companyProfiles.orgId, orgId));
   }
 
-  // Watchlists (natural key: name within org).
+  // Watchlists (natural key: name within org). A name the org already has is skipped — that row may be the user's
+  // own, so only the ids inserted here are recorded as demo (`demo.seeded` meta.watchlistIds; see removeDemo).
   const existingWl = await db.select({ id: watchlists.id, name: watchlists.name }).from(watchlists).where(eq(watchlists.orgId, orgId));
   const wlId = new Map(existingWl.map((w) => [w.name, w.id]));
+  const insertedWlIds: string[] = [];
   for (const w of DEMO_WATCHLISTS) {
     if (wlId.has(w.name)) continue;
-    const [row] = await db.insert(watchlists).values({ orgId, name: w.name, criteria: w.criteria, active: true, createdBy: userId, createdAt: new Date(now.getTime() - 16 * DAY), updatedAt: now })
+    const [row] = await db.insert(watchlists).values({ orgId, name: w.name, criteria: w.criteria, active: true, createdBy: userId, createdAt: new Date(now.getTime() - DEMO_WATCHLIST_AGE_MS), updatedAt: now })
       .returning({ id: watchlists.id });
     wlId.set(w.name, row!.id);
+    insertedWlIds.push(row!.id);
+  }
+  if (marker && insertedWlIds.length) {
+    // A repeat seed re-created a demo watchlist the user had deleted: add it to the existing record. A marker written
+    // before ids were recorded is backfilled first from the legacy fingerprint, so it is complete from now on.
+    const recorded = recordedWatchlistIds(marker.meta) ?? await legacyDemoWatchlistIds(db, orgId);
+    await db.update(activityLog)
+      .set({ meta: sql`jsonb_set(${activityLog.meta}, '{watchlistIds}', ${JSON.stringify([...new Set([...recorded, ...insertedWlIds])])}::jsonb)` })
+      .where(eq(activityLog.id, marker.id));
   }
 
   // Matches — spread across the last 14 days so the trend chart has a shape; unique index makes this idempotent.
@@ -609,7 +675,7 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
       act('workspace.stage_changed', 'workspace', ws('ready')?.id ?? null, 7, { from: 'preparing', to: 'ready', tenderId: tid(6), title: plan[6]!.item.title }),
       act('workspace.submitted', 'workspace', ws('submitted')?.id ?? null, 4, { tenderId: tid(5), title: plan[5]!.item.title }),
       act('workspace.commented', 'workspace', prep?.id ?? null, 3, { tenderId: tid(9), excerpt: 'Technical compliance sheet is done. Price sign-off pending with Ananya.' }),
-      act('demo.seeded', 'organization', orgId, 0.02, { tenders: plan.length }),
+      act('demo.seeded', 'organization', orgId, 0.02, { tenders: plan.length, watchlistIds: insertedWlIds }),
     ];
     await db.insert(activityLog).values(rows);
   }
@@ -626,4 +692,177 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
     tenders: plan.length, watchlists: counts!.wl, matches: counts!.m, analyses: counts!.a, workspaces: counts!.w,
     vaultDocuments: counts!.v, pastContracts: counts!.p, created: firstTime || analysesCreated > 0,
   };
+}
+
+// ───────────── Removal (007/FR-065, T053) ─────────────
+
+export interface DemoBlobDeleter {
+  /** Idempotent: deleting a missing key is not an error. */
+  delete(key: string): Promise<unknown>;
+}
+
+export interface RemoveDemoOptions {
+  orgId: string;
+  /** When given, the files behind the removed rows (vault documents and their versions, packets, uploaded bid documents) are deleted after commit. */
+  blobs?: DemoBlobDeleter | null;
+  /** Called for a blob that could not be deleted (the rows are already gone; the file is only orphaned). */
+  onBlobError?: (key: string, error: unknown) => void;
+  /** Runs inside the removal transaction, after the deletes (org flag, audit entry) — a failure rolls everything back. */
+  afterRemove?: (tx: DemoTx, result: RemoveDemoResult) => Promise<void>;
+}
+
+/** True when `removeDemo` found nothing to remove. */
+export function nothingRemoved(r: RemoveDemoResult): boolean {
+  return !r.profileReset && Object.values(r).every((v) => v === 0 || v === false);
+}
+
+/** Rows removed per kind; all zeros (and `profileReset: false`) when the org has no demo data left. */
+export interface RemoveDemoResult {
+  workspaces: number;
+  analyses: number;
+  matches: number;
+  comments: number;
+  notifications: number;
+  activity: number;
+  pastContracts: number;
+  vaultDocuments: number;
+  watchlists: number;
+  profileReset: boolean;
+}
+
+/**
+ * Remove the demo dataset from one org without touching anything its users created (007/FR-065, US4-10/14).
+ *
+ *   const removed = await removeDemo(db, { orgId, blobs })
+ *
+ * Decision (T053) — demo rows are identified by PROVENANCE, not by a new `demo boolean` column:
+ * every row the seeder writes already carries a marker the product never produces on its own, so a column would add a
+ * migration and a write path for no extra safety. The rules mirror the seeder's own natural keys:
+ *   - org work on a demo tender (`source = 'demo'`, `raw.demo = true`, or the seeder fingerprint
+ *     `content_hash = 'demo-' || bid_number` — the same rules as apps/api/src/lib/tender-scope.ts): workspaces with
+ *     their comments and packets, analyses, matches, and bid documents the org uploaded to those tenders. Demo tenders
+ *     are visible only to demo orgs, so anything a user did on them (a moved card, a comment) is demo data too
+ *     (spec edge case "demo removal after the user edited demo rows");
+ *   - watchlists: exactly the ids the seeder inserted, recorded in the org's `demo.seeded` activity entry
+ *     (`meta.watchlistIds`; a repeat seed that re-creates a deleted demo watchlist appends its id). A watchlist the
+ *     user made — even one with a demo name, before seeding (the seed skips that name) or re-created after deleting
+ *     the demo one — is never in that list. Orgs seeded before ids were recorded fall back to the legacy fingerprint
+ *     (`legacyDemoWatchlistIds`). Matches of the removed watchlists go with them;
+ *   - vault documents: a seeded title AND a seeder marker (the `demo` tag or the `org/<org>/vault/demo-` blob key) —
+ *     a user upload has neither; their file versions go with them. A demo document whose file the user replaced (new
+ *     key without the `demo-` prefix) AND whose `demo` tag the user removed survives removal — accepted, it errs on
+ *     the side of keeping a row;
+ *   - past contracts: a seeded GeM contract number (`GEMC-5116877…`, the seed's natural key);
+ *   - notifications: `dedupe_key LIKE 'demo:%'`, or a link to a demo tender / demo workspace;
+ *   - activity: `meta.demo = true`, or an entry about a demo workspace / demo tender;
+ *   - company profile: deleted (= reset to empty) only while legal name AND GSTIN still equal `DEMO_COMPANY`;
+ *     a profile the user edited is kept, with links to removed demo documents cleared.
+ *
+ * Everything is deleted in one transaction that first locks the org row (concurrent removals — and `seedDemo`, which
+ * takes the same lock — serialise; a second removal finds nothing and returns zeros). Blobs are deleted only after
+ * commit, so a rollback never loses a file. `onboardingState.demo` and the `demo.removed` activity entry are the
+ * caller's job, done in `afterRemove` so they commit (or roll back) with the deletes (DELETE /api/demo).
+ */
+export async function removeDemo(db: Db, opts: RemoveDemoOptions): Promise<RemoveDemoResult> {
+  const { orgId } = opts;
+  const anyOf = <T extends string>(col: Parameters<typeof inArray>[0], ids: T[]) => (ids.length ? inArray(col, ids) : sql`false`);
+  const demoDocTitles = demoDocs().map((d) => d.title);
+  const demoContractNos = demoPastContracts(new Date(0)).map((p) => p.gemContractNo);
+
+  const { result, blobKeys } = await db.transaction(async (tx) => {
+    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId)).for('no key update');
+
+    const demoTenderIds = (await tx.select({ id: tenders.id }).from(tenders).where(or(
+      eq(tenders.source, DEMO_MARK),
+      sql`coalesce(${tenders.raw}->>'demo', '') = 'true'`,
+      sql`${tenders.contentHash} = 'demo-' || ${tenders.bidNumber}`,
+    ))).map((r) => r.id);
+    const demoWsIds = (await tx.select({ id: bidWorkspaces.id }).from(bidWorkspaces)
+      .where(and(eq(bidWorkspaces.orgId, orgId), anyOf(bidWorkspaces.tenderId, demoTenderIds)))).map((r) => r.id);
+    // Read before the activity delete below removes the `demo.seeded` entries (they carry meta.demo).
+    const markers = await tx.select({ meta: activityLog.meta }).from(activityLog)
+      .where(and(eq(activityLog.orgId, orgId), eq(activityLog.action, 'demo.seeded')));
+    const recordedWl = markers.map((m) => recordedWatchlistIds(m.meta));
+    const candidateWl = [...new Set([
+      ...recordedWl.flatMap((ids) => ids ?? []),
+      ...(recordedWl.some((ids) => ids === null) ? await legacyDemoWatchlistIds(tx, orgId) : []),
+    ])];
+    const demoWlIds = (await tx.select({ id: watchlists.id }).from(watchlists)
+      .where(and(eq(watchlists.orgId, orgId), anyOf(watchlists.id, candidateWl)))).map((r) => r.id);
+    const demoDocIds = (await tx.select({ id: vaultDocuments.id }).from(vaultDocuments).where(and(
+      eq(vaultDocuments.orgId, orgId), inArray(vaultDocuments.title, demoDocTitles),
+      // Either marker suffices. If the user replaced the file (new key, no `demo-` prefix) AND removed the `demo` tag,
+      // neither is left and the document is kept: we cannot tell it from the user's own, so we err on keeping it.
+      or(sql`${vaultDocuments.tags} @> ${JSON.stringify([DEMO_MARK])}::jsonb`, like(vaultDocuments.blobKey, `org/${orgId}/vault/demo-%`)),
+    ))).map((r) => r.id);
+    const keys: string[] = [];
+
+    const removedComments = await tx.delete(comments)
+      .where(and(eq(comments.orgId, orgId), anyOf(comments.workspaceId, demoWsIds))).returning({ id: comments.id });
+    const removedPackets = await tx.delete(packets)
+      .where(and(eq(packets.orgId, orgId), anyOf(packets.workspaceId, demoWsIds))).returning({ blobKey: packets.blobKey });
+    keys.push(...removedPackets.map((p) => p.blobKey).filter((k): k is string => !!k));
+    const linkedId = sql`substring(${notifications.link} from '^/(?:tenders|workspaces)/([0-9a-fA-F-]{36})')`;
+    const linkTargets = [...demoTenderIds, ...demoWsIds];
+    const removedNotes = await tx.delete(notifications).where(and(eq(notifications.orgId, orgId), or(
+      like(notifications.dedupeKey, 'demo:%'),
+      linkTargets.length ? sql`lower(${linkedId}) in (${sql.join(linkTargets.map((id) => sql`${id.toLowerCase()}`), sql`, `)})` : sql`false`,
+    ))).returning({ id: notifications.id });
+    const removedActivity = await tx.delete(activityLog).where(and(eq(activityLog.orgId, orgId), or(
+      sql`${activityLog.meta}->>'demo' = 'true'`,
+      and(eq(activityLog.entityType, 'workspace'), anyOf(activityLog.entityId, demoWsIds)),
+      and(eq(activityLog.entityType, 'tender'), anyOf(activityLog.entityId, demoTenderIds)),
+    ))).returning({ id: activityLog.id });
+    const removedWs = await tx.delete(bidWorkspaces)
+      .where(and(eq(bidWorkspaces.orgId, orgId), anyOf(bidWorkspaces.id, demoWsIds))).returning({ id: bidWorkspaces.id });
+    const removedAnalyses = await tx.delete(analyses)
+      .where(and(eq(analyses.orgId, orgId), anyOf(analyses.tenderId, demoTenderIds))).returning({ id: analyses.id });
+    const removedMatches = await tx.delete(tenderMatches).where(and(eq(tenderMatches.orgId, orgId), or(
+      anyOf(tenderMatches.tenderId, demoTenderIds), anyOf(tenderMatches.watchlistId, demoWlIds),
+    ))).returning({ id: tenderMatches.id });
+    const removedWl = await tx.delete(watchlists)
+      .where(and(eq(watchlists.orgId, orgId), anyOf(watchlists.id, demoWlIds))).returning({ id: watchlists.id });
+    const removedTenderDocs = await tx.delete(tenderDocuments)
+      .where(and(eq(tenderDocuments.orgId, orgId), anyOf(tenderDocuments.tenderId, demoTenderIds))).returning({ blobKey: tenderDocuments.blobKey });
+    keys.push(...removedTenderDocs.map((d) => d.blobKey));
+
+    // US4-14: a profile that still holds the demo company goes back to empty (no row = empty profile).
+    const resetProfile = await tx.delete(companyProfiles).where(and(
+      eq(companyProfiles.orgId, orgId), eq(companyProfiles.legalName, DEMO_COMPANY.legalName), eq(companyProfiles.gstin, DEMO_COMPANY.gstin),
+    )).returning({ orgId: companyProfiles.orgId });
+
+    // Kept rows must not point at removed demo documents (same unlinking as DELETE /vault/:id).
+    if (demoDocIds.length) {
+      await tx.update(pastContracts).set({ cracDocumentId: null })
+        .where(and(eq(pastContracts.orgId, orgId), inArray(pastContracts.cracDocumentId, demoDocIds)));
+      const docList = sql.join(demoDocIds.map((id) => sql`${id.toLowerCase()}`), sql`, `);
+      await tx.update(companyProfiles).set({
+        oemAuthorizations: sql`(select coalesce(jsonb_agg(case when lower(e->>'documentId') in (${docList}) then jsonb_set(e, '{documentId}', 'null'::jsonb) else e end order by i), '[]'::jsonb)
+          from jsonb_array_elements(${companyProfiles.oemAuthorizations}) with ordinality as t(e, i))`,
+      }).where(and(eq(companyProfiles.orgId, orgId), sql`exists (select 1 from jsonb_array_elements(${companyProfiles.oemAuthorizations}) as o(e) where lower(e->>'documentId') in (${docList}))`));
+    }
+    const removedPcs = await tx.delete(pastContracts)
+      .where(and(eq(pastContracts.orgId, orgId), inArray(pastContracts.gemContractNo, demoContractNos))).returning({ id: pastContracts.id });
+    const removedVersions = await tx.delete(vaultDocumentVersions)
+      .where(and(eq(vaultDocumentVersions.orgId, orgId), anyOf(vaultDocumentVersions.documentId, demoDocIds))).returning({ blobKey: vaultDocumentVersions.blobKey });
+    const removedDocs = await tx.delete(vaultDocuments)
+      .where(and(eq(vaultDocuments.orgId, orgId), anyOf(vaultDocuments.id, demoDocIds))).returning({ blobKey: vaultDocuments.blobKey });
+    keys.push(...removedDocs.map((d) => d.blobKey), ...removedVersions.map((v) => v.blobKey));
+
+    const result: RemoveDemoResult = {
+      workspaces: removedWs.length, analyses: removedAnalyses.length, matches: removedMatches.length, comments: removedComments.length,
+      notifications: removedNotes.length, activity: removedActivity.length, pastContracts: removedPcs.length,
+      vaultDocuments: removedDocs.length, watchlists: removedWl.length, profileReset: resetProfile.length > 0,
+    };
+    await opts.afterRemove?.(tx, result);
+    return { blobKeys: keys, result };
+  });
+
+  // After commit only: a failed delete orphans a file, it never loses one that a row still points at.
+  if (opts.blobs) {
+    for (const key of new Set(blobKeys)) {
+      try { await opts.blobs.delete(key); } catch (e) { opts.onBlobError?.(key, e); }
+    }
+  }
+  return result;
 }

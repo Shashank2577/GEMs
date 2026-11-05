@@ -23,7 +23,7 @@ export default {
         border: token('border'),
         input: token('input'),
         ring: token('ring'),
-        primary: { DEFAULT: token('primary'), foreground: token('primary-foreground'), soft: token('primary-soft') },
+        primary: { DEFAULT: token('primary'), foreground: token('primary-foreground'), soft: token('primary-soft'), ink: token('primary-ink') },
         accent: { DEFAULT: token('accent'), foreground: token('accent-foreground'), soft: token('accent-soft') },
         success: { DEFAULT: token('success'), foreground: token('success-foreground'), soft: token('success-soft') },
         warning: { DEFAULT: token('warning'), foreground: token('warning-foreground'), soft: token('warning-soft') },
@@ -32,6 +32,8 @@ export default {
         sidebar: { DEFAULT: token('sidebar'), foreground: token('sidebar-foreground'), border: token('sidebar-border'), active: token('sidebar-active') },
         chart: { 1: token('chart-1'), 2: token('chart-2'), 3: token('chart-3'), 4: token('chart-4'), 5: token('chart-5') },
       },
+      // `text-primary` uses its own token so dark-mode links/labels meet WCAG AA while buttons keep --primary (002/NFR-004).
+      textColor: { primary: { DEFAULT: token('primary-text'), foreground: token('primary-foreground'), soft: token('primary-soft') } },
       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)', xl: 'calc(var(--radius) + 4px)', '2xl': 'calc(var(--radius) + 8px)' },
       boxShadow: {
         xs: '0 1px 2px 0 hsl(var(--shadow) / 0.05)',

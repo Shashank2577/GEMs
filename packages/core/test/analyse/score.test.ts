@@ -85,6 +85,41 @@ describe('scoreTender on the sample bids', () => {
   });
 });
 
+describe('OEM product match (FR-030)', () => {
+  const demoOems = [
+    { oem: 'CP PLUS', products: 'IP cameras, NVRs' },
+    { oem: 'D-Link India', products: 'Managed switches, Wi-Fi access points' },
+  ];
+  const profile = { ...baseProfile, oemAuthorizations: demoOems };
+  const oemReqs = [R('oem_auth', true, null, true)];
+  const run = (tender: ScoreInput['tender'], p = profile, vaultDocs = baseVault) =>
+    f(scoreTender({ requirements: oemReqs, profile: p, pastContracts: basePastContracts, vaultDocs, tender, now: NOW }).factors, 'oem');
+
+  it('unknown when no valid authorisation mentions the tender category', () => {
+    const oem = run({ title: 'Supply of Desktop Computers', category: 'Desktop Computers', items: [{ name: 'Desktop Computer (Core i5)' }] });
+    expect(oem).toMatchObject({ status: 'unknown', blocking: true });
+    expect(oem.detail).toBe('None of your valid OEM authorisations (CP PLUS, D-Link India) mention Desktop Computers — confirm one covers this product.');
+  });
+
+  it('passes when an authorisation mentions the product (plural-insensitive, items and title count)', () => {
+    expect(run({ title: 'CCTV Camera supply', category: 'CCTV Cameras' }).status).toBe('pass');
+    expect(run({ title: 'Network upgrade', items: [{ name: 'Managed Switch 24 port' }] }).status).toBe('pass');
+  });
+
+  it('uses vault authorisation title/tags and ignores expired ones', () => {
+    const none = { ...baseProfile, oemAuthorizations: [] };
+    const vault = [...baseVault, { type: 'oem_authorization' as const, title: 'Dell authorisation', tags: ['Desktops'] }];
+    expect(run({ category: 'Desktop Computers' }, none, vault).status).toBe('pass');
+    const expired = { ...baseProfile, oemAuthorizations: [{ oem: 'Dell', products: 'Desktops', validTill: '2026-01-01' }, ...demoOems] };
+    expect(run({ category: 'Desktop Computers' }, expired).status).toBe('unknown');
+  });
+
+  it('keeps the generic pass when the tender text is unknown', () => {
+    expect(run(null).status).toBe('pass');
+    expect(run({ endAt: null }).status).toBe('pass');
+  });
+});
+
 describe('exemptions (FR-014)', () => {
   const reqs = (mse: boolean, startup: boolean) => [
     R('turnover_min', '1 Crore', 10_000_000), R('experience_years', '3 years', 3), R('mse_exemption', mse, null, false), R('startup_exemption', startup, null, false),
@@ -159,6 +194,19 @@ describe('edge cases', () => {
     const r = scoreTender({ requirements: [R('delivery_days', '30 days', 30)], profile: baseProfile, tender: { state: 'Kerala' }, now: NOW });
     expect(f(r.factors, 'deliveryFeasibility').status).toBe('unknown');
     expect(f(r.factors, 'deliveryFeasibility').detail).toContain('Kerala');
+  });
+
+  it('delivery falls back to the consignee state from the document when the listing has no state (FR-019)', () => {
+    const reqs = [R('delivery_days', '30 days', 30), R('consignee_state', 'Kerala', null, false)];
+    const fromDoc = scoreTender({ requirements: reqs, profile: baseProfile, tender: { state: null }, now: NOW });
+    expect(f(fromDoc.factors, 'deliveryFeasibility')).toMatchObject({ status: 'unknown', requirementKey: 'delivery_days' });
+    expect(f(fromDoc.factors, 'deliveryFeasibility').detail).toBe('Delivery in 30 days to Kerala, outside your operating states — check logistics.');
+    // The listing state wins over the document.
+    const listing = scoreTender({ requirements: reqs, profile: baseProfile, tender: { state: 'Delhi' }, now: NOW });
+    expect(f(listing.factors, 'deliveryFeasibility')).toMatchObject({ status: 'pass', detail: 'Delivery period of 30 days to Delhi looks feasible.' });
+    // Real sample bid: Haryana consignee is inside the operating states.
+    const oem = base('review-hardware-oem');
+    expect(f(oem.factors, 'deliveryFeasibility').detail).toBe('Delivery period of 45 days to Haryana looks feasible.');
   });
 
   it('averageTurnover uses the latest three financial years', () => {

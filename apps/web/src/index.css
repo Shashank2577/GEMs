@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Inter (SIL OFL 1.1), self-hosted variable font: latin is preloaded from index.html; latin-ext (₹ etc.) loads on demand. */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+
 /*
  * TenderPilot design tokens. HSL triplets so Tailwind can apply alpha (`bg-primary/10`).
  * Primary: deep indigo ink. Accent: saffron. Success/Go: emerald. Warning/Review: amber. Danger/No-Go: rose.
@@ -21,21 +28,24 @@
     --input: 230 18% 86%;
     --ring: 243 75% 58%;
     --primary: 243 75% 52%;
+    --primary-ink: 243 75% 52%; /* primary as text colour (>= 4.5:1 on card/background) */
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 90% 96.5%;
+    /* Primary used as text/link colour (text-primary). Same as --primary in light; lighter in dark (WCAG AA ≥ 4.5:1). */
+    --primary-text: 243 75% 52%;
     --accent: 33 96% 50%;
     --accent-foreground: 26 90% 14%;
     --accent-soft: 40 100% 95%;
-    --success: 158 72% 34%;
+    --success: 158 72% 28%; /* ≥ 4.5:1 as text on success-soft and white on success (002/NFR-004) */
     --success-foreground: 0 0% 100%;
     --success-soft: 152 70% 95%;
-    --warning: 34 92% 42%;
+    --warning: 30 95% 31%;
     --warning-foreground: 0 0% 100%;
     --warning-soft: 45 100% 94%;
-    --danger: 350 74% 50%;
+    --danger: 350 74% 46%;
     --danger-foreground: 0 0% 100%;
     --danger-soft: 352 100% 96.5%;
-    --info: 205 85% 45%;
+    --info: 205 90% 32%;
     --info-soft: 205 100% 96%;
     --sidebar: 230 30% 98.4%;
     --sidebar-foreground: 232 18% 30%;
@@ -65,8 +75,10 @@
     --input: 234 16% 22%;
     --ring: 243 90% 70%;
     --primary: 243 82% 66%;
+    --primary-ink: 243 90% 74%;
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 45% 18%;
+    --primary-text: 243 90% 74%; /* ≥ 5:1 on background, card, muted and primary-soft (white-on-primary buttons keep --primary) */
     --accent: 36 98% 58%;
     --accent-foreground: 26 90% 10%;
     --accent-soft: 34 60% 15%;

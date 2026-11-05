@@ -22,9 +22,15 @@ export interface ResolvedAuth {
   kind: 'session' | 'token';
   sessionId: string | null;
   apiTokenId: string | null;
+  /**
+   * 006/FR-074: the token's scope when `kind === 'token'`, else null. Anything other than `'full'` is treated as
+   * read-only (fail closed), see middleware/auth.ts#assertWritable.
+   */
+  tokenScope: 'full' | 'read' | null;
 }
 
-function isHttps(c: Context): boolean {
+/** True when the request reached us over https (directly, or per `x-forwarded-proto` from the proxy). */
+export function isHttps(c: Context): boolean {
   const proto = c.req.header('x-forwarded-proto');
   if (proto) return proto.split(',')[0].trim() === 'https';
   return new URL(c.req.url).protocol === 'https:';
@@ -59,8 +65,10 @@ export async function rememberOrg(db: Db, userId: string, orgId: string) {
   await db.update(users).set({ lastOrgId: orgId }).where(eq(users.id, userId));
 }
 
+const userCols = { id: users.id, name: users.name, email: users.email, phone: users.phone };
+
 export async function loadUser(db: Db, userId: string): Promise<AuthUser | null> {
-  const [u] = await db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone }).from(users).where(eq(users.id, userId));
+  const [u] = await db.select(userCols).from(users).where(eq(users.id, userId));
   return u ?? null;
 }
 
@@ -107,25 +115,27 @@ export async function resolveAuth(c: Context<AppEnv>): Promise<ResolvedAuth | nu
 
   const bearer = bearerToken(c);
   if (bearer) {
-    const [t] = await db.select().from(apiTokens).where(eq(apiTokens.tokenHash, await sha256Hex(bearer)));
-    if (!t) return null;
-    const user = await loadUser(db, t.userId);
-    if (!user) return null;
+    // Token + owner in one query (002/NFR-001: /auth/me ≤ 4 queries).
+    const [row] = await db.select({ t: apiTokens, user: userCols }).from(apiTokens).innerJoin(users, eq(users.id, apiTokens.userId))
+      .where(eq(apiTokens.tokenHash, await sha256Hex(bearer)));
+    if (!row) return null;
+    const { t, user } = row;
+    if (t.expiresAt && t.expiresAt.getTime() <= now.getTime()) return null; // 002/FR-037: expired → 401
     const m = await loadMembership(db, t.userId, t.orgId);
     if (!m) return null; // token's org membership was revoked
     if (!t.lastUsedAt || now.getTime() - t.lastUsedAt.getTime() > 60_000) {
       await db.update(apiTokens).set({ lastUsedAt: now }).where(eq(apiTokens.id, t.id));
     }
-    return { user, org: m.org, role: m.role, kind: 'token', sessionId: null, apiTokenId: t.id };
+    return { user, org: m.org, role: m.role, kind: 'token', sessionId: null, apiTokenId: t.id, tokenScope: t.scope };
   }
 
   const token = getCookie(c, SESSION_COOKIE);
   if (!token) return null;
-  const [s] = await db.select().from(sessions)
+  // Session + user in one query (002/NFR-001: /auth/me ≤ 4 queries).
+  const [row] = await db.select({ s: sessions, user: userCols }).from(sessions).innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.tokenHash, await sha256Hex(token)), gt(sessions.expiresAt, now)));
-  if (!s) return null;
-  const user = await loadUser(db, s.userId);
-  if (!user) return null;
+  if (!row) return null;
+  const { s, user } = row;
 
   let m = s.activeOrgId ? await loadMembership(db, s.userId, s.activeOrgId) : null;
   const patch: Partial<typeof sessions.$inferInsert> = {};
@@ -140,5 +150,5 @@ export async function resolveAuth(c: Context<AppEnv>): Promise<ResolvedAuth | nu
   if (!s.lastSeenAt || now.getTime() - s.lastSeenAt.getTime() >= SESSION_SEEN_INTERVAL_MS) patch.lastSeenAt = now;
   if (Object.keys(patch).length) await db.update(sessions).set(patch).where(eq(sessions.id, s.id));
 
-  return { user, org: m?.org ?? null, role: m?.role ?? null, kind: 'session', sessionId: s.id, apiTokenId: null };
+  return { user, org: m?.org ?? null, role: m?.role ?? null, kind: 'session', sessionId: s.id, apiTokenId: null, tokenScope: null };
 }

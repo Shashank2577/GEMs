@@ -1,0 +1,12 @@
+# sc10a-packet-41-items — project desktop — 2026-11-05T07:23:25.407Z
+### Build packet with 41 items
+> POST /api/workspaces/81b68cbd-3be5-4e71-8973-0d3726adf60e/packets {items: 41 × cover}
+< 413
+{"error":{"code":"packet_too_large","message":"This packet has 41 items (limit 40). Deselect some items and try again.","details":{"items":41,"maxItems":40}}}
+
+packets rows before/after: 0/0; stored files before/after: 54/54
+### Control: 40 items
+> POST … {items: 40 × cover}
+< 201
+{"id":"7715ef93-99e7-4a54-8313-beb1f0022f08","workspaceId":"81b68cbd-3be5-4e71-8973-0d3726adf60e","status":"ready","items":[{"kind":"cover","pages":2,"title":"Item 1","included":true,"startPage":1}],"warnings":["OEM authorisation certificate (MAF) for this bid: the vault document has expired — replace it or ask a Bid Manager to override."],"sizeBytes":2888,"pageCount":2,"createdBy":{"id":"a702f0fb-b2bd-411a-898f-e9e84dbdf64c","name":"QA analyst mw37ye781","email":"analyst.mw37ye781@example.in"},"createdAt":"2026-11-05T07:23:26.040Z","downloadUrl":"/api/packets/7715ef93-99e7-4a54-8313-beb1f0022f08/download"}
+

@@ -69,7 +69,7 @@ export function DocumentsStep({ data, onNext, onOpenAnnexure }: { data: Workspac
         {r.blockers.length > 0 && (
           <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Blockers">
             {r.blockers.map((b) => (
-              <li key={b.itemId}><a href={`#item-${b.itemId}`} className="inline-flex items-center gap-1 rounded-full border border-danger/25 bg-danger-soft px-2.5 py-1 text-xs font-medium text-danger hover:border-danger/50 focus-ring">
+              <li key={b.itemId}><a href={`#item-${b.itemId}`} className="inline-flex items-center gap-1 rounded-full border border-danger/25 bg-danger-soft px-2.5 py-1 text-xs font-medium text-[hsl(350_74%_38%)] dark:text-danger hover:border-danger/50 focus-ring">
                 {b.state === 'expired' ? 'Expired' : 'Missing'} · {b.label.length > 48 ? `${b.label.slice(0, 46)}…` : b.label}
               </a></li>
             ))}
@@ -121,7 +121,7 @@ function ChecklistRow({ wsId, it, doc, allDocs, onOpenAnnexure }: {
             <div className="mt-1.5 text-sm font-medium leading-snug">{it.item.label}</div>
             <p className="mt-0.5 text-xs text-muted-foreground">{it.item.reason}</p>
             {it.override && (
-              <p className="mt-1.5 inline-flex items-start gap-1.5 rounded-md bg-info-soft px-2 py-1 text-xs text-info">
+              <p className="mt-1.5 inline-flex items-start gap-1.5 rounded-md bg-info-soft px-2 py-1 text-xs text-[hsl(205_85%_30%)] dark:text-info">
                 <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden /> Override: {it.override.reason}
               </p>
             )}

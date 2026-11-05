@@ -10,13 +10,15 @@ export const E2E_PORT = Number(process.env.E2E_PORT || 8788);
 export const DB_URL = process.env.E2E_DATABASE_URL || `postgres://tp:tp@localhost:5433/${process.env.E2E_DB_NAME || 'tenderpilot_e2e'}`;
 export const BLOB_ROOT = join(process.cwd(), '.data', `e2e-blobs-${E2E_PORT}`);
 // pdf-lib is a dependency of apps/api (not of the repo root), so resolve it from there.
-const { PDFDocument } = createRequire(join(process.cwd(), 'apps', 'api', 'package.json'))('pdf-lib') as { PDFDocument: { create(): Promise<{ addPage(size: [number, number]): { drawText(t: string, o: object): void }; save(): Promise<Uint8Array> }> } };
+type PdfLib = { PDFDocument: { create(): Promise<{ addPage(size: [number, number]): { drawText(t: string, o: object): void }; save(): Promise<Uint8Array> }> } };
+const loadPdfLib = () => createRequire(join(process.cwd(), 'apps', 'api', 'package.json'))('pdf-lib') as PdfLib;
 
 export const MB = 1024 * 1024;
 
 /** A real PDF with `pages` pages (each stamped with `label` so different files differ). `makePdf(text)` = one page carrying `text` (US5). */
 export async function makePdf(pagesOrText: number | string = 1, label = 'TenderPilot QA'): Promise<Buffer> {
   const [pages, text] = typeof pagesOrText === 'string' ? [1, pagesOrText] : [pagesOrText, label];
+  const { PDFDocument } = loadPdfLib();
   const doc = await PDFDocument.create();
   for (let i = 1; i <= pages; i++) doc.addPage([300, 200]).drawText(`${text} - page ${i}/${pages}`, { x: 20, y: 100, size: 12 });
   return Buffer.from(await doc.save());
@@ -171,12 +173,13 @@ export async function putProfile(page: Page, data: unknown) {
   return page.request.put('/api/profile', { data });
 }
 
-// 1x1 PNG
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+// Distinct small PNG per upload: identical bytes in one org are refused as duplicates since US6 (FR-067).
+let pngSeq = 0;
+const uniquePng = () => makePng(1 + (++pngSeq % 500), 1);
 
 export async function uploadDoc(page: Page, fields: { type: string; title: string; expiryDate?: string }) {
   const multipart: Record<string, string | { name: string; mimeType: string; buffer: Buffer }> = {
-    file: { name: `${fields.type}.png`, mimeType: 'image/png', buffer: PNG },
+    file: { name: `${fields.type}.png`, mimeType: 'image/png', buffer: uniquePng() },
     type: fields.type, title: fields.title,
   };
   if (fields.expiryDate) multipart.expiryDate = fields.expiryDate;

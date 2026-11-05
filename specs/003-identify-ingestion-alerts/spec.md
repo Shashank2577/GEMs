@@ -164,7 +164,7 @@ Maharashtra), confirm the preview shows 2 bids before saving, save, and confirm 
     and each card shows its criteria chips plus "Open bids", "This week", "All time" counts and a **View matches** action
     linking to `/tenders?watchlistId=<id>&matched=1`.
 14. *(gap)* **Given** an org already has 50 watchlists, **When** a user creates another, **Then** the API returns `409`
-    `watchlist_limit` "You can have up to 50 watchlists — pause or delete one first."
+    `watchlist_limit` "You can have up to 50 watchlists — delete one first." (paused watchlists count toward the limit)
 15. *(gap)* **Given** more than 5,000 open tenders satisfy the cheap SQL pre-filter, **When** a preview or back-fill runs,
     **Then** every matching open tender is still found (no silent truncation at 5,000).
 
@@ -485,7 +485,8 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
   have since closed are kept).
 - **FR-026**: The watchlist list MUST return per watchlist: `matchCount`, `newThisWeek` (last 7 days), `openCount`,
   `lastMatchAt`, `createdBy`.
-- **FR-027** *(gap)*: An org MUST NOT exceed 50 watchlists (`409 watchlist_limit`).
+- **FR-027** *(gap)*: An org MUST NOT exceed 50 watchlists, paused ones included (`409 watchlist_limit` "You can have up to 50
+  watchlists — delete one first.").
 - **FR-028** *(gap)*: Preview and back-fill MUST find all matching open tenders regardless of volume (no silent cap at
   5,000 candidates); the SQL pre-filter SHOULD also narrow by categories and ministries.
 

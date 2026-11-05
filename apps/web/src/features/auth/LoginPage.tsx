@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/label';
 import { toast } from '@/components/ui/toaster';
 import { safeNext, useAuth } from '@/lib/auth';
-import { ApiError, errorMessage } from '@/lib/api';
+import { ApiError, errorMessage, tooManyAttemptsMessage } from '@/lib/api';
 import { AuthLayout } from './AuthLayout';
 import { PasswordInput } from './PasswordInput';
 import { FormAlert } from './FormAlert';
@@ -16,7 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** 429 → the server's "Too many attempts. Try again in N minutes." (002/FR-010); 400/401 → generic mismatch. */
 function loginError(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.status === 429) return err.message;
+    if (err.status === 429) return tooManyAttemptsMessage(err)!;
     if (err.status === 401 || err.status === 400) return 'That email and password don’t match. Please try again.';
   }
   return errorMessage(err);
@@ -53,7 +53,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout
+    <AuthLayout canonical="/login"
       docTitle="Sign in"
       title="Welcome back"
       subtitle="Sign in to see today’s GeM matches and your bid pipeline."

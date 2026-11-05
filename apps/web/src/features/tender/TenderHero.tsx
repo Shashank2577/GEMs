@@ -10,6 +10,7 @@ import {
   ScoreRing, StageBadge, Tooltip, VerdictBadge, toast,
 } from '@/components/ui';
 import { RoleGate } from '@/lib/auth';
+import { SampleBadge } from '@/features/feed/SampleBadge';
 import { formatDateIST, formatINR, formatNumberIN } from '@/lib/format';
 import type { Stage } from '@/lib/types';
 import { useState } from 'react';
@@ -29,10 +30,12 @@ function Fact({ icon: Icon, label, help, children }: { icon: typeof Wallet; labe
 }
 
 export function TenderHero({
-  tender, analysis, analysing, onAnalyse, onStartBid, startingBid, onDismiss, dismissing,
+  tender, analysis, analysing, analyseDisabled = false, onAnalyse, onStartBid, startingBid, onDismiss, dismissing,
 }: {
   tender: TenderDetail; analysis: AnalysisDto | null; analysing: boolean; onAnalyse: () => void; onStartBid: () => void; startingBid: boolean;
   onDismiss: () => void; dismissing: boolean;
+  /** Another analysis for this tender is running (FR-028). */
+  analyseDisabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const buyer = [tender.ministry, tender.department, tender.organisation, tender.buyerOffice].filter((x, i, a) => x && a.indexOf(x) === i) as string[];
@@ -69,6 +72,7 @@ export function TenderHero({
           <Badge tone="outline">{BID_TYPE_LABEL[tender.bidType] ?? tender.bidType}</Badge>
           {tender.status !== 'open' && <Badge tone={tender.status === 'cancelled' ? 'danger' : 'neutral'} className="capitalize">{tender.status}</Badge>}
           {tender.isNew && <Badge tone="primary" dot>New match</Badge>}
+          {tender.isDemo && <SampleBadge size="md" />}
           {tender.hasCorrigendum && <Badge tone="warning">Corrigendum</Badge>}
           {tender.workspace && <StageBadge stage={tender.workspace.stage as Stage} />}
           {tender.matches.slice(0, 2).map((m) => (
@@ -123,7 +127,7 @@ export function TenderHero({
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <RoleGate min="analyst">
-            <Button size="lg" onClick={onAnalyse} loading={analysing} disabled={closed && !done} className="sm:min-w-44">
+            <Button size="lg" onClick={onAnalyse} loading={analysing} disabled={(closed && !done) || analyseDisabled} className="sm:min-w-44">
               {!analysing && (done ? <RefreshCw /> : <Gauge />)} {done ? 'Re-analyse' : 'Analyse eligibility'}
             </Button>
             {tender.workspace ? (

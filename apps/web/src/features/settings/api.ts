@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  ApiTokenSummary, CreatedApiToken, CreatedInvitation, Me, MembersResponse, NotificationPrefs,
+  ActivityItem, ActivityQuery, ApiTokenSummary, CreateApiTokenInput, CreatedApiToken, CreatedInvitation, Me, MembersResponse, NotificationPrefs,
   RevokeOtherSessionsResponse, SessionsResponse, TestAlertResult,
 } from '@tp/core/contracts/auth';
 import type { ScoringWeights } from '@tp/core/contracts/analyse';
@@ -20,6 +20,7 @@ export const settingsKeys = {
   weights: ['scoring-weights'] as const,
   runs: ['ingestion', 'runs'] as const,
   usage: ['org', 'usage'] as const,
+  activity: ['activity'] as const,
 };
 
 function useSetMe() {
@@ -140,7 +141,7 @@ export function useTokens() {
 }
 export function useCreateToken() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (name: string) => api.post<CreatedApiToken>('/me/api-tokens', { name }), onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tokens }) });
+  return useMutation({ mutationFn: (input: CreateApiTokenInput) => api.post<CreatedApiToken>('/me/api-tokens', input), onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tokens }) });
 }
 export function useRevokeToken() {
   const qc = useQueryClient();
@@ -174,4 +175,13 @@ export async function copyText(text: string): Promise<boolean> {
       return ok;
     } catch { return false; }
   }
+}
+
+// ── Activity log (002/FR-043, FR-044) ──
+export function useActivity(params: ActivityQuery) {
+  return useQuery({
+    queryKey: [...settingsKeys.activity, params] as const,
+    queryFn: () => api.get<Paged<ActivityItem>>('/activity', params as Record<string, string | number>),
+    placeholderData: keepPreviousData,
+  });
 }

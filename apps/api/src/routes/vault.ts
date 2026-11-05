@@ -36,6 +36,8 @@ import { runExpiryReminders } from '../services/reminders';
 import { badRequest, HttpError, notFound, validationError } from '../lib/errors';
 import { parseQuery, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { VAULT_TOO_LARGE, VAULT_UPLOAD_MAX_BYTES, bodyLimit } from '../middleware/body-limit';
+import { rateLimit } from '../middleware/rate-limit';
 import type { AppEnv } from '../types';
 
 export const vaultRoutes = new Hono<AppEnv>();
@@ -288,7 +290,7 @@ vaultRoutes.post('/vault/reminders/run', requireRole('bid_manager'), async (c) =
   return c.json(report);
 });
 
-vaultRoutes.post('/vault', requireRole('analyst'), async (c) => {
+vaultRoutes.post('/vault', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_LARGE), requireRole('analyst'), rateLimit('upload.org'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
   const { body, file, pageCount } = await readFile(c);
@@ -344,7 +346,7 @@ vaultRoutes.patch('/vault/:id', requireRole('analyst'), async (c) => {
   return c.json(await dto(deps, row!));
 });
 
-vaultRoutes.put('/vault/:id/file', requireRole('analyst'), async (c) => {
+vaultRoutes.put('/vault/:id/file', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_LARGE), requireRole('analyst'), rateLimit('upload.org'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
   const uid = userId(c);

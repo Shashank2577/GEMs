@@ -17,10 +17,12 @@ import { annexureTemplateInputSchema, packetBuildSchema } from '@tp/core/contrac
 import { normalizeTemplateKey, unknownPlaceholderMessage, unknownPlaceholders, type TemplateKey } from '@tp/core/packet/templates';
 import { logActivity } from '../lib/activity';
 import { assertWithinPlan } from '../lib/plan';
-import { HttpError, notFound } from '../lib/errors';
-import { parseJson } from '../lib/validate';
+import { HttpError, badRequest, notFound } from '../lib/errors';
+import { contentDisposition } from '../lib/http';
+import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
-import { buildWorkspacePacket, getTenderRow, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
+import { rateLimit } from '../middleware/rate-limit';
+import { assertPacketItemCount, buildWorkspacePacket, getTenderRow, recoverStuckPackets, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
 import type { AppEnv } from '../types';
 
 export const packetsRoutes = new Hono<AppEnv>();
@@ -38,7 +40,7 @@ const pdfResponse = (bytes: Uint8Array, fileName: string, download: boolean) =>
     headers: {
       'content-type': 'application/pdf',
       'content-length': String(bytes.length),
-      'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${fileName.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"`,
+      'content-disposition': contentDisposition(download ? 'attachment' : 'inline', fileName),
       'cache-control': 'private, no-store',
       'x-content-type-options': 'nosniff',
     },
@@ -111,16 +113,28 @@ packetsRoutes.get('/workspaces/:id/packets', requireAuth, async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
   const w = await getWorkspace(deps, org, c.req.param('id'));
+  await recoverStuckPackets(deps, org, w.id);
   const rows = await deps.db.select().from(packets).where(and(eq(packets.orgId, org), eq(packets.workspaceId, w.id))).orderBy(desc(packets.createdAt)).limit(50);
   const ppl = await people(deps, rows.map((r) => r.createdBy));
   return c.json({ items: rows.map((r) => toPacketDto(r, ppl)), total: rows.length });
 });
 
-packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), async (c) => {
+packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), rateLimit('packet.org'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
   const w = await getWorkspace(deps, org, c.req.param('id'));
-  const body = await parseJson(c, packetBuildSchema);
+  // 008/FR-032: > 40 items is a 413 packet_too_large (not a 400), so count before the schema caps the array.
+  // The body is read and parsed once (review N2); invalid JSON is the usual 400.
+  let raw: unknown;
+  try {
+    const text = await c.req.text();
+    raw = text ? JSON.parse(text) : {};
+  } catch {
+    throw badRequest('Request body must be valid JSON');
+  }
+  const peek = raw as { items?: unknown } | null;
+  if (Array.isArray(peek?.items)) assertPacketItemCount(peek.items.length);
+  const body = parseWith(packetBuildSchema, raw, 'body');
   await assertWithinPlan(deps, org, 'packetsPerMonth'); // 008/FR-036
   const p = await buildWorkspacePacket(deps, org, userId(c), w, body.items);
   await logActivity(deps.db, {
@@ -152,7 +166,7 @@ packetsRoutes.get('/packets/:id/download', requireAuth, async (c) => {
     headers: {
       'content-type': 'application/pdf',
       'content-length': String(obj.size),
-      'content-disposition': `${c.req.query('inline') === '1' ? 'inline' : 'attachment'}; filename="${name}"`,
+      'content-disposition': contentDisposition(c.req.query('inline') === '1' ? 'inline' : 'attachment', name),
       'cache-control': 'private, no-store',
       'x-content-type-options': 'nosniff',
     },

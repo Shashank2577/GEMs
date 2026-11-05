@@ -9,6 +9,7 @@ import {
 import { formatDateIST, formatINR, formatNumberIN } from '@/lib/format';
 import type { Stage } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { SampleBadge } from './SampleBadge';
 import { useDismiss, useMarkSeen } from './api';
 
 export const BID_TYPE_LABEL: Record<string, string> = { bid: 'Bid', ra: 'Reverse auction', bunch: 'Bunch bid', service: 'Service' };
@@ -24,7 +25,7 @@ export function locationLine(t: Pick<TenderListItem, 'city' | 'state'>) {
 }
 
 /** Up to N unique match-reason chips across all watchlists. */
-export function reasonChips(t: TenderListItem, max = 4) {
+export function reasonChips(t: TenderListItem, max = 3) {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of t.matches) for (const r of m.reasons) if (!seen.has(r)) { seen.add(r); out.push(r); }
@@ -81,6 +82,7 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
             )}
             <span className="font-mono text-[12px] tracking-tight text-foreground/70">{t.bidNumber}</span>
             {t.bidType !== 'bid' && <Badge size="sm" tone={t.bidType === 'ra' ? 'info' : 'neutral'}>{BID_TYPE_LABEL[t.bidType] ?? t.bidType}</Badge>}
+            {t.isDemo && <SampleBadge />}
             {t.hasCorrigendum && (
               <Tooltip content="GeM published a corrigendum this week — dates or terms changed.">
                 <Badge size="sm" tone="warning"><FileWarning aria-hidden />Corrigendum</Badge>
@@ -137,7 +139,7 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
             <Countdown to={t.endAt} compact className="text-[13px] font-semibold" />
           </Metric>
           <Metric label="EMD" hint="Earnest Money Deposit — MSEs and Startups are often exempt">
-            {t.emdAmount === 0 ? <span className="text-success">Nil</span> : formatINR(t.emdAmount, { compact: true })}
+            {t.emdAmount === 0 ? <span className="text-emerald-700 dark:text-success">Nil</span> : formatINR(t.emdAmount, { compact: true })}
           </Metric>
           <Metric label="Est. value" hint={t.estimatedValue ? formatINR(t.estimatedValue) : 'Not published on the listing — open the bid document'}>
             {formatINR(t.estimatedValue, { compact: true, fallback: '—' })}
@@ -163,7 +165,7 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button variant="ghost" size="sm" className="text-primary hover:text-primary" onClick={() => { open(); navigate(href); }}>
+          <Button variant="ghost" size="sm" className="text-primary hover:text-primary dark:text-indigo-300 dark:hover:text-indigo-300" onClick={() => { open(); navigate(href); }}>
             Open<ArrowUpRight />
           </Button>
         </div>

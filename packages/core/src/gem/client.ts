@@ -14,6 +14,8 @@
  * Request shape adapted from erenmyeager15/india-government-tenders-scraper (Apache-2.0) and
  * arush15june/gem-search (MIT) — see NOTICE.
  */
+import { bidResultPath } from './award';
+import { isPdfBody, readBoundedBody, SourceBodyLimitError } from './http';
 import { parseBidPlusDoc, parseBidPlusResponse, type BidPlusPage, type NormalizedTender } from './parse';
 
 export interface GemClientOptions {
@@ -33,6 +35,11 @@ export interface GemClientOptions {
   now?: () => number;
   /** Largest bid document accepted by fetchBidDocument (default 25 MB, FR-008). */
   maxDocumentBytes?: number;
+  /**
+   * Called before every HTTP attempt, retries included (008/FR-024): the API passes the cluster-wide GeM lease
+   * (`lib/gem-lease.ts`) so all isolates together stay ≤ 1 request/s. A rejection aborts the request unsent.
+   */
+  beforeRequest?: () => Promise<void>;
 }
 
 export interface FetchPageOptions {
@@ -54,6 +61,42 @@ export class GemError extends Error {
   }
 }
 
+/** Upper bound on a bid-result page body; anything beyond is not read (007/T033). */
+export const MAX_RESULT_BYTES = 1024 * 1024;
+
+/**
+ * Response text, reading at most `maxBytes`: a declared content-length above the cap is refused, an undeclared
+ * oversized body is cut off (the stream is cancelled) and the prefix returned.
+ */
+export async function readTextCapped(res: Response, maxBytes: number): Promise<string> {
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await res.body?.cancel().catch(() => {});
+    // Not retryable: the same page will be just as large next time.
+    throw new GemError(`GeM response too large (${declared} bytes)`, res.status, false);
+  }
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const room = maxBytes - total;
+    if (value.length >= room) {
+      chunks.push(value.subarray(0, room));
+      total += room;
+      await reader.cancel().catch(() => {});
+      break;
+    }
+    chunks.push(value);
+    total += value.length;
+  }
+  const buf = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { buf.set(c, off); off += c.length; }
+  return new TextDecoder().decode(buf);
+}
 /** Default cap for a downloaded bid document — same as the upload limit (FR-008). */
 export const MAX_GEM_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
@@ -71,6 +114,7 @@ export class GemClient {
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
   private readonly maxDocumentBytes: number;
+  private readonly beforeRequest?: () => Promise<void>;
   private csrf: string | null = null;
   private session: Promise<void> | null = null;
   private cookies = new Map<string, string>();
@@ -89,6 +133,7 @@ export class GemClient {
     this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.now = opts.now ?? (() => Date.now());
     this.maxDocumentBytes = opts.maxDocumentBytes ?? MAX_GEM_DOCUMENT_BYTES;
+    this.beforeRequest = opts.beforeRequest;
   }
 
   // ───────────── public API ─────────────
@@ -159,10 +204,25 @@ export class GemClient {
     const started = this.attemptStartedAt.get(res) ?? Date.now();
     const bytes = await readCapped(res, this.maxDocumentBytes, started + this.timeout);
     const contentType = res.headers.get('content-type') ?? 'application/pdf';
-    if (bytes.length < 5 || String.fromCharCode(...bytes.slice(0, 5)) !== '%PDF-') {
+    if (!isPdfBody(bytes)) {
       throw new GemError('GeM did not return a PDF for this bid document', res.status);
     }
     return { bytes, contentType, url: path.startsWith('http') ? path : `${this.baseUrl}${path}` };
+  }
+
+  /**
+   * Fetch the public bid-result (award) page HTML for a BidPlus `b_id` (007/T033). Read-only, same throttle and
+   * back-off as every other request. 404 → `null` (no result published).
+   */
+  async fetchBidResultHtml(gemBidId: string): Promise<{ html: string; url: string } | null> {
+    const path = bidResultPath(gemBidId);
+    const res = await this.request(path, {
+      method: 'GET',
+      headers: { accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8', referer: `${this.baseUrl}/all-bids`, 'x-requested-with': 'XMLHttpRequest' },
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new GemError(`GeM bid result failed: HTTP ${res.status}`, res.status, res.status >= 500);
+    return { html: await readTextCapped(res, MAX_RESULT_BYTES), url: `${this.baseUrl}${path}` };
   }
 
   // ───────────── internals ─────────────
@@ -207,6 +267,8 @@ export class GemClient {
       for (;;) {
         const wait = this.lastRequestAt + this.minInterval - this.now();
         if (wait > 0) await this.sleep(wait);
+        // Cluster-wide slot (FR-024): taken per attempt, so a retry waits for its own slot too.
+        if (this.beforeRequest) await this.beforeRequest();
         this.lastRequestAt = this.now();
         this.requests++;
         let res: Response | null = null;
@@ -248,46 +310,22 @@ export class GemClient {
   }
 }
 
-/** Read a response body, cancelling it as soon as it is known to exceed `maxBytes`. */
+/**
+ * Read a response body with the ported bounded reader (`gem/http.ts#readBoundedBody`): cancel as soon as it is
+ * known to exceed `maxBytes`, and stop a body that is still trickling in at `deadline`.
+ */
 async function readCapped(res: Response, maxBytes: number, deadline = Infinity): Promise<Uint8Array> {
-  const tooLarge = () => new GemError(`GeM document is larger than ${maxBytes} bytes`, res.status, false, 'too_large');
-  const advertised = Number(res.headers.get('content-length'));
-  if (Number.isFinite(advertised) && advertised > maxBytes) {
-    await res.body?.cancel().catch(() => {});
-    throw tooLarge();
-  }
-  if (!res.body) return new Uint8Array(0);
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let received = 0;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timedOut = Symbol('timeout');
-  const expired = Number.isFinite(deadline)
-    ? new Promise<typeof timedOut>((resolve) => { timer = setTimeout(() => resolve(timedOut), Math.max(0, deadline - Date.now())); })
-    : null;
+  const ctrl = Number.isFinite(deadline) ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(new Error('deadline')), Math.max(0, deadline - Date.now())) : undefined;
   try {
-    for (;;) {
-      const r = expired ? await Promise.race([reader.read(), expired]) : await reader.read();
-      if (r === timedOut) {
-        await reader.cancel().catch(() => {});
-        throw new GemError('GeM unreachable: document download timed out', res.status, true, 'timeout');
-      }
-      const { value, done } = r;
-      if (done) break;
-      received += value.byteLength;
-      if (received > maxBytes) {
-        await reader.cancel().catch(() => {});
-        throw tooLarge();
-      }
-      chunks.push(value);
-    }
+    return await readBoundedBody(res, maxBytes, ctrl?.signal);
+  } catch (e) {
+    if (e instanceof SourceBodyLimitError) throw new GemError(`GeM document is larger than ${maxBytes} bytes`, res.status, false, 'too_large');
+    if (ctrl?.signal.aborted) throw new GemError('GeM unreachable: document download timed out', res.status, true, 'timeout');
+    throw e;
   } finally {
     if (timer) clearTimeout(timer);
   }
-  const out = new Uint8Array(received);
-  let at = 0;
-  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
-  return out;
 }
 
 /** Find the CSRF token embedded in the all-bids HTML (several layouts seen in the wild). */

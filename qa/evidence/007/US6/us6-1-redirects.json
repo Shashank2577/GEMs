@@ -1,0 +1,13 @@
+{
+  "/": "/dashboard",
+  "/login": "/dashboard",
+  "/signup": "/dashboard",
+  "/?next=/tenders": "/tenders",
+  "/login?next=/pipeline": "/pipeline",
+  "/signup?next=/vault": "/vault",
+  "/?next=//evil.com": "/dashboard",
+  "/login?next=//evil.com": "/dashboard",
+  "/signup?next=//evil.com/x": "/dashboard",
+  "/login?next=https://evil.com": "/dashboard",
+  "/login?next=/\\evil.com": "/dashboard"
+}

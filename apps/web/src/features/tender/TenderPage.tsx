@@ -3,6 +3,7 @@
  * with evidence, requirements, documents and history.
  */
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Bot, CheckCircle2, FileSearch, FileText, Gauge, History, ListChecks, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react';
 import type { AnalysisDto } from '@tp/core/contracts/analyse';
@@ -18,8 +19,8 @@ import { DocumentsTab } from './DocumentsTab';
 import { HistoryTab } from './HistoryTab';
 import { RequirementsTab } from './RequirementsTab';
 import { TenderHero } from './TenderHero';
-import { useAnalyse, useAnalysis, useDismiss, useStartBid, useTender, useTenderDocuments } from './api';
-import { staleReasonCopy } from './labels';
+import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
+import { canRescoreFor, isAnalysisRunning, staleReasonCopy } from './labels';
 
 const TABS = ['analysis', 'requirements', 'documents', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -35,9 +36,14 @@ export default function TenderPage() {
   const analysisQ = useAnalysis(id);
   const docs = useTenderDocuments(id);
   const analyse = useAnalyse(id);
+  const rescore = useRescore(id);
   const startBid = useStartBid(id);
   const dismiss = useDismiss(id);
   const canAnalyse = useCan('analyst');
+  const qc = useQueryClient();
+  // FR-028/FR-029: another member's run (lastAttempt running, polled every 3 s) or a 409 whose refetch is in flight.
+  const running = isAnalysisRunning(analysisQ.data);
+  const analyseBlocked = running || (isAnalysisRunningError(analyse.error) && analysisQ.isFetching);
   useDocumentTitle(tender.data ? `${tender.data.bidNumber} · ${tender.data.title}` : 'Tender');
 
   // Mark a new match as seen once opened.
@@ -49,7 +55,18 @@ export default function TenderPage() {
     }
   }, [tender.data?.isNew, id]);
 
+  // When a run we were polling finishes, refresh the hero score, documents and history too.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      qc.invalidateQueries({ queryKey: tenderKeys.detail(id), exact: true });
+      qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
+    }
+    wasRunning.current = running;
+  }, [running, qc, id]);
+
   const runAnalyse = () => {
+    if (analyseBlocked) return;
     setTab('analysis');
     analyse.mutate(undefined, {
       onSuccess: (a) => toast.success(`${a.verdict === 'go' ? 'Go' : a.verdict === 'review' ? 'Review' : 'No-Go'} · ${a.score}/100`, {
@@ -59,8 +76,18 @@ export default function TenderPage() {
         if (e instanceof ApiError && e.code === 'no_documents') {
           toast.error('Add the bid document first', { description: e.message, action: { label: 'Upload PDF', onClick: () => setTab('documents') } });
           setTab('documents');
+        } else if (isAnalysisRunningError(e)) {
+          toast(e instanceof Error ? e.message : 'An analysis is already running for this tender', { description: 'The result will appear here when it finishes.' });
         } else toast.error(errorMessage(e, 'Analysis failed'));
       },
+    });
+  };
+
+  const runRescore = () => {
+    if (!analysis || analyseBlocked) return;
+    rescore.mutate(analysis.id, {
+      onSuccess: (a) => toast.success(`Re-scored · ${a.score}/100`, { description: 'Updated with your current profile, vault and weights.' }),
+      onError: (e) => toast.error(errorMessage(e, 'Re-score failed')),
     });
   };
 
@@ -102,7 +129,7 @@ export default function TenderPage() {
         </ol>
       </nav>
       <TenderHero
-        tender={t} analysis={analysis} analysing={analyse.isPending} onAnalyse={runAnalyse}
+        tender={t} analysis={analysis} analysing={analyse.isPending} analyseDisabled={analyseBlocked} onAnalyse={runAnalyse}
         onStartBid={onStartBid} startingBid={startBid.isPending} onDismiss={onDismiss} dismissing={dismiss.isPending}
       />
 
@@ -122,19 +149,25 @@ export default function TenderPage() {
                 <div className="font-semibold">Re-analysis needed</div>
                 <div className="text-muted-foreground">{staleReasonCopy(analysis?.staleReason)}</div>
               </div>
-              <RoleGate min="analyst"><Button size="sm" variant="secondary" onClick={runAnalyse}><RefreshCw /> Re-analyse now</Button></RoleGate>
+              <RoleGate min="analyst">
+                {canRescoreFor(analysis?.staleReason) && analysis ? (
+                  <Button size="sm" variant="secondary" onClick={runRescore} loading={rescore.isPending} disabled={analyseBlocked}><RefreshCw /> Re-score</Button>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={runAnalyse} disabled={analyseBlocked}><RefreshCw /> Re-analyse now</Button>
+                )}
+              </RoleGate>
             </div>
           )}
           {analyse.isPending ? <AnalysingState /> : analysisQ.isLoading ? <AnalysisSkeleton /> : analysisQ.isError ? (
             <ErrorState error={analysisQ.error} onRetry={() => analysisQ.refetch()} />
           ) : analysis ? (
-            <AnalysisPanel analysis={analysis} tenderId={id} onReanalyse={runAnalyse} reanalysing={analyse.isPending} canAnalyse={canAnalyse} hasWorkspace={!!t.workspace} />
+            <AnalysisPanel analysis={analysis} tenderId={id} onReanalyse={runAnalyse} reanalysing={analyse.isPending} canAnalyse={canAnalyse} hasWorkspace={!!t.workspace} analyseDisabled={analyseBlocked} />
           ) : (
             <AnalyseEmpty canAnalyse={canAnalyse} hasDocs={docCount > 0} hasGemLink={hasGemLink} onAnalyse={runAnalyse} onUpload={() => setTab('documents')} />
           )}
         </TabsContent>
         <TabsContent value="requirements">
-          <RequirementsTab analysis={analysis} tenderId={id} />
+          <RequirementsTab analysis={analysis} tenderId={id} documents={docs.data?.items} bidNumber={t.bidNumber} />
         </TabsContent>
         <TabsContent value="documents">
           <DocumentsTab tenderId={id} hasGemLink={hasGemLink} hasAnalysis={!!analysis} onReanalyse={runAnalyse} />

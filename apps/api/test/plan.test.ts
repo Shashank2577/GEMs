@@ -12,6 +12,7 @@ import { PLAN_LIMITS, type PlanKey } from '@tp/core/contracts/plans';
 import { createApp, type App } from '../src/app';
 import type { AppDeps, LlmClient } from '../src/deps';
 import { assertWithinPlan, usageFor, usedOf } from '../src/lib/plan';
+import { WATCHLIST_LIMIT } from '../src/routes/watchlists';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
 // 5 Nov 2026 10:00 IST
@@ -250,7 +251,8 @@ describe('plan limits per resource (FR-036, scenarios 2–5)', () => {
   it('enterprise is never limited, even at 10× the Pro numbers (scenario 5, FR-043)', async () => {
     const o = await newOrg('enterprise');
     const pro = PLAN_LIMITS.pro;
-    await seedWatchlists(o.orgId, 60);
+    // Pro watchlists are unlimited; 003/FR-027's product cap of 50 per org still applies to every plan.
+    await seedWatchlists(o.orgId, WATCHLIST_LIMIT - 1);
     await seedInvites(o.orgId, pro.seats! * 10);
     await seedVaultBytes(o.orgId, pro.vaultBytes! * 10);
     await seedAnalyses(o.orgId, pro.analysesPerMonth! * 10);
@@ -291,9 +293,12 @@ describe('analyse quota (T084)', () => {
 
   it('concurrent requests cannot exceed the limit (org row lock)', async () => {
     const o = await newOrg();
-    const t = await analysableTender(o.analyst.cookie);
+    // Six different tenders: one running analysis per org+tender (004/FR-028) is a separate 409, so only the org row lock
+    // keeps these from overshooting the monthly quota together.
+    const ts = [];
+    for (let i = 0; i < 6; i++) ts.push(await analysableTender(o.analyst.cookie));
     await seedAnalyses(o.orgId, 8);
-    const results = await Promise.all(Array.from({ length: 6 }, () => request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: o.analyst.cookie })));
+    const results = await Promise.all(ts.map((t) => request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: o.analyst.cookie })));
     const statuses = results.map((r) => r.status).sort();
     expect(statuses).toEqual([201, 201, 402, 402, 402, 402]);
     const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(analyses).where(eq(analyses.orgId, o.orgId));
@@ -456,7 +461,8 @@ describe('requireActivePlan (T086, scenario 6)', () => {
     expect(r.body.error.code).toBe('plan_expired');
   });
 
-  it('GETs still work: feed, analysis, vault list and download (all roles)', async () => {
+  it('GETs still work: health, feed, analysis, vault list and download (all roles)', async () => {
+    expect((await request(ctx.app, 'GET', '/health')).status).toBe(200);
     for (const u of [o.viewer, o.analyst, o.owner]) {
       expect((await request(ctx.app, 'GET', '/tenders', { cookie: u.cookie })).status).toBe(200);
       expect((await request(ctx.app, 'GET', '/vault', { cookie: u.cookie })).status).toBe(200);

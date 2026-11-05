@@ -61,7 +61,7 @@ export function FileDropzone({
         <span className={cn('flex size-11 items-center justify-center rounded-xl border bg-card shadow-sm transition-transform', over && 'scale-110')}>
           <FileUp className="size-5 text-primary" aria-hidden />
         </span>
-        <span className="text-sm font-medium">{title ?? <>Drop file here or <span className="text-primary underline-offset-4 group-hover:underline">browse</span></>}</span>
+        <span className="text-sm font-medium">{title ?? <>Drop file here or <span className="text-primary-ink underline-offset-4 group-hover:underline">browse</span></>}</span>
         <span className="text-xs text-muted-foreground">{hint ?? `PDF or image, up to ${formatBytes(maxSize)}`}</span>
         <input
           ref={input}

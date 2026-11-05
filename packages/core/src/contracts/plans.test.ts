@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   PLAN_KEYS, PLAN_LIMITS, TRIAL_DAYS, allowedWhenExpired, isTrialExpired, istMonthPeriod, limitsFor, planDateIST,
-  planLimitMessage, PLAN_EXPIRED_MESSAGE, trialDaysLeft, trialEndsAtFor,
+  planLimitMessage, PLAN_EXPIRED_MESSAGE, PLANS, trialDaysLeft, trialEndsAtFor,
 } from './plans';
 
 const GB = 1024 ** 3;
@@ -93,4 +93,16 @@ describe('allowedWhenExpired (FR-038)', () => {
     ['PATCH', '/api/org'], ['POST', '/api/org/invitations'], ['POST', '/api/demo/seed'], ['DELETE', '/api/me'], ['POST', '/api/me'],
     ['POST', '/api/authx'], ['PUT', '/api/me/password'],
   ])('blocks %s %s', (m, p) => expect(allowedWhenExpired(m, p)).toBe(false));
+});
+
+describe('PLANS cards agree with PLAN_LIMITS (007/FR-086 × 008/FR-034)', () => {
+  it('shows the enforced member, watchlist and vault limits', () => {
+    for (const p of PLANS) {
+      const l = PLAN_LIMITS[p.key];
+      expect(p.limits.members, p.key).toBe(l.seats);
+      expect(p.limits.watchlists, p.key).toBe(l.watchlists);
+      // The card may leave vault uncapped (null); when it shows a figure it is the enforced one.
+      if (p.limits.vaultGb != null) expect(p.limits.vaultGb * GB, p.key).toBe(l.vaultBytes);
+    }
+  });
 });

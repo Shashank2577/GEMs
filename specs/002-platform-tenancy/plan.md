@@ -155,7 +155,7 @@ Auth column: `—` public, `S` session cookie only, `A` any member (cookie or be
 | DELETE `/api/org/invitations/:id` | M | – | 200 `{ok}` | 404 |
 | PATCH `/api/org/members/:userId` | O | `{role}` | 200 `Member` | 403; 404; 409 last_owner |
 | DELETE `/api/org/members/:userId` | O | – | 200 `{ok}` | 403; 404; 409 last_owner |
-| GET `/api/activity` | A | `page,pageSize,entityType,entityId,userId` | 200 `{items:ActivityItem[],total}` | 400 |
+| GET `/api/activity` | A | `page,pageSize,entityType (one or comma-separated list),entityId,userId` | 200 `{items:ActivityItem[] (each with optional server-resolved target:{label,href}|null),total}` | 400 |
 | GET/PUT `/api/scoring-weights` | A / M | PUT: partial weights, `{}` resets | 200 `{weights,defaults,custom}` | 400; 403 |
 | GET `/api/ingestion/runs`, POST `/api/ingestion/run` | A / M | – | runs summary / run result | 403 |
 | (gap) POST `/api/auth/forgot-password` | — | `{email}` | 200 `{ok:true}` always | 400; 429 |
@@ -208,13 +208,23 @@ new+name+password) → (gap) email-mismatch 403 → tx {membership ON CONFLICT D
 `INSERT … ON CONFLICT (key,kind) DO UPDATE SET count = CASE WHEN window_start <= now-window THEN 1 ELSE count+1 END,
 window_start = CASE … END RETURNING count, window_start`; `over = count > limit`.
 Credential checks (login, accept-invite existing user, change password) use `credentialLimiter(db, email, ip, now)`:
-`reserve()` hits the `login_email` (10/15 min) and `login_ip` (30/15 min) counters **before** PBKDF2 and throws 429
-`rate_limited` + `Retry-After` when either is over, so a parallel burst can never get more than the cap through;
+`reserve()` hits the `login_ip` (30/15 min) counter **first**, then `login_email` (10/15 min), **before** PBKDF2, and throws
+429 `rate_limited` + `Retry-After` when either is over, so a parallel burst can never get more than the cap through.
+**Limiter order** (#482 item 1): the IP counter is taken first and a request refused by it stops there, so a blocked IP
+cannot keep advancing a victim's email counter (lock-out of others); if the email counter is the one that is over, the IP
+reservation is released, so a locked-out user who keeps retrying does not burn the shared IP budget. Forgot-password uses
+the same order (`reserveIpThenKey`: `reset_ip` then `reset_email`);
 `succeed()` deletes the email counter and decrements the IP counter (a valid login does not use the IP budget, but cannot
 clear an attacker's failures either). Forgot-password hits `reset_email` (3/h) and `reset_ip` (20/h) for every email,
 existing or not, then does the lookup, token write and email in the background (`lib/defer.ts`: `waitUntil` on Workers,
 fire-and-forget with a caught rejection on Node; the Worker closes its DB pool only after deferred work settles).
 Reset-password looks up a valid token before hashing and counts invalid tokens against `login_ip`.
+**Invitation resend** (#482 items 9, 11; FR-020): `POST /org/invitations/:id/resend` replaces the token hash, sets a new
+7-day expiry and sets `invited_by` to **the member who resent it** (the email and the invite preview name them, and they
+vouch for the new link; the original inviter stays visible in the activity log). It deliberately **also revives an expired,
+unaccepted invitation**: expired rows are kept until replaced or revoked, so "Resend" is how an admin renews one. Accepted
+invitations and other orgs' invitations are 404. The pending list (`GET /org/members`) shows only unexpired rows.
+**Security headers** (decision, FR-050): `X-Frame-Options: DENY` everywhere except `SAMEORIGIN` on `content-disposition: inline` file responses (in-app previews, `middleware/security.ts`); the SPA CSP keeps `style-src 'unsafe-inline'` (Radix/sonner inline styles) and adds `frame-src`/`object-src`/`worker-src 'self' blob:` for PDF previews.
 **Client IP** (decision): read only from a trusted proxy, selected by `TRUST_PROXY`: `cloudflare` (the Worker default) →
 `cf-connecting-ip`; `xff`/`1` → first `x-forwarded-for` hop (Node behind a reverse proxy); unset (Node default) → `null`.
 A `null` IP means per-IP limits are **skipped** (per-email limits still apply), so un-proxied clients do not share one

@@ -68,8 +68,8 @@ describe('SELF_CONTAINED', () => {
 
   it('marks sentences that read complete without a target', () => {
     expect([...SELF_CONTAINED].sort()).toEqual([
-      'annexure.template_reset', 'annexure.template_updated', 'api_token.created', 'api_token.revoked', 'demo.seeded',
-      'ingestion.run', 'member.joined', 'member.left', 'org.created', 'org.plan_changed', 'org.scoring_weights_updated', 'org.updated', 'vault.reminders_run',
+      'annexure.template_reset', 'annexure.template_updated', 'api_token.created', 'api_token.revoked', 'auth.password_changed', 'auth.sessions_revoked', 'demo.removed', 'demo.seeded',
+      'ingestion.run', 'member.joined', 'member.left', 'onboarding.completed', 'org.created', 'org.plan_changed', 'org.scoring_weights_updated', 'org.updated', 'vault.reminders_run',
     ]);
   });
 
@@ -77,5 +77,13 @@ describe('SELF_CONTAINED', () => {
     for (const a of ['workspace.created', 'tender.analysed', 'vault.uploaded', 'watchlist.created', 'member.invited', 'profile.updated']) {
       expect(SELF_CONTAINED.has(a)).toBe(false);
     }
+  });
+});
+
+describe('auth verbs (002/FR-042)', () => {
+  it('describes password and session events', () => {
+    expect(describeActivity({ action: 'auth.password_changed', meta: {} })).toBe('changed their password');
+    expect(describeActivity({ action: 'auth.sessions_revoked', meta: { scope: 'others' } })).toBe('signed out their other devices');
+    expect(describeActivity({ action: 'auth.sessions_revoked', meta: { scope: 'one' } })).toBe('signed out a device');
   });
 });

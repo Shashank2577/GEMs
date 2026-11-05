@@ -1,7 +1,7 @@
 /** T016 — pure dashboard helpers (FR-008). Times are UTC instants; IST = UTC + 05:30. */
 import { describe, expect, it } from 'vitest';
 import type { DashboardResponse } from '@tp/core/contracts/experience';
-import { greeting, isEmptyOrg, istHour, istTime, pctDelta, summaryLine } from './summary';
+import { greeting, isEmptyOrg, istHour, istTime, pctDelta, roleGate, summaryLine } from './summary';
 
 /** UTC instant for an IST wall-clock time on 4 Nov 2026. */
 const ist = (hhmm: string) => new Date(`2026-11-04T${hhmm}:00+05:30`);
@@ -83,5 +83,17 @@ describe('istTime', () => {
     expect(istTime('2026-11-04T04:30:00.000Z')).toBe('10:00');
     expect(istTime('2026-11-04T13:05:00.000Z')).toBe('18:35');
     expect(istTime('2026-11-03T18:30:00.000Z')).toBe('00:00');
+  });
+});
+
+describe('roleGate (007/FR-071…FR-073)', () => {
+  it.each([
+    ['owner', { persona: true, ownerLayout: true, setupCard: true, decide: true }],
+    ['bid_manager', { persona: true, ownerLayout: false, setupCard: true, decide: true }],
+    ['analyst', { persona: true, ownerLayout: false, setupCard: false, decide: false }],
+    ['viewer', { persona: false, ownerLayout: false, setupCard: false, decide: false }],
+    [null, { persona: false, ownerLayout: false, setupCard: false, decide: false }],
+  ] as const)('%s', (role, expected) => {
+    expect(roleGate(role)).toEqual(expected);
   });
 });

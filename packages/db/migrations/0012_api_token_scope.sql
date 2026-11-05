@@ -1,0 +1,1 @@
+ALTER TABLE "api_tokens" ADD COLUMN "scope" text DEFAULT 'full' NOT NULL;

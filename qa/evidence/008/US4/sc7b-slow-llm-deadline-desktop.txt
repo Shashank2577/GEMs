@@ -1,0 +1,8 @@
+# sc7b-slow-llm-deadline — project desktop — 2026-11-05T07:24:39.346Z
+### Analyse with a fake LLM that answers after 55 s
+> POST /api/tenders/:id/analyse
+< 201  (90051 ms)
+{"id":"a2d1929b-d75f-4641-8c10-47850b44e7ff","orgId":"5108fe03-e97c-4ca7-89e3-6d125e5d6dea","tenderId":"0b81312a-aac1-408b-8641-18e3358c7d7b","status":"done","method":"rules+llm","requirements":[{"key":"bid_published_at","label":"Bid published on","value":"2026-11-28T00:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Dated: 28-11-2026 Bid Document Bid Details","fileName":"go-it-services.pdf","documentId":"fd44e4ab-24ea-4ed2-867e-352cd91ca584"},"numeric":null,"mandatory":false,"confidence":0.95},{"key":"bid_end","label":"Bid end date","value":"2026-12-02T17:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Bid End Date/Time 02-12-2026 17:00:00","fileName":"emd-exempt-mse.pdf",
+
+wall clock: 90051 ms; LLM calls started: 2 at +0 s, +55 s
+GET analysis → status=done method=rules+llm error=null lastAttempt=null warnings=[{"code":"llm_budget_exhausted","total":5,"covered":1}]

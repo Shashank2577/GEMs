@@ -1,6 +1,7 @@
 /** Hono environment shared by every router: `new Hono<AppEnv>()`. */
 import type { Role } from '@tp/db';
 import type { AppDeps } from './deps';
+import type { ResolvedAuth } from './lib/session';
 
 export interface AuthUser { id: string; name: string; email: string; phone: string | null }
 export interface AuthOrg {
@@ -24,6 +25,15 @@ export interface AppVariables {
   sessionId: string | null;
   /** api_tokens.id when authenticated by Bearer token, else null. */
   apiTokenId: string | null;
+  /** 006/FR-074: scope of the API token, null for cookie sessions. */
+  apiTokenScope: 'full' | 'read' | null;
+  /**
+   * Credentials resolved once by the global rate limiter (middleware/rate-limit.ts#ipLimit) so requireAuth does not
+   * resolve them again. Unset when the request carried no credentials.
+   */
+  preAuth?: { auth: ResolvedAuth | null };
+  /** True once `api.ip` was counted for this request (middleware/rate-limit.ts). */
+  ipCounted?: boolean;
 }
 
 export type AppEnv = { Variables: AppVariables };
