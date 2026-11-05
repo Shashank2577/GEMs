@@ -16,8 +16,8 @@ export function usePipeline(f: { mine: boolean; q: string }) {
 export function useMoveCard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, stage, position }: { id: string; stage?: string; position: number }) =>
-      api.patch<WorkspaceDto>(`/workspaces/${id}`, { ...(stage ? { stage } : {}), position }),
+    mutationFn: ({ id, stage, position }: { id: string; stage?: string; position?: number }) =>
+      api.patch<WorkspaceDto>(`/workspaces/${id}`, { ...(stage ? { stage } : {}), ...(position !== undefined ? { position } : {}) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       qc.invalidateQueries({ queryKey: ['workspace', v.id] });
