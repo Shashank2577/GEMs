@@ -1,0 +1,18 @@
+$ pnpm exec tsx scripts/e2e-summary.ts scripts/fixtures/e2e-results.json
+## E2E results: FAILED
+
+| total | passed | failed | flaky | skipped |
+|---:|---:|---:|---:|---:|
+| 5 | 2 | 1 | 1 | 1 |
+
+total: 5 · passed: 2 · failed: 1 · flaky: 1 · skipped: 1
+
+### Failed
+
+- [desktop] 008-operations-scale/US1-ci-evidence.e2e.ts › summary parses its own results (timedOut)
+
+### Flaky (passed on retry)
+
+- [desktop] 000-smoke/smoke.e2e.ts › smoke › feed loads
+
+_Source: `scripts/fixtures/e2e-results.json`. Traces, videos and the HTML report are in the `e2e-evidence-<run_id>` artifact._
