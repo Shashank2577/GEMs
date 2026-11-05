@@ -75,6 +75,15 @@ describe('POST /api/demo/seed', () => {
     expect(n).toBe(40);
   });
 
+  it('links the demo OEM rows on a retried seed (profile written, links missing)', async () => {
+    const [p] = await ctx.db.select({ oems: companyProfiles.oemAuthorizations }).from(companyProfiles).where(eq(companyProfiles.orgId, org.orgId));
+    await ctx.db.update(companyProfiles).set({ oemAuthorizations: p!.oems.map(({ documentId: _d, ...o }) => o) }).where(eq(companyProfiles.orgId, org.orgId));
+    const r = await request(ctx.app, 'POST', '/demo/seed', { cookie: org.owner.cookie });
+    expect(r.status).toBe(200);
+    const profile = await request(ctx.app, 'GET', '/profile', { cookie: org.viewer.cookie });
+    expect(profile.body.profile.oemAuthorizations.map((o: { documentId?: string | null }) => !!o.documentId)).toEqual([true, true, false]);
+  });
+
   it('stores real PDFs in the vault that download and merge (pdf-lib)', async () => {
     const list = await request(ctx.app, 'GET', '/vault', { cookie: org.viewer.cookie });
     expect(list.status).toBe(200);

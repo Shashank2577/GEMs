@@ -46,7 +46,7 @@ describe('profileCompleteness', () => {
 describe('profileCompleteness — golden weights (spec 005 US2)', () => {
   const GOLDEN_NOW = new Date('2026-11-05T04:30:00Z');
   const ids = { legalName: 'Aarav Technologies Pvt Ltd', gstin: '27AAPFU0939F1ZV', pan: 'AAPFU0939F' };
-  // Mirrors the demo org (packages/db/src/demo.ts) as seen on 2026-11-05.
+  // Score-equivalent to the demo org (packages/db/src/demo.ts) as seen on 2026-11-05 (same weights, gaps and issues).
   const demo = {
     ...ids, udyamNumber: 'UDYAM-MH-26-0123456', mseCategory: 'micro', isStartup: false, miiClass: 'class_1', incorporationDate: '2016-03-14',
     address: 'Office 402, Pride Purple Square, Baner Road, Baner, Pune', state: 'Maharashtra', pincode: '411045',
@@ -126,8 +126,8 @@ describe('profileCompleteness — OEM info issues (FR-020)', () => {
     expect(oemIssues([{ oem: 'HP', validTill: '2026-11-05', documentId: linked }]).issues[0]!.message).toBe('OEM authorisation from HP expires today — ask for a renewed MAF.');
     expect(oemIssues([{ oem: 'HP', validTill: '2026-11-06', documentId: linked }]).issues[0]!.message).toBe('OEM authorisation from HP expires in 1 day — ask for a renewed MAF.');
     // Expired: the warning only, never the "expires in" info.
-    expect(oemIssues([{ oem: 'HP', validTill: '2026-11-04', documentId: linked }]).issues.map((i) => [i.severity, i.message])).toEqual([
-      ['warning', 'OEM authorisation from HP has expired — request a fresh one.'],
+    expect(oemIssues([{ oem: 'Acer', documentId: linked }, { oem: 'HP', validTill: '2026-11-04', documentId: linked }]).issues.map((i) => [i.field, i.severity, i.message])).toEqual([
+      ['oemAuthorizations.1.validTill', 'warning', 'OEM authorisation from HP has expired — request a fresh one.'],
     ]);
   });
   it('OEM authorisation without a linked vault document → info, no score change', () => {
@@ -137,6 +137,11 @@ describe('profileCompleteness — OEM info issues (FR-020)', () => {
       { field: 'oemAuthorizations.0.documentId', section: 'oem', severity: 'info', message: 'Link the Dell authorisation letter from the vault so packets can attach it.' },
       { field: 'oemAuthorizations.2.documentId', section: 'oem', severity: 'info', message: 'Link the HP authorisation letter from the vault so packets can attach it.' },
     ]);
+  });
+  it('skips rows without an OEM name', () => {
+    const r = oemIssues([{ oem: '' }, { oem: '  ', validTill: '2026-11-25' }]);
+    expect(r.percent).toBe(100);
+    expect(r.issues).toEqual([]);
   });
   it('info issues sort after errors and warnings', () => {
     const r = profileCompleteness({ ...full, gstin: null, oemAuthorizations: [{ oem: 'Dell', validTill: '2026-11-25' }] }, [{}, {}, {}], docs, GOLDEN_NOW);

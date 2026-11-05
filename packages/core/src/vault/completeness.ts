@@ -97,9 +97,10 @@ export function profileCompleteness(
 
   // OEM authorisations — warnings/info only, no weight (FR-017, FR-020).
   (p.oemAuthorizations ?? []).forEach((o, i) => {
+    if (!present(o.oem)) return; // a half-typed row; the editor's own validation covers it
     const st = o.validTill ? docStatus(o.validTill, now) : null;
     if (st?.status === 'expired') {
-      issues.push({ field: 'oemAuthorizations', section: 'oem', severity: 'warning', message: `OEM authorisation from ${o.oem} has expired — request a fresh one.` });
+      issues.push({ field: `oemAuthorizations.${i}.validTill`, section: 'oem', severity: 'warning', message: `OEM authorisation from ${o.oem} has expired — request a fresh one.` });
     } else if (st?.status === 'expiring' && st.daysToExpiry != null) {
       issues.push({ field: `oemAuthorizations.${i}.validTill`, section: 'oem', severity: 'info', message: `OEM authorisation from ${o.oem} ${reminderCopy(1, st.daysToExpiry)} — ask for a renewed MAF.` });
     }

@@ -98,7 +98,7 @@ task is sized at ≤ 1 day.
 ### Tests for User Story 2
 
 - [x] T023 [P] [US2] Unit tests: empty profile < 10% errors first, complete profile 100% no issues, missing FYs named, expired docs flagged, startup needs DPIIT in `packages/core/test/vault/completeness.test.ts` FR-016, FR-017
-- [x] T024 [P] [US2] Pin the exact weights with golden tests at `NOW = 2026-11-05T04:30Z`: empty → 0% with 17 issues (first four errors in spec order), legal name + GSTIN + PAN → 27%, + `gst` doc → 32%, demo-like profile with 5 contracts → 96% with the 3 warnings of US2 scenario 10; and `averageTurnoverLastN` de-dup / ≤ 3 years / ignores negatives in `packages/core/test/vault/completeness.test.ts`, `packages/core/test/vault/validators.test.ts` FR-016, FR-017, FR-019 (#131)
+- [x] T024 [P] [US2] Pin the exact weights with golden tests at `NOW = 2026-11-05T04:30Z`: empty → 0% with 17 issues (first four errors in spec order), legal name + GSTIN + PAN → 27%, + `gst` doc → 32%, demo-like profile with 5 contracts → 96% with the 3 warnings of US2 scenario 10 followed by the D-Link India "Link …" info suggestion; and `averageTurnoverLastN` de-dup / ≤ 3 years / ignores negatives in `packages/core/test/vault/completeness.test.ts`, `packages/core/test/vault/validators.test.ts` FR-016, FR-017, FR-019 (#131)
 
 ### Implementation for User Story 2
 

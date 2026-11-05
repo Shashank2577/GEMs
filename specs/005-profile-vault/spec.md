@@ -39,7 +39,8 @@ organisation answers **404** `not_found` (never 403, never data).
 > `signupViaApi()` (role Owner, empty profile and vault). "Demo org" = a fresh org after `POST /api/demo/seed` (company
 > "Aarav Technologies Pvt Ltd", GSTIN `27AAJCA4721K1ZK`, PAN `AAJCA4721K`, CIN `U72900PN2016PTC165432`, Udyam
 > `UDYAM-MH-26-0012345`, 5 past contracts, 15 vault documents including an ISO 9001 certificate expiring in **10** days, a
-> CA turnover certificate expiring in **25** days and a Dell OEM authorisation that expired **5** days ago). Other roles
+> CA turnover certificate expiring in **25** days and a Dell OEM authorisation that expired **5** days ago; the profile's
+> CP PLUS and Dell Technologies OEM rows are linked to their vault letters, the D-Link India row is not). Other roles
 > are added by inviting users from Settings → Team. API errors always have the shape
 > `{ "error": { "code", "message", "details?" } }`; field errors are in `details.fields` keyed by path (e.g.
 > `financials.1.fy`). Dates are calendar dates, "today" is the IST calendar day; all times are shown in IST. Fixture
