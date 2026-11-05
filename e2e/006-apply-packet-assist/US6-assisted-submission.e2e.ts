@@ -579,7 +579,8 @@ test.describe('extension', () => {
     const ws: Record<string, string> = {};
     for (const [i, stage] of ['ready', 'submitted', 'dropped'].entries()) {
       const id = (await createWorkspace(c.fx, extra[i].id)).id;
-      const r = await call(c.fx, 'analyst', 'patch', `/api/workspaces/${id}`, { stage });
+      // Dropping is the Bid Manager's call (#527); the other moves stay Analyst+.
+      const r = await call(c.fx, stage === 'dropped' ? 'bid_manager' : 'analyst', 'patch', `/api/workspaces/${id}`, { stage });
       expect(r.status, JSON.stringify(r.body)).toBe(200);
       ws[stage] = id;
     }

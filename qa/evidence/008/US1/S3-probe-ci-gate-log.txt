@@ -1,0 +1,27 @@
+03:00:35 ##[group]Run echo "job results: $RESULTS"
+03:00:35 echo "job results: $RESULTS"
+03:00:35 if [ "$CHANGES" != "success" ]; then echo "::error::changes job did not succeed ($CHANGES)"; exit 1; fi
+03:00:35 if echo "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then echo "::error::a required CI job failed or was cancelled"; exit 1; fi
+03:00:37 shell: /usr/bin/bash -e {0}
+03:00:37 env:
+03:00:37   NODE_VERSION: 22
+03:00:37   RESULTS: [
+  "success",
+  "success",
+  "success",
+  "failure",
+  "skipped",
+  "success"
+]
+03:00:37   CHANGES: success
+03:00:37 ##[endgroup]
+03:00:37 job results: [
+03:00:37   "success",
+03:00:37   "success",
+03:00:37   "success",
+03:00:37   "failure",
+03:00:37   "skipped",
+03:00:37   "success"
+03:00:37 ]
+03:00:37 ##[error]a required CI job failed or was cancelled
+03:00:37 ##[error]Process completed with exit code 1.

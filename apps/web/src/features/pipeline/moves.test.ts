@@ -15,6 +15,28 @@ describe('moveTargets (FR-029)', () => {
   });
 });
 
+describe('moveTargets by role (#527: Go/No-Go is Bid Manager+)', () => {
+  const byStage = (role: 'analyst' | 'bid_manager' | 'owner', from: 'identified' | 'go' = 'identified') =>
+    Object.fromEntries(moveTargets(from, role).map((t) => [t.stage, t]));
+  it('disables Go and Dropped with the tooltip for an Analyst, everything else stays available', () => {
+    const t = byStage('analyst');
+    expect(t.go).toMatchObject({ disabled: true, reason: 'Only a Bid Manager can make the Go/No-Go call' });
+    expect(t.dropped).toMatchObject({ disabled: true, reason: 'Only a Bid Manager can make the Go/No-Go call' });
+    expect(t.go!.hint).toBe('Bid Manager only');
+    expect(t.analysing!.disabled).toBe(false);
+    expect(t.preparing!.disabled).toBe(false);
+  });
+  it('leaves Go and Dropped open for Bid Manager and Owner', () => {
+    for (const r of ['bid_manager', 'owner'] as const) {
+      expect(byStage(r).go).toMatchObject({ disabled: false });
+      expect(byStage(r).dropped!.reason).toBeUndefined();
+    }
+  });
+  it('lets an Analyst move a bid OUT of Go', () => {
+    expect(byStage('analyst', 'go').identified!.disabled).toBe(false);
+  });
+});
+
 describe('parseRupees / outcomePayload (FR-030)', () => {
   it('parses Indian-grouped and ₹-prefixed amounts to whole rupees', () => {
     expect(parseRupees('29,50,000')).toBe(2_950_000);

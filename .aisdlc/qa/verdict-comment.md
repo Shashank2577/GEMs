@@ -33,11 +33,15 @@ the change is free of defects.
 
 ### Verdict
 
+**Verdict:** approved | rejected
+
 <`qa:approved` — every criterion met, evidence above.>
 <`qa:rejected` — criteria <n, m> not met. Rejection <k> of 3 on this item.>
 
 <!--
 Rules:
+- Keep exactly one value on the `**Verdict:**` line and one of the two label lines below it; the `dod` CI check
+  (scripts/dod-check.ts) treats any remaining "rejected" / `qa:rejected` as a rejection.
 - Comment first, then the label. A comment without a label is recoverable;
   a label without reasons is not.
 - Exactly one of qa:approved / qa:rejected, and remove the other.

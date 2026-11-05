@@ -1,0 +1,89 @@
+
+> tenderpilot@ test:scripts /home/user/GEMs
+> vitest run --config scripts/vitest.config.ts --reporter=verbose
+
+
+ RUN  v2.1.9 /home/user/GEMs
+
+ ✓ scripts/workflows.test.ts > ci.yml → deploy hand-off (008 US1 scenario 8) > deploys only on a push to main after ci-gate succeeded
+ ✓ scripts/workflows.test.ts > ci.yml → deploy hand-off (008 US1 scenario 8) > calls the reusable deploy workflow with inherited secrets and read-only contents
+ ✓ scripts/workflows.test.ts > ci.yml → deploy hand-off (008 US1 scenario 8) > ci-gate does not depend on deploy (a deploy skipped on PRs never affects the gate)
+ ✓ scripts/workflows.test.ts > ci.yml → deploy hand-off (008 US1 scenario 8) > is triggered by pull_request and push to main, without workflow_run
+ ✓ scripts/workflows.test.ts > deploy.yml (reusable placeholder until US2/T036) > is callable from ci and dispatchable, never via workflow_run
+ ✓ scripts/workflows.test.ts > deploy.yml (reusable placeholder until US2/T036) > runs one deploy at a time and never cancels one in flight
+ ✓ scripts/check-migrations.test.ts > check-migrations > accepts additive drizzle output
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags DROP TABLE "tenders";
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags drop table if exists tenders cascade;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "tenders" DROP COLUMN "title";
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE tenders DROP IF EXISTS title;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "tenders" ALTER COLUMN "qty" SET DATA TYPE bigint;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE tenders ALTER qty TYPE bigint USING qty::bigint;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "tenders" RENAME COLUMN "a" TO "b";
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "tenders" RENAME TO "bids";
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "tenders" ALTER COLUMN "org_id" SET NOT NULL;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "t" ALTER COLUMN "a" SET DEFAULT 0, ALTER COLUMN "b" SET NOT NULL;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "t" ADD COLUMN "org_id" uuid NOT NULL;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE t ADD org_id uuid NOT NULL REFERENCES orgs(id);
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags ALTER TABLE "t" ADD COLUMN "a" int DEFAULT 1 NOT NULL, ADD COLUMN "b" int NOT NULL;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags DROP TYPE "public"."plan";
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags DROP SCHEMA legacy CASCADE;
+ ✓ scripts/check-migrations.test.ts > check-migrations > flags TRUNCATE "usage";
+ ✓ scripts/check-migrations.test.ts > check-migrations > allows SET NOT NULL when the same column gets a DEFAULT in the same statement
+ ✓ scripts/check-migrations.test.ts > check-migrations > allows NOT NULL columns with a default or generated value, and constraint additions
+ ✓ scripts/check-migrations.test.ts > check-migrations > ignores keywords inside comments and string literals
+ ✓ scripts/check-migrations.test.ts > check-migrations > honours the allow-destructive marker on line 1 only, with a reason
+ ✓ scripts/check-migrations.test.ts > check-migrations > reports the line of the offending statement
+ ✓ scripts/check-migrations.test.ts > check-migrations > only selects migration SQL from a diff listing
+ ✓ scripts/check-migrations.test.ts > check-migrations > separates deleted migrations (always a violation) from added/modified ones
+ ✓ scripts/check-migrations.test.ts > check-migrations > does not flag the migrations already on main
+ ✓ scripts/dod-check.test.ts > story resolution > indexes story headings and task lines
+ ✓ scripts/dod-check.test.ts > story resolution > reads Work-Item trailers and closing keywords
+ ✓ scripts/dod-check.test.ts > story resolution > prefers the [NNN/USn] PR title
+ ✓ scripts/dod-check.test.ts > story resolution > maps Closes #<story> / Work-Item trailers through the spec index
+ ✓ scripts/dod-check.test.ts > story resolution > falls back to spec:<nnn> label + USn mention
+ ✓ scripts/dod-check.test.ts > story resolution > returns null for hardening PRs
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > passes a complete story PR
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails with "Missing QA verdict: qa/evidence/<nnn>/US<n>/VERDICT.md" when absent
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails with "QA verdict is not approved" without "Verdict: approved"
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > accepts every approval form of the QA template; rejection wins
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails when any criterion row is "not met"
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met for a "not met" criterion cell
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met for a "**not met**" criterion cell
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met for a "not met ❌" criterion cell
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met for a "unverifiable" criterion cell
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met for a "**unverifiable**" criterion cell
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met for a "" criterion cell
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met for a "partially met" criterion cell
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > accepts "met" with markup or a check mark, reading only the Verdict column
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails criteria-met without a criteria table
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > requires at least one .png and one .webm in the folder, linked from the verdict
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > requires Work-Item/Requirement/Agent-Role/Harness on every commit
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > reports each failing rule by name
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > passes hardening PRs with a note
+ ✓ scripts/dod-check.test.ts > dod rules (scenario 6) > fails a type:story PR whose story cannot be determined
+ ✓ scripts/dod-check.test.ts > .aisdlc/qa/verdict-comment.md template (B1) > passes evaluate() when filled in as APPROVED
+ ✓ scripts/dod-check.test.ts > .aisdlc/qa/verdict-comment.md template (B1) > fails evaluate() when filled in as REJECTED
+ ✓ scripts/dod-check.test.ts > .aisdlc/qa/verdict-comment.md template (B1) > fails evaluate() for the unfilled template
+ ✓ scripts/dod-check.test.ts > io parsing > parses labels as JSON or a comma list
+ ✓ scripts/dod-check.test.ts > io parsing > parses git log records
+ ✓ scripts/dod-check.test.ts > review round 2 (N-R1, N-R2) > an approved verdict whose findings mention an earlier qa:rejected stays approved
+ ✓ scripts/dod-check.test.ts > review round 2 (N-R1, N-R2) > a rejection in the Verdict section still wins
+ ✓ scripts/dod-check.test.ts > review round 2 (N-R1, N-R2) > escaped pipes inside a criterion do not shift the Verdict column
+ ✓ scripts/docs-only.test.ts > docs-only path filter (scenario 7) > is true for specs/**, docs/** and *.md changes
+ ✓ scripts/docs-only.test.ts > docs-only path filter (scenario 7) > is false when code changes too
+ ✓ scripts/docs-only.test.ts > docs-only path filter (scenario 7) > treats QA evidence (even markdown) as code
+ ✓ scripts/docs-only.test.ts > docs-only path filter (scenario 7) > is false for an empty change list
+ ✓ scripts/docs-only.test.ts > docs-only path filter (scenario 7) > is false when code is moved into docs/ (ci/dod diff with --no-renames lists the old path)
+ ✓ scripts/e2e-summary.test.ts > e2e-summary > counts every spec × project by its final attempt
+ ✓ scripts/e2e-summary.test.ts > e2e-summary > reports a test that failed then passed on retry as flaky (scenario 5)
+ ✓ scripts/e2e-summary.test.ts > e2e-summary > lists failed test titles with their final status
+ ✓ scripts/e2e-summary.test.ts > e2e-summary > uses Playwright's test.status first
+ ✓ scripts/e2e-summary.test.ts > e2e-summary > falls back to the attempt list when test.status is absent
+ ✓ scripts/e2e-summary.test.ts > e2e-summary > handles an empty report
+ ✓ scripts/e2e-summary.test.ts > e2e-summary > appends to $GITHUB_STEP_SUMMARY and never fails on a missing report 822ms
+
+ Test Files  5 passed (5)
+      Tests  76 passed (76)
+   Start at  03:14:22
+   Duration  1.32s (transform 216ms, setup 0ms, collect 307ms, tests 1.04s, environment 1ms, prepare 266ms)
+

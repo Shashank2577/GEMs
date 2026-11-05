@@ -80,7 +80,8 @@ test('sc2 create (default name) → 201 shape, secret dialog, copy, close, list 
   ]);
   expect(resp.status()).toBe(201);
   const body = await resp.json();
-  expect(Object.keys(body).sort()).toEqual(['createdAt', 'expiresAt', 'hint', 'id', 'lastUsedAt', 'name', 'token'].sort());
+  // `scope` was added by 006/US6 (read/write tokens for the extension).
+  expect(Object.keys(body).sort()).toEqual(['createdAt', 'expiresAt', 'hint', 'id', 'lastUsedAt', 'name', 'scope', 'token'].sort());
   expect(body.name).toBe('Chrome extension');
   expect(body.lastUsedAt).toBeNull();
   expect(body.token).toMatch(/^tp_/);
@@ -295,7 +296,7 @@ test('sc8 expiry choices stored; list shows Expires in N days (amber < 7d), red 
   await page.goto('/settings/api-tokens');
   await page.getByRole('button', { name: 'Create token' }).first().click();
   const dlg = page.getByRole('dialog');
-  await dlg.getByRole('combobox').click();
+  await dlg.getByRole('combobox', { name: 'Expires' }).click(); // 006/US6 added an `Access` (scope) select
   const opts = await page.getByRole('option').allInnerTexts();
   expect(opts.map((o) => o.trim())).toEqual(['30 days', '90 days', '1 year', 'Never']);
   await expect(page.getByRole('option', { name: '90 days' })).toHaveAttribute('aria-selected', 'true');

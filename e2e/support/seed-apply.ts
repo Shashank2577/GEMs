@@ -183,6 +183,14 @@ export async function createWorkspace(fx: ApplyFixture, tenderId = fx.tender.id,
   const res = await api.post(`/api/tenders/${tenderId}/workspace`);
   const body = await okJson<any>(res, 'create workspace');
   await api.dispose();
+  // #527: a Go verdict starts a bid in "go" only when a Bid Manager+ creates it; an Analyst's waits in "analysing" for the
+  // Bid Manager's call. These suites need the bid in Go, so the Bid Manager makes that call here.
+  if (body.stage === 'analysing' && tenderId === fx.tender.id) {
+    const bm = await apiAs(fx, 'bid_manager');
+    const moved = await okJson<any>(await bm.patch(`/api/workspaces/${body.id}`, { data: { stage: 'go' } }), 'bid manager decides Go');
+    await bm.dispose();
+    body.stage = moved.stage;
+  }
   if (tenderId === fx.tender.id) fx.workspaceId = body.id;
   return body as { id: string; created: boolean; stage: string };
 }

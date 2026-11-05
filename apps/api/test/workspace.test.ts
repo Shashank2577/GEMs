@@ -8,6 +8,7 @@ import { hit, reset } from '../src/lib/rate-limit';
 import { serviceUnavailable } from '../src/lib/errors';
 import { GEM_BUSY_MESSAGE } from '../src/lib/gem-lease';
 import { GEM_LEASE_MAX_WAIT_MS } from '@tp/core/contracts/caps';
+import { DECISION_FORBIDDEN_MESSAGE } from '@tp/core/contracts/apply';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
@@ -31,12 +32,12 @@ describe('POST /tenders/:id/workspace', () => {
     expect(r.status).toBe(403);
   });
 
-  it('creates the workspace in "go" and stores an empty (all-automatic) mapping (US1 #1)', async () => {
-    const r = await request(ctx.app, 'POST', `/tenders/${s.tender.id}/workspace`, { cookie: s.org.analyst.cookie });
+  it('a Bid Manager creates the workspace in "go" and stores an empty (all-automatic) mapping (US1 #1)', async () => {
+    const r = await request(ctx.app, 'POST', `/tenders/${s.tender.id}/workspace`, { cookie: s.org.bidManager.cookie });
     expect(r.status).toBe(201);
     expect(r.body.created).toBe(true);
     expect(r.body.stage).toBe('go');
-    expect(r.body.owner.id).toBe(s.org.analyst.me.user.id);
+    expect(r.body.owner.id).toBe(s.org.bidManager.me.user.id);
     expect(r.body.dueAt).toBe('2026-11-20T09:30:00.000Z');
     // Nothing is stored: every item stays "automatic" (absent key, FR-014) and is resolved at read time.
     expect(r.body.mapping).toEqual({});
@@ -198,7 +199,7 @@ describe('comments & list', () => {
   it('lists Kanban cards with tender summary, score, owner and readiness', async () => {
     const t2 = await seedTender(ctx, 2);
     await seedAnalysis(ctx, s.org.orgId, t2.id);
-    await request(ctx.app, 'POST', `/tenders/${t2.id}/workspace`, { cookie: s.org.analyst.cookie });
+    await request(ctx.app, 'POST', `/tenders/${t2.id}/workspace`, { cookie: s.org.bidManager.cookie }); // Bid Manager: Go verdict starts in "go" (#527)
     const r = await request(ctx.app, 'GET', '/workspaces', { cookie: s.org.viewer.cookie });
     expect(r.status).toBe(200);
     expect(r.body.total).toBe(2);
@@ -213,7 +214,7 @@ describe('comments & list', () => {
     expect(f.body.items.map((i: any) => i.tender.bidNumber)).toEqual(['GEM/2026/B/700002']);
     const q = await request(ctx.app, 'GET', '/workspaces?q=batch%202', { cookie: s.org.viewer.cookie });
     expect(q.body.total).toBe(1);
-    const mine = await request(ctx.app, 'GET', '/workspaces?mine=1', { cookie: s.org.analyst.cookie });
+    const mine = await request(ctx.app, 'GET', '/workspaces?mine=1', { cookie: s.org.bidManager.cookie });
     expect(mine.body.total).toBe(2);
     expect((await request(ctx.app, 'GET', '/workspaces?stage=bogus', { cookie: s.org.viewer.cookie })).status).toBe(400);
   });
@@ -279,7 +280,8 @@ describe('outcome price validation, dropped guard and override-aware blockers (0
 
   it('POST submitted on a dropped bid → 409 with the move-back message', async () => {
     const wid = await fresh();
-    expect((await request(ctx.app, 'PATCH', `/workspaces/${wid}`, { cookie: s.org.analyst.cookie, json: { stage: 'dropped' } })).status).toBe(200);
+    // Dropping (No-Go) is Bid Manager+ (#527); the submitted guard below is still exercised as the Analyst.
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${wid}`, { cookie: s.org.bidManager.cookie, json: { stage: 'dropped' } })).status).toBe(200);
     const r = await request(ctx.app, 'POST', `/workspaces/${wid}/submitted`, { cookie: s.org.analyst.cookie });
     expect(r.status).toBe(409);
     expect(r.body.error.message).toBe('This bid was dropped. Move it back to the pipeline first.');
@@ -310,7 +312,7 @@ describe('PATCH /workspaces/:id — won/lost only after submission (T020; 006/FR
   beforeAll(async () => {
     const t = await seedTender(ctx, 4);
     await seedAnalysis(ctx, s.org.orgId, t.id);
-    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.bidManager.cookie });
     expect(r.body.stage).toBe('go');
     goId = r.body.id;
   });
@@ -344,6 +346,87 @@ describe('PATCH /workspaces/:id — won/lost only after submission (T020; 006/FR
     const lost = await request(ctx.app, 'PATCH', `/workspaces/${goId}`, { cookie: s.org.analyst.cookie, json: { outcome: { result: 'lost' } } });
     expect(lost.status).toBe(200);
     expect(lost.body).toMatchObject({ stage: 'lost', outcome: { result: 'lost' } });
+  });
+});
+
+describe('PATCH /workspaces/:id — Go / No-Go is Bid Manager+ (#527 item 5; 004 roles, 007/FR-072)', () => {
+  let n = 0;
+  /** A workspace in "identified" (its tender has no analysis), started by the Analyst. */
+  const fresh = async () => {
+    const t = await seedTender(ctx, 80 + n++);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    expect(r.body.stage).toBe('identified');
+    return r.body.id as string;
+  };
+  const stageOf = async (id: string) => (await request(ctx.app, 'GET', `/workspaces/${id}`, { cookie: s.org.analyst.cookie })).body.workspace.stage as string;
+  const stageLogs = async (id: string) => ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, id), eq(activityLog.action, 'workspace.stage_changed')));
+
+  it('an Analyst (cookie or API token) cannot start a bid straight into "go": it waits in "analysing" for the Bid Manager (#527)', async () => {
+    const t = await seedTender(ctx, 90);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    expect(r.status).toBe(201);
+    expect(r.body.stage).toBe('analysing');
+    const [created] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.action, 'workspace.created'), eq(activityLog.entityId, r.body.id)));
+    expect(created.meta).toMatchObject({ stage: 'analysing' });
+    const t2 = await seedTender(ctx, 91);
+    await seedAnalysis(ctx, s.org.orgId, t2.id);
+    const token = (await request(ctx.app, 'POST', '/me/api-tokens', { cookie: s.org.analyst.cookie, json: { name: 'create-path' } })).body.token as string;
+    const viaToken = await request(ctx.app, 'POST', `/tenders/${t2.id}/workspace`, { bearer: token });
+    expect(viaToken.status).toBe(201);
+    expect(viaToken.body.stage).toBe('analysing');
+    // The Bid Manager then makes the call.
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${r.body.id}`, { cookie: s.org.bidManager.cookie, json: { stage: 'go' } })).status).toBe(200);
+  });
+
+  it('an Analyst cannot move a bid to Go or Dropped: 403 forbidden, stage and activity unchanged', async () => {
+    const id = await fresh();
+    for (const stage of ['go', 'dropped']) {
+      const r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage, position: 0 } });
+      expect(r.status).toBe(403);
+      expect(r.body.error).toEqual({ code: 'forbidden', message: DECISION_FORBIDDEN_MESSAGE });
+    }
+    expect(await stageOf(id)).toBe('identified');
+    expect(await stageLogs(id)).toHaveLength(0);
+  });
+
+  it('the same refusal applies to an Analyst\'s API token (extension / integrations)', async () => {
+    const id = await fresh();
+    const token = (await request(ctx.app, 'POST', '/me/api-tokens', { cookie: s.org.analyst.cookie, json: { name: 'go-no-go' } })).body.token as string;
+    const r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { bearer: token, json: { stage: 'go' } });
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('forbidden');
+    const bmToken = (await request(ctx.app, 'POST', '/me/api-tokens', { cookie: s.org.bidManager.cookie, json: { name: 'go-no-go' } })).body.token as string;
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { bearer: bmToken, json: { stage: 'go' } })).status).toBe(200);
+  });
+
+  it('an Analyst can still make every other stage move, edit other fields, and move a bid out of Go', async () => {
+    const id = await fresh();
+    let r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage: 'analysing' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('analysing');
+    r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { dueAt: null, position: 0 } });
+    expect(r.status).toBe(200);
+    // Bid Manager says Go; the Analyst then moves it on to Preparing (006 US1 #9).
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.bidManager.cookie, json: { stage: 'go' } })).status).toBe(200);
+    r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage: 'preparing' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('preparing');
+    // An unchanged stage is a no-op, not a decision: an Analyst re-sending the current stage is fine.
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.bidManager.cookie, json: { stage: 'go' } })).status).toBe(200);
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage: 'go' } })).status).toBe(200);
+  });
+
+  it('a Bid Manager and an Owner can decide Go and Drop (200, logged as a stage change)', async () => {
+    const a = await fresh();
+    let r = await request(ctx.app, 'PATCH', `/workspaces/${a}`, { cookie: s.org.bidManager.cookie, json: { stage: 'go' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('go');
+    expect((await stageLogs(a))[0]).toMatchObject({ userId: s.org.bidManager.me.user.id, meta: expect.objectContaining({ from: 'identified', to: 'go' }) });
+    const b = await fresh();
+    r = await request(ctx.app, 'PATCH', `/workspaces/${b}`, { cookie: s.org.owner.cookie, json: { stage: 'dropped' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('dropped');
   });
 });
 
