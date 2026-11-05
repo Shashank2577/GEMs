@@ -14,7 +14,24 @@ import { pruneRateLimits } from './rate-limiter';
 
 export interface ScheduledReport { step: string; ok: boolean; ms: number; error?: string }
 
-export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' | 'manual' } = {}): Promise<ScheduledReport[]> {
+/** A scheduled invocation lives at most this long (Workers cron limit); RUN_LOCK_MS-style stale checks assume it. */
+export const SCHEDULED_INVOCATION_MS = 15 * 60_000;
+/** Kept free at the end of the invocation for the steps after results (alerts, reminders, cleanups, housekeeping). */
+export const SCHEDULED_TAIL_RESERVE_MS = 2 * 60_000;
+
+/**
+ * Budget for the results step: what is left of the invocation after ingestion, minus the tail reserve (N5), so the
+ * results refresh can never run the invocation past its 15 minutes. ≤ 0 → the refresh checks nothing this tick.
+ */
+export function resultsBudgetMs(startedAt: number, now = Date.now()): number {
+  return Math.max(0, startedAt + SCHEDULED_INVOCATION_MS - SCHEDULED_TAIL_RESERVE_MS - now);
+}
+
+export async function runScheduledJobs(
+  deps: AppDeps,
+  opts: { trigger?: 'cron' | 'manual'; /** Wall-clock start of the invocation (ms epoch); defaults to now. */ startedAt?: number } = {},
+): Promise<ScheduledReport[]> {
+  const startedAt = opts.startedAt ?? Date.now();
   const steps: [string, () => Promise<unknown>][] = [
     ['ingestion', async () => {
       try {
@@ -26,7 +43,7 @@ export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' |
       }
     }],
     // Daily results refresh (job_runs claim + one running `results` run cluster-wide); a busy run is not a failure.
-    ['results', () => runDailyResults(deps)],
+    ['results', () => runDailyResults(deps, { budgetMs: resultsBudgetMs(startedAt) })],
     ['alerts', () => dispatchNotifications(deps)],
     ['reminders', () => runExpiryReminders(deps)],
     ['auth-cleanup', () => pruneAuthState(deps.db, deps.clock.now())],

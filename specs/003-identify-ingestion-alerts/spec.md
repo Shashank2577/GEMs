@@ -379,7 +379,7 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
    closing."
 4. **Given** a tracked tender becomes awarded, **Then** org members with in-app alerts get "Result published: <title> — L1
    <seller> at ₹<price>" (dedupe per tender per org).
-5. **Given** the org's awarded tracked tenders, **When** a Bid Manager opens **Insights → Competitors**, **Then** a table lists
+5. **Given** the org's awarded tracked tenders, **When** any signed-in member of the org (any role, read-only) opens **Insights → Competitors**, **Then** a table lists
    sellers ranked by wins with win count, total awarded value and categories, filterable by category and buyer state;
    "winner is not the lowest price" cases are flagged.
 6. **Given** the results page returns HTML the parser cannot read, **Then** the refresh records the error on the run and

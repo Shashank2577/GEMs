@@ -310,7 +310,7 @@ export const tenders = pgTable('tenders', {
 export const tenderEvents = pgTable('tender_events', {
   id: id(),
   tenderId: uuid('tender_id').notNull().references(() => tenders.id, { onDelete: 'cascade' }),
-  kind: text('kind').$type<'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled' | 'awarded'>().notNull(),
+  kind: text('kind').$type<'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled' | 'awarded' | 'technical_evaluated' | 'financial_evaluated'>().notNull(),
   changes: jsonb('changes').$type<Record<string, { from: unknown; to: unknown }>>().notNull().default({}),
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_events_tender_idx').on(t.tenderId) }));
@@ -346,9 +346,12 @@ export const tenderDocuments = pgTable('tender_documents', {
  * Global like `tenders` (no org_id): one row per tender serves every org; org scoping happens where it is read
  * (routes/insights.ts only aggregates tenders the caller's org tracks). Written only by services/results.ts.
  * - `fetched_at`: last time GeM was read successfully (status, and bidders when published); null until then.
- * - `checked_at`: last attempt, successful or not — the daily refresh skips rows checked in the last 24 h.
- * - `error`: why the last attempt failed (network, unreadable result page); a failure never touches
- *   `evaluation_status`, `bidders`, `categories`, `source_url` or `fetched_at` (US6 scenario 6).
+ * - `checked_at`: last completed check — GeM answered, readable or not; the daily refresh skips rows checked in the
+ *   last 24 h. Null until one completes. A GeM outage (transport, 5xx, lease busy) or a bid missing from the
+ *   submitted-bids search does not advance it, so the tender is asked again on the next run.
+ * - `error`: why the last attempt failed (network, unreadable result page, bid not in the search); a failure never
+ *   touches `evaluation_status`, `bidders`, `categories`, `source_url` or `fetched_at` (US6 scenario 6).
+ * - `evaluation_status` only moves forward (not → technical → financial → awarded), never back.
  */
 export const tenderResults = pgTable('tender_results', {
   tenderId: uuid('tender_id').primaryKey().references(() => tenders.id, { onDelete: 'cascade' }),
@@ -359,7 +362,7 @@ export const tenderResults = pgTable('tender_results', {
   categories: jsonb('categories').$type<string[]>().notNull().default([]),
   sourceUrl: text('source_url'),
   fetchedAt: timestamp('fetched_at', { withTimezone: true }),
-  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }),
   error: text('error'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

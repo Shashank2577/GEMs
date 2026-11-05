@@ -81,16 +81,25 @@ export const MAX_RESULT_BYTES = 1024 * 1024;
  * oversized body is cut off (the stream is cancelled) and the prefix returned.
  */
 export async function readTextCapped(res: Response, maxBytes: number): Promise<string> {
+  return (await readTextCappedInfo(res, maxBytes)).text;
+}
+
+/**
+ * readTextCapped that also says whether the cap was hit (`truncated`), so a caller that must not treat a cut-off
+ * page as complete (the results refresh, 003/US6) can refuse it. Reaching exactly `maxBytes` counts as truncated.
+ */
+export async function readTextCappedInfo(res: Response, maxBytes: number): Promise<{ text: string; truncated: boolean }> {
   const declared = Number(res.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) {
     await res.body?.cancel().catch(() => {});
     // Not retryable: the same page will be just as large next time.
-    throw new GemError(`GeM response too large (${declared} bytes)`, res.status, false);
+    throw new GemError(`GeM response too large (${declared} bytes)`, res.status, false, 'too_large');
   }
-  if (!res.body) return '';
+  if (!res.body) return { text: '', truncated: false };
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let truncated = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -98,6 +107,7 @@ export async function readTextCapped(res: Response, maxBytes: number): Promise<s
     if (value.length >= room) {
       chunks.push(value.subarray(0, room));
       total += room;
+      truncated = true;
       await reader.cancel().catch(() => {});
       break;
     }
@@ -107,7 +117,7 @@ export async function readTextCapped(res: Response, maxBytes: number): Promise<s
   const buf = new Uint8Array(total);
   let off = 0;
   for (const c of chunks) { buf.set(c, off); off += c.length; }
-  return new TextDecoder().decode(buf);
+  return { text: new TextDecoder().decode(buf), truncated };
 }
 /** Default cap for a downloaded bid document — same as the upload limit (FR-008). */
 export const MAX_GEM_DOCUMENT_BYTES = 25 * 1024 * 1024;
@@ -187,10 +197,11 @@ export class GemClient {
 
   /**
    * Public bid-result view for a BidPlus `b_id` (`/bidding/bid/getBidResultView/<id>`), adapted from gem-search
-   * `get_bid_result` (MIT). Returns the raw HTML for `parseBidResultHtml`; 404 → `null`.
+   * `get_bid_result` (MIT). Returns the raw HTML for `parseBidResultHtml`; 404 → `null`. `truncated` is true when
+   * the body hit MAX_RESULT_BYTES and was cut off — such a page must not be stored as complete.
    */
-  fetchBidResult(gemBidId: string): Promise<{ html: string; url: string } | null> {
-    return this.fetchBidResultHtml(gemBidId);
+  fetchBidResult(gemBidId: string): Promise<{ html: string; url: string; truncated: boolean } | null> {
+    return this.getBidResult(gemBidId);
   }
 
   private async postListing(payload: object): Promise<BidPlusPage> {
@@ -258,6 +269,11 @@ export class GemClient {
    * back-off as every other request. 404 → `null` (no result published).
    */
   async fetchBidResultHtml(gemBidId: string): Promise<{ html: string; url: string } | null> {
+    const r = await this.getBidResult(gemBidId);
+    return r && { html: r.html, url: r.url };
+  }
+
+  private async getBidResult(gemBidId: string): Promise<{ html: string; url: string; truncated: boolean } | null> {
     const path = bidResultPath(gemBidId);
     const res = await this.request(path, {
       method: 'GET',
@@ -265,7 +281,8 @@ export class GemClient {
     });
     if (res.status === 404) return null;
     if (!res.ok) throw new GemError(`GeM bid result failed: HTTP ${res.status}`, res.status, res.status >= 500);
-    return { html: await readTextCapped(res, MAX_RESULT_BYTES), url: `${this.baseUrl}${path}` };
+    const { text, truncated } = await readTextCappedInfo(res, MAX_RESULT_BYTES);
+    return { html: text, url: `${this.baseUrl}${path}`, truncated };
   }
 
   // ───────────── internals ─────────────

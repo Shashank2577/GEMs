@@ -163,7 +163,7 @@ export interface TenderListResponse {
   facets: { states: Facet[]; ministries: Facet[]; categories: Facet[] };
 }
 
-export interface TenderEventDto { id: string; kind: 'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled' | 'awarded'; changes: Record<string, { from: unknown; to: unknown }>; createdAt: string }
+export interface TenderEventDto { id: string; kind: 'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled' | 'awarded' | 'technical_evaluated' | 'financial_evaluated'; changes: Record<string, { from: unknown; to: unknown }>; createdAt: string }
 export interface TenderDocumentDto { id: string; kind: string; fileName: string; sizeBytes: number; pageCount: number | null; sourceUrl: string | null; orgOwned: boolean; createdAt: string }
 
 export interface TenderDetail extends TenderListItem {

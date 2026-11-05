@@ -40,7 +40,7 @@ export default function CompetitorsPage() {
                 <div className="grid gap-1.5">
                   <Label htmlFor="cmp-category">Category</Label>
                   <Select
-                    id="cmp-category" aria-label="Category" value={selectValue(filters.category, data.facets.categories)}
+                    id="cmp-category" value={selectValue(filters.category, data.facets.categories)}
                     onValueChange={(v) => set({ ...filters, category: v === ALL ? undefined : v, page: 1 })}
                     options={[{ value: ALL, label: 'All categories' }, ...data.facets.categories.map((c) => ({ value: c, label: c }))]}
                   />
@@ -48,7 +48,7 @@ export default function CompetitorsPage() {
                 <div className="grid gap-1.5">
                   <Label htmlFor="cmp-state">State</Label>
                   <Select
-                    id="cmp-state" aria-label="State" value={selectValue(filters.state, data.facets.states)}
+                    id="cmp-state" value={selectValue(filters.state, data.facets.states)}
                     onValueChange={(v) => set({ ...filters, state: v === ALL ? undefined : v, page: 1 })}
                     options={[{ value: ALL, label: 'All states' }, ...data.facets.states.map((s) => ({ value: s, label: s }))]}
                   />

@@ -11,10 +11,10 @@ import {
 import { GemError } from '@tp/core/gem/client';
 import type { BidPlusPage } from '@tp/core/gem/parse';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
-import { runScheduledJobs } from '../src/lib/scheduled';
+import { SCHEDULED_INVOCATION_MS, SCHEDULED_TAIL_RESERVE_MS, resultsBudgetMs, runScheduledJobs } from '../src/lib/scheduled';
 import { runIngestion } from '../src/services/ingest';
 import {
-  RESULTS_BATCH, ResultsBusyError, refreshResults, resultAlertTitle, resultCandidates, runDailyResults,
+  BID_NOT_FOUND_ERROR, RESULTS_BATCH, ResultsBusyError, refreshResults, resultAlertTitle, resultCandidates, runDailyResults,
 } from '../src/services/results';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
 
@@ -79,14 +79,18 @@ beforeAll(async () => {
 afterAll(async () => { await ctx?.close(); });
 
 describe('refreshResults (T071)', () => {
-  it('scenario 3: evaluated-but-unpublished and never-evaluated bids store their status with no bidders and no alert', async () => {
+  it('scenario 3: an evaluated-but-unpublished bid stores its status with no bidders and no alert; bids missing from the search record why', async () => {
     expect((await award(A, 'tech_evaluated')).status).toBe(200);
     const run = await refreshResults(ctx.deps, { trigger: 'manual' });
-    expect(run).toMatchObject({ kind: 'results', trigger: 'manual', status: 'success', tendersSeen: 3, tendersUpdated: 3, tendersCreated: 0, error: null });
+    // B and C are not in the submitted-bids search: not a run error, and nothing is read as "not evaluated" (B1).
+    expect(run).toMatchObject({ kind: 'results', trigger: 'manual', status: 'success', tendersSeen: 3, tendersUpdated: 1, tendersCreated: 0, error: null });
     expect(await resultOf(A)).toMatchObject({ evaluationStatus: 'technical_evaluated', bidders: [], error: null, sourceUrl: null });
     expect((await resultOf(A))!.fetchedAt?.toISOString()).toBe(REF.toISOString());
-    expect(await resultOf(B)).toMatchObject({ evaluationStatus: 'not_evaluated', bidders: [] });
-    expect(await resultOf(C)).toMatchObject({ evaluationStatus: 'not_evaluated' });
+    expect(await resultOf(B)).toMatchObject({ evaluationStatus: 'not_evaluated', bidders: [], error: BID_NOT_FOUND_ERROR, checkedAt: null, fetchedAt: null });
+    expect(await resultOf(C)).toMatchObject({ evaluationStatus: 'not_evaluated', error: BID_NOT_FOUND_ERROR, checkedAt: null });
+    // N3: the stage change is on the tender's history.
+    const ev = await ctx.db.select().from(tenderEvents).where(and(eq(tenderEvents.tenderId, A.id), eq(tenderEvents.kind, 'technical_evaluated')));
+    expect(ev.map((e) => e.changes)).toEqual([{ evaluation: { from: 'not_evaluated', to: 'technical_evaluated' } }]);
     expect(await resultOf(D)).toBeUndefined(); // still open: not a candidate
     expect((await tenderOf(A)).status).toBe('closed');
     expect(await count(resultAlerts())).toBe(0);
@@ -109,11 +113,12 @@ describe('refreshResults (T071)', () => {
     expect(r.body.lastRun.tendersCreated).toBeGreaterThan(30);
   });
 
-  it('a tender checked in the last 24 h is not asked about again (no GeM request)', async () => {
-    const before = gemRequests;
-    const run = await refreshResults(ctx.deps);
-    expect(run).toMatchObject({ status: 'success', tendersSeen: 0, pagesFetched: 0 });
-    expect(gemRequests).toBe(before);
+  it('a tender checked in the last 24 h is not asked about again; a bid missing from the search did not spend its check', async () => {
+    const asked: string[] = [];
+    const client = { fetchSubmittedPage: async (o: { search?: string }) => { asked.push(o.search!); return page(); }, fetchBidResult: async () => null };
+    const run = await refreshResults(ctx.deps, { client });
+    expect(run).toMatchObject({ status: 'success', tendersSeen: 2, tendersUpdated: 0 });
+    expect(asked.sort()).toEqual([B.bidNumber, C.bidNumber].sort());
   });
 
   it('scenarios 1, 2, 4: an award stores the bidder table, marks the tender awarded once and alerts only tracking orgs', async () => {
@@ -121,7 +126,7 @@ describe('refreshResults (T071)', () => {
     await award(A);
     await award(C);
     const run = await refreshResults(ctx.deps);
-    expect(run).toMatchObject({ status: 'success', tendersSeen: 3, tendersUpdated: 3, tendersCreated: 2 });
+    expect(run).toMatchObject({ status: 'success', tendersSeen: 3, tendersUpdated: 2, tendersCreated: 2 }); // B: not in the search
 
     const a = (await resultOf(A))!;
     expect(a).toMatchObject({ evaluationStatus: 'awarded', error: null, categories: ['Desktop Computers (Q2)', 'Monitor (Q2)'] });
@@ -177,7 +182,7 @@ describe('refreshResults (T071)', () => {
     ctx.clock.advance(25 * 3_600_000);
     const client = {
       fetchSubmittedPage: async () => page([{ b_bid_number: [B.bidNumber], b_id: [B.gemBidId], b_buyer_status: [3] }]),
-      fetchBidResult: async (id: string) => ({ html: '<html><body><table><tr><td>Bidder</td><td>???</td></tr></table></body></html>', url: `${GEM}/bidding/bid/getBidResultView/${id}` }),
+      fetchBidResult: async (id: string) => ({ html: '<html><body><table><tr><td>Bidder</td><td>???</td></tr></table></body></html>', url: `${GEM}/bidding/bid/getBidResultView/${id}`, truncated: false }),
     };
     const run = await refreshResults(ctx.deps, { client });
     expect(run.status).toBe('failed');
@@ -186,11 +191,11 @@ describe('refreshResults (T071)', () => {
     const after = (await resultOf(B))!;
     expect(after).toMatchObject({ evaluationStatus: 'financial_evaluated', bidders: stored, sourceUrl: before.sourceUrl, fetchedAt: before.fetchedAt });
     expect(after.error).toMatch(/could not be read/);
-    expect(after.checkedAt.getTime()).toBe(ctx.clock.now().getTime());
+    expect(after.checkedAt!.getTime()).toBe(ctx.clock.now().getTime()); // GeM answered: the daily check is spent
     expect((await tenderOf(B)).status).toBe('closed');
     expect(await count(resultAlerts(team.orgId))).toBe(3);
     const r = await request(ctx.app, 'GET', `/tenders/${B.id}/result`, { cookie: team.owner.cookie });
-    expect(r.body).toMatchObject({ evaluationStatus: 'financial_evaluated', lastCheckFailed: true, fetchedAt: before.fetchedAt!.toISOString() });
+    expect(r.body).toMatchObject({ evaluationStatus: 'financial_evaluated', lastCheckFailed: true, fetchedAt: before.fetchedAt?.toISOString() ?? null });
   });
 
   it('NFR-001: a GeM failure is recorded on the tender and stops the run (no further requests)', async () => {
@@ -207,7 +212,8 @@ describe('refreshResults (T071)', () => {
     expect(run).toMatchObject({ status: 'failed', tendersSeen: 1, tendersUpdated: 0 });
     expect(run.error).toMatch(/check failed: GeM listing failed: HTTP 503/);
     // Never-checked D goes first and fails; B (checked before) is not attempted and stays exactly as it was.
-    expect(await resultOf(D)).toMatchObject({ evaluationStatus: 'not_evaluated', bidders: [], fetchedAt: null, error: expect.stringContaining('HTTP 503') });
+    // N4: an outage does not spend the tender's daily check.
+    expect(await resultOf(D)).toMatchObject({ evaluationStatus: 'not_evaluated', bidders: [], fetchedAt: null, checkedAt: null, error: expect.stringContaining('HTTP 503') });
     expect(await resultOf(B)).toEqual(before);
   });
 
@@ -381,5 +387,146 @@ describe('candidate selection (T071, FR-061)', () => {
     expect(t.length).toBeLessThanOrEqual(200);
     expect(t.startsWith('Result published: Supply of')).toBe(true);
     expect(t.endsWith(`— L1 ${L1} at ₹28,40,500`)).toBe(true);
+  });
+});
+
+describe('results refresh — failure handling, stage history and budget (round-1 review)', () => {
+  let seq = 0;
+  const resultHtml = (rows: [string, number, string][]) => `<html><body><table>${rows.map(([seller, price, level], i) =>
+    `<tr><td class="productDtl">${i + 1}</td><td><span>${seller}</span></td><td><span class="bid_price">${price}</span></td><td><strong>${level}</strong></td></tr>`).join('')}</table></body></html>`;
+  const HTML = resultHtml([['Zenith Traders', 500_000, 'L1'], ['Orbit Supplies', 650_000, 'L2']]);
+  /** A closed tender the team tracks (analysis), unknown to the mock. */
+  const mk = async () => {
+    seq++;
+    const [t] = await ctx.db.insert(tenders).values({
+      bidNumber: `GEM/2026/B/77${String(seq).padStart(5, '0')}`, title: `Round one ${seq}`, sourceUrl: 'https://bidplus.gem.gov.in/x',
+      contentHash: `r1-${seq}`, status: 'closed', endAt: new Date(ctx.clock.now().getTime() - DAY), gemBidId: `77${seq}`,
+    }).returning();
+    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t!.id });
+    return t!;
+  };
+  const doc = (t: T, status: number) => ({ b_bid_number: [t.bidNumber], b_id: [t.gemBidId], b_buyer_status: [status] });
+  const fake = (docs: Record<string, unknown>[], html: string | null = null, truncated = false) => ({
+    fetchSubmittedPage: async () => page(docs),
+    fetchBidResult: async (id: string) => (html == null ? null : { html, url: `${GEM}/bidding/bid/getBidResultView/${id}`, truncated }),
+  });
+  const eventsOf = async (t: T) => (await ctx.db.select().from(tenderEvents).where(eq(tenderEvents.tenderId, t.id)).orderBy(tenderEvents.createdAt))
+    .filter((e) => e.kind !== 'created').map((e) => [e.kind, e.changes]);
+  const old = () => new Date(ctx.clock.now().getTime() - 2 * DAY);
+
+  beforeAll(async () => {
+    // Only this block's tenders are candidates: drop the synthetic batch and park every earlier row.
+    await ctx.db.delete(tenders).where(sql`${tenders.title} like 'Synthetic%'`);
+    ctx.clock.advance(25 * 3_600_000);
+    await ctx.db.update(tenders).set({ endAt: new Date(ctx.clock.now().getTime() - 60 * DAY) });
+    expect(await resultCandidates(ctx.deps, ctx.clock.now())).toEqual([]);
+  });
+
+  it('B1: a bid missing from the search never overwrites a stored status and does not spend the daily check', async () => {
+    const t = await mk();
+    const fetchedAt = old();
+    await ctx.db.insert(tenderResults).values({ tenderId: t.id, evaluationStatus: 'financial_evaluated', fetchedAt, checkedAt: old(), updatedAt: old() });
+    const run = await refreshResults(ctx.deps, { client: fake([]) });
+    expect(run).toMatchObject({ status: 'success', tendersSeen: 1, tendersUpdated: 0 });
+    const r = (await resultOf(t))!;
+    expect(r).toMatchObject({ evaluationStatus: 'financial_evaluated', error: BID_NOT_FOUND_ERROR, fetchedAt, checkedAt: old() });
+    expect((await resultCandidates(ctx.deps, ctx.clock.now())).map((c) => c.id)).toEqual([t.id]); // asked again next run
+
+    // GeM later reports an earlier stage: the stored one stands (never backwards), no event, the check is spent.
+    const back = await refreshResults(ctx.deps, { client: fake([doc(t, 1)]) });
+    expect(back).toMatchObject({ status: 'success', tendersUpdated: 1 });
+    expect(await resultOf(t)).toMatchObject({ evaluationStatus: 'financial_evaluated', error: null, checkedAt: ctx.clock.now() });
+    expect(await eventsOf(t)).toEqual([]);
+    await ctx.db.delete(analyses).where(eq(analyses.tenderId, t.id));
+  });
+
+  it('never moves down from awarded (awarded, table not yet published, GeM shows stage 1)', async () => {
+    const t = await mk();
+    await ctx.db.insert(tenderResults).values({ tenderId: t.id, evaluationStatus: 'awarded', checkedAt: old(), updatedAt: old() });
+    await refreshResults(ctx.deps, { client: fake([doc(t, 1)]) });
+    expect(await resultOf(t)).toMatchObject({ evaluationStatus: 'awarded', bidders: [], error: null });
+    expect((await eventsOf(t)).map(([k]) => k)).toEqual(['awarded']); // tenders.status caught up with the stored award
+    await ctx.db.delete(analyses).where(eq(analyses.tenderId, t.id));
+  });
+
+  it('N3: each evaluation stage change is a tender event, once; the award adds its own', async () => {
+    const t = await mk();
+    await refreshResults(ctx.deps, { client: fake([doc(t, 1)]) });
+    ctx.clock.advance(25 * 3_600_000);
+    await refreshResults(ctx.deps, { client: fake([doc(t, 2)]) });
+    ctx.clock.advance(25 * 3_600_000);
+    await refreshResults(ctx.deps, { client: fake([doc(t, 2)]) });
+    expect(await eventsOf(t)).toEqual([
+      ['technical_evaluated', { evaluation: { from: 'not_evaluated', to: 'technical_evaluated' } }],
+      ['financial_evaluated', { evaluation: { from: 'technical_evaluated', to: 'financial_evaluated' } }],
+    ]);
+    ctx.clock.advance(25 * 3_600_000);
+    await refreshResults(ctx.deps, { client: fake([doc(t, 3)], HTML) });
+    expect((await eventsOf(t)).map(([k]) => k)).toEqual(['technical_evaluated', 'financial_evaluated', 'awarded']);
+    const detail = await request(ctx.app, 'GET', `/tenders/${t.id}`, { cookie: team.owner.cookie });
+    expect(detail.body.events.map((e: { kind: string }) => e.kind)).toEqual(expect.arrayContaining(['technical_evaluated', 'financial_evaluated', 'awarded']));
+  });
+
+  it('N1: if the alerts cannot be written, nothing is stored (row not final, check not spent); the next run stores both', async () => {
+    const t = await mk();
+    const fn = `r1_fail_alert_${seq}`;
+    await ctx.db.execute(sql.raw(`create function ${fn}() returns trigger language plpgsql as $$ begin
+      if new.dedupe_key like 'result:${t.id}:%' then raise exception 'injected alert failure'; end if; return new; end $$`));
+    await ctx.db.execute(sql.raw(`create trigger ${fn} before insert on notifications for each row execute function ${fn}()`));
+    try {
+      const run = await refreshResults(ctx.deps, { client: fake([doc(t, 3)], HTML) });
+      expect(run.status).toBe('failed');
+      expect(await resultOf(t)).toMatchObject({ evaluationStatus: 'not_evaluated', bidders: [], fetchedAt: null, checkedAt: null, error: expect.stringMatching(/^Check failed/) });
+      expect((await tenderOf(t)).status).toBe('closed');
+      expect(await eventsOf(t)).toEqual([]);
+      expect(await count(ctx.db.select().from(notifications).where(sql`${notifications.dedupeKey} like ${`result:${t.id}:%`}`))).toBe(0);
+    } finally {
+      await ctx.db.execute(sql.raw(`drop trigger if exists ${fn} on notifications; drop function if exists ${fn}()`));
+    }
+    const again = await refreshResults(ctx.deps, { client: fake([doc(t, 3)], HTML) });
+    expect(again).toMatchObject({ status: 'success', tendersUpdated: 1, tendersCreated: 1 });
+    expect((await resultOf(t))!.bidders.map((b) => b.seller)).toEqual(['Zenith Traders', 'Orbit Supplies']);
+    expect(await count(ctx.db.select().from(notifications).where(eq(notifications.dedupeKey, `result:${t.id}:${team.orgId}`)))).toBe(3);
+  });
+
+  it('N2: a result page cut off at the byte cap is unreadable — nothing stored, error recorded, check spent', async () => {
+    const t = await mk();
+    const run = await refreshResults(ctx.deps, { client: fake([doc(t, 3)], HTML, true) });
+    expect(run.status).toBe('failed');
+    expect(await resultOf(t)).toMatchObject({ evaluationStatus: 'not_evaluated', bidders: [], fetchedAt: null, checkedAt: ctx.clock.now(), error: expect.stringMatching(/could not be read/) });
+    expect((await tenderOf(t)).status).toBe('closed');
+    await ctx.db.delete(analyses).where(eq(analyses.tenderId, t.id));
+  });
+
+  it('N4: during a GeM outage (5xx, lease busy) the stored check time is kept and only the error is set', async () => {
+    const t = await mk();
+    const checkedAt = old();
+    await ctx.db.insert(tenderResults).values({ tenderId: t.id, evaluationStatus: 'technical_evaluated', fetchedAt: checkedAt, checkedAt, updatedAt: checkedAt });
+    const down = { fetchSubmittedPage: async () => { throw new GemError('GeM listing failed: HTTP 502', 502, true); }, fetchBidResult: async () => null };
+    expect((await refreshResults(ctx.deps, { client: down })).status).toBe('failed');
+    expect(await resultOf(t)).toMatchObject({ evaluationStatus: 'technical_evaluated', fetchedAt: checkedAt, checkedAt, error: expect.stringContaining('HTTP 502') });
+    // Lease busy through the real client: same.
+    const busy = { ...ctx.deps, gemLease: { acquire: async () => { throw new Error('GeM is busy'); } } };
+    expect((await refreshResults(busy)).status).toBe('failed');
+    expect(await resultOf(t)).toMatchObject({ checkedAt, error: expect.stringContaining('busy') });
+    expect((await resultCandidates(ctx.deps, ctx.clock.now())).map((c) => c.id)).toContain(t.id);
+    await ctx.db.delete(analyses).where(eq(analyses.tenderId, t.id));
+  });
+
+  it('N5: the scheduled results step only gets the time left in the 15-minute invocation', async () => {
+    expect(resultsBudgetMs(1_000_000, 1_000_000)).toBe(SCHEDULED_INVOCATION_MS - SCHEDULED_TAIL_RESERVE_MS);
+    expect(resultsBudgetMs(1_000_000, 1_000_000 + 10 * 60_000)).toBe(3 * 60_000);
+    expect(resultsBudgetMs(1_000_000, 1_000_000 + 14 * 60_000)).toBe(0);
+
+    const t = await mk();
+    const at = new Date('2026-11-25T06:00:00.000Z'); // 11:30 IST on a day not claimed yet
+    expect(at.getTime()).toBeGreaterThan(ctx.clock.now().getTime());
+    const deps = { ...ctx.deps, clock: { now: () => at } };
+    const report = await runScheduledJobs(deps, { trigger: 'cron', startedAt: Date.now() - 14 * 60_000 });
+    expect(report.find((s) => s.step === 'results')).toMatchObject({ ok: true });
+    const [run] = await ctx.db.select().from(ingestionRuns).where(eq(ingestionRuns.kind, 'results')).orderBy(sql`${ingestionRuns.startedAt} desc`).limit(1);
+    expect(run).toMatchObject({ status: 'failed', tendersSeen: 0, pagesFetched: 0 });
+    expect(run!.error).toMatch(/time budget reached/);
+    expect(await resultOf(t)).toBeUndefined();
   });
 });

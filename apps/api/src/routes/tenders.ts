@@ -339,7 +339,7 @@ export function tenderResultDto(
     categories: r?.categories ?? [],
     sourceUrl: r?.sourceUrl ?? null,
     fetchedAt: r?.fetchedAt?.toISOString() ?? null,
-    checkedAt: r ? r.checkedAt.toISOString() : null,
+    checkedAt: r?.checkedAt?.toISOString() ?? null,
     lastCheckFailed: !!r?.error,
     checkUntil: t.endAt ? new Date(t.endAt.getTime() + RESULT_CHECK_DAYS * 86_400_000).toISOString() : null,
   };

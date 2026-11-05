@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BUYER_STATUS, buyerStatusLabel, parseBidResultHtml } from '../../src/gem/result';
+import { BUYER_STATUS, MAX_RESULT_HTML_CHARS, buyerStatusLabel, parseBidResultHtml } from '../../src/gem/result';
 
 const FIX = join(__dirname, '../fixtures/gem/results');
 const read = (f: string) => readFileSync(join(FIX, f), 'utf8');
@@ -65,6 +65,14 @@ describe('parseBidResultHtml', () => {
     }
     expect(parseBidResultHtml(undefined as unknown as string)).toEqual({ ok: false, reason: 'malformed' });
     expect(parseBidResultHtml(null as unknown as string)).toEqual({ ok: false, reason: 'malformed' });
+  });
+
+  it('refuses input over MAX_RESULT_HTML_CHARS even when its first rows parse (no cut-off table stored as complete)', () => {
+    const rows = `<table>${row(1, 'A', '100', 'L1')}${row(2, 'B', '200', 'L2')}</table>`;
+    expect(parseBidResultHtml(rows).ok).toBe(true);
+    const big = rows + ' '.repeat(MAX_RESULT_HTML_CHARS);
+    expect(parseBidResultHtml(big)).toEqual({ ok: false, reason: 'malformed' });
+    expect(parseBidResultHtml(rows.padEnd(MAX_RESULT_HTML_CHARS, ' ')).ok).toBe(true); // exactly at the window: whole
   });
 
   it('skips rows missing price or level instead of borrowing from the next row', () => {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { extractCsrfToken, GemClient, GemError } from '../../src/gem/client';
+import { extractCsrfToken, GemClient, GemError, MAX_RESULT_BYTES } from '../../src/gem/client';
 
 const FIX = join(__dirname, '../fixtures/gem');
 const page = (n: number) => readFileSync(join(FIX, `page-${n}.json`), 'utf8');
@@ -181,10 +181,23 @@ describe('GemClient submitted bids and results (spec 003 US6, FR-060)', () => {
     const r = await gem.fetchBidResult('8100037');
     expect(r?.url).toBe('http://gem.test/bidding/bid/getBidResultView/8100037');
     expect(r?.html).toBe(html);
+    expect(r?.truncated).toBe(false);
     expect(calls.map((c) => c.method)).toEqual(['GET']);
     expect(await gem.fetchBidResult('1')).toBeNull();
     const down = mk((c) => (c.url.includes('getBidResultView') ? new Response('down', { status: 503 }) : undefined));
     await expect(down.gem.fetchBidResult('2')).rejects.toBeInstanceOf(GemError);
+  });
+
+  it('fetchBidResult flags a body cut off at MAX_RESULT_BYTES as truncated; a declared oversize is a too_large GemError', async () => {
+    const endless = () => new Response(new ReadableStream<Uint8Array>({ pull(ctrl) { ctrl.enqueue(new TextEncoder().encode('<tr>'.repeat(4096))); } }));
+    const { gem } = mk((c) => (c.url.includes('getBidResultView') ? endless() : undefined));
+    const r = await gem.fetchBidResult('8100037');
+    expect(r?.truncated).toBe(true);
+    expect(r?.html).toHaveLength(MAX_RESULT_BYTES);
+    const declared = mk((c) => (c.url.includes('getBidResultView') ? new Response('x', { headers: { 'content-length': String(MAX_RESULT_BYTES + 1) } }) : undefined));
+    const err = await declared.gem.fetchBidResult('1').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(GemError);
+    expect((err as GemError).code).toBe('too_large');
   });
 
   it('spaces submitted-page and result requests by minIntervalMs (<= 1 req/s)', async () => {

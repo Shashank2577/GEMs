@@ -10,13 +10,19 @@
  * 2. Per tender, through one polite GemClient (≤ 1 req/s via the cluster-wide GeM lease, retries with back-off):
  *    submitted-bids search for the bid number → `b_buyer_status`; when it is 3 (awarded) → public result view →
  *    parseBidResultHtml.
- * 3. Writes: `tender_results` upsert; on award `tenders.status = 'awarded'` + one `awarded` event (in one
- *    transaction, conditional on the old status so it happens once); when the bidder table is published, an in-app
- *    "Result published: <title> — L1 <seller> at ₹<price>" (kind `result`) for every member of every org that tracks
- *    the tender, deduped per (user, `result:<tender>:<org>`).
- * 4. Failures: an unreadable result page records `tender_results.error` (+ `checked_at`) and leaves the stored status,
- *    bidders and `fetched_at` untouched (US6 scenario 6), then moves on. A GeM/transport failure records the same and
- *    STOPS the run (NFR-001: don't hammer a failing portal); the rest wait for the next run.
+ * 3. Writes, in ONE transaction per tender: `tender_results` upsert (evaluation_status only moves forward — a lower
+ *    status from GeM never downgrades a stored one); a `technical_evaluated` / `financial_evaluated` tender event when
+ *    the stage advances; on award `tenders.status = 'awarded'` + one `awarded` event (conditional on the old status so
+ *    it happens once); and, when the bidder table is published, an in-app "Result published: <title> — L1 <seller> at
+ *    ₹<price>" (kind `result`) for every member of every org that tracks the tender, deduped per
+ *    (user, `result:<tender>:<org>`). A failure anywhere rolls all of it back, so a row is never final without its
+ *    alerts.
+ * 4. Failures (only `error` changes; status, bidders, categories, source_url, fetched_at are untouched — scenario 6):
+ *    - unreadable / truncated / oversized result page: also advances `checked_at` (no re-asking for 24 h), moves on;
+ *    - bid missing from the submitted-bids search: `checked_at` not advanced, moves on (not a run error);
+ *    - GeM/transport/5xx/lease (or DB) failure: `checked_at` not advanced, and the run STOPS (NFR-001: don't hammer a
+ *      failing portal); the rest wait for the next run. Candidates are ordered by last touch (`updated_at`), so a
+ *      tender that keeps failing goes to the back of the queue instead of starving the others.
  *
  * Concurrency: at most one running `results` run cluster-wide — `ingestion_runs_one_running_uq` is per kind, so a
  * second concurrent start fails atomically (→ ResultsBusyError), independent of listing syncs. The daily gate is a
@@ -27,7 +33,7 @@ import { and, desc, eq, gte, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { ingestionRuns, jobRuns, notifications, tenderEvents, tenderResults, tenders } from '@tp/db';
 import { INGESTION_RUN_BUDGET_MS } from '@tp/core/contracts/caps';
 import { EVALUATION_STATUSES, RESULT_CHECK_DAYS, type EvaluationStatus } from '@tp/core/contracts/identify';
-import { GemClient } from '@tp/core/gem/client';
+import { GemClient, GemError } from '@tp/core/gem/client';
 import { parseBidResultHtml, type ResultBidder } from '@tp/core/gem/result';
 import { istDay, istHour } from '@tp/core/time';
 import type { AppDeps } from '../deps';
@@ -44,6 +50,8 @@ export const RESULTS_BATCH = 50;
 export const RESULTS_RECHECK_MS = 24 * 3_600_000;
 /** An unfinished daily claim older than this is taken over (a scheduled invocation lives ≤ 15 min). */
 export const RESULTS_STALE_CLAIM_MS = 3_600_000;
+/** Recorded when the submitted-bids search does not return the bid (B1: never read as "not evaluated"). */
+export const BID_NOT_FOUND_ERROR = 'Bid not found in GeM submitted-bids search';
 
 const DAY_MS = 86_400_000;
 
@@ -62,6 +70,8 @@ export interface RefreshResultsOptions {
   client?: ResultsClient;
   /** Override the batch size (≤ RESULTS_BATCH). */
   limit?: number;
+  /** Wall-clock budget (ms) for GeM work, capped at INGESTION_RUN_BUDGET_MS; the scheduler passes what is left. */
+  budgetMs?: number;
 }
 
 const RESULTS_RUNS = eq(ingestionRuns.kind, 'results');
@@ -103,12 +113,13 @@ export async function resultCandidates(deps: AppDeps, now: Date, limit = RESULTS
       ne(tenders.status, 'cancelled'),
       lt(tenders.endAt, now),
       gte(tenders.endAt, new Date(now.getTime() - RESULT_CHECK_DAYS * DAY_MS)),
-      or(isNull(tenderResults.tenderId), lt(tenderResults.checkedAt, new Date(now.getTime() - RESULTS_RECHECK_MS))),
+      or(isNull(tenderResults.tenderId), isNull(tenderResults.checkedAt), lt(tenderResults.checkedAt, new Date(now.getTime() - RESULTS_RECHECK_MS))),
       // Final: awarded with a published bidder table — nothing left to learn.
       sql`not (coalesce(${tenderResults.evaluationStatus} = 'awarded', false) and jsonb_array_length(coalesce(${tenderResults.bidders}, '[]'::jsonb)) > 0)`,
       TRACKED_BY_ANY_ORG,
     ))
-    .orderBy(sql`${tenderResults.checkedAt} asc nulls first`, desc(tenders.endAt), tenders.id)
+    // Never-touched first, then least recently touched (a failure moves a tender to the back, see the module comment).
+    .orderBy(sql`${tenderResults.updatedAt} asc nulls first`, desc(tenders.endAt), tenders.id)
     .limit(Math.max(1, Math.min(RESULTS_BATCH, limit)));
   return rows as Candidate[];
 }
@@ -141,17 +152,26 @@ export function resultAlertTitle(title: string, l1: ResultBidder): string {
 
 type Outcome =
   | { kind: 'status'; evaluation: EvaluationStatus; awardedNow: boolean }
-  | { kind: 'published'; awardedNow: boolean }
-  | { kind: 'unreadable'; error: string };
+  | { kind: 'published'; awardedNow: boolean; alerts: number }
+  | { kind: 'unreadable'; error: string }
+  | { kind: 'not_found'; error: string };
 
-/** Record a failed attempt: only `error` and `checked_at` change (a new row starts at the defaults, bidders []). */
-async function recordFailure(deps: AppDeps, tenderId: string, error: string, now: Date): Promise<void> {
-  await deps.db.insert(tenderResults).values({ tenderId, error: error.slice(0, 500), checkedAt: now, createdAt: now, updatedAt: now })
-    .onConflictDoUpdate({ target: tenderResults.tenderId, set: { error: error.slice(0, 500), checkedAt: now, updatedAt: now } });
+type Tx = Parameters<Parameters<AppDeps['db']['transaction']>[0]>[0];
+
+const stage = (s: EvaluationStatus) => EVALUATION_STATUSES.indexOf(s);
+
+/**
+ * Record a failed attempt: only `error` (and `updated_at`) change; `checked_at` too when `advance` (GeM answered but
+ * the page was unreadable). A new row starts at the defaults (not_evaluated, bidders [], checked_at null).
+ */
+async function recordFailure(deps: AppDeps, tenderId: string, error: string, now: Date, advance: boolean): Promise<void> {
+  const e = error.slice(0, 500);
+  await deps.db.insert(tenderResults).values({ tenderId, error: e, checkedAt: advance ? now : null, createdAt: now, updatedAt: now })
+    .onConflictDoUpdate({ target: tenderResults.tenderId, set: { error: e, updatedAt: now, ...(advance ? { checkedAt: now } : {}) } });
 }
 
 /** Mark the tender awarded once (status-conditional) with its event; true when this call made the change. */
-async function markAwarded(tx: Parameters<Parameters<AppDeps['db']['transaction']>[0]>[0], t: Candidate, at: Date): Promise<boolean> {
+async function markAwarded(tx: Tx, t: Candidate, at: Date): Promise<boolean> {
   const [row] = await tx.update(tenders).set({ status: 'awarded', updatedAt: at })
     .where(and(eq(tenders.id, t.id), ne(tenders.status, 'awarded'), ne(tenders.status, 'cancelled')))
     .returning({ id: tenders.id });
@@ -160,58 +180,91 @@ async function markAwarded(tx: Parameters<Parameters<AppDeps['db']['transaction'
   return true;
 }
 
-/** Check one tender against GeM and store what we learn. GeM/transport errors propagate (the run stops). */
-async function checkTender(deps: AppDeps, client: ResultsClient, t: Candidate, now: Date): Promise<Outcome> {
+/**
+ * Store a successful read. `evaluation_status` never moves backwards (the stored row is locked and compared); an
+ * advance to technical/financial evaluation adds its tender event (the `awarded` one comes from markAwarded).
+ */
+async function storeResult(
+  tx: Tx, t: Candidate, evaluation: EvaluationStatus, at: Date,
+  extra: Partial<Pick<typeof tenderResults.$inferInsert, 'bidders' | 'categories' | 'sourceUrl'>> = {},
+): Promise<EvaluationStatus> {
+  const [cur] = await tx.select({ s: tenderResults.evaluationStatus }).from(tenderResults)
+    .where(eq(tenderResults.tenderId, t.id)).for('update');
+  const prev: EvaluationStatus = cur?.s ?? 'not_evaluated';
+  const next = stage(evaluation) >= stage(prev) ? evaluation : prev;
+  const values = { ...extra, evaluationStatus: next, fetchedAt: at, checkedAt: at, error: null, updatedAt: at };
+  await tx.insert(tenderResults).values({ tenderId: t.id, ...values, createdAt: at })
+    .onConflictDoUpdate({ target: tenderResults.tenderId, set: values });
+  if (stage(next) > stage(prev) && (next === 'technical_evaluated' || next === 'financial_evaluated')) {
+    await tx.insert(tenderEvents).values({ tenderId: t.id, kind: next, changes: { evaluation: { from: prev, to: next } }, createdAt: at });
+  }
+  return next;
+}
+
+const UNREADABLE = 'GeM result page could not be read (format changed?)';
+
+/** Check one tender against GeM and store what we learn. GeM/transport (and DB) errors propagate (the run stops). */
+async function checkTender(deps: AppDeps, client: ResultsClient, t: Candidate): Promise<Outcome> {
   const page = await client.fetchSubmittedPage({ search: t.bidNumber });
   const want = t.bidNumber.trim().toUpperCase();
   const doc = page.docs.find((d) => String(first(d.b_bid_number) ?? '').trim().toUpperCase() === want);
-  const evaluation = doc ? evaluationFromBuyerStatus(doc.b_buyer_status) : 'not_evaluated';
-  const gemBidId = (doc ? String(first(doc.b_id) ?? '') : '') || t.gemBidId;
+  // B1: absence from the search says nothing about the stage — never store it as `not_evaluated`.
+  if (!doc) return { kind: 'not_found', error: BID_NOT_FOUND_ERROR };
+  const evaluation = evaluationFromBuyerStatus(doc.b_buyer_status);
+  const gemBidId = String(first(doc.b_id) ?? '') || t.gemBidId;
 
   let result: Awaited<ReturnType<ResultsClient['fetchBidResult']>> = null;
-  if (evaluation === 'awarded' && gemBidId) result = await client.fetchBidResult(gemBidId);
-  const parsed = result ? parseBidResultHtml(result.html) : null;
+  if (evaluation === 'awarded' && gemBidId) {
+    try {
+      result = await client.fetchBidResult(gemBidId);
+    } catch (e) {
+      // A declared-oversized page is this tender's problem, not a portal outage: unreadable, move on.
+      if (e instanceof GemError && e.code === 'too_large') return { kind: 'unreadable', error: `${UNREADABLE}: page too large` };
+      throw e;
+    }
+  }
+  // N2: a body cut off at the byte cap is never parsed as if it were the whole table.
+  const parsed = result ? (result.truncated ? { ok: false as const, reason: 'malformed' as const } : parseBidResultHtml(result.html)) : null;
 
   if (parsed && !parsed.ok && parsed.reason === 'malformed') {
     // US6 scenario 6: the page could not be read — keep everything we had, record why.
-    return { kind: 'unreadable', error: 'GeM result page could not be read (format changed?)' };
+    return { kind: 'unreadable', error: result?.truncated ? `${UNREADABLE}: page too large` : UNREADABLE };
   }
 
   const at = deps.clock.now();
   if (parsed?.ok && parsed.bidders.length) {
     const bidders = [...parsed.bidders].sort((a, b) => a.rank - b.rank);
-    const values = {
-      evaluationStatus: 'awarded' as const, bidders, categories: parsed.categories.slice(0, 20), sourceUrl: result!.url,
-      fetchedAt: at, checkedAt: at, error: null, updatedAt: at,
-    };
-    const awardedNow = await deps.db.transaction(async (tx) => {
-      await tx.insert(tenderResults).values({ tenderId: t.id, ...values, createdAt: at })
-        .onConflictDoUpdate({ target: tenderResults.tenderId, set: values });
-      return markAwarded(tx, t, at);
+    const alerts = await resultAlerts(deps, t, bidders, at);
+    return deps.db.transaction(async (tx) => {
+      await storeResult(tx, t, 'awarded', at, { bidders, categories: parsed.categories.slice(0, 20), sourceUrl: result!.url });
+      const awardedNow = await markAwarded(tx, t, at);
+      // N1: the alerts commit with the row that makes the result final, or not at all.
+      let n = 0;
+      for (let i = 0; i < alerts.length; i += 500) {
+        n += (await tx.insert(notifications).values(alerts.slice(i, i + 500)).onConflictDoNothing().returning({ id: notifications.id })).length;
+      }
+      return { kind: 'published' as const, awardedNow, alerts: n };
     });
-    await notifyResult(deps, t, bidders, at);
-    return { kind: 'published', awardedNow };
   }
 
   // Status only (not awarded yet, or awarded but GeM has not published the bidder table): bidders untouched.
-  const values = { evaluationStatus: evaluation, fetchedAt: at, checkedAt: at, error: null, updatedAt: at };
-  const awardedNow = await deps.db.transaction(async (tx) => {
-    await tx.insert(tenderResults).values({ tenderId: t.id, ...values, createdAt: at })
-      .onConflictDoUpdate({ target: tenderResults.tenderId, set: values });
-    return evaluation === 'awarded' ? markAwarded(tx, t, at) : false;
+  return deps.db.transaction(async (tx) => {
+    const stored = await storeResult(tx, t, evaluation, at);
+    const awardedNow = stored === 'awarded' ? await markAwarded(tx, t, at) : false;
+    return { kind: 'status' as const, evaluation: stored, awardedNow };
   });
-  return { kind: 'status', evaluation, awardedNow };
 }
 
 /**
- * FR-063: in-app "Result published" for every member (in-app enabled) of every org tracking the tender. Deduped per
- * (user, in_app, `result:<tenderId>:<orgId>`), so later runs or a re-published table never alert twice.
+ * FR-063: in-app "Result published" rows for every member (in-app enabled) of every org tracking the tender, inserted
+ * by checkTender inside the result's transaction. Deduped per (user, in_app, `result:<tenderId>:<orgId>`), so later
+ * runs or a re-published table never alert twice.
  */
-async function notifyResult(deps: AppDeps, t: Candidate, bidders: ResultBidder[], now: Date): Promise<number> {
+async function resultAlerts(deps: AppDeps, t: Candidate, bidders: ResultBidder[], now: Date): Promise<(typeof notifications.$inferInsert)[]> {
   const l1 = l1Bidder(bidders);
-  if (!l1) return 0;
+  if (!l1) return [];
   const orgIds = await trackingOrgIds(deps.db, t.id);
-  if (!orgIds.length) return 0;
+  if (!orgIds.length) return [];
   const recipients = await orgRecipients(deps, orgIds);
   const title = resultAlertTitle(t.title, l1);
   const winner = bidders.find((b) => b.awarded) ?? l1;
@@ -228,11 +281,7 @@ async function notifyResult(deps: AppDeps, t: Candidate, bidders: ResultBidder[]
       });
     }
   }
-  let n = 0;
-  for (let i = 0; i < values.length; i += 500) {
-    n += (await deps.db.insert(notifications).values(values.slice(i, i + 500)).onConflictDoNothing().returning({ id: notifications.id })).length;
-  }
-  return n;
+  return values;
 }
 
 /**
@@ -246,7 +295,7 @@ export async function refreshResults(deps: AppDeps, opts: RefreshResultsOptions 
   if (busy && busy.startedAt.getTime() > now.getTime() - RUN_LOCK_MS) throw new ResultsBusyError(busy);
   const run = await startResultsRun(deps, opts.trigger ?? 'cron', now);
 
-  const budgetEnds = Date.now() + INGESTION_RUN_BUDGET_MS;
+  const budgetEnds = Date.now() + Math.max(0, Math.min(INGESTION_RUN_BUDGET_MS, opts.budgetMs ?? INGESTION_RUN_BUDGET_MS));
   const gem = opts.client ? null : new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl,
     userAgent: deps.gem.userAgent,
@@ -263,27 +312,32 @@ export async function refreshResults(deps: AppDeps, opts: RefreshResultsOptions 
     const candidates = await resultCandidates(deps, now, opts.limit);
     let stopped = false;
     for (const [i, t] of candidates.entries()) {
-      if (Date.now() > budgetEnds) {
+      if (Date.now() >= budgetEnds) {
         errors.push(`time budget reached; ${candidates.length - i} tender(s) left for the next run`);
         break;
       }
       const where = `tender ${i + 1}/${candidates.length}`;
       const before = gem?.requests ?? 0;
       try {
-        const out = await checkTender(deps, client, t, now);
+        const out = await checkTender(deps, client, t);
         stats.tendersSeen++;
         if (out.kind === 'unreadable') {
-          await recordFailure(deps, t.id, out.error, deps.clock.now());
+          await recordFailure(deps, t.id, out.error, deps.clock.now(), true);
           errors.push(`${where}: ${out.error}`);
           logger.warn('results: unreadable result page', { runId: run.id, bidNumber: t.bidNumber });
+        } else if (out.kind === 'not_found') {
+          // Not a run error (bids often appear in the search only once opened); asked again next run.
+          await recordFailure(deps, t.id, out.error, deps.clock.now(), false);
+          logger.info('results: bid not in the submitted-bids search', { runId: run.id, bidNumber: t.bidNumber });
         } else {
           stats.tendersUpdated++;
           if (out.awardedNow) stats.tendersCreated++;
         }
       } catch (e) {
-        // GeM unreachable / 5xx after retries / lease busy (or a DB error): record it on the tender and stop (NFR-001).
+        // GeM unreachable / 5xx after retries / lease busy (or a DB error): record it on the tender without spending
+        // its daily check (N4), and stop (NFR-001).
         stats.tendersSeen++;
-        await recordFailure(deps, t.id, `Check failed: ${errMsg(e)}`, deps.clock.now()).catch(() => {});
+        await recordFailure(deps, t.id, `Check failed: ${errMsg(e)}`, deps.clock.now(), false).catch(() => {});
         errors.push(`${where}: check failed: ${errMsg(e)}`);
         logger.warn('results: GeM request failed; stopping this run', { runId: run.id, bidNumber: t.bidNumber, error: errMsg(e) });
         stopped = true;
@@ -317,7 +371,7 @@ export type DailyResultsOutcome =
  * RESULTS_STALE_CLAIM_MS. A `failed` run (or a busy/throwing one) releases the claim so the next tick retries; the
  * 24 h per-tender recheck window keeps those retries from re-asking GeM about tenders already checked today.
  */
-export async function runDailyResults(deps: AppDeps): Promise<DailyResultsOutcome> {
+export async function runDailyResults(deps: AppDeps, opts: Pick<RefreshResultsOptions, 'budgetMs'> = {}): Promise<DailyResultsOutcome> {
   const now = deps.clock.now();
   const day = istDay(now);
   if (istHour(now) < RESULTS_HOUR_IST) return { ran: false, day, reason: 'before_window' };
@@ -334,7 +388,7 @@ export async function runDailyResults(deps: AppDeps): Promise<DailyResultsOutcom
   const release = () => deps.db.delete(jobRuns).where(ours).catch(() => {});
   let run: IngestionRunRow;
   try {
-    run = await refreshResults(deps, { trigger: 'cron' });
+    run = await refreshResults(deps, { trigger: 'cron', budgetMs: opts.budgetMs });
   } catch (e) {
     await release();
     if (e instanceof ResultsBusyError) return { ran: false, day, reason: 'busy' };

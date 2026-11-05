@@ -175,7 +175,7 @@ recorded HTML fixture; `POST /__admin/award/<bidNumber>` to move a bid into the 
 | Table (schema.ts) | Columns used | Change |
 |---|---|---|
 | `tenders` | `source, bid_number (uq with source), gem_bid_id, bid_type, title, items, category, quantity, ministry, department, organisation, buyer_office, state, city, start_at, end_at (idx), opening_at, emd_amount, estimated_value, epbg_percent, hsn_codes, status, document_url, source_url, raw, content_hash, fetched_at, created_at, updated_at` | none (US6 sets `status='awarded'`) |
-| `tender_events` | `tender_id, kind (created/updated/corrigendum/closed/cancelled), changes, created_at` | *(built, US6)* kind `awarded` (TS union only; no separate `result` event — the alert and `tender_results` carry it) |
+| `tender_events` | `tender_id, kind (created/updated/corrigendum/closed/cancelled), changes, created_at` | *(built, US6)* kinds `awarded`, `technical_evaluated`, `financial_evaluated` (TS union only; no separate `result` event — the alert and `tender_results` carry it) |
 | `ingestion_runs` | `trigger, status, pages_fetched, tenders_seen/created/updated, matches_created, error, started_at, finished_at` | *(built, US6, migration 0025)* `kind text not null default 'listing'` (`listing`/`results`); `ingestion_runs_one_running_uq` is now per kind |
 | `watchlists` | `org_id, name, criteria (WatchlistCriteria JSON), active, created_by` | none |
 | `tender_matches` | `org_id, tender_id, watchlist_id (uq triple), reasons, relevance, seen, dismissed, created_at` | none |
@@ -238,6 +238,12 @@ is null or > 24 h old ─▶ `GemClient.fetchSubmittedPage({search: bidNumber, s
 As built: candidates also exclude cancelled tenders and tenders already final (awarded with a bidder table); the run
 holds the per-kind single-running slot (`ResultsBusyError` on overlap) and the daily `job_runs ('results', day)` claim;
 an unreadable result page records `tender_results.error` and leaves stored data untouched; a GeM failure stops the run.
+Round-1 review: `evaluation_status` only moves forward (a bid missing from the search records
+"Bid not found in GeM submitted-bids search" and never writes `not_evaluated`); stage advances add
+`technical_evaluated` / `financial_evaluated` tender events; result alerts commit in the same transaction as the row;
+a truncated/oversized result page is unreadable; outages and not-found do not advance `checked_at` (migration 0026 makes it
+nullable), candidates are ordered by last touch; the scheduled step's budget is capped to what is left of the 15-minute
+invocation.
 
 ## What to Port from the Reference Repos
 

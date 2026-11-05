@@ -5,8 +5,9 @@
  *   // ok:   { ok: true, categories, bidders: [{ rank, seller, price, level, awarded }], winner, lowestPrice, anomalies }
  *   // fail: { ok: false, reason: 'not_published' | 'malformed' }
  *
- * Never throws: a page GeM has not published yet, an empty or oversized body, or changed markup yields a typed
- * failure the caller records without touching stored data. Markup knowledge (bidder rows `td.productDtl` ->
+ * Never throws: a page GeM has not published yet, an empty or oversized body (> MAX_RESULT_HTML_CHARS is refused as
+ * `malformed`, never parsed as a prefix), or changed markup yields a typed failure the caller records without
+ * touching stored data. Markup knowledge (bidder rows `td.productDtl` ->
  * seller span -> `span.bid_price` -> `<td><strong>L<n></strong>`, `var categoris`) comes from arush15june/gem-search
  * `get_bid_result` (MIT, see NOTICE); this module is a separate, stricter reader that keeps the seller as
  * `seller`, flags the awarded row, and works on one table row at a time so nothing can backtrack across rows.
@@ -113,7 +114,9 @@ export function detectAnomalies(bidders: ResultBidder[], winner: ResultBidder | 
 export function parseBidResultHtml(input: string): BidResultParse {
   try {
     if (typeof input !== 'string' || !input.trim()) return { ok: false, reason: 'malformed' };
-    const html = input.length > MAX_RESULT_HTML_CHARS ? input.slice(0, MAX_RESULT_HTML_CHARS) : input;
+    // Never parse a prefix: a cut-off page would be stored as the complete bidder table (003/US6 scenario 6).
+    if (input.length > MAX_RESULT_HTML_CHARS) return { ok: false, reason: 'malformed' };
+    const html = input;
     const bidders: ResultBidder[] = [];
     for (const chunk of html.split(/<tr\b/i).slice(1)) {
       if (bidders.length >= MAX_BIDDERS) break;

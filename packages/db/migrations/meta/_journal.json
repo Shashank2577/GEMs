@@ -183,6 +183,13 @@
       "when": 1793879760719,
       "tag": "0025_clammy_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793881661200,
+      "tag": "0026_perfect_red_wolf",
+      "breakpoints": true
     }
   ]
 }
