@@ -1,0 +1,62 @@
+[
+  {
+    "name": "changes",
+    "needs": [],
+    "timeout": 5,
+    "runsOn": "ubuntu-latest"
+  },
+  {
+    "name": "typecheck",
+    "needs": [],
+    "timeout": 10,
+    "runsOn": "ubuntu-latest"
+  },
+  {
+    "name": "unit",
+    "needs": [
+      "changes"
+    ],
+    "timeout": 10,
+    "runsOn": "ubuntu-latest",
+    "ifExpr": "needs.changes.outputs.code == 'true'"
+  },
+  {
+    "name": "api",
+    "needs": [
+      "unit"
+    ],
+    "timeout": 15,
+    "runsOn": "ubuntu-latest"
+  },
+  {
+    "name": "e2e",
+    "needs": [
+      "api"
+    ],
+    "timeout": 30,
+    "runsOn": "ubuntu-latest"
+  },
+  {
+    "name": "migrations-additive",
+    "needs": [
+      "changes"
+    ],
+    "timeout": 10,
+    "runsOn": "ubuntu-latest",
+    "ifExpr": "needs.changes.outputs.code == 'true'"
+  },
+  {
+    "name": "ci-gate",
+    "needs": [
+      "changes",
+      "typecheck",
+      "unit",
+      "api",
+      "e2e",
+      "migrations-additive"
+    ],
+    "timeout": 5,
+    "runsOn": "ubuntu-latest",
+    "ifExpr": "always()"
+  }
+]

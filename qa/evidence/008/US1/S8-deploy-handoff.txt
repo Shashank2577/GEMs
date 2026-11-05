@@ -1,0 +1,5 @@
+workflows: ci.yml, dod.yml, project-board.yml, wiki-sync.yml
+deploy workflows: (none; US2 #357 not implemented)
+ci triggers on push to main: yes
+ci-gate aggregator guarantees one always-reporting result for a deploy to key on.
+default branch of the repo: claude/gem-tender-automation-om9hyj (not main), so workflow_run: [ci] would not fire for a deploy.yml on main (documented in ci.yml header and docs/runbook.md).
