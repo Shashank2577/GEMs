@@ -516,7 +516,8 @@ test.describe('US4 alerts', () => {
     await page.goto('/notifications?unread=1');
     await expect(page.locator('section[aria-labelledby^="day-"]').first()).toBeVisible();
     const n = await page.locator('section[aria-labelledby^="day-"] ul > li').count();
-    note('observed', `GET /notifications?unread=1 (page URL) renders ${n} items (the page filter's own param is ?tab=unread)`);
+    note('observed', `GET /notifications?unread=1 (page URL) renders ${n} items`);
+    expect(n).toBe(3); // round 2: ?unread=1 now shows the Unread list
     await shot(page, 'S8a-page-url-unread-1');
   });
 
