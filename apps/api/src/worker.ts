@@ -8,6 +8,7 @@ import { createDeps } from './adapters/index';
 import { createR2BlobStore, type R2BucketLike } from './adapters/blob-r2';
 import type { RuntimeEnv } from './env';
 import { runScheduledJobs } from './lib/scheduled';
+import { settleDeferred } from './lib/defer';
 
 export interface WorkerEnv extends RuntimeEnv {
   DATABASE_URL: string;
@@ -21,7 +22,8 @@ interface ExecutionContextLike {
 }
 
 function envVars(env: WorkerEnv): RuntimeEnv {
-  return { NODE_ENV: 'production', ...env };
+  // On Workers, cf-connecting-ip is set by Cloudflare and cannot be forged by the client.
+  return { NODE_ENV: 'production', TRUST_PROXY: 'cloudflare', ...env };
 }
 
 async function withDeps<T>(env: WorkerEnv, ctx: ExecutionContextLike, fn: (deps: ReturnType<typeof createDeps>) => Promise<T>): Promise<T> {
@@ -31,7 +33,8 @@ async function withDeps<T>(env: WorkerEnv, ctx: ExecutionContextLike, fn: (deps:
   try {
     return await fn(deps);
   } finally {
-    ctx.waitUntil(close().catch(() => {}));
+    // Background work (lib/defer.ts) still needs the pool: close only after it settles.
+    ctx.waitUntil(settleDeferred(deps).then(() => close()).catch(() => {}));
   }
 }
 

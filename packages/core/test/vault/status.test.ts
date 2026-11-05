@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DOC_TYPES, daysUntilExpiry, docStatus, docTypeInfo, guessDocType, guessFinancialYear, istDate, reminderCopy, reminderDue, suggestExpiry,
+  DOC_TYPES, GEM_SELLER_DOC_LABELS, daysUntilExpiry, docStatus, docTypeInfo, guessDocType, guessFinancialYear, istDate, reminderCopy, reminderDue, suggestExpiry,
 } from '../../src/vault/status';
 
 // 4 Nov 2026, 10:00 IST
@@ -83,5 +83,82 @@ describe('catalog & guessing', () => {
   it('suggests expiry from typical validity', () => {
     expect(suggestExpiry('iso', '2024-01-15')).toBe('2027-01-14');
     expect(suggestExpiry('gst', '2024-01-15')).toBeNull();
+  });
+});
+
+/**
+ * SC-007 / T041: ≥ 80% of 50 realistic Indian bid-document file names get the right type, including names
+ * copied from GeM "Document required from seller" labels (vocabulary attributed in NOTICE).
+ */
+describe('guessDocType corpus (SC-007)', () => {
+  // Held-out names as sellers actually save them: underscored, abbreviated, Hindi / mixed, camera and
+  // scanner defaults. None is a verbatim GEM_SELLER_DOC_LABELS label (that is covered by the round-trip test).
+  const CORPUS: [string, string][] = [
+    ['GST_REG06_2023.pdf', 'gst'],
+    ['gstin_cert_aarav.pdf', 'gst'],
+    ['GST Registration (Form REG-06).pdf', 'gst'],
+    ['जीएसटी पंजीकरण प्रमाणपत्र.pdf', 'gst'],
+    ['PAN_Card_Company.jpg', 'pan'],
+    ['company-pan-copy.pdf', 'pan'],
+    ['पैन कार्ड.jpg', 'pan'],
+    ['Udyam_Registration_Certificate.pdf', 'udyam'],
+    ['MSME_cert_2024.pdf', 'udyam'],
+    ['UDYAM-MH-26-0012345.pdf', 'udyam'],
+    ['उद्यम प्रमाणपत्र.pdf', 'udyam'],
+    ['DPIIT_Startup_Recog.pdf', 'startup_dpiit'],
+    ['COI_AaravTech.pdf', 'incorporation'],
+    ['Partnership Deed (notarised).pdf', 'incorporation'],
+    ['MOA_AOA.pdf', 'incorporation'],
+    ['Audited_BS_FY2023-24.pdf', 'balance_sheet'],
+    ['BS FY24-25.pdf', 'balance_sheet'],
+    ['P&L_2023-24.pdf', 'balance_sheet'],
+    ['Fin Statements 2022-23.pdf', 'balance_sheet'],
+    ['ITR_AY2024-25.pdf', 'itr'],
+    ['ITR-V_ack_AY23-24.pdf', 'itr'],
+    ['CA_Turnover_Cert_UDIN.pdf', 'ca_turnover_certificate'],
+    ['Avg_Annual_TO_3yrs_CA.pdf', 'ca_turnover_certificate'],
+    ['Turnover certificate last 3 FY.pdf', 'ca_turnover_certificate'],
+    ['Dell_MAF_2026.pdf', 'oem_authorization'],
+    ['HP_OEM_Auth_Letter.pdf', 'oem_authorization'],
+    ['Lenovo Authorisation Letter.pdf', 'oem_authorization'],
+    ['Acer_Dealership_Cert.pdf', 'oem_authorization'],
+    ['CRAC_NIC_2024.pdf', 'crac'],
+    ['Performance_Cert_CPWD.pdf', 'crac'],
+    ['Completion Cert - Railways.pdf', 'crac'],
+    ['Satisfactory_Report_ONGC.pdf', 'crac'],
+    ['WO_BSNL_2023.pdf', 'work_order'],
+    ['PO 4500012345 IOCL.pdf', 'work_order'],
+    ['GeM_Contract_GEMC-511687712345678.pdf', 'work_order'],
+    ['Supply_Order_DRDO.pdf', 'work_order'],
+    ['ISO_9001_2015.pdf', 'iso'],
+    ['ISO27001 certificate.pdf', 'iso'],
+    ['BIS_CRS_Registration.pdf', 'bis'],
+    ['MII_Declaration_Class1.pdf', 'mii_certificate'],
+    ['Make in India self cert.pdf', 'mii_certificate'],
+    ['EMD_Exemption.pdf', 'emd_exemption'],
+    ['Cancelled_Cheque_HDFC.jpg', 'bank_details'],
+    ['Board Resolution - Authorised Signatory.pdf', 'power_of_attorney'],
+    ['POA_Ravi_Sharma.pdf', 'power_of_attorney'],
+    ['Latitude_5440_Datasheet.pdf', 'product_catalogue'],
+    ['NABL_Test_Report_Cable.pdf', 'test_report'],
+    ['scan0001.pdf', 'other'],
+    ['IMG_20240312_101522.jpg', 'other'],
+    ['WhatsApp Image 2024-05-02 at 10.15.32.jpeg', 'other'],
+  ];
+
+  it('has 50 names', () => expect(CORPUS).toHaveLength(50));
+
+  it('guesses at least 80% correctly', () => {
+    const wrong = CORPUS.filter(([name, type]) => guessDocType(name) !== type).map(([name, type]) => `${name}: expected ${type}, got ${guessDocType(name)}`);
+    const accuracy = (CORPUS.length - wrong.length) / CORPUS.length;
+    expect(accuracy, wrong.join('\n')).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('maps every GeM seller-document label to a catalog type that guessDocType recognises', () => {
+    const types = new Set(DOC_TYPES.map((d) => d.type));
+    for (const [label, type] of Object.entries(GEM_SELLER_DOC_LABELS)) {
+      expect(types.has(type), label).toBe(true);
+      expect(guessDocType(`${label.replace(/ /g, '_')}.pdf`), label).toBe(type);
+    }
   });
 });

@@ -9,7 +9,9 @@ listed here with its licence.
    Licence: Apache License 2.0
    Used in: packages/core/src/gem/client.ts (BidPlus /all-bids → /all-bids-data request shape and CSRF
    bootstrap), packages/core/src/gem/parse.ts (field names and the bid-type → document-route mapping),
-   packages/core/src/gem/normalize.ts (Solr response unwrapping approach).
+   packages/core/src/gem/normalize.ts (Solr response unwrapping approach), packages/core/src/vault/status.ts
+   (GeM seller-document label vocabulary: the buildEligibilitySummary eligibility labels in src/routes.ts, used
+   in GEM_SELLER_DOC_LABELS and DOC_TYPES keywords).
    Spec 004 Analyse (ported at commit 46925c6, 2026-11-04):
    - packages/core/test/fixtures/bids/synthetic-tender.pdf — copied unchanged from
      test/fixtures/synthetic-tender.pdf.

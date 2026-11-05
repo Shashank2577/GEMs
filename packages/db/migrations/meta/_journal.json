@@ -12,8 +12,15 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1793845960411,
-      "tag": "0001_analyse_stale_ocr",
+      "when": 1793845957931,
+      "tag": "0001_tranquil_iron_monger",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793848342554,
+      "tag": "0002_analyse_stale_ocr",
       "breakpoints": true
     }
   ]

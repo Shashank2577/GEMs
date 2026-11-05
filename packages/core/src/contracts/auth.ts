@@ -47,6 +47,60 @@ export const changePasswordInputSchema = z.object({
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordInputSchema>;
 
+// ───────────── Password reset (002/FR-011) ─────────────
+
+export const forgotPasswordInputSchema = z.object({ email: emailSchema });
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>;
+
+export const resetPasswordInputSchema = z.object({
+  token: z.string().min(10).max(200),
+  newPassword: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
+
+/** Minutes a password reset link stays valid. */
+export const PASSWORD_RESET_TTL_MINUTES = 60;
+
+// ───────────── Sessions (002/FR-012) ─────────────
+
+export interface SessionSummary {
+  id: string;
+  /** True for the session making the request ("This device"). */
+  current: boolean;
+  /** Raw User-Agent recorded at sign-in (may be null for sessions created before FR-012). */
+  userAgent: string | null;
+  /** Human summary, e.g. "Chrome on Windows". */
+  device: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+}
+export interface SessionsResponse { items: SessionSummary[]; total: number }
+export interface RevokeOtherSessionsResponse { revoked: number }
+
+/** "Mozilla/5.0 (Windows NT 10.0…) … Chrome/120…" → "Chrome on Windows". Unknown parts → "Unknown browser/device". */
+export function summarizeUserAgent(ua: string | null | undefined): string {
+  if (!ua) return 'Unknown device';
+  const browser =
+    /Edg(e|A|iOS)?\//.test(ua) ? 'Edge'
+      : /OPR\/|Opera/.test(ua) ? 'Opera'
+        : /SamsungBrowser\//.test(ua) ? 'Samsung Internet'
+          : /Firefox\/|FxiOS\//.test(ua) ? 'Firefox'
+            : /Chrome\/|CriOS\//.test(ua) ? 'Chrome'
+              : /Safari\//.test(ua) && /Version\//.test(ua) ? 'Safari'
+                : /^curl\//i.test(ua) ? 'curl'
+                  : null;
+  const os =
+    /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+      : /Android/.test(ua) ? 'Android'
+        : /Windows/.test(ua) ? 'Windows'
+          : /CrOS/.test(ua) ? 'ChromeOS'
+            : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
+              : /Linux/.test(ua) ? 'Linux'
+                : null;
+  if (browser && os) return `${browser} on ${os}`;
+  return browser ?? (os ? `Unknown browser on ${os}` : 'Unknown device');
+}
+
 // ───────────── Me ─────────────
 
 export interface MeUser { id: string; name: string; email: string; phone: string | null }
