@@ -161,6 +161,19 @@ describe('edge cases', () => {
     expect(f(r.factors, 'deliveryFeasibility').detail).toContain('Kerala');
   });
 
+  it('delivery falls back to the consignee state from the document when the listing has no state (FR-019)', () => {
+    const reqs = [R('delivery_days', '30 days', 30), R('consignee_state', 'Kerala', null, false)];
+    const fromDoc = scoreTender({ requirements: reqs, profile: baseProfile, tender: { state: null }, now: NOW });
+    expect(f(fromDoc.factors, 'deliveryFeasibility')).toMatchObject({ status: 'unknown', requirementKey: 'delivery_days' });
+    expect(f(fromDoc.factors, 'deliveryFeasibility').detail).toBe('Delivery in 30 days to Kerala, outside your operating states — check logistics.');
+    // The listing state wins over the document.
+    const listing = scoreTender({ requirements: reqs, profile: baseProfile, tender: { state: 'Delhi' }, now: NOW });
+    expect(f(listing.factors, 'deliveryFeasibility')).toMatchObject({ status: 'pass', detail: 'Delivery period of 30 days to Delhi looks feasible.' });
+    // Real sample bid: Haryana consignee is inside the operating states.
+    const oem = base('review-hardware-oem');
+    expect(f(oem.factors, 'deliveryFeasibility').detail).toBe('Delivery period of 45 days to Haryana looks feasible.');
+  });
+
   it('averageTurnover uses the latest three financial years', () => {
     expect(averageTurnover(baseProfile.financials)).toEqual({ avg: 20_000_000, years: 3 });
     expect(averageTurnover([])).toBeNull();

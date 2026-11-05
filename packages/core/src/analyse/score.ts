@@ -294,7 +294,9 @@ export function scoreTender(input: ScoreInput): ScoreResult {
   // 9. Delivery feasibility
   {
     const r = get('delivery_days');
-    const state = input.tender?.state ?? null;
+    // The listing's state wins; otherwise the consignee's state read from the bid document (FR-019).
+    const consignee = get('consignee_state');
+    const state = input.tender?.state || (typeof consignee?.value === 'string' ? consignee.value : null);
     const opStates = (profile?.operatingStates ?? []).map((s) => s.toLowerCase());
     if (!r || r.numeric == null) push('deliveryFeasibility', 'na', 'No delivery period found in the bid.');
     else if (r.numeric < 7) push('deliveryFeasibility', 'fail', `Only ${plural(r.numeric, 'day')} to deliver — very tight.`, { requirementKey: 'delivery_days' });
