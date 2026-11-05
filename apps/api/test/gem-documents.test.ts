@@ -42,7 +42,7 @@ describe('mock-gem /__admin/document-mode', () => {
     expect((await admin('/__admin/document-mode', { mode: 'bogus' })).status).toBe(400);
     const ok = await admin('/__admin/document-mode', { mode: 'scanned' });
     expect(await ok.json()).toEqual({ ok: true, documentMode: 'scanned' });
-    expect((await (await mock.app.request(`${GEM}/__admin/state`)).json()).documentMode).toBe('scanned');
+    expect(((await (await mock.app.request(`${GEM}/__admin/state`)).json()) as { documentMode: string }).documentMode).toBe('scanned');
     await admin('/__admin/reset');
     expect(mock.state.documentMode).toBe('normal');
   });

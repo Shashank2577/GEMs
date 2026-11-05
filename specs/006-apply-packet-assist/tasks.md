@@ -43,9 +43,9 @@ task is sized at ≤ 1 day.
 **Purpose**: E2E fixture, extension test harness, attribution
 
 - [x] T001 [P] Playwright E2E stack (`pnpm e2e`, mock-gem :4011, API + SPA :8788), `evidence()` and `collectRunArtifacts()` helpers in `e2e/support/fixtures.ts` and `e2e/support/start-api.sh` NFR-010
-- [ ] T002 [P] Create `e2e/006-apply-packet-assist/` and add `seedApplyFixture(request)` in `e2e/support/seed-apply.ts` (mirror `apps/api/test/workspace-fixtures.ts::seedApply` via public API + a direct `@tp/db` insert for tender/analysis, with tender `endAt` = now + 15 d and Dell MAF expiry = now − 35 d; returns ids and per-role storage states) NFR-010 (#193)
+- [x] T002 [P] Create `e2e/006-apply-packet-assist/` and add `seedApplyFixture(request)` in `e2e/support/seed-apply.ts` (mirror `apps/api/test/workspace-fixtures.ts::seedApply` via public API + a direct `@tp/db` insert for tender/analysis, with tender `endAt` = now + 15 d and Dell MAF expiry = now − 35 d; returns ids and per-role storage states) NFR-010 (#193)
 - [x] T003 [P] Extension E2E helper `launchWithExtension()` in `e2e/support/extension.ts` (build `apps/extension/dist` once, compute the unpacked id like `smoke.e2e.mjs`, serve `apps/extension/test/fixtures/gem-form.html` on `http://localhost:<port>/gem-form.html`, open `chrome-extension://<id>/popup.html`) NFR-010 (#195)
-- [ ] T004 [P] Append to root `NOTICE` the attributions for ports in this spec: `IshanMaheshwari-777_GEM-SCRAPER/scraper.py` + `ra_page_dump.html` (no licence file — copied with the user's approval) and `erenmyeager15_india-government-tenders-scraper/src/{pdf.ts,run-budget.ts}` (Apache-2.0) NFR-009 (#197)
+- [x] T004 [P] Append to root `NOTICE` the attributions for ports in this spec: `IshanMaheshwari-777_GEM-SCRAPER/scraper.py` + `ra_page_dump.html` (no licence file — copied with the user's approval) and `erenmyeager15_india-government-tenders-scraper/src/{pdf.ts,run-budget.ts}` (Apache-2.0) NFR-009 (#197)
 
 ---
 
@@ -58,7 +58,7 @@ task is sized at ≤ 1 day.
 - [x] T007 [P] PDF helpers (`A4`, `sanitize`, `wrap`, `embedFonts`, `text*`, `dateIST`, `dateTimeIST`) in `packages/core/src/packet/pdf-utils.ts` FR-039
 - [x] T008 Apply service loaders and mappers (`getWorkspace` UUID+org 404, `latestAnalysis`, `vaultRows`, `profileRow`, `readinessFor`, `people`, `orgMembers`, `toWorkspaceDto`, `toPacketDto`, `workspaceDetail`) in `apps/api/src/services/packet.ts` FR-011, NFR-004
 - [x] T009 Mount `workspacesRoutes`, `packetsRoutes`, `assistRoutes` in `apps/api/src/app.ts` FR-001
-- [ ] T010 [P] Add unique index `(org_id, key)` on `annexure_templates`, index `comments_ws_idx (workspace_id)` and index `(org_id, stage)` on `bid_workspaces` in `packages/db/src/schema.ts`; generate the migration in `packages/db/migrations/` (drizzle-kit) FR-036, NFR-001 (#199)
+- [x] T010 [P] Add unique index `(org_id, key)` on `annexure_templates`, index `comments_ws_idx (workspace_id)` and index `(org_id, stage)` on `bid_workspaces` in `packages/db/src/schema.ts`; generate the migration in `packages/db/migrations/` (drizzle-kit) FR-036, NFR-001 (#199)
 
 **Checkpoint**: Foundation ready — user stories can proceed in parallel
 
@@ -263,9 +263,9 @@ task is sized at ≤ 1 day.
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T096 [P] Update the Apply section of `specs/001-gem-tender-copilot/contracts/api.md` with the new errors/endpoints (`invalid_transition`, `nothing_to_override`, `unknown_placeholder`, `packet_too_large`, `DELETE …/comments/:commentId`, token `scope`) FR-008, FR-027, FR-033, FR-041, FR-056, FR-074 (#288)
-- [ ] T097 [P] dnd-kit screen-reader announcements for packet reordering ("Picked up <title>. Position 3 of 8." …) in `apps/web/src/features/workspace/PacketStep.tsx` NFR-006 (#289)
-- [ ] T098 Cairn review of the 006 changes (spec ↔ code traceability, Constitution I checklist) and QA summary `qa/evidence/006/SUMMARY.md` linking the seven `VERDICT.md` files SC-006 (#290)
+- [x] T096 [P] Update the Apply section of `specs/001-gem-tender-copilot/contracts/api.md` with the new errors/endpoints (`invalid_transition`, `nothing_to_override`, `unknown_placeholder`, `packet_too_large`, `DELETE …/comments/:commentId`, token `scope`) FR-008, FR-027, FR-033, FR-041, FR-056, FR-074 (#288)
+- [x] T097 [P] dnd-kit screen-reader announcements for packet reordering ("Picked up <title>. Position 3 of 8." …) in `apps/web/src/features/workspace/PacketStep.tsx` NFR-006 (#289)
+- [x] T098 Cairn review of the 006 changes (spec ↔ code traceability, Constitution I checklist) and QA summary `qa/evidence/006/SUMMARY.md` linking the seven `VERDICT.md` files SC-006 (#290)
 
 ---
 

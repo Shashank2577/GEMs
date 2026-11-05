@@ -36,6 +36,8 @@ export interface RuntimeEnv {
   ADMIN_TOKEN?: string;
   /** Sentry DSN; unset → error reporter is a no-op (008/FR-046). */
   SENTRY_DSN?: string;
+  /** Sentry environment tag: "production" | "staging" | "development" (default from NODE_ENV). */
+  SENTRY_ENVIRONMENT?: string;
   /** "debug" | "info" | "warn" | "error" (default info). */
   LOG_LEVEL?: string;
   /** /api/health reports `ingestion_stale` when the last successful sync is older than this (default 120). */

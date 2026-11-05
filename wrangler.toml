@@ -2,7 +2,9 @@
 # pipeline, and stores files in R2. Database: Neon Postgres (DATABASE_URL secret).
 #
 # Secrets (wrangler secret put <NAME>): DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY,
-#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID. Optional ones may be omitted (features degrade to no-ops).
+#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, SENTRY_DSN. Optional ones may be omitted (features degrade to no-ops).
+# Sentry environment: the Worker always runs with NODE_ENV=production, so a staging deploy must set the var
+#   SENTRY_ENVIRONMENT=staging (otherwise its events are tagged "production").
 # Deploy: pnpm deploy   (builds apps/web, then `wrangler deploy`)
 name = "tenderpilot"
 main = "apps/api/src/worker.ts"

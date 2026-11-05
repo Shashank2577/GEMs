@@ -35,7 +35,8 @@ export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' |
       report.push({ step, ok: true, ms: Date.now() - t0 });
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
-      deps.logger.error(`scheduled step failed: ${step}`, { error });
+      deps.logger.error(`scheduled step failed: ${step}`, { error, job: step });
+      try { deps.errors.capture(e, { job: step }); } catch { /* never let reporting stop the pipeline */ }
       report.push({ step, ok: false, ms: Date.now() - t0, error });
     }
   }

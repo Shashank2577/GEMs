@@ -1,0 +1,25 @@
+# sc1-health-healthy — project desktop — 2026-11-05T05:55:25.761Z
+### Manual sync now (mock-gem)
+> POST /api/ingestion/run {"pages":1}
+< 200
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: cabf57b6-17a8-4adc-8869-1d984c4fba66
+{"id":"615536f0-e925-4d67-94f2-f7424044bc7f","trigger":"manual","status":"success","pagesFetched":1,"tendersSeen":10,"tendersCreated":0,"tendersUpdated":0,"matchesCreated":0,"error":null,"startedAt":"2026-11-05T05:55:25.850Z","finishedAt":"2026-11-05T05:55:25.894Z","durationMs":44}
+
+### Health after real sync
+> GET /api/health
+< 200
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: 2036359f-076e-43e3-809f-8a05a4bb7ce5
+{"ok":true,"db":true,"version":"0.1.0","ingestion":{"lastSuccessAt":"2026-11-05T05:55:25.894Z","ageMinutes":0,"lastStatus":"success","state":"ok"},"alerts":{"pendingOlderThan30m":0},"reasons":[]}
+
+### Health, last success 25 min ago
+> GET /api/health
+< 200  (26 ms)
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: a54f7341-d11b-400f-8529-c17a55e7a4eb
+{"ok":true,"db":true,"version":"0.1.0","ingestion":{"lastSuccessAt":"2026-11-05T05:30:26.049Z","ageMinutes":25,"lastStatus":"success","state":"ok"},"alerts":{"pendingOlderThan30m":0},"reasons":[]}
+
