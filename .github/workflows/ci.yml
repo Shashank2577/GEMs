@@ -8,9 +8,11 @@
 #              otherwise skip every gated job, and skipped counts as passing for required checks)
 #
 # Branch protection on main requires `ci-gate` and `dod` (see docs/runbook.md § CI).
-# Deploy gating (US2): `workflow_run` only fires for workflow files on the repository's DEFAULT branch, which is
-# currently not `main`, so a deploy must not rely on `workflow_run: [ci]` unless the default branch is switched to main
-# (alternatives: deploy as a job in this workflow with `needs: ci-gate`, or check the commit's ci-gate status first).
+#   deploy ── needs ci-gate; push to main only, and only when ci-gate succeeded → calls the reusable
+#             .github/workflows/deploy.yml (US2/T036 fills in staging + production). A red ci means no deploy.
+#             ci-gate does not need deploy, so the deploy job being skipped on PRs never affects the gate.
+# Why not `workflow_run` from deploy.yml: it only fires for workflow files on the repository's DEFAULT branch, which
+# is currently not `main` (spec 008 US1 scenario 8 / FR-007 hand-off).
 name: ci
 
 on:
@@ -233,3 +235,15 @@ jobs:
           echo "job results: $RESULTS"
           if [ "$CHANGES" != "success" ]; then echo "::error::changes job did not succeed ($CHANGES)"; exit 1; fi
           if echo "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then echo "::error::a required CI job failed or was cancelled"; exit 1; fi
+
+  deploy:
+    name: deploy
+    needs: ci-gate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-gate.result == 'success'
+    # Concurrency (group `deploy`, no cancel) lives on the job inside deploy.yml; repeating it here would deadlock.
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      sha: ${{ github.sha }}
+    secrets: inherit
