@@ -1,5 +1,5 @@
 {
-  "id": "e84aa756-d50e-4625-abf6-65ca4a53b24e",
+  "id": "d5654a64-334b-443e-8800-7790e232a07e",
   "prevId": "509eb29b-7228-4adb-b904-e9493fffb983",
   "version": "7",
   "dialect": "postgresql",
@@ -1060,6 +1060,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "listing_stop": {
+          "name": "listing_stop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "error": {
           "name": "error",
@@ -2754,164 +2760,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.vault_document_versions": {
-      "name": "vault_document_versions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "document_id": {
-          "name": "document_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "blob_key": {
-          "name": "blob_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "file_name": {
-          "name": "file_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mime_type": {
-          "name": "mime_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size_bytes": {
-          "name": "size_bytes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "page_count": {
-          "name": "page_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expiry_date": {
-          "name": "expiry_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "replaced_by": {
-          "name": "replaced_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "replaced_at": {
-          "name": "replaced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "vault_versions_org_idx": {
-          "name": "vault_versions_org_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "vault_versions_doc_idx": {
-          "name": "vault_versions_doc_idx",
-          "columns": [
-            {
-              "expression": "document_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "replaced_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "vault_document_versions_org_id_organizations_id_fk": {
-          "name": "vault_document_versions_org_id_organizations_id_fk",
-          "tableFrom": "vault_document_versions",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "vault_document_versions_document_id_vault_documents_id_fk": {
-          "name": "vault_document_versions_document_id_vault_documents_id_fk",
-          "tableFrom": "vault_document_versions",
-          "tableTo": "vault_documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "vault_document_versions_replaced_by_users_id_fk": {
-          "name": "vault_document_versions_replaced_by_users_id_fk",
-          "tableFrom": "vault_document_versions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "replaced_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.vault_documents": {
       "name": "vault_documents",
       "schema": "",
@@ -3020,12 +2868,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "content_sha256": {
-          "name": "content_sha256",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3068,27 +2910,6 @@
             },
             {
               "expression": "type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "vault_org_sha_idx": {
-          "name": "vault_org_sha_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "content_sha256",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

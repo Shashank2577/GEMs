@@ -54,6 +54,10 @@ export function useSyncNow() {
     onError: (e: unknown) => {
       const err = e as { status?: number; message?: string };
       if (err.status === 409) toast.info('A sync is already running', { description: 'New tenders will appear in a moment.' });
+      else if (err.status === 429) {
+        qc.invalidateQueries({ queryKey: feedKeys.runs });
+        toast.info('GeM was synced moments ago', { description: err.message });
+      }
       else toast.error(err.message ?? 'Sync failed');
     },
   });

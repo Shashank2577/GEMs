@@ -1,7 +1,8 @@
 /**
- * Ingestion (T036; FR-001, FR-007): manual "Sync now" for Bid Managers and sync health for everyone.
+ * Ingestion (T036; FR-001, FR-007, FR-013): manual "Sync now" for Bid Managers (2-min cooldown after a finished
+ * manual run → `429 sync_cooldown {details.retryAt}`) and sync health for everyone.
  */
-import { desc, eq, and, gte, isNull, or, sql } from 'drizzle-orm';
+import { desc, eq, and, gte, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { ingestionRuns, tenders } from '@tp/db';
 import { ingestionRunInputSchema, type IngestionRunDto } from '@tp/core/contracts/identify';
@@ -24,9 +25,26 @@ export function runDto(r: IngestionRunRow): IngestionRunDto {
   };
 }
 
+/** FR-013: a finished manual run blocks the next manual run (any org — GeM is shared) for this long. */
+export const MANUAL_SYNC_COOLDOWN_MS = 2 * 60_000;
+
+const fmtTimeIst = (d: Date) =>
+  d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+
 ingestionRoutes.post('/ingestion/run', requireRole('bid_manager'), async (c) => {
   const deps = c.var.deps;
   const body = await parseJson(c, ingestionRunInputSchema);
+  // Manual-sync cooldown (FR-013): protects GeM from button-mashing across all orgs.
+  const [lastManual] = await deps.db.select({ finishedAt: ingestionRuns.finishedAt }).from(ingestionRuns)
+    .where(and(eq(ingestionRuns.trigger, 'manual'), isNotNull(ingestionRuns.finishedAt)))
+    .orderBy(desc(ingestionRuns.finishedAt)).limit(1);
+  if (lastManual?.finishedAt) {
+    const retryAt = new Date(lastManual.finishedAt.getTime() + MANUAL_SYNC_COOLDOWN_MS);
+    if (deps.clock.now().getTime() < retryAt.getTime()) {
+      throw new HttpError(429, 'sync_cooldown',
+        `GeM was synced moments ago. Next manual sync at ${fmtTimeIst(retryAt)} IST.`, { retryAt: retryAt.toISOString() });
+    }
+  }
   let run: IngestionRunRow;
   try {
     run = await runIngestion(deps, { trigger: 'manual', pages: body.pages, search: body.search });

@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1793848436133,
-      "tag": "0002_vault_versions",
+      "when": 1793848419196,
+      "tag": "0002_magenta_ikaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793848788472,
+      "tag": "0003_vault_versions",
       "breakpoints": true
     }
   ]
