@@ -4,13 +4,14 @@
  * syncNow, evidence003. One real sync only (the default manual-sync cooldown is 10 minutes, 008/FR-026), then a second
  * syncNow proves the fail-fast branch (wait > 60 s throws instead of sleeping).
  */
-import { test, expect, collectRunArtifacts, mockGem, uniqueUser, signupViaApi, resetGem, publishOnGem, gemCorrigendum, gemCancel, gemFail, syncNow, evidence003, GEM_URL } from '../support/fixtures';
+import { test, expect, collectRunArtifacts, mockGem, uniqueUser, signupViaApi, resetGem, publishOnGem, gemCorrigendum, gemCancel, gemFail, syncNow, evidence003, GEM_URL, resetIngestionData } from '../support/fixtures';
 
 const STORY = 'HARDEN';
 const BID = 'GEM/2026/B/6421001';
 const BID2 = 'GEM/2026/B/6421010';
 
 test.describe.configure({ mode: 'serial' });
+test.beforeAll(async ({ request }, info) => { if (info.project.name === 'desktop') await resetIngestionData(request); }); // clean state per spec file: whole-directory runs pass
 test.afterEach(async ({ page }) => { await collectRunArtifacts('003', STORY, page); });
 
 test('HARDEN scaffold helpers drive the mock GeM and a real sync', async ({ page, request }) => {
