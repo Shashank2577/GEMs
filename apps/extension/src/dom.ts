@@ -143,11 +143,13 @@ export function toTarget(el: Control): FillTarget {
   };
 }
 
-/** Every visible text-like input, textarea, select and radio/checkbox question (never buttons / files / passwords). */
+/** Every visible text-like input, textarea, select and radio/checkbox question (never buttons / files); password inputs are included only so they can be marked forbidden. */
 export function collectControls(root: ParentNode): Control[] {
   const els = Array.from(root.querySelectorAll<Control>('input, textarea, select'));
   const seenGroups = new Set<string>();
   return els.filter((el) => {
+    // Password inputs (e.g. the DSC PIN) are collected so they get the "never filled" outline; fill.ts classifies them forbidden.
+    if (el instanceof HTMLInputElement && el.type === 'password') return visible(el);
     if (el instanceof HTMLInputElement && !TEXT_TYPES.has(el.type)) {
       // Radio / checkbox questions are collected (reported as "left for you"); one entry per radio group.
       if (!isChoice(el) || !visible(el)) return false;

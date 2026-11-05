@@ -5,6 +5,7 @@
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0b1020; --fg: #e2e8f0; --muted: #94a3b8; --card: #121a2e; --border: #1e293b; --primary: #818cf8; --primary-fg: #0b1020; --warning-bg: #2a1f0a; --warning: #fbbf24; }
 }
+[hidden] { display: none !important; }
 * { box-sizing: border-box; }
 body { margin: 0; width: 380px; max-height: 590px; font: 13px/1.45 Inter, system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--fg); }
 .top { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 1; }

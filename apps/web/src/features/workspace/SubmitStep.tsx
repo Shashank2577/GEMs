@@ -12,10 +12,10 @@ import { useCan } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, formatINR } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { changedAssistKeys, isAssistDraftDirty } from './assist-draft';
+import { changedAssistKeys, isAssistDraftDirty, needsBuild } from './assist-draft';
 import { useAssist, useMarkSubmitted, useRecordOutcome, useSaveAssist, useUpdateWorkspace } from './api';
 
-const GROUP_LABEL: Record<AssistField['group'], string> = { product: 'Product', offer: 'Offer', compliance: 'Compliance', declaration: 'Declarations' };
+const GROUP_LABEL: Record<AssistField['group'], string> = { product: 'Product', offer: 'Offer', compliance: 'Compliance', declaration: 'Declaration' };
 const SOURCE_LABEL: Record<AssistField['source'], string> = { saved: 'Edited', profile: 'From profile', tender: 'From tender', analysis: 'From analysis', empty: 'Not set' };
 const STEP_ICON = { price: BadgeIndianRupee, upload: Upload, auth: Fingerprint, submit: MousePointerClick } as const;
 
@@ -107,20 +107,20 @@ export function SubmitStep({ data }: { data: WorkspaceDetail }) {
                   <div className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{GROUP_LABEL[g as AssistField['group']]}</div>
                   <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {fields.map((f) => (
-                      <div key={f.key} className="flex min-w-0 items-center gap-2 rounded-lg border bg-subtle/60 px-3 py-2">
-                        <div className="min-w-0 flex-1">
-                          <dt className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-                            {f.label}
-                            {!editing && <span className={cn('rounded px-1 text-[10px]', f.source === 'empty' ? 'bg-warning-soft text-warning' : 'bg-muted')}>{SOURCE_LABEL[f.source]}</span>}
-                          </dt>
-                          {editing ? (
-                            <Input value={draft[f.key] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))} className="mt-1 h-8" aria-label={f.label}
-                              inputMode={f.input === 'number' ? 'decimal' : undefined} placeholder={f.help} />
-                          ) : (
-                            <dd className={cn('truncate text-sm font-medium', !f.value && 'font-normal italic text-muted-foreground')} title={f.value}>{f.value || 'Not set'}</dd>
-                          )}
-                        </div>
-                        {!editing && <CopyButton value={f.value} label={f.label} />}
+                      <div key={f.key} className="min-w-0 rounded-lg border bg-subtle/60 px-3 py-2">
+                        <dt className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+                          {f.label}
+                          {!editing && <span className={cn('rounded px-1 text-[10px]', f.source === 'empty' ? 'bg-warning-soft text-[hsl(32_90%_28%)] dark:text-warning' : 'bg-muted')}>{SOURCE_LABEL[f.source]}</span>}
+                        </dt>
+                        {editing ? (
+                          <dd className="m-0"><Input value={draft[f.key] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))} className="mt-1 h-8" aria-label={f.label}
+                            inputMode={f.input === 'number' ? 'decimal' : undefined} placeholder={f.help} /></dd>
+                        ) : (
+                          <dd className="m-0 flex items-center gap-2">
+                            <span className={cn('min-w-0 flex-1 truncate text-sm font-medium', !f.value && 'font-normal italic text-muted-foreground')} title={f.value}>{f.value || 'Not set'}</span>
+                            <CopyButton value={f.value} label={f.label} />
+                          </dd>
+                        )}
                       </div>
                     ))}
                   </dl>
@@ -136,6 +136,7 @@ export function SubmitStep({ data }: { data: WorkspaceDetail }) {
             <p className="text-xs text-muted-foreground">File names as they’ll appear in your downloads.</p>
           </div>
           <ol className="divide-y">
+            {assist.data && needsBuild(assist.data.documents) && <li className="px-4 py-6 text-center text-sm text-muted-foreground">Build the packet first — the merged PDF will appear here.</li>}
             {(assist.data?.documents ?? []).map((d, i) => (
               <li key={`${d.url}-${i}`} className="flex items-center gap-3 px-4 py-2.5">
                 <span className="tabular flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-2xs font-semibold text-primary">{i + 1}</span>
@@ -148,7 +149,6 @@ export function SubmitStep({ data }: { data: WorkspaceDetail }) {
                 <Tooltip content="Download"><Button asChild size="icon-xs" variant="ghost"><a href={toPath(d.url)} aria-label={`Download ${d.title}`}><Download /></a></Button></Tooltip>
               </li>
             ))}
-            {assist.data && !assist.data.documents.length && <li className="px-4 py-6 text-center text-sm text-muted-foreground">Build the packet first — the merged PDF will appear here.</li>}
           </ol>
         </Card>
       </div>
@@ -179,7 +179,7 @@ function HumanOnly() {
   const steps = [
     { key: 'price', title: 'Enter your price on GeM', detail: 'Type the unit price yourself in the GeM price schedule.' },
     { key: 'upload', title: 'Upload the documents', detail: 'Attach the merged packet and documents listed below.' },
-    { key: 'auth', title: 'Verify with OTP / DSC / e-Sign', detail: 'Aadhaar OTP, e-Sign or your Digital Signature Certificate.' },
+    { key: 'auth', title: 'Authenticate with OTP / DSC / e-Sign', detail: 'Aadhaar OTP, e-Sign or your Digital Signature Certificate.' },
     { key: 'submit', title: 'Click Final Submit', detail: 'Review the GeM summary and submit — then mark it here.' },
   ] as const;
   return (
@@ -273,7 +273,7 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
         <>
           <div className="text-sm font-semibold">Done on GeM?</div>
           <p className="mt-1 text-[13px] text-muted-foreground">After you press Final Submit on GeM, record it here so your team and pipeline stay in sync.</p>
-          {data.readiness.blockers.length > 0 && <p className="mt-2 rounded-md bg-warning-soft px-2 py-1.5 text-xs text-warning">{data.readiness.blockers.length} checklist item(s) were still missing or expired.</p>}
+          {data.readiness.blockers.length > 0 && <p className="mt-2 rounded-md bg-warning-soft px-2 py-1.5 text-xs text-[hsl(32_90%_28%)] dark:text-warning">{data.readiness.blockers.length} checklist item(s) were still missing or expired.</p>}
           {canWrite && <Button block size="lg" className="mt-3" onClick={() => setConfirmOpen(true)}><Send /> Mark as submitted</Button>}
         </>
       )}

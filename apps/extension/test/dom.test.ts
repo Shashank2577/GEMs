@@ -50,11 +50,20 @@ describe('table context (FR-069)', () => {
 });
 
 describe('collectControls (FR-071)', () => {
-  it('excludes hidden, display:none, visibility:hidden, files, passwords, buttons and submit', () => {
+  it('excludes hidden, display:none, visibility:hidden, files, buttons and submit', () => {
     mount(`<input id="ok" name="a"/><input id="h1" hidden/><input id="h2" style="display:none"/><input id="h3" style="visibility:hidden"/>
-      <input type="hidden" id="h4"/><input type="file" id="f"/><input type="password" id="p"/><input type="submit" id="s"/><input type="button" id="b"/>
+      <input type="hidden" id="h4"/><input type="file" id="f"/><input type="submit" id="s"/><input type="button" id="b"/>
       <textarea id="ta"></textarea><select id="se"><option>x</option></select>`);
     expect(collectControls(document).map((e) => e.id)).toEqual(['ok', 'ta', 'se']);
+  });
+  it('collects visible password inputs (DSC PIN) so they can be marked forbidden, never filled', () => {
+    mount('<input type="password" id="p" name="dscPin"/><input type="password" id="ph" hidden/>');
+    const found = collectControls(document);
+    expect(found.map((e) => e.id)).toEqual(['p']);
+    const t = toTarget(found[0]);
+    expect(plan([t], FIELDS)[0].status).toBe('forbidden');
+    expect(fillAll([t], FIELDS).filled).toEqual([]);
+    expect((found[0] as HTMLInputElement).value).toBe('');
   });
   it('collects one entry per radio group plus checkboxes', () => {
     mount('<input type="radio" name="g" id="r1"/><input type="radio" name="g" id="r2"/><input type="checkbox" id="c1"/>');

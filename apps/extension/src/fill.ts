@@ -68,6 +68,17 @@ export function plan(targets: FillTarget[], fields: PayloadField[]): PlanEntry[]
   });
 }
 
+/** Human text for every skip reason code (FR-075). */
+export const SKIP_REASON_TEXT: Record<string, string> = {
+  fillable: 'could not be filled',
+  forbidden: 'protected field — never filled',
+  unmatched: 'not a recognised field',
+  no_value: 'no prepared value',
+  disabled: 'disabled or read-only',
+  manual: 'left for you',
+};
+export const skipReasonText = (code: string) => SKIP_REASON_TEXT[code] ?? code;
+
 /** Fill a single planned entry (called when the user clicks that field's chip). */
 export function fillOne(entry: PlanEntry, opts: { overwrite?: boolean } = {}): { ok: boolean; reason?: string } {
   // Radio / checkbox questions are never clicked (FR-077).
@@ -75,7 +86,7 @@ export function fillOne(entry: PlanEntry, opts: { overwrite?: boolean } = {}): {
   // Defence in depth: re-check the descriptor right before writing.
   const reason = forbiddenReason(entry.target.descriptor);
   if (reason) { entry.target.mark('blocked', `Never filled: ${reason}`); return { ok: false, reason: `forbidden (${reason})` }; }
-  if (entry.status !== 'fillable' || !entry.field) return { ok: false, reason: entry.status };
+  if (entry.status !== 'fillable' || !entry.field) return { ok: false, reason: skipReasonText(entry.status) };
   if (!opts.overwrite && entry.target.getValue().trim() !== '') return { ok: false, reason: 'already has a value' };
   const ok = entry.target.setValue(entry.field.value);
   if (ok) entry.target.mark('filled', `${entry.field.label} filled by TenderPilot — please verify`);
@@ -92,7 +103,7 @@ export function fillAll(targets: FillTarget[], fields: PayloadField[], opts: { o
     if (e.status === 'manual') { report.skipped.push({ key: e.field!.key, label: e.field!.label, reason: `left for you — choose “${e.field!.value}” yourself` }); continue; }
     const r = fillOne(e, opts);
     if (r.ok) report.filled.push({ key: e.field!.key, label: e.field!.label, value: e.field!.value });
-    else report.skipped.push({ key: e.field?.key, label: e.field?.label, reason: r.reason ?? e.status });
+    else report.skipped.push({ key: e.field?.key, label: e.field?.label, reason: skipReasonText(r.reason ?? e.status) });
   }
   return report;
 }

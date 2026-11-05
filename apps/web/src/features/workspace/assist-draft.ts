@@ -11,3 +11,6 @@ export function changedAssistKeys(draft: Record<string, string>, fields: readonl
 /** True when the editor is open and at least one value was changed — the only time leaving must be confirmed. */
 export const isAssistDraftDirty = (editing: boolean, draft: Record<string, string>, fields: readonly DraftField[]) =>
   editing && changedAssistKeys(draft, fields).length > 0;
+
+/** No merged packet yet: the upload-order list leads with "Build the packet first…" (006 US6 scenario 6). */
+export const needsBuild = (documents: { kind?: string }[]): boolean => !documents.some((d) => d.kind === 'packet');

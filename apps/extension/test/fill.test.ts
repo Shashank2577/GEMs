@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { assistPayload, type FieldDescriptor } from '@tp/core/assist/allowlist';
-import { fillAll, fillOne, pickOption, plan, type FillTarget, type MarkState, type PayloadField } from '../src/fill';
+import { fillAll, fillOne, pickOption, plan, skipReasonText, type FillTarget, type MarkState, type PayloadField } from '../src/fill';
 
 interface Fake extends FillTarget { value: string; state: MarkState; writes: number; options?: { value: string; text: string }[] }
 
@@ -117,6 +117,16 @@ describe('fillAll on a GeM-like form (US5 acceptance 1)', () => {
     const disabled = fake({ label: 'Make', type: 'text' }, { disabled: true });
     const entries = plan([disabled, fake({ label: 'Warranty' }), fake({ label: 'Startup exemption claimed' })], fields.map((x) => (x.key === 'warranty_months' ? { ...x, value: '' } : x)));
     expect(entries.map((e) => e.status)).toEqual(['disabled', 'no_value', 'fillable']);
+  });
+
+  it('reports human-readable skip reasons, never raw codes (FR-075)', () => {
+    const noVal = fake({ label: 'Warranty' });
+    const off = fake({ label: 'Make', type: 'text' }, { disabled: true });
+    const r = fillAll([noVal, off], fields.map((x) => (x.key === 'warranty_months' ? { ...x, value: '' } : x)));
+    const reasons = r.skipped.map((x) => x.reason);
+    expect(reasons).toContain('no prepared value');
+    expect(reasons.join(' ')).not.toMatch(/no_value/);
+    for (const code of ['fillable', 'forbidden', 'unmatched', 'no_value', 'disabled', 'manual']) expect(skipReasonText(code)).not.toBe(code);
   });
 
   it('fillOne re-checks the descriptor before writing', () => {

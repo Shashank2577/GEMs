@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedAssistKeys, isAssistDraftDirty } from './assist-draft';
+import { changedAssistKeys, isAssistDraftDirty, needsBuild } from './assist-draft';
 
 const fields = [{ key: 'make', value: 'Dell' }, { key: 'model', value: '' }];
 
@@ -14,5 +14,13 @@ describe('assist-values draft (FR-092)', () => {
     expect(isAssistDraftDirty(false, { make: 'HP' }, fields)).toBe(false);
     expect(isAssistDraftDirty(true, { make: 'Dell', model: '' }, fields)).toBe(false);
     expect(isAssistDraftDirty(true, { make: 'HP', model: '' }, fields)).toBe(true);
+  });
+});
+
+describe('needsBuild (006 US6 scenario 6)', () => {
+  it('is true before a merged packet exists even when other documents are listed', () => {
+    expect(needsBuild([])).toBe(true);
+    expect(needsBuild([{ kind: 'vault' }, { kind: 'annexure' }])).toBe(true);
+    expect(needsBuild([{ kind: 'packet' }, { kind: 'vault' }])).toBe(false);
   });
 });
