@@ -92,9 +92,9 @@ technical disqualification on GeM).
 
 1. **Given** the Apply fixture and the Analyst signed in, **When** they call `POST /api/tenders/{tenderId}/workspace`,
    **Then** the response is **201** with `created: true`, `stage: "go"`, `owner.id` = the Analyst, `dueAt` = the tender's
-   `endAt`, `assignees: []` and `mapping` = `{ gst, pan, balance_sheets → "Balance sheet 2024-25", oem_authorization →
-   "Dell MAF" }` (4 keys; `udyam` absent because nothing matches); the activity log has `workspace.created` for both the
-   workspace and the tender.
+   `endAt`, `assignees: []`, an empty stored `mapping` (`{}` — every item automatic, FR-014) and `readiness.items` resolving
+   gst, pan, balance_sheets → "Balance sheet 2024-25" and oem_authorization → "Dell MAF" with `auto: true` (4 picks; `udyam`
+   unmatched because nothing matches); the activity log has `workspace.created` for both the workspace and the tender.
 2. **Given** the workspace exists, **When** any Analyst+ calls the same endpoint again (or two calls race), **Then** the
    response is **200** with `created: false` and the same `id`; no second row exists (`workspace_org_tender_uq`).
 3. **Given** the Viewer, **When** they call `POST /api/tenders/{tenderId}/workspace`, **Then** the response is **403**
@@ -577,7 +577,8 @@ anywhere and never used to fill GeM.
   create won — enforced by the unique index `workspace_org_tender_uq`.
 - **FR-002**: On create the system MUST set `stage` to `go` when the latest analysis verdict is `go`, `analysing` when the
   analysis is running, else `identified`; `ownerId` = the caller; `dueAt` = tender `endAt`; `position` = max position in that
-  stage + 1; and store only real auto-matches in `doc_mapping` (absent keys stay automatic).
+  stage + 1; and store an empty `doc_mapping` — automatic picks are resolved at read time (FR-014) so they keep the **Auto-matched**
+  badge and fall back when a document is deleted; the `workspace.created` activity records the auto-match count.
 - **FR-003**: The stage set MUST be exactly `identified, analysing, go, preparing, ready, submitted, won, lost, dropped` with the
   labels Identified, Analysing, Go, Preparing, Ready to submit, Submitted, Won, Lost, Dropped (`STAGES`, `STAGE_LABELS`).
 - **FR-004**: `PATCH /api/workspaces/:id` (Analyst+) MUST accept only `stage, ownerId, assigneeIds (≤20, de-duplicated), dueAt
