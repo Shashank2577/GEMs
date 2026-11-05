@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CloudDownload, Download, Eye, FileText, Globe, MoreHorizontal, Trash2, Upload } from 'lucide-react';
+import { CloudDownload, Download, Eye, FileText, Globe, Loader2, MoreHorizontal, ScanText, Sparkles, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import type { TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
 import {
   Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, ConfirmDialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -8,8 +8,8 @@ import {
 import { apiUrl, errorMessage } from '@/lib/api';
 import { RoleGate, useCan } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
-import { useFetchFromGem, useRemoveDocument, useTender, useTenderDocuments, useUploadDocument } from './api';
-import { DOC_KIND_LABEL } from './labels';
+import { useAnalysisCapabilities, useFetchFromGem, useOcrDocument, useRemoveDocument, useTender, useTenderDocuments, useUploadDocument } from './api';
+import { DOC_KIND_LABEL, isOcrDocument, ocrActionState, type OcrActionState, unreadableDocumentNotice, unreadableDocuments } from './labels';
 
 const KIND_OPTIONS = (Object.keys(DOC_KIND_LABEL) as TenderDocKind[]).map((k) => ({ value: k, label: DOC_KIND_LABEL[k] }));
 
@@ -20,6 +20,8 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
   const remove = useRemoveDocument(tenderId);
   const bidNumber = useTender(tenderId).data?.bidNumber ?? '';
   const canRemove = useCan('analyst');
+  const ocr = useOcrDocument(tenderId);
+  const ocrAvailable = !!useAnalysisCapabilities().data?.ocr;
   const [kind, setKind] = useState<TenderDocKind>('bid');
   const [removing, setRemoving] = useState<TenderDocumentDto | null>(null);
 
@@ -46,12 +48,22 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
     onError: (e) => toast.error(errorMessage(e)),
   });
 
+  const onOcr = (d: TenderDocumentDto) => ocr.mutate(d.id, {
+    onSuccess: () => toast.success(`${d.fileName} read with AI`, {
+      description: 'Text via OCR. Requirements from it are marked — check them against the original.',
+      action: hasAnalysis ? { label: 'Re-analyse', onClick: onReanalyse } : undefined,
+    }),
+    onError: (e) => toast.error(errorMessage(e, 'AI OCR failed')),
+  });
+
   const onFetch = () => fetchGem.mutate(undefined, {
     onSuccess: (r) => toast.success(r.fetched ? 'Bid document downloaded from GeM' : 'The GeM bid document is already here'),
     onError: (e) => toast.error(errorMessage(e)),
   });
 
   const items = docs.data?.items ?? [];
+  const unreadable = unreadableDocuments(items);
+  const offerOcr = ocrAvailable && canRemove;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -71,11 +83,23 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
           {docs.isLoading ? <SkeletonList rows={2} /> : docs.isError ? <ErrorState compact error={docs.error} onRetry={() => docs.refetch()} /> : items.length === 0 ? (
             <EmptyState compact icon={FileText} title="No documents yet" body={hasGemLink ? 'Fetch the bid document from GeM, or upload the PDF you downloaded.' : 'Upload the bid PDF you downloaded from GeM.'} />
           ) : (
+            <>
+            {unreadable.length > 0 && (
+              <ul role="status" aria-label="Documents without readable text" data-testid="unreadable-notice" className="mb-3 grid gap-1.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
+                {unreadable.map((d) => (
+                  <li key={d.id} className="flex items-start gap-2 break-words">
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
+                    <span>{unreadableDocumentNotice(d.fileName, offerOcr)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
             <ul className="grid gap-2">
               {items.map((d) => (
-                <DocRow key={d.id} doc={d} tenderId={tenderId} bidNumber={bidNumber} onRemove={canRemove && d.source === 'upload' ? () => setRemoving(d) : undefined} />
+                <DocRow key={d.id} doc={d} tenderId={tenderId} bidNumber={bidNumber} ocrState={ocrActionState(d, { ocrAvailable, canRun: canRemove, running: ocr.isPending && ocr.variables === d.id })} ocrBusy={ocr.isPending} onOcr={() => onOcr(d)} onRemove={canRemove && d.source === 'upload' ? () => setRemoving(d) : undefined} />
               ))}
             </ul>
+            </>
           )}
         </CardContent>
       </Card>
@@ -108,7 +132,9 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
   );
 }
 
-function DocRow({ doc, tenderId, bidNumber, onRemove }: { doc: TenderDocumentDto; tenderId: string; bidNumber: string; onRemove?: () => void }) {
+function DocRow({ doc, tenderId, bidNumber, onRemove, ocrState, ocrBusy, onOcr }: {
+  doc: TenderDocumentDto; tenderId: string; bidNumber: string; onRemove?: () => void; ocrState: OcrActionState; ocrBusy: boolean; onOcr: () => void;
+}) {
   const base = `/tenders/${tenderId}/documents/${doc.id}/download`;
   return (
     <li className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center">
@@ -124,6 +150,7 @@ function DocRow({ doc, tenderId, bidNumber, onRemove }: { doc: TenderDocumentDto
               <Badge size="sm" tone="warning" data-testid="pages-truncated">Only the first {doc.pageCount} of {doc.totalPages} pages were read</Badge>
             )}
             <Tooltip content={formatDateIST(doc.createdAt, { time: true })}><span>· {relativeTime(doc.createdAt)}</span></Tooltip>
+            {isOcrDocument(doc) && <Badge size="sm" tone="info" data-testid="ocr-badge"><Sparkles aria-hidden /> Text via OCR</Badge>}
             {!doc.hasText && <Badge size="sm" tone="warning">No text — scanned?</Badge>}
             {doc.bidNumberFound && (
               <Tooltip content={`Page 1 shows ${doc.bidNumberFound}${bidNumber ? `, but this tender is ${bidNumber}` : ''}. Check that this is the right PDF.`}>
@@ -133,7 +160,13 @@ function DocRow({ doc, tenderId, bidNumber, onRemove }: { doc: TenderDocumentDto
           </div>
         </div>
       </div>
-      <div className="flex shrink-0 gap-2">
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {ocrState !== 'hidden' && (
+          <Button size="sm" variant="secondary" onClick={onOcr} disabled={ocrBusy} aria-label={ocrState === 'running' ? `Reading ${doc.fileName} with AI` : `Read ${doc.fileName} with AI (OCR)`}>
+            {ocrState === 'running' ? <Loader2 className="animate-spin" aria-hidden /> : <ScanText aria-hidden />} {ocrState === 'running' ? 'Reading…' : 'Read with AI (OCR)'}
+          </Button>
+        )}
+        {ocrState === 'running' && <span role="status" className="sr-only">Reading {doc.fileName} with AI. This can take a minute.</span>}
         <Button asChild size="sm" variant="secondary"><a href={apiUrl(base, { inline: 1 })} target="_blank" rel="noreferrer"><Eye /> View</a></Button>
         <Button asChild size="sm" variant="ghost"><a href={apiUrl(base)} download={doc.fileName} aria-label={`Download ${doc.fileName}`}><Download /> <span className="sm:sr-only">Download</span></a></Button>
         {onRemove && (

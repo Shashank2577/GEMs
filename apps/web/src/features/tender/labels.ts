@@ -218,3 +218,28 @@ export function analysisWarningText(w: AnalysisWarning): string {
       return 'Part of this analysis used rules only.';
   }
 }
+
+/** Tooltip on requirements read from a scanned page (004/FR-052). */
+export const OCR_REQUIREMENT_TOOLTIP = 'Read by AI from a scanned page — check against the original';
+
+export type OcrActionState = 'hidden' | 'available' | 'running';
+
+/** "Read with AI (OCR)" row action: only for documents without text, when OCR is configured and the user is analyst+ (FR-052/FR-053). */
+export function ocrActionState(
+  doc: Pick<TenderDocumentDto, 'hasText' | 'textSource'>, opts: { ocrAvailable: boolean; canRun: boolean; running: boolean },
+): OcrActionState {
+  if (doc.hasText || doc.textSource === 'ocr' || !opts.ocrAvailable || !opts.canRun) return 'hidden';
+  return opts.running ? 'running' : 'available';
+}
+
+export const isOcrDocument = (doc: Pick<TenderDocumentDto, 'textSource'>) => doc.textSource === 'ocr';
+
+/** Notice for a document with no readable text. Spec wording when the user cannot run OCR; otherwise points at the OCR action. */
+export function unreadableDocumentNotice(fileName: string, offerOcr: boolean): string {
+  return offerOcr
+    ? `We couldn't read text from ${fileName}. Use “Read with AI (OCR)” to transcribe it, or upload a text PDF.`
+    : `We couldn't read text from ${fileName}. Upload a text PDF or ask your admin to enable AI OCR.`;
+}
+
+/** Documents that still have no text and so need the notice. */
+export const unreadableDocuments = <T extends Pick<TenderDocumentDto, 'hasText'>>(docs: readonly T[] | undefined): T[] => (docs ?? []).filter((d) => !d.hasText);

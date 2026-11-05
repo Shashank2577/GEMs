@@ -104,7 +104,7 @@ Types: `packages/core/src/contracts/analyse.ts` (004). Every route is scoped to 
 
 - `TenderDocumentDto` = `{id, tenderId, orgId (null = GeM), kind, fileName, sizeBytes, pageCount, totalPages, sourceUrl, hasText, source:'gem'\|'upload', textSource:'pdf'\|'ocr', bidNumberFound, createdAt}`.
   - `pageCount` = pages read (capped at 150, 004/NFR-005); `totalPages` = the PDF's real page count (`totalPages > pageCount` means it was truncated; `null` for rows that predate the column).
-  - `hasText:false` = no text layer (scanned). `textSource` is `'pdf'` for every document today; `'ocr'` is reserved for US7.
+  - `hasText:false` = no text layer (scanned). `textSource` is `'pdf'` for a text layer and `'ocr'` once the text was transcribed by AI OCR (004/FR-052).
   - `bidNumberFound` = the bid number printed on page 1 when it differs from the tender's, else `null`.
 - `TenderDocumentWarning` (upload response only, non-blocking, FR-010): `{code:'bid_number_mismatch', found}` and `{code:'pages_truncated', analysed, total}`.
 - `AnalysisDto` = `{id, orgId, tenderId, status:'pending'\|'running'\|'done'\|'failed', method, requirements[], factors[], checklist[], score, confidence, verdict:'go'\|'review'\|'no_go'\|null, summary, error, stale, staleReason, staleAt, notes[], warnings[], createdBy, createdAt, updatedAt, documents?, lastAttempt?}`.
@@ -140,13 +140,11 @@ Types: `packages/core/src/contracts/analyse.ts` (004). Every route is scoped to 
 | `forbidden` | 403 | Role too low, or removing a GeM-fetched document |
 | `analysis_failed` | 500 | The run failed unexpectedly; the previous result (if any) stays and is reported with `lastAttempt` |
 
-### US7 (pending): AI enrichment and OCR
+### US7: AI enrichment and OCR (004/FR-052, FR-053)
 
-> Not built yet. The US7 PR completes this section (and ticks T095 in `specs/004-analyse-scoring/tasks.md`); nothing below exists on `main` today.
-
-- `POST /tenders/:id/documents/:docId/ocr` (analyst+) — read a scanned document with AI → the updated `TenderDocumentDto` (`textSource:'ocr'`). Planned: 409 when the document already has text. TODO(US7): request/response details.
-- `GET /analysis/capabilities` (viewer+) — `{ai, ocr, models}`. TODO(US7): shape and caching.
-- Error codes `ocr_unavailable` (503, no OCR model configured) and `ocr_failed` (502, the model could not transcribe the document). TODO(US7): messages and `details`.
+- `POST /tenders/:id/documents/:docId/ocr` — see the route table above. No body. Success → 200 `TenderDocumentDto` with `textSource:'ocr'`. Calls are metered as `extract` usage without an analysis (008/FR-039); OCR run inside `POST …/analyse` is metered under the coming analysis's id (`analysis_ref`, no foreign key, so deleting an analysis does not give its AI slot back) and counts against the monthly AI-analysis quota. Messages: `ocr_unavailable` "AI OCR is not set up. Upload the text PDF from GeM, or ask your admin to enable AI OCR."; `ocr_failed` "AI OCR could not read this document. Try again in a few minutes, or upload the text PDF from GeM."
+- `GET /analysis/capabilities` (viewer+, any signed-in user) → `{ai:boolean, ocr:boolean, models:{enrichment?, ocr?, escalation?}}`. `ai` = an LLM key is configured; `ocr` = an OCR model is available; `models` holds model ids only (never keys) and omits tiers that are not configured. Not cached server-side; the web client caches it for 5 minutes.
+- Error codes `ocr_unavailable` (503) and `ocr_failed` (502): see the table above. Neither carries `details`.
 
 ## Profile & Vault — owner: Vault module (`routes/profile.ts`, `routes/vault.ts`)
 

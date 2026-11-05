@@ -98,6 +98,17 @@ export function useRemoveDocument(id: string) {
   });
 }
 
+/** POST /tenders/:id/documents/:docId/ocr — read a scanned document with AI (004/FR-052). Marks the analysis stale, so refresh it too. */
+export function useOcrDocument(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (docId: string) => api.post<TenderDocumentDto>(`/tenders/${id}/documents/${docId}/ocr`),
+    onSuccess: () => invalidateDocumentChange(qc, id),
+    // 409 (already has text) means the list is out of date; refresh it either way.
+    onError: () => { qc.invalidateQueries({ queryKey: tenderKeys.documents(id) }); },
+  });
+}
+
 function invalidateDocumentChange(qc: ReturnType<typeof useQueryClient>, id: string) {
   qc.invalidateQueries({ queryKey: tenderKeys.documents(id) });
   qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
