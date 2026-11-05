@@ -346,4 +346,35 @@ describe('error reporter wiring and Sentry options (FR-046, NFR-008)', () => {
     expect(beforeBreadcrumb({ data: { url: 'https://x.in/a?k=v' } }).data!.url).toBe('https://x.in/a');
     expect(scrubEvent({})).toEqual({});
   });
+
+  it('strips @sentry/node http.query / http.fragment breadcrumb data (R2-1)', () => {
+    const { beforeSend, beforeBreadcrumb } = sentryOptions(loadConfig({}));
+    const crumb = () => ({ category: 'http', data: { url: 'https://api.resend.com/emails', 'http.query': '?key=SECRETQ', 'http.fragment': '#SECRETF', method: 'POST' } as Record<string, unknown> });
+    const viaBreadcrumb = beforeBreadcrumb(crumb());
+    expect(viaBreadcrumb.data).toEqual({ url: 'https://api.resend.com/emails', method: 'POST' });
+    const out = beforeSend({ breadcrumbs: [crumb(), { category: 'x', data: undefined }] });
+    expect(JSON.stringify(out)).not.toMatch(/SECRET/);
+    expect(out.breadcrumbs![0]!.data).toEqual({ url: 'https://api.resend.com/emails', method: 'POST' });
+  });
+
+  it('scrubs invite tokens from the request path and credentials from message / exception values (R2-2)', () => {
+    const { beforeSend } = sentryOptions(loadConfig({}));
+    const out = beforeSend({
+      message: 'failed with Bearer tp_abcdefghijklmnopqrstuvwxyz',
+      request: { url: 'https://app.example.in/api/auth/invite/INVITETOKEN123?x=1' },
+      exception: { values: [{ value: 'connect postgres://u:pw@db.internal/x failed' }, { value: 'Basic dXNlcjpwYXNz rejected' }] },
+    });
+    expect(out.request!.url).toBe('https://app.example.in/api/auth/invite/:token');
+    const json = JSON.stringify(out);
+    for (const s of ['INVITETOKEN123', 'tp_abc', 'pw@', 'dXNlcjpwYXNz']) expect(json).not.toContain(s);
+    expect(out.exception!.values![0]!.value).toBe('connect postgres://[redacted]@db.internal/x failed');
+  });
+
+  it('log scrubbing covers empty-user URLs, passwords containing @, and Basic auth (R2-3)', () => {
+    const lines: string[] = [];
+    const logger = createJsonLogger({ write: (l) => lines.push(l) });
+    logger.info('a postgres://u:p@ss@h.example/db b redis://:hunter2@cache:6379 c Basic dXNlcjpwYXNz d', {});
+    const msg = JSON.parse(lines[0]!).msg as string;
+    expect(msg).toBe('a postgres://[redacted]@h.example/db b redis://[redacted]@cache:6379 c Basic [redacted] d');
+  });
 });

@@ -5,6 +5,8 @@
  */
 import type { AppConfig } from '../env';
 import type { ErrorReporter } from '../deps';
+import { scrubString } from './logger';
+import { redactPath } from '../middleware/request';
 
 export const noopErrorReporter: ErrorReporter = { capture() { /* nothing configured */ } };
 
@@ -35,10 +37,30 @@ export function createSentryReporter(sdk: SentryLike): ErrorReporter {
 /** The parts of a Sentry event that can carry request data (structural, so both SDKs' event types fit). */
 export interface ScrubbableEvent {
   request?: { url?: string; headers?: unknown; cookies?: unknown; query_string?: unknown; data?: unknown; env?: unknown };
-  breadcrumbs?: { data?: Record<string, unknown> }[];
+  breadcrumbs?: { data?: Record<string, unknown>; category?: string }[];
+  message?: string;
+  exception?: { values?: { value?: string }[] };
 }
 
 const stripQuery = (url: string) => url.replace(/[?#].*$/, '');
+
+/** Breadcrumb data from @sentry/node's http / node-fetch instrumentations: `url` plus separate `http.query` / `http.fragment`. */
+function scrubBreadcrumbData(data: Record<string, unknown> | undefined): void {
+  if (!data) return;
+  if (typeof data.url === 'string') data.url = stripQuery(data.url);
+  delete data['http.query'];
+  delete data['http.fragment'];
+}
+
+/** Path-only URL with route secrets (invite tokens) redacted; unparsable values fall back to the query-stripped string. */
+function scrubUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${redactPath(u.pathname)}`;
+  } catch {
+    return redactPath(stripQuery(url));
+  }
+}
 
 /**
  * NFR-008 / ADR-0011: nothing from the request may reach Sentry except the path. Drops headers (Authorization: Bearer
@@ -49,11 +71,11 @@ export function scrubEvent<E extends ScrubbableEvent>(event: E): E {
   const req = event.request;
   if (req) {
     delete req.headers; delete req.cookies; delete req.query_string; delete req.data; delete req.env;
-    if (typeof req.url === 'string') req.url = stripQuery(req.url);
+    if (typeof req.url === 'string') req.url = scrubUrl(req.url);
   }
-  for (const b of event.breadcrumbs ?? []) {
-    if (b.data && typeof b.data.url === 'string') b.data.url = stripQuery(b.data.url);
-  }
+  for (const b of event.breadcrumbs ?? []) scrubBreadcrumbData(b.data);
+  if (typeof event.message === 'string') event.message = scrubString(event.message);
+  for (const v of event.exception?.values ?? []) if (typeof v.value === 'string') v.value = scrubString(v.value);
   return event;
 }
 
@@ -75,7 +97,7 @@ export function sentryOptions(config: Pick<AppConfig, 'sentryDsn' | 'version' | 
     beforeSend: scrubEvent,
     beforeSendTransaction: scrubEvent,
     beforeBreadcrumb: <B extends { data?: Record<string, unknown> }>(b: B): B => {
-      if (b.data && typeof b.data.url === 'string') b.data.url = stripQuery(b.data.url);
+      scrubBreadcrumbData(b.data);
       return b;
     },
   };

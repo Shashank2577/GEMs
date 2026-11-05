@@ -9,8 +9,9 @@ import type { Logger } from '../deps';
 export const REDACT_KEY = /password|token|secret|cookie|authorization|(?:api|access|private)_?key|dsn|database_?url/i;
 /** Credential-shaped substrings scrubbed from string values: URL userinfo, bearer tokens, extension tokens (`tp_…`). */
 const SCRUB_VALUE: [RegExp, string][] = [
-  [/(:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@'],
-  [/\bBearer\s+\S+/gi, 'Bearer [redacted]'],
+  // userinfo up to the LAST '@' before the host, so a password containing '@' is consumed whole; the user part may be empty.
+  [/(:\/\/)[^/\s:@]*:[^/\s]*@/g, '$1[redacted]@'],
+  [/\b(Bearer|Basic)\s+\S+/gi, '$1 [redacted]'],
   [/\btp_[A-Za-z0-9_-]{16,}/g, 'tp_[redacted]'],
 ];
 export const scrubString = (s: string) => SCRUB_VALUE.reduce((acc, [re, rep]) => acc.replace(re, rep), s);
