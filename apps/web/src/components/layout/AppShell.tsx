@@ -181,7 +181,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <a href="#main" className="sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>
+      <a href="#main" className="sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring">Skip to content</a>
 
       {/* Desktop sidebar */}
       <aside

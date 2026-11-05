@@ -31,13 +31,13 @@
     --success: 158 72% 28%; /* ≥ 4.5:1 as text on success-soft and white on success (002/NFR-004) */
     --success-foreground: 0 0% 100%;
     --success-soft: 152 70% 95%;
-    --warning: 34 92% 42%;
+    --warning: 30 95% 31%;
     --warning-foreground: 0 0% 100%;
     --warning-soft: 45 100% 94%;
     --danger: 350 74% 50%;
     --danger-foreground: 0 0% 100%;
     --danger-soft: 352 100% 96.5%;
-    --info: 205 85% 45%;
+    --info: 205 90% 32%;
     --info-soft: 205 100% 96%;
     --sidebar: 230 30% 98.4%;
     --sidebar-foreground: 232 18% 30%;

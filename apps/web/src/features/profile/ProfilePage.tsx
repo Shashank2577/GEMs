@@ -282,8 +282,8 @@ export default function ProfilePage() {
       {/* Phone/tablet: section pills + compact meter */}
       <div className="sticky top-14 z-10 -mx-4 mb-4 border-b bg-background/90 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:hidden">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => jump('identity')} className="flex shrink-0 items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3 text-xs font-semibold focus-ring" aria-label={`Profile ${percent}% complete`}>
-            <span className="scale-[0.42] -m-[22px]"><Ring value={percent} /></span>{percent}%
+          <button type="button" onClick={() => jump('identity')} className="flex shrink-0 items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3 text-xs font-semibold focus-ring" aria-label={`${percent}% profile complete`}>
+            <span className="scale-[0.42] -m-[22px] [&_span.absolute]:hidden" aria-hidden="true"><Ring value={percent} /></span>{percent}%
           </button>
           <nav aria-label="Profile sections" className="-mr-4 flex gap-1.5 overflow-x-auto pr-4 scrollbar-thin">
             {SECTIONS.map((s) => (
