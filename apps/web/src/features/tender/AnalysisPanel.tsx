@@ -11,6 +11,8 @@ import { useCan } from '@/lib/auth';
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useOverride } from './api';
+import { checklistReadiness } from '@tp/core/analyse/checklist';
+import { useVault } from '@/features/vault/api';
 import { ChecklistCard } from './ChecklistCard';
 import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, failedAttemptCopy, friendlyAnalysisError, isAnalysisRunning, truncatedDocuments } from './labels';
 
@@ -74,6 +76,14 @@ export function AnalysisPanel({
     for (const r of analysis.requirements) if (!m.has(r.key)) m.set(r.key, r);
     return m;
   }, [analysis.requirements]);
+
+  // Vault readiness for checklist rows (FR-040): only without a workspace; hidden if the vault query fails.
+  const vault = useVault({});
+  const vaultItems = vault.data?.items;
+  const readiness = useMemo(
+    () => (hasWorkspace || vault.isError || !vaultItems ? null : checklistReadiness(analysis.checklist, vaultItems.map((d) => ({ type: d.type, title: d.title, expiryDate: d.expiryDate })), new Date())),
+    [hasWorkspace, vault.isError, vaultItems, analysis.checklist],
+  );
 
   const running = isAnalysisRunning(analysis);
   const failedCopy = failedAttemptCopy(analysis);
@@ -139,7 +149,7 @@ export function AnalysisPanel({
       </div>
 
       <div className="grid content-start gap-6">
-        <ChecklistCard items={analysis.checklist} hasWorkspace={hasWorkspace} />
+        <ChecklistCard items={analysis.checklist} hasWorkspace={hasWorkspace} readiness={readiness} />
       </div>
 
       <OverrideDialog analysis={analysis} factor={overrideFor} tenderId={tenderId} onClose={() => setOverrideFor(null)} />
