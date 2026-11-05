@@ -15,6 +15,8 @@ import { FormAlert } from './FormAlert';
 
 function inviteError(err: unknown) {
   if (err instanceof ApiError) {
+    // 002/FR-010: "Too many attempts. Try again in N minutes." instead of a credentials error.
+    if (err.status === 429) return err.message;
     if (err.status === 404 || err.code.includes('not_found')) return 'This invitation link is invalid. Ask your admin to send a new one.';
     if (err.status === 410 || err.code.includes('expired')) return 'This invitation has expired. Ask your admin to send a new one.';
     if (err.status === 409) return 'This invitation has already been used. Try signing in instead.';

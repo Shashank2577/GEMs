@@ -7,7 +7,7 @@ import type { AppEnv } from '../types';
 
 /** app.onError handler → `{ error: { code, message, details? } }`. */
 export function errorHandler(err: Error, c: Context<AppEnv>) {
-  if (err instanceof HttpError) return c.json(err.toJSON(), err.status);
+  if (err instanceof HttpError) return c.json(err.toJSON(), err.status, err.headers);
   if (err instanceof ZodError) {
     const e = zodToHttpError(err);
     return c.json(e.toJSON(), e.status);

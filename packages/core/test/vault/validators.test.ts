@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   averageTurnoverLastN, fyLabelForDate, fyStartYear, gstinCheckChar, gstinPan, gstinState, lastCompletedFys, normalizeFy, panEntityType,
-  toE164IndianMobile, validateCin, validateGstin, validateIfsc, validatePan, validatePincode, validateUdyam,
+  toE164IndianMobile, UDYAM_STATE_CODES, udyamState, validateCin, validateDpiit, validateGstin, validateIfsc, validatePan, validatePincode, validateUdyam,
 } from '../../src/vault/validators';
 
 // Real-format GSTINs whose check characters were computed with the mod-36 algorithm
@@ -59,6 +59,29 @@ describe('other identifiers', () => {
     expect(validateUdyam('udyam-mh-26-0123456')).toBeNull();
     expect(validateUdyam('UDYAM-MH-260123456')).toMatch(/UDYAM-XX/);
     expect(validateUdyam('UAM-MH-26-0123456')).not.toBeNull();
+  });
+  it('Udyam state code (FR-015)', () => {
+    expect(Object.keys(UDYAM_STATE_CODES)).toHaveLength(36);
+    for (const sc of ['MH', 'DL', 'TS', 'OD', 'LA', 'DN']) expect(validateUdyam(`UDYAM-${sc}-01-0000001`)).toBeNull();
+    expect(validateUdyam('UDYAM-XX-26-0123456')).toBe('"XX" is not a valid state code in a Udyam number');
+    expect(validateUdyam('udyam-zz-26-0123456')).toBe('"ZZ" is not a valid state code in a Udyam number');
+  });
+  it('Udyam accepts alias state codes DD → DN and TG → TS, but not prototype keys', () => {
+    expect(validateUdyam('UDYAM-DD-01-0000001')).toBeNull();
+    expect(validateUdyam('UDYAM-TG-02-0000001')).toBeNull();
+    expect(udyamState('DD')).toBe(udyamState('DN'));
+    expect(udyamState('tg')).toBe('Telangana');
+    expect(Object.keys(UDYAM_STATE_CODES)).not.toContain('DD');
+    expect(udyamState('constructor')).toBeNull();
+    expect(udyamState('__proto__')).toBeNull();
+  });
+  it('CIN year bound uses an injectable now (FR-015)', () => {
+    const now = new Date('2026-11-05T00:00:00Z');
+    expect(validateCin('U72200MH2027PTC123456', now)).toBeNull();
+    expect(validateCin('U72200MH2028PTC123456', now)).toMatch(/Incorporation year 2028/);
+    expect(validateCin('U72200MH2028PTC123456', new Date('2027-06-01T00:00:00Z'))).toBeNull();
+    expect(validateCin('U72200MH1850PTC123456', now)).toBeNull();
+    expect(validateCin('U72200MH1849PTC123456', now)).toMatch(/year/);
   });
   it('CIN', () => {
     expect(validateCin('U72200MH2015PTC123456')).toBeNull();
@@ -119,6 +142,46 @@ describe('financial years', () => {
     expect(averageTurnoverLastN([], 3)).toBeNull();
     expect(averageTurnoverLastN([{ fy: 'junk', turnover: 5 }], 3)).toBeNull();
   });
+  it('spec 005 US2 average: ₹6 Cr, ₹4.5 Cr, ₹3 Cr → ₹4,50,00,000 over the 3 latest FYs', () => {
+    const fin = [{ fy: '2025-26', turnover: 6_00_00_000 }, { fy: '2024-25', turnover: 4_50_00_000 }, { fy: '2023-24', turnover: 3_00_00_000 }];
+    expect(averageTurnoverLastN(fin, 3)).toEqual({ avg: 45_000_000, years: ['2025-26', '2024-25', '2023-24'] });
+  });
+  it('de-duplicates FYs (first row per normalised FY wins)', () => {
+    const fin = [{ fy: '2024-25', turnover: 100 }, { fy: 'FY 2024-2025', turnover: 900 }, { fy: '2023-24', turnover: 300 }];
+    expect(averageTurnoverLastN(fin, 3)).toEqual({ avg: 200, years: ['2024-25', '2023-24'] });
+  });
+  it('uses at most 3 years by default and fewer when fewer have figures', () => {
+    const fin = ['2025-26', '2024-25', '2023-24', '2022-23', '2021-22'].map((fy, i) => ({ fy, turnover: (i + 1) * 100 }));
+    expect(averageTurnoverLastN(fin)).toEqual({ avg: 200, years: ['2025-26', '2024-25', '2023-24'] });
+    expect(averageTurnoverLastN([{ fy: '2025-26', turnover: 7 }])).toEqual({ avg: 7, years: ['2025-26'] });
+  });
+  it('ignores negative and non-finite turnovers', () => {
+    const fin = [{ fy: '2025-26', turnover: -1 }, { fy: '2024-25', turnover: Number.NaN }, { fy: '2023-24', turnover: 300 }, { fy: '2022-23', turnover: 0 }];
+    expect(averageTurnoverLastN(fin, 3)).toEqual({ avg: 150, years: ['2023-24', '2022-23'] });
+    expect(averageTurnoverLastN([{ fy: '2025-26', turnover: -5 }], 3)).toBeNull();
+  });
+});
+
+describe('quoted examples are themselves valid (FR-004)', () => {
+  // Every "e.g. …" in a validator message (and the matching UI placeholder/hint) must pass its own validator.
+  const exampleIn = (msg: string | null, re: RegExp) => { expect(msg).not.toBeNull(); const m = msg!.match(re); expect(m).not.toBeNull(); return m![1]!; };
+  it.each([
+    ['GSTIN', validateGstin, '27AAPFU0939F1Z', /e\.g\. (\w+)/],
+    ['PAN', validatePan, 'AAPF', /e\.g\. (\w+)/],
+    ['Udyam', validateUdyam, 'UDYAM-1', /e\.g\. ([\w-]+)/],
+    ['CIN', validateCin, 'U72200MH2015PTC12345', /e\.g\. (\w+)/],
+    ['IFSC', validateIfsc, 'HDFC1', /e\.g\. (\w+)/],
+    ['DPIIT', validateDpiit, 'X1', /like (\w+)/],
+  ] as const)('%s', (_name, validator, bad, re) => {
+    const example = exampleIn((validator as (v: string) => string | null)(bad), re);
+    expect((validator as (v: string) => string | null)(example)).toBeNull();
+  });
+  it('GSTIN example is 27AAPCS1234K1Z2 and embeds the PAN example', () => {
+    expect(validateGstin('27AAPCS1234K1Z5')).not.toBeNull();
+    expect(exampleIn(validateGstin('1'), /e\.g\. (\w+)/)).toBe('27AAPCS1234K1Z2');
+    expect(gstinPan('27AAPCS1234K1Z2')).toBe(exampleIn(validatePan('1'), /e\.g\. (\w+)/));
+  });
+  it('PIN placeholder used in the UI (411001) is valid', () => expect(validatePincode('411001')).toBeNull());
 });
 
 describe('isoDateSchema (US6 review: impossible calendar dates)', () => {

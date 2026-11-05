@@ -156,7 +156,7 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
             ) : (
               <>
                 <Preview doc={doc} />
-                <dl className="grid gap-x-6 sm:grid-cols-2">
+                <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
                   <Meta icon={Hash} label="Number">{doc.number ? <span className="font-mono text-[13px]">{doc.number}</span> : <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={User} label="Issued by">{doc.issuer ?? <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={Calendar} label="Issue date">{formatDateIST(doc.issueDate, { fallback: '—' })}</Meta>
