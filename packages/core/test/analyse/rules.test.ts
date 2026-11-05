@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { generateBidPdf, getSampleBidSpec, SAMPLE_BID_SPECS } from '../../src/analyse/sample-bid';
 import { extractPages, isPdf, joinPages, looksScanned, splitPages, PdfTextError } from '../../src/analyse/pdf-text';
 import {
-  combineRequirements, detectBidNumber, extractRequirementsRules, flattenText, normalizeBidNumber, parseGemDateTime,
-  parseIndianAmount, requirementsFromListing, splitDocumentList,
+  combineRequirements, detectBidNumber, extractRequirementsRules, flattenText, inferIndianState, INDIAN_STATES, normalizeBidNumber,
+  parseGemDateTime, parseIndianAmount, requirementsFromListing, splitDocumentList,
 } from '../../src/analyse/rules';
 import type { Requirement } from '../../src/analyse/types';
 
@@ -180,6 +180,182 @@ describe('rules: robustness on raw text', () => {
     expect(req(all, 'emd')!.numeric).toBe(50_000);
     expect(req(all, 'estimated_value')).toMatchObject({ numeric: 1_000_000, confidence: 0.7 });
     expect(all.filter((r) => r.key === 'document').map((r) => r.value).sort()).toEqual(['Bidder Turnover', 'Experience Criteria']);
+  });
+});
+
+describe('rules: newer GeM label variants (FR-018, FR-019)', () => {
+  it('reads "MSE/Startup Relaxation for Years Of Experience and Turnover" with "Yes | Complete" / "No | Complete" (US2 #11)', () => {
+    const rs = extractRequirementsRules([[
+      'एमएसई छूट/MSE Relaxation for Years Of Experience and Turnover Yes | Complete',
+      'स्टार्टअप छूट/Startup Relaxation for Years Of Experience and Turnover No | Complete',
+      'Document required from seller Experience Criteria,Bidder Turnover',
+    ].join('\n')]);
+    expect(req(rs, 'mse_exemption')).toMatchObject({ value: true, confidence: 0.95, method: 'RULE' });
+    expect(req(rs, 'startup_exemption')).toMatchObject({ value: false });
+    expect(req(rs, 'mse_exemption')!.source.quote).toContain('MSE Relaxation');
+  });
+
+  it('reads the Relaxation labels without "and Turnover" and when the label wraps around the value', () => {
+    const rs = extractRequirementsRules([
+      'MSE Relaxation for Years Of Experience No | Complete\nStartup Relaxation for Years Of Yes | Complete\nExperience and Turnover',
+    ]);
+    expect(req(rs, 'mse_exemption')!.value).toBe(false);
+    expect(req(rs, 'startup_exemption')!.value).toBe(true);
+  });
+
+  it('extracts contract_period (→ months) and bid_published_at from "Dated:" (US2 #12)', () => {
+    const rs = extractRequirementsRules([
+      'Bid Number: GEM/2026/B/6200101 Dated: 01-11-2026 Bid Details Bid End Date/Time 21-11-2026 15:00:00 ' +
+      'Item Category Security Manpower Service (Version 2.0) Contract Period 2 Year(s) Minimum Average Annual Turnover of the bidder (For 3 Years) 1 Crore (s)',
+    ]);
+    expect(req(rs, 'contract_period')).toMatchObject({ value: '2 years', numeric: 24, mandatory: false, confidence: 0.95 });
+    expect(req(rs, 'bid_published_at')).toMatchObject({ value: '2026-11-01T00:00:00+05:30', mandatory: false });
+    expect(req(rs, 'item_category')!.value).toBe('Security Manpower Service (Version 2.0)');
+    expect(req(rs, 'turnover_min')!.numeric).toBe(10_000_000);
+  });
+
+  it('adds up mixed contract periods and ignores prose about "the contract period"', () => {
+    const one = (t: string) => req(extractRequirementsRules([t]), 'contract_period');
+    expect(one('Contract Period 1 Year(s) 6 Month(s) Item Category X')).toMatchObject({ value: '1 year 6 months', numeric: 18 });
+    expect(one('Contract Period 90 Day(s)')).toMatchObject({ value: '90 days', numeric: 3 });
+    expect(one('Contract Period / 6 Month(s)')).toMatchObject({ value: '6 months', numeric: 6 });
+    expect(one('Rates shall remain firm during the contract period of 2 years.')).toBeUndefined();
+    expect(one('Contract Period: as per ATC')).toBeUndefined();
+  });
+
+  it('reads "Dated:" only on page 1 and not from prose "dated 23.03.2012"', () => {
+    const rs = extractRequirementsRules(['Order, 2012 dated 23.03.2012 issued by Ministry', 'Corrigendum Dated: 05-11-2026']);
+    expect(req(rs, 'bid_published_at')).toBeUndefined();
+  });
+
+  it('treats "Years of Past Experience Required for same/similar service" as the experience label', () => {
+    const rs = extractRequirementsRules(['Years of Past Experience Required for same/similar service 3 Year (s) MSE Exemption for Years Of Experience and Turnover No']);
+    expect(req(rs, 'experience_years')).toMatchObject({ numeric: 3, confidence: 0.95 });
+    expect(req(rs, 'experience_years')!.source.quote).toContain('for same/similar service');
+  });
+
+  it('reads delivery days from the consignee table (last column of the first row)', () => {
+    const page = 'Consignees/Reporting Officer and Quantity S.No. Consignee/Reporting Officer Address Quantity Delivery Days ' +
+      '1 Anil Kumar *********** 560001,MG Road, Bengaluru, Karnataka 25 30 2 Ravi S *********** 411001,Pune, Maharashtra 5 45 Buyer Added Bid Specific Terms';
+    const rs = extractRequirementsRules([page]);
+    expect(req(rs, 'delivery_days')).toMatchObject({ value: '30 days', numeric: 30 });
+    expect(req(rs, 'consignee_state')).toMatchObject({ value: 'Karnataka', confidence: 0.8, mandatory: false });
+  });
+});
+
+describe('review fixes (GEM-168)', () => {
+  it('parseIndianAmount ignores durations and parenthesised text before the amount', () => {
+    expect(parseIndianAmount('3 Years 50 Lakh')).toBe(5_000_000);
+    expect(parseIndianAmount('(For 3 Years) 1.2 Crore (s)')).toBe(12_000_000);
+    expect(parseIndianAmount('39,00,000 and 1.2 Crore')).toBe(3_900_000);
+    const one = (t: string, k: string) => req(extractRequirementsRules([t]), k);
+    expect(one('Minimum Average Annual Turnover of the bidder 3 Years 50 Lakh (s)', 'turnover_min')!.numeric).toBe(5_000_000);
+    expect(one('OEM Average Turnover 3 years 200 Crore (s)', 'oem_turnover')!.numeric).toBe(2_000_000_000);
+  });
+
+  it('a corrigendum\'s own "Dated:" does not replace the bid publication date', () => {
+    const bid = extractRequirementsRules(['Bid Number: GEM/2026/B/1 Dated: 01-11-2026 Bid End Date/Time 21-11-2026 18:00:00']);
+    const corr = extractRequirementsRules(['Corrigendum Dated: 10-11-2026 Bid End Date/Time 28-11-2026 18:00:00']);
+    const all = combineRequirements([bid, corr]);
+    expect(req(all, 'bid_published_at')!.value).toBe('2026-11-01T00:00:00+05:30');
+    expect(req(all, 'bid_end')!.value).toBe('2026-11-28T18:00:00+05:30');
+    expect(req(combineRequirements([corr]), 'bid_published_at')!.value).toBe('2026-11-10T00:00:00+05:30');
+  });
+
+  it('contract_period from an ATC heading on a later page is low confidence', () => {
+    const one = (pages: string[]) => req(extractRequirementsRules(pages), 'contract_period');
+    expect(one(['Contract Period 2 Year(s)'])!.confidence).toBe(0.95);
+    expect(one(['Bid Details', 'ATC: 4. Contract Period 3 Years extendable by one year'])).toMatchObject({ numeric: 36, confidence: 0.8 });
+    expect(one(['Bid Details', 'Contract Period: 2 years from the date of award'])!.confidence).toBeLessThan(0.9);
+  });
+
+  it('delivery days survive "2 <word>" inside the first consignee address', () => {
+    const rs = extractRequirementsRules(['Delivery Days 1 Anil Kumar 110001, 2 Lodhi Road, New Delhi 25 30']);
+    expect(req(rs, 'delivery_days')).toMatchObject({ value: '30 days', numeric: 30 });
+    const two = extractRequirementsRules(['Delivery Days 1 Anil Kumar 110001, 2 Lodhi Road, New Delhi 25 30 2 Ravi S 411001, Pune 5 45']);
+    expect(req(two, 'delivery_days')!.numeric).toBe(30);
+  });
+
+  it('consignee state is the last state of the first row, not a bank name in the address', () => {
+    const rs = extractRequirementsRules([
+      'Consignees/Reporting Officer and Quantity S.No. Delivery Days 1 Anil Kumar 122001, Punjab National Bank Building, Sector 5, Gurugram, Haryana 25 30 ' +
+      '2 Ravi S 411001, Pune, Maharashtra 5 45 Buyer Added Bid Specific Terms',
+    ]);
+    expect(req(rs, 'consignee_state')!.value).toBe('Haryana');
+  });
+});
+
+describe('rules: values interleaved inside wrapped labels (T035 corpus findings)', () => {
+  it('reads a value printed between the two lines of a wrapped English label', () => {
+    const page = [
+      'बिड पेशकश वैधता/Bid Offer Validity (From End 60 (Days)', 'Date)',
+      'अनुमानित बिड मूल्य/Estimated Bid Value 39,00,000',
+      'टर्नओवर/Minimum Average 1.2 Crore (s)', 'Annual Turnover of the bidder (For 3 Years)',
+      'टर्नओवर/OEM Average 250 Crore (s)', 'Turnover (Last 3 Years)',
+      'अनुभव/Years of Past 2 Year (s)', 'Experience Required for same/ similar service',
+      'छूट/Startup Relaxation for No | Complete', 'Years Of Experience and Turnover',
+      'बिड का प्रकार/Type of Bid Two Packet Bid',
+      'समय/Time 2 Days', 'allowed for Technical Clarifications during technical evaluation',
+      'मूल्यांकन पद्धति/Evaluation Method Total value wise evaluation',
+    ].join('\n');
+    const rs = extractRequirementsRules([page]);
+    expect(req(rs, 'offer_validity')!.numeric).toBe(60);
+    expect(req(rs, 'estimated_value')!.numeric).toBe(3_900_000);
+    expect(req(rs, 'turnover_min')).toMatchObject({ value: '1.2 Crore (s)', numeric: 12_000_000 });
+    expect(req(rs, 'turnover_min')!.source.quote).toContain('Annual Turnover of the bidder');
+    expect(req(rs, 'oem_turnover')!.numeric).toBe(2_500_000_000);
+    expect(req(rs, 'experience_years')!.numeric).toBe(2);
+    expect(req(rs, 'startup_exemption')!.value).toBe(false);
+    expect(req(rs, 'bid_type')!.value).toBe('Two Packet Bid');
+    expect(req(rs, 'evaluation_method')!.value).toBe('Total value wise evaluation');
+  });
+
+  it('a label head without enough of its tail is not a label', () => {
+    expect(req(extractRequirementsRules(['Time 2 Days for the vendor. Evaluation Method L1']), 'evaluation_method')!.value).toBe('L1');
+    expect(req(extractRequirementsRules(['Minimum Average speed 40 km/h']), 'turnover_min')).toBeUndefined();
+  });
+
+  it('keeps "Past Performance" inside the documents list as a document', () => {
+    const rs = extractRequirementsRules(['Past Performance 30 % Document required from seller Experience Criteria,Past Performance,Bidder Turnover *In case any bidder']);
+    expect(req(rs, 'past_performance')!.numeric).toBe(30);
+    expect(rs.filter((r) => r.key === 'document').map((r) => r.value)).toEqual(['Experience Criteria', 'Past Performance', 'Bidder Turnover']);
+  });
+
+  it('parseIndianAmount takes the first amount in the text', () => {
+    expect(parseIndianAmount('39,00,000 /Minimum Average 1.2 Crore (s)')).toBe(3_900_000);
+    expect(parseIndianAmount('Rs. 1.2 Crore')).toBe(12_000_000);
+  });
+});
+
+describe('consignee_state (FR-019)', () => {
+  it('reads the first consignee state from the consignee block of every sample bid', () => {
+    const want: Record<string, string> = { 'go-it-services': 'Delhi', 'review-hardware-oem': 'Haryana', 'nogo-experience': 'Uttar Pradesh', 'emd-exempt-mse': 'Madhya Pradesh' };
+    for (const s of SAMPLE_BID_SPECS) {
+      const rs = extractRequirementsRules(pagesByKey.get(s.key)!, { fileName: `${s.key}.pdf` });
+      const r = req(rs, 'consignee_state')!;
+      expect(r.value).toBe(want[s.key]);
+      expect(r.source).toMatchObject({ page: req(rs, 'delivery_days')!.source.page, fileName: `${s.key}.pdf` });
+      expect(r.source.quote).toContain(want[s.key]);
+    }
+  });
+
+  it('ignores states outside the consignee block (ministry, office, ATC)', () => {
+    const rs = extractRequirementsRules([
+      'Ministry/State Name Maharashtra Office Name Pune Consignees/Reporting Officer and Quantity 1 Officer 110003, Lodhi Road, New Delhi 1 30 ' +
+      'Technical Specifications Make in Gujarat preferred',
+    ]);
+    expect(req(rs, 'consignee_state')!.value).toBe('Delhi');
+    expect(req(extractRequirementsRules(['Ministry/State Name Maharashtra Office Name Pune']), 'consignee_state')).toBeUndefined();
+  });
+
+  it('inferIndianState: word-bounded, longest match, aliases', () => {
+    expect(inferIndianState('Plot 4, Goalpara Road, Guwahati, Assam')!.state).toBe('Assam');
+    expect(inferIndianState('Bhubaneswar, Orissa-751001')!.state).toBe('Odisha');
+    expect(inferIndianState('Jammu & Kashmir Bank, Srinagar')!.state).toBe('Jammu and Kashmir');
+    expect(inferIndianState('Dadra and Nagar Haveli and Daman and Diu')!.state).toBe('Dadra and Nagar Haveli and Daman and Diu');
+    expect(inferIndianState('Andhra   Pradesh')!.state).toBe('Andhra Pradesh');
+    expect(inferIndianState('Goalpara, Bengaluru')).toBeNull();
+    expect(INDIAN_STATES).toHaveLength(36);
   });
 });
 
