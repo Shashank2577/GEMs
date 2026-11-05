@@ -7,23 +7,24 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowUpDown, CheckCircle2, Clock, FileUp, FolderLock, LayoutGrid, List, Plus, Search, ShieldCheck, X,
+  AlertTriangle, ArrowUpDown, BellRing, CheckCircle2, Clock, FileUp, FolderLock, LayoutGrid, List, MoreHorizontal, Plus, Search, ShieldCheck, X,
 } from 'lucide-react';
 import type { VaultDocumentDto } from '@tp/core/contracts/vault';
 import { DOC_CATEGORIES, DOC_TYPES, docTypeInfo, type DocCategory, type DocStatus, type DocType } from '@tp/core/vault/status';
 import {
-  Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, ResponsiveTable, Segmented, Select, Skeleton, StatTile, toast, type Column,
+  Badge, Button, Card, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, ErrorState, Input, PageHeader, ResponsiveTable, Segmented, Select, Skeleton, StatTile, toast, type Column,
 } from '@/components/ui';
-import { ApiError } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { RoleGate, useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { useLocalStorage } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { useVault, useVaultDoc, useVaultSummary, type VaultFilters } from './api';
+import { useRunReminders, useVault, useVaultDoc, useVaultSummary, type VaultFilters } from './api';
 import { DocTypeIcon, ExpiryBadge, STATUS_LABEL } from './doc-ui';
 import { DocumentDrawer } from './DocumentDrawer';
 import { checkVaultFile } from './file-check';
 import { ExpiryTimeline } from './ExpiryTimeline';
+import { reminderRunMessage } from './reminders';
 import { UploadDialog } from './UploadDialog';
 
 type Sort = NonNullable<VaultFilters['sort']>;
@@ -141,6 +142,13 @@ export default function VaultPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [presetType, setPresetType] = useState<DocType | null>(null);
   const openUpload = (file: File | null = null, t: DocType | null = null) => { setUploadFile(file); setPresetType(t); setUploadOpen(true); };
+
+  // Manual reminder run (FR-052): same job as the scheduler, for this org only.
+  const runReminders = useRunReminders();
+  const sendReminders = () => runReminders.mutate(undefined, {
+    onSuccess: (r) => (r.documents > 0 ? toast.success(reminderRunMessage(r)) : toast.info(reminderRunMessage(r))),
+    onError: (err) => toast.error(errorMessage(err)),
+  });
   useEffect(() => {
     if (params.get('upload') === '1' && can('analyst')) {
       openUpload(null, (params.get('uploadType') as DocType) || null);
@@ -212,9 +220,21 @@ export default function VaultPage() {
         title="Document vault"
         description="Certificates, financials and authorisations your bids need — tracked for expiry and ready to attach."
         actions={
-          <RoleGate min="analyst">
-            <Button onClick={() => openUpload()}><FileUp />Upload document</Button>
-          </RoleGate>
+          <>
+            <RoleGate min="analyst">
+              <Button onClick={() => openUpload()}><FileUp />Upload document</Button>
+            </RoleGate>
+            <RoleGate min="bid_manager">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="More vault actions"><MoreHorizontal /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem disabled={runReminders.isPending} onSelect={sendReminders}><BellRing />Send reminders now</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </RoleGate>
+          </>
         }
       />
 

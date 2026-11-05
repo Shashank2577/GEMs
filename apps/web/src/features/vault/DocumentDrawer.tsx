@@ -1,6 +1,6 @@
 /** Preview drawer: inline PDF/image preview, metadata (view & edit), replace file, download, delete. */
 import { useEffect, useState } from 'react';
-import { Calendar, Download, ExternalLink, FileWarning, Hash, Pencil, RefreshCw, Tag, Trash2, User } from 'lucide-react';
+import { BellRing, Calendar, Download, ExternalLink, FileWarning, Hash, Pencil, RefreshCw, Tag, Trash2, User } from 'lucide-react';
 import type { VaultDocumentDto } from '@tp/core/contracts/vault';
 import { VAULT_ACCEPT } from '@tp/core/contracts/vault';
 import { docTypeInfo } from '@tp/core/vault/status';
@@ -14,6 +14,7 @@ import { useDeleteVault, useReplaceVaultFile, useUpdateVault } from './api';
 import { checkVaultFile } from './file-check';
 import { DocTypeIcon, ExpiryBadge } from './doc-ui';
 import { DocumentForm, validateDraft, type DocDraft } from './DocumentForm';
+import { nextReminderLine } from './reminders';
 import { serverFieldErrors } from './UploadDialog';
 
 const toDraft = (d: VaultDocumentDto): DocDraft => ({
@@ -131,7 +132,14 @@ export function DocumentDrawer({ doc, open, onOpenChange }: { doc: VaultDocument
                   <Meta icon={Hash} label="Number">{doc.number ? <span className="font-mono text-[13px]">{doc.number}</span> : <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={User} label="Issued by">{doc.issuer ?? <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={Calendar} label="Issue date">{formatDateIST(doc.issueDate, { fallback: '—' })}</Meta>
-                  <Meta icon={Calendar} label="Expiry date">{doc.expiryDate ? <>{formatDateIST(doc.expiryDate)}</> : <span className="text-muted-foreground">Does not expire</span>}</Meta>
+                  <Meta icon={Calendar} label="Expiry date">{doc.expiryDate ? (
+                    <>
+                      {formatDateIST(doc.expiryDate)}
+                      <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground" data-testid="next-reminder">
+                        <BellRing className="size-3.5 shrink-0" aria-hidden />{nextReminderLine(doc.nextReminder)}
+                      </span>
+                    </>
+                  ) : <span className="text-muted-foreground">Does not expire</span>}</Meta>
                   <Meta icon={Tag} label="Tags">{doc.tags.length ? <span className="flex flex-wrap gap-1">{doc.tags.map((t) => <Badge key={t} size="sm">{t}</Badge>)}</span> : <span className="text-muted-foreground">—</span>}</Meta>
                   <Meta icon={Download} label="File">{doc.fileName} · {formatBytes(doc.sizeBytes)}{doc.pageCount ? ` · ${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'}` : ''}</Meta>
                 </dl>

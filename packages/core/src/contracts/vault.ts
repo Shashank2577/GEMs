@@ -233,6 +233,8 @@ export interface VaultDocumentDto {
   fileName: string; mimeType: string; sizeBytes: number; pageCount: number | null;
   uploadedBy: { id: string; name: string } | null; createdAt: string; updatedAt: string;
   status: DocStatus; daysToExpiry: number | null;
+  /** Next "N days before expiry" reminder (FR-053); null = no expiry date or all reminders sent. */
+  nextReminder: { days: number; date: string } | null;
   /** Relative API path for download (`?inline=1` for preview). */
   downloadUrl: string;
 }

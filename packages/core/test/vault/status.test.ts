@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DOC_TYPES, GEM_SELLER_DOC_LABELS, daysUntilExpiry, docStatus, docTypeInfo, guessDocType, guessFinancialYear, istDate, reminderCopy, reminderDue, suggestExpiry,
+  DOC_TYPES, GEM_SELLER_DOC_LABELS, daysUntilExpiry, docStatus, docTypeInfo, guessDocType, guessFinancialYear, istDate, nextReminder, reminderCopy, reminderDue, suggestExpiry,
 } from '../../src/vault/status';
 
 // 4 Nov 2026, 10:00 IST
@@ -53,6 +53,39 @@ describe('reminderDue', () => {
     expect(reminderCopy(1, 1)).toBe('expires in 1 day');
     expect(reminderCopy(1, 0)).toBe('expires today');
     expect(reminderCopy(0, -1)).toBe('expired 1 day ago');
+  });
+});
+
+describe('nextReminder (FR-053)', () => {
+  it('null without an expiry date', () => {
+    expect(nextReminder(null, null, NOW)).toBeNull();
+    expect(nextReminder(undefined, 30, NOW)).toBeNull();
+  });
+  it('far expiry → 30 days before expiry, on expiry − 30', () => {
+    expect(nextReminder('2027-06-01', null, NOW)).toEqual({ days: 30, date: '2027-05-02' });
+  });
+  it('after the 30-day reminder → 7 days before (acceptance 10)', () => {
+    expect(nextReminder('2026-11-14', 30, NOW)).toEqual({ days: 7, date: '2026-11-07' });
+  });
+  it('a crossed but unsent threshold is due today (IST)', () => {
+    expect(nextReminder('2026-11-14', null, NOW)).toEqual({ days: 30, date: '2026-11-04' });
+    expect(nextReminder('2026-11-09', null, NOW)).toEqual({ days: 7, date: '2026-11-04' }); // 5 days left → 7 only
+    expect(nextReminder('2026-11-11', 30, NOW)).toEqual({ days: 7, date: '2026-11-04' }); // exactly 7 days left
+  });
+  it('after the 7-day reminder → 1 day before', () => {
+    expect(nextReminder('2026-11-09', 7, NOW)).toEqual({ days: 1, date: '2026-11-08' });
+  });
+  it('all reminders sent / passed → null', () => {
+    expect(nextReminder('2026-11-05', 1, NOW)).toBeNull();
+    expect(nextReminder('2026-11-04', 1, NOW)).toBeNull(); // expires today
+    expect(nextReminder('2026-11-03', 1, NOW)).toBeNull(); // expired
+    expect(nextReminder('2026-11-03', 0, NOW)).toBeNull();
+    expect(nextReminder('2026-10-01', null, NOW)).toBeNull();
+  });
+  it('uses the IST calendar day of now', () => {
+    // 5 Nov 2026 01:30 IST — 30 days to 2026-12-05 in IST (29 by the UTC date).
+    expect(nextReminder('2026-12-05', null, new Date('2026-11-04T20:00:00Z'))).toEqual({ days: 30, date: '2026-11-05' });
+    expect(nextReminder('2026-12-06', null, new Date('2026-11-04T20:00:00Z'))).toEqual({ days: 30, date: '2026-11-06' });
   });
 });
 

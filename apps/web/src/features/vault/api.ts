@@ -72,3 +72,15 @@ export function useDeleteVault() {
 export function useVaultDoc(id: string | null) {
   return useQuery({ queryKey: ['vault', 'doc', id], queryFn: () => api.get<VaultDocumentDto>(`/vault/${id}`), enabled: !!id });
 }
+
+/** Manual "Send reminders now" (FR-052, bid_manager+). Refreshes the vault (next-reminder lines) and the bell. */
+export function useRunReminders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ documents: number; notifications: number }>('/vault/reminders/run'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: vaultKeys.all });
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
