@@ -519,6 +519,8 @@ test.describe('US5 corrigendum', () => {
     const banner = page.getByTestId('cancelled-banner');
     await expect(banner).toBeVisible();
     await expect(banner).toContainText('Cancelled on GeM');
+    // round 2: the cancelled hero (location row beside the buyer) shows no closing countdown
+    await expect(page.getByRole('heading', { level: 1 }).locator('xpath=ancestor::div[contains(@class,"min-w-0")][1]').getByText(/Closes in/)).toHaveCount(0);
     await shot(page, 'S6b-cancelled-banner');
     await page.getByRole('tab', { name: /History/ }).click();
     await expect(page.locator('ol.relative > li').first().getByText('Bid cancelled')).toBeVisible();
