@@ -85,8 +85,8 @@ test.describe('US3 vault', () => {
     await expect(d.getByRole('combobox').filter({ hasText: 'FY 2024-25' })).toBeVisible();
     await ev(page, 'ac02-guessed-metadata-balance-sheet');
     await d.getByRole('button', { name: 'Cancel' }).click();
-    // wait for the first dialog to unmount; otherwise, under load, the file lands in the closing dialog's input
-    // and the re-opened dialog starts empty (no type picker yet)
+    // wait for the first dialog to unmount: while it is still closing, Radix keeps the page aria-hidden, so the
+    // 'Upload document' role query can hit the closing dialog's submit button and pickFile targets its input
     await expect(d).toBeHidden();
 
     await page.getByRole('button', { name: 'Upload document' }).first().click();
