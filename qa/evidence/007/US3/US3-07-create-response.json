@@ -1,0 +1,29 @@
+{
+  "status": 201,
+  "body": {
+    "id": "8cb64772-a8b7-4dfb-a87b-ae078f5485a3",
+    "name": "Desktop computers & CCTV & surveillance – Maharashtra",
+    "criteria": {
+      "states": [],
+      "bidTypes": [],
+      "hsnCodes": [],
+      "keywords": [
+        "desktop"
+      ],
+      "categories": [],
+      "ministries": [],
+      "excludeKeywords": []
+    },
+    "active": true,
+    "createdBy": {
+      "id": "f8502361-a8a6-4f2d-82fd-a1b0aac21009",
+      "name": "Aarav Shah"
+    },
+    "createdAt": "2026-11-05T04:56:23.203Z",
+    "updatedAt": "2026-11-05T04:56:23.203Z",
+    "matchCount": 2,
+    "newThisWeek": 2,
+    "openCount": 2,
+    "lastMatchAt": "2026-11-05T04:56:23.207Z"
+  }
+}
