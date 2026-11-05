@@ -6,7 +6,7 @@ export type ContentRequest =
   | { type: 'tp:fill'; fields: PayloadField[]; keys?: string[]; overwrite?: boolean }
   | { type: 'tp:clear' };
 
-export interface ScanSummary { fillable: number; forbidden: number; unmatched: number; noValue: number; keys: string[] }
+export interface ScanSummary { fillable: number; forbidden: number; unmatched: number; noValue: number; manual: number; keys: string[] }
 
 export type ContentResponse =
   | { ok: true; scan: ScanSummary }

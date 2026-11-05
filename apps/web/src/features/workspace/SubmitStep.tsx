@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useBlocker } from 'react-router-dom';
 import {
   BadgeIndianRupee, Check, CheckCircle2, Copy, Download, Fingerprint, Hand, KeyRound, MousePointerClick, PartyPopper, PencilLine, Puzzle, Send, Trophy, Upload, XCircle,
 } from 'lucide-react';
 import { canTransition, type AssistField, type WorkspaceDetail } from '@tp/core/contracts/apply';
 import {
-  Badge, Button, Card, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ErrorState, Field, Input,
+  Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ErrorState, Field, Input,
   Segmented, SkeletonList, Textarea, Tooltip, toast,
 } from '@/components/ui';
 import { useCan } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, formatINR } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { changedAssistKeys, isAssistDraftDirty } from './assist-draft';
 import { useAssist, useMarkSubmitted, useRecordOutcome, useSaveAssist, useUpdateWorkspace } from './api';
 
 const GROUP_LABEL: Record<AssistField['group'], string> = { product: 'Product', offer: 'Offer', compliance: 'Compliance', declaration: 'Declarations' };
@@ -33,6 +34,34 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
+/**
+ * "Discard unsaved changes?" for the assist-values editor (FR-092): in-app navigation (links, Back/Forward, step strip)
+ * and tab close. Rendered ONLY while the editor is open with unsaved edits, so the router's single blocker slot is
+ * taken only then (the US4 template editor follows the same rule).
+ */
+const leavesPage = ({ currentLocation, nextLocation }: { currentLocation: { pathname: string; search: string }; nextLocation: { pathname: string; search: string } }) =>
+  currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search;
+
+function UnsavedValuesGuard() {
+  const blocker = useBlocker(leavesPage);
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', h);
+    return () => window.removeEventListener('beforeunload', h);
+  }, []);
+  return (
+    <ConfirmDialog
+      open={blocker.state === 'blocked'}
+      onOpenChange={(o) => { if (!o && blocker.state === 'blocked') blocker.reset(); }}
+      title="Discard unsaved changes?"
+      description="Your edits to the values for GeM have not been saved."
+      cancelLabel="Keep editing"
+      confirmLabel="Discard changes"
+      onConfirm={() => { if (blocker.state === 'blocked') blocker.proceed(); }}
+    />
+  );
+}
+
 export function SubmitStep({ data }: { data: WorkspaceDetail }) {
   const assist = useAssist(data.workspace.id);
   const canWrite = useCan('analyst');
@@ -45,15 +74,17 @@ export function SubmitStep({ data }: { data: WorkspaceDetail }) {
   useEffect(() => { if (assist.data) setDraft(Object.fromEntries(assist.data.fields.map((f) => [f.key, f.value]))); }, [assist.data]);
 
   const saveValues = () => {
-    const changed = Object.fromEntries(Object.entries(draft).filter(([k, v]) => v !== (assist.data?.fields.find((f) => f.key === k)?.value ?? '')));
+    const changed = Object.fromEntries(changedAssistKeys(draft, assist.data?.fields ?? []).map((k) => [k, draft[k] ?? '']));
     if (!Object.keys(changed).length) { setEditing(false); return; }
     save.mutate(changed, { onSuccess: () => { toast.success('Values saved'); setEditing(false); }, onError: (e) => toast.error(errorMessage(e)) });
   };
 
+  const dirty = isAssistDraftDirty(editing, draft, assist.data?.fields ?? []);
   const groups = (assist.data?.fields ?? []).reduce<Record<string, AssistField[]>>((acc, f) => { (acc[f.group] ??= []).push(f); return acc; }, {});
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+      {dirty && <UnsavedValuesGuard />}
       <div className="grid grid-cols-1 content-start gap-4">
         <HumanOnly />
 
@@ -129,13 +160,13 @@ export function SubmitStep({ data }: { data: WorkspaceDetail }) {
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"><Puzzle className="size-4" aria-hidden /></div>
             <div className="min-w-0">
               <div className="text-sm font-semibold">Fill GeM forms in one click</div>
-              <p className="mt-0.5 text-xs text-muted-foreground">The TenderPilot Chrome extension highlights the fields above on the GeM page and fills them when you click — never prices, OTP or submit.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">The TenderPilot Chrome extension highlights the fields above on the GeM page and fills them when you click — never prices, OTP or submit. Its token is read-only: it can read this workspace but cannot change anything in TenderPilot.</p>
               <ol className="mt-2 list-decimal space-y-0.5 pl-4 text-xs text-muted-foreground">
                 <li>Load the extension (apps/extension → Load unpacked).</li>
-                <li>Create an API token in Settings.</li>
+                <li>Create an “Extension (read-only)” API token in Settings and paste it into the extension.</li>
                 <li>Open the bid on GeM and click “Fill allowed fields”.</li>
               </ol>
-              <Button asChild size="xs" variant="link" className="mt-2"><Link to="/settings/api-tokens">Create an API token</Link></Button>
+              <Button asChild size="xs" variant="link" className="mt-2"><Link to="/settings/api-tokens?scope=read">Create a read-only API token</Link></Button>
             </div>
           </div>
         </Card>

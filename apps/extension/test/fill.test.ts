@@ -137,3 +137,26 @@ describe('pickOption', () => {
     expect(pickOption([], 'x')).toBeNull();
   });
 });
+
+
+describe('radio / checkbox questions (T082, FR-077)', () => {
+  const fields: PayloadField[] = [{ key: 'mse_claim', label: 'MSE preference claimed', value: 'Yes', selectorHints: ['\\bmse\\b'] }];
+  const radio = (label: string, name = 'q1') => fake({ tagName: 'input', type: 'radio', name, label }, { kind: 'choice' });
+
+  it('reports a matching radio as manual and never writes', () => {
+    const r = radio('Do you want to avail MSE purchase preference?', 'mseClaim');
+    const [e] = plan([r], fields);
+    expect(e.status).toBe('manual');
+    expect(e.field?.key).toBe('mse_claim');
+    expect(fillOne(e, { overwrite: true })).toEqual({ ok: false, reason: 'left for you' });
+    const report = fillAll([r], fields, { overwrite: true });
+    expect(r.writes).toBe(0);
+    expect(report.filled).toEqual([]);
+    expect(report.skipped).toEqual([{ key: 'mse_claim', label: 'MSE preference claimed', reason: 'left for you — choose “Yes” yourself' }]);
+  });
+
+  it('still treats a price-like radio as forbidden and an unrelated one as unmatched', () => {
+    expect(plan([radio('Quoted price includes GST?')], fields)[0].status).toBe('forbidden');
+    expect(plan([radio('Preferred colour')], fields)[0].status).toBe('unmatched');
+  });
+});

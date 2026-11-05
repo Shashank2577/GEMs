@@ -1,0 +1,18 @@
+import { describe, expect, it } from 'vitest';
+import { changedAssistKeys, isAssistDraftDirty } from './assist-draft';
+
+const fields = [{ key: 'make', value: 'Dell' }, { key: 'model', value: '' }];
+
+describe('assist-values draft (FR-092)', () => {
+  it('detects changed keys', () => {
+    expect(changedAssistKeys({ make: 'Dell', model: '' }, fields)).toEqual([]);
+    expect(changedAssistKeys({ make: 'HP', model: '' }, fields)).toEqual(['make']);
+    expect(changedAssistKeys({ make: 'Dell', model: 'Latitude' }, fields)).toEqual(['model']);
+    expect(changedAssistKeys({}, fields)).toEqual(['make']); // a missing entry is an empty value
+  });
+  it('is dirty only while editing with real changes', () => {
+    expect(isAssistDraftDirty(false, { make: 'HP' }, fields)).toBe(false);
+    expect(isAssistDraftDirty(true, { make: 'Dell', model: '' }, fields)).toBe(false);
+    expect(isAssistDraftDirty(true, { make: 'HP', model: '' }, fields)).toBe(true);
+  });
+});

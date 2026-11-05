@@ -25,6 +25,23 @@ describe('forbidden fields (Constitution I)', () => {
     for (const k of ALLOWED_KEYS) expect(isForbiddenKey(k), k).toBe(false);
   });
 
+  // SC-002 / FR-062: every spelling of a price / auth / submit key is forbidden, as a key and as a field descriptor.
+  const SPELLINGS = [
+    'unitPrice', 'unit-rate', 'Total Bid Value', 'quoted_amount', 'GST Amount', '₹', 'Rs', 'captchaText', 'otpCode', 'e-Sign',
+    'aadhaarNo', 'DSC PIN', 'password', 'finalSubmit', 'placeBid',
+  ];
+  it('the forbidden-key matrix has at least 15 spellings', () => expect(SPELLINGS.length).toBeGreaterThanOrEqual(15));
+  it.each(SPELLINGS)('forbids the key spelling %j', (k) => {
+    expect(isForbiddenKey(k)).toBe(true);
+    expect(validateAssistValues({ [k]: '1' })[k]).toMatch(/never stores or fills prices/);
+  });
+  it.each(SPELLINGS)('never matches a field described as %j (name, label, placeholder, aria-label or context)', (k) => {
+    for (const d of [{ name: k }, { id: k }, { label: k }, { placeholder: k }, { ariaLabel: k }, { label: 'Make', context: k }, { label: 'Model', name: k }]) {
+      expect(isFieldAllowed(d), JSON.stringify(d)).toBe(false);
+      expect(matchField(d)).toBeNull();
+    }
+  });
+
   it('does not over-match ordinary words', () => {
     expect(forbiddenReason({ label: 'Product description' })).toBeNull(); // "dsc" inside "description"
     expect(forbiddenReason({ label: 'Corporate accurate separate' })).toBeNull(); // "rate" inside words

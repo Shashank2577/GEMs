@@ -31,6 +31,22 @@ describe('PUT /workspaces/:id/assist-values', () => {
     expect(w.assistValues).toEqual({}); // nothing was saved
   });
 
+  it('rejects every spelling of the forbidden-key matrix (SC-002) and saves nothing', async () => {
+    const SPELLINGS = [
+      'unitPrice', 'unit-rate', 'Total Bid Value', 'quoted_amount', 'GST Amount', '₹', 'Rs', 'captchaText', 'otpCode', 'e-Sign',
+      'aadhaarNo', 'DSC PIN', 'password', 'finalSubmit', 'placeBid',
+    ];
+    expect(SPELLINGS.length).toBeGreaterThanOrEqual(15);
+    for (const key of SPELLINGS) {
+      const r = await request(ctx.app, 'PUT', `/workspaces/${wsId}/assist-values`, { cookie: s.org.analyst.cookie, json: { make: 'Dell', [key]: '123' } });
+      expect(r.status, key).toBe(400);
+      expect(r.body.error.code, key).toBe('forbidden_field');
+      expect(r.body.error.details.forbidden, key).toEqual([key]);
+    }
+    const [w] = await ctx.db.select().from(bidWorkspaces).where(eq(bidWorkspaces.id, wsId));
+    expect(w.assistValues).toEqual({});
+  });
+
   it('rejects unknown keys and non-text values', async () => {
     const r = await request(ctx.app, 'PUT', `/workspaces/${wsId}/assist-values`, { cookie: s.org.analyst.cookie, json: { colour: 'red' } });
     expect(r.status).toBe(400);

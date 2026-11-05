@@ -13,11 +13,12 @@ import { forbiddenReason, matchField, type FieldDescriptor } from '@tp/core/assi
 
 export interface PayloadField { key: string; label: string; value: string; selectorHints: string[] }
 
-export type MarkState = 'available' | 'filled' | 'blocked' | 'none';
+export type MarkState = 'available' | 'filled' | 'blocked' | 'manual' | 'none';
 
 export interface FillTarget {
   descriptor: FieldDescriptor;
-  kind: 'input' | 'textarea' | 'select';
+  /** `choice` = radio / checkbox question: reported as "left for you", never clicked (FR-077). */
+  kind: 'input' | 'textarea' | 'select' | 'choice';
   disabled?: boolean;
   readOnly?: boolean;
   getValue(): string;
@@ -26,7 +27,7 @@ export interface FillTarget {
   mark(state: MarkState, note?: string): void;
 }
 
-export type PlanStatus = 'fillable' | 'forbidden' | 'unmatched' | 'no_value' | 'disabled';
+export type PlanStatus = 'fillable' | 'forbidden' | 'unmatched' | 'no_value' | 'disabled' | 'manual';
 
 export interface PlanEntry {
   target: FillTarget;
@@ -46,6 +47,16 @@ export interface FillReport {
 export function plan(targets: FillTarget[], fields: PayloadField[]): PlanEntry[] {
   const byKey = new Map(fields.map((f) => [f.key, f]));
   return targets.map((target) => {
+    if (target.kind === 'choice') {
+      // Radio / checkbox: judged on text only (the input type is always "forbidden"). A pattern hit is still
+      // forbidden; an allow-listed question is reported as manual — we show the answer, the user clicks.
+      const text = { ...target.descriptor, type: 'text' };
+      const why = forbiddenReason(text);
+      if (why) return { target, status: 'forbidden', reason: why } as PlanEntry;
+      const k = matchField(text, fields);
+      if (!k) return { target, status: 'unmatched' } as PlanEntry;
+      return { target, status: 'manual', field: byKey.get(k)! } as PlanEntry;
+    }
     const reason = forbiddenReason(target.descriptor);
     if (reason) return { target, status: 'forbidden', reason } as PlanEntry;
     const key = matchField(target.descriptor, fields);
@@ -59,6 +70,8 @@ export function plan(targets: FillTarget[], fields: PayloadField[]): PlanEntry[]
 
 /** Fill a single planned entry (called when the user clicks that field's chip). */
 export function fillOne(entry: PlanEntry, opts: { overwrite?: boolean } = {}): { ok: boolean; reason?: string } {
+  // Radio / checkbox questions are never clicked (FR-077).
+  if (entry.status === 'manual' || entry.target.kind === 'choice') return { ok: false, reason: 'left for you' };
   // Defence in depth: re-check the descriptor right before writing.
   const reason = forbiddenReason(entry.target.descriptor);
   if (reason) { entry.target.mark('blocked', `Never filled: ${reason}`); return { ok: false, reason: `forbidden (${reason})` }; }
@@ -76,6 +89,7 @@ export function fillAll(targets: FillTarget[], fields: PayloadField[], opts: { o
     if (e.status === 'forbidden') { report.forbidden++; e.target.mark('blocked', `Never filled by TenderPilot (${e.reason})`); continue; }
     if (e.status === 'unmatched') { report.unmatched++; continue; }
     if (opts.keys && e.field && !opts.keys.includes(e.field.key)) continue;
+    if (e.status === 'manual') { report.skipped.push({ key: e.field!.key, label: e.field!.label, reason: `left for you — choose “${e.field!.value}” yourself` }); continue; }
     const r = fillOne(e, opts);
     if (r.ok) report.filled.push({ key: e.field!.key, label: e.field!.label, value: e.field!.value });
     else report.skipped.push({ key: e.field?.key, label: e.field?.label, reason: r.reason ?? e.status });
