@@ -52,7 +52,8 @@ export const oemAuthorizationSchema = z.object({
   oem: z.string().trim().min(1, 'OEM name is required').max(120),
   products: z.string().trim().max(500).default(''),
   validTill: optDate,
-  documentId: z.preprocess(blankToNull, z.string().uuid().nullable().optional()),
+  // Lowercased so ids compare with Postgres' canonical uuid text (FR-061).
+  documentId: z.preprocess(blankToNull, z.string().uuid().transform((v) => v.toLowerCase()).nullable().optional()),
 });
 
 export const MSE_CATEGORIES = ['micro', 'small', 'medium'] as const;

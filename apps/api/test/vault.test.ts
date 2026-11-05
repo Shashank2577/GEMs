@@ -424,6 +424,156 @@ describe('expiry reminders', () => {
   });
 });
 
+// T056 / T060 — past contracts with CRACs and OEM authorisations (US5; FR-054…FR-057, FR-061)
+describe('past contracts & OEM authorisations (US5)', () => {
+  let us5: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  let other: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  let cracId: string;
+  let otherCracId: string;
+  let mafId: string;
+  let otherMafId: string;
+  const upload = async (o: { cookie: string }, type: string, title: string, expiryDate?: string) => {
+    const r = await request(ctx.app, 'POST', '/vault', { cookie: o.cookie, form: { file: file(await pdf(1), `${type}.pdf`), type, title, ...(expiryDate ? { expiryDate } : {}) } });
+    expect(r.status).toBe(201);
+    return r.body.id as string;
+  };
+  const contract = { buyer: 'Central Railway, Mumbai Division', title: 'Supply of 85 desktop computers', value: 58_20_000 };
+  const NOT_IN_VAULT = 'That document is not in your vault';
+
+  beforeAll(async () => {
+    us5 = await seedOrgWithRoles(ctx.app, 'US5 Traders');
+    other = await seedOrgWithRoles(ctx.app, 'US5 Other');
+    cracId = await upload(us5.analyst, 'crac', 'CRAC Central Railway');
+    otherCracId = await upload(other.analyst, 'crac', 'Other CRAC');
+    mafId = await upload(us5.analyst, 'oem_authorization', 'HP MAF', '2028-03-31');
+    otherMafId = await upload(other.analyst, 'oem_authorization', 'Other MAF', '2028-03-31');
+  });
+
+  it('links a CRAC from the own vault (independent test)', async () => {
+    const r = await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.analyst.cookie, json: { ...contract, cracDocumentId: cracId } });
+    expect(r.status).toBe(201);
+    expect(r.body.cracDocumentId).toBe(cracId);
+    const l = await request(ctx.app, 'GET', '/past-contracts', { cookie: us5.viewer.cookie });
+    expect(l.body.items.find((i: any) => i.id === r.body.id).cracDocumentId).toBe(cracId);
+  });
+
+  it.each([
+    ['another org\'s document', () => otherCracId],
+    ['a random UUID', () => '6f1c2d3e-4b5a-4c6d-8e7f-901234567890'],
+  ])('rejects cracDocumentId of %s on POST and PATCH → 400 (FR-055)', async (_label, id) => {
+    const r = await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.analyst.cookie, json: { ...contract, cracDocumentId: id() } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe('validation_error');
+    expect(r.body.error.details.fields.cracDocumentId).toBe(NOT_IN_VAULT);
+    const c = await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.analyst.cookie, json: contract });
+    const p = await request(ctx.app, 'PATCH', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie, json: { cracDocumentId: id() } });
+    expect(p.status).toBe(400);
+    expect(p.body.error.details.fields.cracDocumentId).toBe(NOT_IN_VAULT);
+    const stored = (await request(ctx.app, 'GET', '/past-contracts', { cookie: us5.viewer.cookie })).body.items.find((i: any) => i.id === c.body.id);
+    expect(stored.cracDocumentId).toBeNull();
+    await request(ctx.app, 'DELETE', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie });
+  });
+
+  it('PATCH with only endDate before the stored startDate → 400 (FR-054)', async () => {
+    const c = await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.analyst.cookie, json: { ...contract, startDate: '2025-04-01', endDate: '2025-06-30' } });
+    const p = await request(ctx.app, 'PATCH', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie, json: { endDate: '2025-03-31' } });
+    expect(p.status).toBe(400);
+    expect(p.body.error.details.fields.endDate).toBe('End date is before the start date');
+    const stored = (await request(ctx.app, 'GET', '/past-contracts', { cookie: us5.viewer.cookie })).body.items.find((i: any) => i.id === c.body.id);
+    expect(stored.endDate).toBe('2025-06-30');
+    await request(ctx.app, 'DELETE', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie });
+  });
+
+  it('another org\'s contract and malformed ids → 404 "Past contract not found"', async () => {
+    const c = await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.analyst.cookie, json: contract });
+    for (const [method, path] of [['PATCH', `/past-contracts/${c.body.id}`], ['DELETE', `/past-contracts/${c.body.id}`], ['PATCH', '/past-contracts/not-a-uuid'], ['DELETE', '/past-contracts/123']] as const) {
+      const r = await request(ctx.app, method, path, { cookie: other.analyst.cookie, json: method === 'PATCH' ? { value: 1 } : undefined });
+      expect(r.status, `${method} ${path}`).toBe(404);
+      expect(r.body.error.code).toBe('not_found');
+      expect(r.body.error.message).toBe('Past contract not found');
+    }
+    const stored = (await request(ctx.app, 'GET', '/past-contracts', { cookie: us5.viewer.cookie })).body.items.find((i: any) => i.id === c.body.id);
+    expect(stored.value).toBe(contract.value);
+    expect((await request(ctx.app, 'GET', '/past-contracts', { cookie: other.viewer.cookie })).body.total).toBe(0);
+    await request(ctx.app, 'DELETE', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie });
+  });
+
+  it('viewer cannot add or edit a contract → 403', async () => {
+    expect((await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.viewer.cookie, json: contract })).status).toBe(403);
+    const c = await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.analyst.cookie, json: contract });
+    expect((await request(ctx.app, 'PATCH', `/past-contracts/${c.body.id}`, { cookie: us5.viewer.cookie, json: { value: 1 } })).status).toBe(403);
+    await request(ctx.app, 'DELETE', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie });
+  });
+
+  it('lists by end date desc, then created desc (FR-056)', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'US5 Order');
+    // created_at comes from the DB default, so sequential inserts are strictly ordered.
+    // Undated contracts sort last (NULLS LAST), not as the newest.
+    for (const [title, endDate] of [['Undated', null], ['Old', '2023-03-31'], ['Newest', '2025-09-30'], ['Same end, created first', '2024-12-31'], ['Same end, created later', '2024-12-31']]) {
+      const r = await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title, value: 1000, endDate } });
+      expect(r.status).toBe(201);
+    }
+    const l = await request(ctx.app, 'GET', '/past-contracts', { cookie: o.viewer.cookie });
+    expect(l.body.total).toBe(5);
+    expect(l.body.items.map((i: any) => i.title)).toEqual(['Newest', 'Same end, created later', 'Same end, created first', 'Old', 'Undated']);
+  });
+
+  it('logs added / updated (with fields) / deleted activity (FR-057)', async () => {
+    const c = await request(ctx.app, 'POST', '/past-contracts', { cookie: us5.analyst.cookie, json: contract });
+    await request(ctx.app, 'PATCH', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie, json: { value: 60_00_000, cracDocumentId: cracId } });
+    await request(ctx.app, 'DELETE', `/past-contracts/${c.body.id}`, { cookie: us5.analyst.cookie });
+    const acts = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, us5.orgId), eq(activityLog.entityId, c.body.id)));
+    expect(acts.map((a) => a.action).sort()).toEqual(['profile.past_contract_added', 'profile.past_contract_deleted', 'profile.past_contract_updated']);
+    expect(acts.every((a) => a.entityType === 'past_contract' && a.userId === us5.analyst.me.user.id)).toBe(true);
+    const upd = acts.find((a) => a.action === 'profile.past_contract_updated')!;
+    expect(((upd.meta as { fields: string[] }).fields).sort()).toEqual(['cracDocumentId', 'value']);
+  });
+
+  // T060 — FR-061
+  const oem = (documentId: string | null) => ({ oemAuthorizations: [{ oem: 'HP', products: 'Desktops', validTill: '2028-03-31', documentId }] });
+
+  it('saves an OEM row linked to an own oem_authorization document (ids compared case-insensitively)', async () => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: us5.analyst.cookie, json: oem(mafId.toUpperCase()) });
+    expect(r.status).toBe(200);
+    expect(r.body.profile.oemAuthorizations[0].documentId).toBe(mafId);
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: us5.analyst.cookie, json: oem(null) })).status).toBe(200);
+  });
+
+  it.each([
+    ['another org\'s OEM authorisation', () => otherMafId],
+    ['a document of another type (CRAC)', () => cracId],
+    ['a random UUID', () => '6f1c2d3e-4b5a-4c6d-8e7f-901234567890'],
+  ])('rejects OEM documentId of %s → 400 (FR-061)', async (_label, id) => {
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: us5.analyst.cookie, json: oem(mafId) })).status).toBe(200);
+    const body = { oemAuthorizations: [{ oem: 'HP', products: '', documentId: mafId }, { oem: 'Dell', products: '', documentId: id() }] };
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: us5.analyst.cookie, json: body });
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe('validation_error');
+    expect(r.body.error.details.fields).toEqual({ 'oemAuthorizations.1.documentId': 'Pick an OEM authorisation from your vault' });
+    // Nothing was written.
+    const stored = (await request(ctx.app, 'GET', '/profile', { cookie: us5.viewer.cookie })).body.profile.oemAuthorizations;
+    expect(stored).toHaveLength(1);
+    expect(stored[0].documentId).toBe(mafId);
+  });
+
+  it('a stored link that went stale (retyped or deleted) never blocks an unrelated save; a new bad id still does', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'US5 Stale');
+    const maf = await upload(o.analyst, 'oem_authorization', 'Lenovo MAF');
+    const gone = await upload(o.analyst, 'oem_authorization', 'Acer MAF');
+    const rows = [{ oem: 'Lenovo', products: '', documentId: maf }, { oem: 'Acer', products: '', documentId: gone }];
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: rows } })).status).toBe(200);
+    expect((await request(ctx.app, 'PATCH', `/vault/${maf}`, { cookie: o.analyst.cookie, json: { type: 'crac' } })).status).toBe(200);
+    await ctx.db.delete(vaultDocuments).where(eq(vaultDocuments.id, gone));
+    // Unrelated field, and the editor's usual full resend of the stored rows → both 200.
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { tradeName: 'Stale Co' } })).status).toBe(200);
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { tradeName: 'Stale Co 2', oemAuthorizations: rows } })).status).toBe(200);
+    // A NEW invalid id is still refused.
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [...rows, { oem: 'HP', products: '', documentId: otherMafId }] } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields).toEqual({ 'oemAuthorizations.2.documentId': 'Pick an OEM authorisation from your vault' });
+  });
+});
+
 /** T033 (#134): download headers, replace PDF → PNG, cross-org 404s, tags, literal `%`, empty file, insert rollback. */
 describe('vault — headers, replace, isolation and rollback (T033)', () => {
   let b: Awaited<ReturnType<typeof seedOrgWithRoles>>;
@@ -826,9 +976,12 @@ describe('vault delete — review fixes (FR-041)', () => {
 
   it('rolls back every unlink when the row delete fails', async () => {
     const o = await seedOrgWithRoles(ctx.app, 'Rollback Traders');
-    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'crac.pdf'), type: 'crac', title: 'CRAC' } });
-    await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title: 'T', value: 1000, cracDocumentId: doc.body.id } });
-    await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Dell', products: 'x', documentId: doc.body.id }] } });
+    // One document linked from both places: it must be an oem_authorization for PUT /profile (FR-061);
+    // cracDocumentId only requires vault ownership (FR-055).
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'maf.pdf'), type: 'oem_authorization', title: 'Dell MAF' } });
+    expect(doc.status).toBe(201);
+    expect((await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title: 'T', value: 1000, cracDocumentId: doc.body.id } })).status).toBe(201);
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Dell', products: 'x', documentId: doc.body.id }] } })).status).toBe(200);
     const failingTx = new Proxy(ctx.db, {
       get(target, prop, recv) {
         if (prop === 'transaction') {

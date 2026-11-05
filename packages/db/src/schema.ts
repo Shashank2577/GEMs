@@ -19,6 +19,8 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   phone: text('phone'), // E.164, for WhatsApp alerts
+  // Org the user last worked in; survives sign-out so the next sign-in resumes there (002/FR-021, US2 scenario 14).
+  lastOrgId: uuid('last_org_id').references(() => organizations.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
 }, (t) => ({ emailUq: uniqueIndex('users_email_uq').on(t.email) }));
 
@@ -269,6 +271,7 @@ export const tenderDocuments = pgTable('tender_documents', {
   pageCount: integer('page_count'),
   text: text('text'), // extracted text, pages separated by \f
   sourceUrl: text('source_url'),
+  textSource: text('text_source').$type<'pdf' | 'ocr'>().notNull().default('pdf'), // FR-052
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_docs_tender_idx').on(t.tenderId) }));
 
@@ -340,7 +343,7 @@ export interface Requirement {
   value?: string | number | boolean | null;
   numeric?: number | null; // normalised rupees / years / days / percent
   mandatory: boolean;
-  source: { documentId?: string; fileName?: string; page?: number; quote?: string };
+  source: { documentId?: string; fileName?: string; page?: number; quote?: string; ocr?: boolean };
   method: 'RULE' | 'LLM' | 'MANUAL';
   confidence: number; // 0..1
 }
@@ -365,6 +368,9 @@ export interface ChecklistItem {
   generated?: string; // annexure template key if it is generated, not uploaded
 }
 
+export type StaleReason =
+  | 'corrigendum' | 'document_added' | 'document_removed' | 'profile_changed' | 'vault_changed' | 'weights_changed';
+
 export const analyses = pgTable('analyses', {
   id: id(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -379,7 +385,10 @@ export const analyses = pgTable('analyses', {
   verdict: text('verdict').$type<'go' | 'review' | 'no_go'>(),
   summary: text('summary'),
   error: text('error'),
-  stale: boolean('stale').notNull().default(false), // corrigendum after analysis
+  stale: boolean('stale').notNull().default(false), // inputs changed after analysis (FR-043)
+  staleReason: text('stale_reason').$type<StaleReason>(),
+  staleAt: timestamp('stale_at', { withTimezone: true }),
+  notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock3, FileSignature, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import type { ReadinessState } from '@tp/core/contracts/apply';
+import { TEMPLATE_PLACEHOLDERS } from '@tp/core/packet/placeholders';
 import { Badge, type BadgeTone } from '@/components/ui';
 import { STAGE_LABEL, type Stage } from '@/lib/types';
 import { formatINR } from '@/lib/format';
@@ -56,14 +57,12 @@ export const PLACEHOLDER_LABEL: Record<string, { label: string; href: string }> 
   'tender.buyerOffice': { label: 'Buyer office (from GeM)', href: '' },
 };
 
-export const placeholderLabel = (p: string) => PLACEHOLDER_LABEL[p]?.label ?? p;
+const CORE_LABEL: Record<string, string> = Object.fromEntries(TEMPLATE_PLACEHOLDERS.map((p) => [p.path, p.label]));
 
-/** Placeholders users can insert in the template editor. */
-export const INSERTABLE_PLACEHOLDERS = [
-  'company.legalName', 'company.gstin', 'company.pan', 'company.address', 'company.udyamNumber', 'company.miiClass', 'company.localContentPct',
-  'signatory.name', 'signatory.designation', 'tender.bidNumber', 'tender.title', 'tender.organisation', 'tender.endDate', 'tender.emdAmount',
-  'oem.name', 'offer.make', 'offer.model', 'date', 'place',
-];
+export const placeholderLabel = (p: string) => PLACEHOLDER_LABEL[p]?.label ?? CORE_LABEL[p] ?? p;
+
+/** Placeholders users can insert in the template editor: exactly the supported context paths (FR-041). */
+export const INSERTABLE_PLACEHOLDERS = TEMPLATE_PLACEHOLDERS;
 
 const stage = (s: unknown) => (typeof s === 'string' && s in STAGE_LABEL ? STAGE_LABEL[s as Stage] : String(s ?? ''));
 

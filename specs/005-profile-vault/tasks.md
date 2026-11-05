@@ -178,17 +178,17 @@ task is sized at ≤ 1 day.
 ### Tests for User Story 5
 
 - [x] T055 [P] [US5] API test: past contracts CRUD in `apps/api/test/vault.test.ts` FR-054
-- [ ] T056 [P] [US5] API tests: `cracDocumentId` of another org / random UUID → 400 "That document is not in your vault"; PATCH only `endDate` < stored `startDate` → 400; cross-org PATCH/DELETE → 404 "Past contract not found"; malformed id → 404; list ordering end date desc then created desc; viewer POST → 403; activity rows for add/update/delete in `apps/api/test/vault.test.ts` FR-054…FR-057 (#147)
+- [x] T056 [P] [US5] API tests: `cracDocumentId` of another org / random UUID → 400 "That document is not in your vault"; PATCH only `endDate` < stored `startDate` → 400; cross-org PATCH/DELETE → 404 "Past contract not found"; malformed id → 404; list ordering end date desc then created desc; viewer POST → 403; activity rows for add/update/delete in `apps/api/test/vault.test.ts` FR-054…FR-057 (#147)
 
 ### Implementation for User Story 5
 
 - [x] T057 [US5] Past-contract routes with CRAC ownership check and activity in `apps/api/src/routes/profile.ts` FR-054, FR-055, FR-056, FR-057
 - [x] T058 [P] [US5] Experience UI: empty state, summary (count/total/largest), responsive table with Proof badge, contract dialog with client validation and Experience-only CRAC picker, delete confirmation in `apps/web/src/features/profile/PastContracts.tsx` FR-058, FR-059
 - [x] T059 [P] [US5] OEM editor rows (OEM, products, valid till + badge, `oem_authorization`-only vault picker) saved with the profile in `apps/web/src/features/profile/OemEditor.tsx` FR-060
-- [ ] T060 [US5] Validate OEM `documentId` ownership and type in `PUT /profile` (one query for all ids) → 400 `details.fields["oemAuthorizations.<i>.documentId"]` "Pick an OEM authorisation from your vault" in `apps/api/src/routes/profile.ts`; API tests (own doc OK, other org 400, wrong type 400) in `apps/api/test/vault.test.ts` FR-061 (#148)
-- [ ] T061 [US5] Inline CRAC upload: "Upload a new CRAC…" option in the picker opens `UploadDialog` (preset `crac`) above the contract dialog and selects the new document via `onUploaded(id)` without losing the draft in `apps/web/src/features/profile/PastContracts.tsx` FR-062 (#149)
-- [ ] T062 [P] [US5] "Use document expiry" in OEM rows when the linked document has an expiry and Valid till is empty/different in `apps/web/src/features/profile/OemEditor.tsx` FR-063 (#150)
-- [ ] T063 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in `qa/evidence/005/US5/` — scenarios 1–11: empty state, client errors, add/edit/delete contract with toasts and summary "1 contract · total ₹58.2 L · largest ₹58.2 L", CRAC linking ("Linked"/"No CRAC"), OEM rows + save, completeness change, cross-org CRAC via API; desktop + `@mobile` (table collapses to cards); spec `e2e/005-profile-vault/US5-experience-oem.e2e.ts`; `VERDICT.md` FR-054…FR-063 (#151)
+- [x] T060 [US5] Validate OEM `documentId` ownership and type in `PUT /profile` (one query for all ids) → 400 `details.fields["oemAuthorizations.<i>.documentId"]` "Pick an OEM authorisation from your vault" in `apps/api/src/routes/profile.ts`; API tests (own doc OK, other org 400, wrong type 400) in `apps/api/test/vault.test.ts` FR-061 (#148)
+- [x] T061 [US5] Inline CRAC upload: "Upload a new CRAC…" option in the picker opens `UploadDialog` (preset `crac`) above the contract dialog and selects the new document via `onUploaded(id)` without losing the draft in `apps/web/src/features/profile/PastContracts.tsx` FR-062 (#149)
+- [x] T062 [P] [US5] "Use document expiry" in OEM rows when the linked document has an expiry and Valid till is empty/different in `apps/web/src/features/profile/OemEditor.tsx` FR-063 (#150)
+- [x] T063 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in `qa/evidence/005/US5/` — scenarios 1–11: empty state, client errors, add/edit/delete contract with toasts and summary "1 contract · total ₹58.2 L · largest ₹58.2 L", CRAC linking ("Linked"/"No CRAC"), OEM rows + save, completeness change, cross-org CRAC via API; desktop + `@mobile` (table collapses to cards); spec `e2e/005-profile-vault/US5-experience-oem.e2e.ts`; `VERDICT.md` FR-054…FR-063 (#151)
 
 **Checkpoint**: Experience and OEM data verified
 
