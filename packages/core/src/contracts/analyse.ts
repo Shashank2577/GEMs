@@ -98,4 +98,11 @@ export interface AnalysisDto {
   updatedAt: string;
   /** Documents the analysis read. */
   documents?: { id: string; fileName: string; kind: TenderDocKind; pageCount: number | null }[];
+  /**
+   * GET …/analysis only (FR-029): the newest attempt when it is still running or failed. The DTO
+   * itself is then the latest done analysis (or that attempt when nothing has completed yet).
+   */
+  lastAttempt?: AnalysisLastAttempt;
 }
+
+export interface AnalysisLastAttempt { status: 'running' | 'failed'; error: string | null; at: string }

@@ -8,7 +8,7 @@
  *   analyseTender        → rules (+ LLM when configured) → score → checklist → analyses row
  *   overrideFactor       → audited manual status change + re-score
  */
-import { and, asc, desc, eq, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import {
   analyses, companyProfiles, organizations, pastContracts, tenderDocuments, tenders, vaultDocuments,
   type Requirement, type ScoreFactor,
@@ -238,6 +238,36 @@ export async function latestAnalysis(deps: AppDeps, tenderId: string, orgId: str
   return a ?? null;
 }
 
+/** Latest analysis with status `done` (FR-029): the result to show and to carry overrides from. */
+export async function latestDoneAnalysis(deps: AppDeps, tenderId: string, orgId: string): Promise<AnalysisRow | null> {
+  const [a] = await deps.db.select().from(analyses)
+    .where(and(eq(analyses.tenderId, tenderId), eq(analyses.orgId, orgId), eq(analyses.status, 'done')))
+    .orderBy(desc(analyses.createdAt)).limit(1);
+  return a ?? null;
+}
+
+/** A `running` analysis older than this is treated as failed ("timed out") (FR-028). */
+export const ANALYSIS_RUNNING_TIMEOUT_MS = 2 * 60 * 1000;
+export const ANALYSIS_TIMED_OUT = 'timed out';
+
+/**
+ * `lastAttempt` for GET …/analysis (FR-029): set when the latest row is not the one shown (a newer
+ * running/failed attempt) or when no done analysis exists yet. A `running` row older than the
+ * timeout is reported as failed "timed out" even before the next analyse request marks it.
+ */
+export function lastAttemptOf(latest: AnalysisRow, shown: AnalysisRow, now: Date): AnalysisDto['lastAttempt'] {
+  if (latest.status !== 'running' && latest.status !== 'failed') return undefined;
+  if (latest.id !== shown.id || shown.status !== 'done') {
+    const timedOut = latest.status === 'running' && now.getTime() - latest.createdAt.getTime() >= ANALYSIS_RUNNING_TIMEOUT_MS;
+    return {
+      status: timedOut ? 'failed' : latest.status,
+      error: timedOut ? ANALYSIS_TIMED_OUT : latest.error ?? null,
+      at: iso(latest.status === 'failed' ? latest.updatedAt : latest.createdAt),
+    };
+  }
+  return undefined;
+}
+
 function overridesOf(a: AnalysisRow | null): Record<string, FactorOverride> {
   const out: Record<string, FactorOverride> = {};
   for (const f of a?.factors ?? []) if (f.overridden) out[f.key] = f.overridden;
@@ -257,11 +287,24 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
   if (!docs.length) {
     throw new HttpError(422, 'no_documents', 'Add the bid document first — upload the PDF or fetch it from GeM.');
   }
-  const previous = await latestAnalysis(deps, tender.id, input.orgId);
+  // Overrides come from the latest DONE analysis: a failed attempt has no factors (FR-029).
+  const previous = await latestDoneAnalysis(deps, tender.id, input.orgId);
   const now = deps.clock.now();
-  const [row] = await deps.db.insert(analyses).values({
-    orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
-  }).returning();
+  // One running analysis per org+tender (FR-028). The advisory lock serialises concurrent requests
+  // for the same org+tender until commit, so the check and the insert cannot interleave.
+  const row = await deps.db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${input.orgId}:${tender.id}`}, 0))`);
+    const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
+    const scope = and(eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'));
+    await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
+      .where(and(scope, lte(analyses.createdAt, cutoff)));
+    const [running] = await tx.select({ id: analyses.id }).from(analyses).where(scope).limit(1);
+    if (running) throw new HttpError(409, 'analysis_running', 'An analysis is already running for this tender');
+    const [inserted] = await tx.insert(analyses).values({
+      orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
+    }).returning();
+    return inserted;
+  });
 
   try {
     const ordered = [...docs].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());

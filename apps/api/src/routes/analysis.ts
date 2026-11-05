@@ -6,8 +6,8 @@
  *   POST /tenders/:id/fetch-documents                 download from GeM              analyst+
  *   GET  /tenders/:id/documents/:docId/download       stream (?inline=1)             viewer+
  *   DELETE /tenders/:id/documents/:docId              remove own upload (204)        analyst+
- *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis         analyst+
- *   GET  /tenders/:id/analysis                        latest Analysis or 404         viewer+
+ *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis; 409 analysis_running  analyst+
+ *   GET  /tenders/:id/analysis                        latest done Analysis (+lastAttempt) or 404  viewer+
  *   POST /analyses/:id/override                       {factorKey,status,reason}      bid_manager+
  *   GET  /scoring-weights                             {weights, defaults, custom}    viewer+
  *   PUT  /scoring-weights                             partial weights ({} = reset)   bid_manager+
@@ -20,7 +20,7 @@ import { HttpError, badRequest, notFound } from '../lib/errors';
 import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import {
-  analyseTender, fetchGemDocuments, getTender, getTenderDocument, latestAnalysis, listTenderDocuments, overrideFactor,
+  analyseTender, fetchGemDocuments, getTender, getTenderDocument, lastAttemptOf, latestAnalysis, latestDoneAnalysis, listTenderDocuments, overrideFactor,
   removeTenderDocument, saveWeights, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
 } from '../services/analyse';
 import type { AppEnv } from '../types';
@@ -101,10 +101,15 @@ analysisRoutes.post('/tenders/:id/analyse', requireRole('analyst'), async (c) =>
 
 analysisRoutes.get('/tenders/:id/analysis', requireAuth, async (c) => {
   const tenderId = tenderIdOf(c.req.param('id'));
-  const a = await latestAnalysis(c.var.deps, tenderId, orgId(c));
-  if (!a) throw notFound('Analysis');
+  const [latest, done] = await Promise.all([
+    latestAnalysis(c.var.deps, tenderId, orgId(c)), latestDoneAnalysis(c.var.deps, tenderId, orgId(c)),
+  ]);
+  if (!latest) throw notFound('Analysis');
+  // FR-029: show the latest completed result; a newer running/failed attempt goes in lastAttempt.
+  const shown = done ?? latest;
   const docs = await listTenderDocuments(c.var.deps, tenderId, orgId(c));
-  return c.json(toAnalysisDto(a, docs));
+  const lastAttempt = lastAttemptOf(latest, shown, c.var.deps.clock.now());
+  return c.json({ ...toAnalysisDto(shown, docs), ...(lastAttempt ? { lastAttempt } : {}) });
 });
 
 analysisRoutes.post('/analyses/:id/override', requireRole('bid_manager'), async (c) => {

@@ -487,3 +487,123 @@ describe('US2 extraction: new keys and document check (FR-010, FR-019, T036)', (
     expect(r.body.summary).toMatch(/^Check documents: old\.pdf is for GEM\/2026\/B\/6120451; other\.pdf is for GEM\/2026\/B\/6151234\. /);
   });
 });
+
+describe('US3 run lifecycle: one running analysis, failed attempts keep the previous result (FR-028, FR-029)', () => {
+  const POST = (app: ReturnType<typeof createApp>, id: string) => request(app, 'POST', `/tenders/${id}/analyse`, { cookie: roles.analyst.cookie });
+  const GET = (id: string) => request(ctx.app, 'GET', `/tenders/${id}/analysis`, { cookie: roles.viewer.cookie });
+  const rowsOf = (id: string) => ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, id), eq(analyses.orgId, roles.orgId)));
+  async function readyTender(tag: string, key = 'go-it-services') {
+    const t = await insertTender(key, { contentHash: `us3-${tag}`, source: `us3-${tag}` });
+    expect((await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile(key) } })).status).toBe(201);
+    return t;
+  }
+  /** Fake LLM that blocks until released, to keep the first analysis `running`. */
+  function slowLlm() {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const llm: LlmClient = {
+      model: 'slow',
+      complete: async () => ({ text: '', model: 'slow', stopReason: null, usage: { inputTokens: 0, outputTokens: 0 } }),
+      completeJson: async <T>() => { await gate; return { requirements: [] } as T; },
+    };
+    return { llm, release };
+  }
+  /** App whose analysis fails mid-run with `message` (LLM fails, then the warning log throws). */
+  const failingApp = (message: string) => createApp({
+    ...ctx.deps,
+    llm: { model: 'down', complete: async () => { throw new Error(message); }, completeJson: async () => { throw new Error(message); } },
+    logger: { ...ctx.deps.logger, warn: () => { throw new Error(message); } },
+  });
+
+  it('two concurrent POSTs: one 201, the other 409 analysis_running; a single analysis row (US3 #14)', async () => {
+    const t = await readyTender('race');
+    const { llm, release } = slowLlm();
+    const app = createApp({ ...ctx.deps, llm });
+    const p1 = POST(app, t.id);
+    const p2 = POST(app, t.id);
+    const first = await Promise.race([p1, p2]); // the loser answers while the winner is blocked in the LLM
+    expect(first.status).toBe(409);
+    expect(first.body.error).toMatchObject({ code: 'analysis_running', message: 'An analysis is already running for this tender' });
+    const during = await GET(t.id);
+    expect(during.status).toBe(200);
+    expect(during.body.status).toBe('running');
+    expect(during.body.lastAttempt).toMatchObject({ status: 'running', error: null });
+    release();
+    const res = await Promise.all([p1, p2]);
+    expect(res.map((r) => r.status).sort()).toEqual([201, 409]);
+    const rows = await rowsOf(t.id);
+    expect(rows.map((r) => r.status)).toEqual(['done']);
+    const after = await GET(t.id);
+    expect(after.body.lastAttempt).toBeUndefined();
+  });
+
+  it('a running row younger than 2 min → 409; older → marked failed "timed out" and a new analysis runs (FR-028)', async () => {
+    const t = await readyTender('timeout');
+    const now = ctx.clock.now().getTime();
+    const [fresh] = await ctx.db.insert(analyses).values({
+      orgId: roles.orgId, tenderId: t.id, status: 'running',
+      createdAt: new Date(now - 119_000), updatedAt: new Date(now - 119_000),
+    }).returning();
+    const busy = await POST(ctx.app, t.id);
+    expect(busy.status).toBe(409);
+    expect(busy.body.error.code).toBe('analysis_running');
+
+    await ctx.db.update(analyses).set({ createdAt: new Date(now - 121_000) }).where(eq(analyses.id, fresh.id));
+    // Before the next request marks it, GET already reports the stuck attempt as timed out.
+    expect((await GET(t.id)).body.lastAttempt).toMatchObject({ status: 'failed', error: 'timed out' });
+    const ok = await POST(ctx.app, t.id);
+    expect(ok.status).toBe(201);
+    expect(ok.body.status).toBe('done');
+    const [old] = await ctx.db.select().from(analyses).where(eq(analyses.id, fresh.id));
+    expect(old).toMatchObject({ status: 'failed', error: 'timed out' });
+    expect(old.updatedAt.toISOString()).toBe(ctx.clock.now().toISOString());
+  });
+
+  it('another org can analyse the same tender while one is running (lock is per org+tender)', async () => {
+    const t = await readyTender('perorg');
+    const other = await signup(ctx.app, { orgName: 'Parallel Co' });
+    await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: other.cookie, form: { file: pdfFile('go-it-services') } });
+    const now = ctx.clock.now();
+    await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId: t.id, status: 'running', createdAt: now, updatedAt: now });
+    expect((await POST(ctx.app, t.id)).status).toBe(409);
+    expect((await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: other.cookie })).status).toBe(201);
+  });
+
+  it('a failed re-analysis keeps the previous result and its overrides; the next run re-applies them (US3 #15, FR-029)', async () => {
+    const t = await readyTender('failed', 'nogo-experience');
+    const first = await POST(ctx.app, t.id);
+    expect(first.body.verdict).toBe('no_go');
+    const ov = await request(ctx.app, 'POST', `/analyses/${first.body.id}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'experience', status: 'pass', reason: 'JV partner brings 6 years' } });
+    expect(ov.status).toBe(200);
+    expect(ov.body.verdict).toBe('go');
+
+    ctx.clock.advance(1000); // the fixed clock would give every row the same created_at
+    const failed = await POST(failingApp('LLM provider down'), t.id);
+    expect(failed.status).toBe(500);
+    expect(failed.body.error.code).toBe('analysis_failed');
+
+    const got = await GET(t.id);
+    expect(got.status).toBe(200);
+    expect(got.body).toMatchObject({ id: first.body.id, status: 'done', verdict: 'go' });
+    expect(got.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'JV partner brings 6 years' });
+    expect(got.body.lastAttempt).toEqual({ status: 'failed', error: 'LLM provider down', at: ctx.clock.now().toISOString() });
+
+    // Re-analysing after the failure carries the override from the last DONE analysis, not the failed row.
+    ctx.clock.advance(1000);
+    const again = await POST(ctx.app, t.id);
+    expect(again.status).toBe(201);
+    expect(again.body.factors.find((f: any) => f.key === 'experience').overridden.status).toBe('pass');
+    expect(again.body.verdict).toBe('go');
+    const latest = await GET(t.id);
+    expect(latest.body.id).toBe(again.body.id);
+    expect(latest.body.lastAttempt).toBeUndefined();
+  });
+
+  it('a failed first analysis is returned itself with lastAttempt failed', async () => {
+    const t = await readyTender('firstfail');
+    expect((await POST(failingApp('boom'), t.id)).status).toBe(500);
+    const got = await GET(t.id);
+    expect(got.status).toBe(200);
+    expect(got.body).toMatchObject({ status: 'failed', error: 'boom', lastAttempt: { status: 'failed', error: 'boom' } });
+  });
+});
