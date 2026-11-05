@@ -132,6 +132,18 @@ export const notificationPrefsSchema = z.object({
   expiryReminders: z.boolean(),
 });
 export type NotificationPrefs = z.infer<typeof notificationPrefsSchema>;
+/** Defaults when a (org, user) has no stored row (002/FR-031). */
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = { inApp: true, email: true, whatsapp: false, frequency: 'instant', expiryReminders: true };
+
+/**
+ * Outcome of `POST /me/notifications/test` per channel (002/FR-034):
+ * `sent` delivered to the provider, `skipped` channel not configured on this server or no mobile number,
+ * `failed` provider error, `off` the channel is switched off in the user's preferences. The in-app row is always
+ * created, so `inApp` is always `sent`.
+ */
+export type TestAlertOutcome = 'sent' | 'skipped' | 'failed' | 'off';
+export interface TestAlertResult { inApp: 'sent'; email: TestAlertOutcome; whatsapp: TestAlertOutcome }
+export const TEST_ALERT_TITLE = 'Test alert from TenderPilot';
 
 // ───────────── API tokens ─────────────
 

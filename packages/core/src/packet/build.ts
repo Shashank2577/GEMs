@@ -296,7 +296,9 @@ function drawIndex(out: PDFDocument, pages: PDFPage[], f: Fonts, input: BuildPac
     page.drawLine({ start: { x: MARGIN, y: y - 6 }, end: { x: W - MARGIN, y: y - 6 }, thickness: 0.3, color: RULE });
     const target = firstPageOf.get(bi);
     if (target) addLink(out, page, [MARGIN, y - 5, W - MARGIN, y + 11], target.ref);
-    y -= 22;
+    // 22 pt rows fit 26 on the first page; continuation pages need 20 pt so all 34 rows stay above the footer
+    // (at 22 pt rows 33–34 fell off the bottom of the page — found by the SC-005 page-plan test, T064).
+    y -= pi === 0 ? 22 : 20;
     count++;
   });
   if (!rows.length) text(page, 'No documents were included.', MARGIN, y, f.italic, 10, MUTED);

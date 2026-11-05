@@ -1,0 +1,896 @@
+{
+  "url": "http://localhost:8806/vault?doc=c077736d-db9c-48e4-90f2-b709606a0c92",
+  "timestamp": "2026-11-05T03:34:36.575Z",
+  "violations": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#7d8092",
+                "bgColor": "#fafafc",
+                "contrastRatio": 3.74,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<aside class=\"fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out md:block w-[248px]\" aria-label=\"Sidebar\">",
+                  "target": [
+                    "aside"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mb-1.5 mt-6 px-2.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/80\">Organization</p>",
+          "target": [
+            ".mb-1\\.5"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#f2fdf8",
+                "contrastRatio": 3.64,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"flex items-center gap-2 rounded-lg bg-success-soft/60 px-3 py-3 text-sm text-success\">",
+                  "target": [
+                    ".bg-success-soft\\/60"
+                  ]
+                },
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs p-4 sm:p-5\">",
+                  "target": [
+                    ".text-card-foreground.sm\\:p-5.p-4"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.64 (foreground color: #189567, background color: #f2fdf8, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"flex items-center gap-2 rounded-lg bg-success-soft/60 px-3 py-3 text-sm text-success\">",
+          "target": [
+            ".bg-success-soft\\/60"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.64 (foreground color: #189567, background color: #f2fdf8, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Valid</span>",
+                  "target": [
+                    "#radix-\\:r1s\\: > .\\[\\&_svg\\]\\:size-3.border-success\\/20.px-1\\.5"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Valid</span>",
+          "target": [
+            "#radix-\\:r1s\\: > .\\[\\&_svg\\]\\:size-3.border-success\\/20.px-1\\.5"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ]
+    }
+  ],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                },
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" class=\"rounded-md focus-ring\" href=\"/dashboard\">",
+                  "target": [
+                    ".rounded-md[aria-label=\"TenderPilot home\"][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Collapse sidebar\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Collapse sidebar\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: qa Traders mw2zs2tj11. Switch organization\">",
+                  "target": [
+                    "#radix-\\:r3\\:"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-8 w-full items-center gap-2 rounded-lg border bg-card px-2.5 text-[13px] text-muted-foreground shadow-xs transition-colors hover:border-foreground/15 hover:text-foreground focus-ring\">",
+                  "target": [
+                    ".pb-3 > .hover\\:border-foreground\\/15.h-8.w-full"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/dashboard\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/tenders\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"tenders\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/watchlists\">",
+                  "target": [
+                    "a[href$=\"watchlists\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring bg-card text-foreground shadow-sm ring-1 ring-border\" href=\"/vault\">",
+                  "target": [
+                    ".ring-1"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/profile\">",
+                  "target": [
+                    "a[href$=\"profile\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/notifications\">",
+                  "target": [
+                    "a[href$=\"notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/settings\">",
+                  "target": [
+                    "a[href$=\"settings\"]"
+                  ]
+                },
+                {
+                  "html": "<button class=\"ml-auto hidden h-8 w-full max-w-sm items-center gap-2 rounded-lg border bg-subtle px-3 text-[13px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground focus-ring md:mr-auto md:ml-0 md:flex\">",
+                  "target": [
+                    ".max-w-sm"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Theme: system\" id=\"radix-:r9:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r9\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".flex-wrap.shrink-0.gap-2 > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\].bg-primary"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"More vault actions\" id=\"radix-:rq:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:rq\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"true\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(5)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(6)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(7)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(8)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40.hover\\:text-primary.gap-1:nth-child(9)"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search title, number...\" aria-label=\"Search documents\" value=\"\" style=\"\">",
+                  "target": [
+                    ".pl-9"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex items-center ju...\" aria-label=\"Document type\">",
+                  "target": [
+                    ".w-\\[11\\.5rem\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex items-center ju...\" aria-label=\"Sort\">",
+                  "target": [
+                    ".w-\\[10rem\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">",
+                  "target": [
+                    "div[aria-label=\"View\"] > .shadow-sm.transition-all[role=\"radio\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">",
+                  "target": [
+                    "div[aria-label=\"View\"] > .transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">All</button>",
+                  "target": [
+                    "div[aria-label=\"Category\"] > .shadow-sm.transition-all[role=\"radio\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Statutory</button>",
+                  "target": [
+                    "div[aria-label=\"Category\"] > .transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Financial</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Experience</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">OEM</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(5)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Quality</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(6)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Other</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(7)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open ISO a11y\"></button>",
+                  "target": [
+                    ".z-\\[1\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"min-h-dvh bg-background\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".bg-background"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"/api/vault/c077736d-...\" download=\"\" aria-label=\"Download ISO-a11y.pd...\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "a[aria-label=\"Download ISO-a11y.pdf\"]"
+                  ]
+                },
+                {
+                  "html": "<a href=\"/api/vault/c077736d-...\" download=\"\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".bg-transparent.border-input[download=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<a href=\"/api/vault/c077736d-...\" target=\"_blank\" rel=\"noreferrer\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "a[target=\"_blank\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Delete document\">",
+                  "target": [
+                    ".hover\\:bg-danger-soft"
+                  ]
+                },
+                {
+                  "html": "<input type=\"file\" class=\"sr-only\" accept=\".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg\" style=\"\">",
+                  "target": [
+                    ".flex-wrap.gap-2.flex > .cursor-pointer.focus-within\\:ring-2.focus-within\\:ring-ring > input[type=\"file\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".flex-wrap.gap-2.flex > .bg-transparent.border-input.h-8"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".border-t.px-5.py-3 > .flex-wrap.gap-2.flex > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\].bg-primary"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-ring\">",
+                  "target": [
+                    "#radix-\\:r1q\\: > .right-4.top-4.p-1"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div role=\"dialog\" id=\"radix-:r1q:\" data-state=\"open\" class=\"fixed z-50 flex flex...\" tabindex=\"-1\" aria-labelledby=\"radix-:r1r:\" aria-describedby=\"radix-:r1s:\" style=\"pointer-events: none...\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            "#radix-\\:r1q\\:"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(7)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(7)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">QT</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">QT</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"ISO a11y\">ISO a11y</h3>",
+          "target": [
+            "h3[title=\"ISO a11y\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">ISO certificate</p>",
+          "target": [
+            ".flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"mt-3 min-h-[20px] truncate font-mono text-xs text-muted-foreground\">ISO-OLD-1</div>",
+          "target": [
+            ".min-h-\\[20px\\]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Valid</span>",
+          "target": [
+            ".mt-3.flex-wrap.gap-1\\.5 > .\\[\\&_svg\\]\\:size-3.border-success\\/20.px-1\\.5"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Expires 05 Oct 2028</span>",
+          "target": [
+            ".pt-3 > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".pt-3 > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<dt class=\"text-2xs font-medium uppercase tracking-wide text-muted-foreground\">Number</dt>",
+          "target": [
+            ".py-2.gap-2\\.5.items-start:nth-child(1) > .flex-1.min-w-0 > dt"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-mono text-[13px]\">ISO-OLD-1</span>",
+          "target": [
+            "dd > .font-mono.text-\\[13px\\]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<dt class=\"text-2xs font-medium uppercase tracking-wide text-muted-foreground\">Issued by</dt>",
+          "target": [
+            ".py-2.gap-2\\.5.items-start:nth-child(2) > .flex-1.min-w-0 > dt"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"mt-0.5 flex items-center gap-1 text-xs text-muted-foreground\" data-testid=\"next-reminder\">",
+          "target": [
+            "span[data-testid=\"next-reminder\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p id=\"radix-:r1v:\" class=\"text-sm text-muted-foreground\">Upload the renewed copy and confirm its dates. The current file is kept under Versions and reminders restart for the new expiry.</p>",
+          "target": [
+            "#radix-\\:r1v\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
+        }
+      ]
+    }
+  ],
+  "passes": 22
+}

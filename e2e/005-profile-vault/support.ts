@@ -14,10 +14,11 @@ const { PDFDocument } = createRequire(join(process.cwd(), 'apps', 'api', 'packag
 
 export const MB = 1024 * 1024;
 
-/** A real PDF with `pages` pages (each stamped with `label` so different files differ). */
-export async function makePdf(pages = 1, label = 'TenderPilot QA'): Promise<Buffer> {
+/** A real PDF with `pages` pages (each stamped with `label` so different files differ). `makePdf(text)` = one page carrying `text` (US5). */
+export async function makePdf(pagesOrText: number | string = 1, label = 'TenderPilot QA'): Promise<Buffer> {
+  const [pages, text] = typeof pagesOrText === 'string' ? [1, pagesOrText] : [pagesOrText, label];
   const doc = await PDFDocument.create();
-  for (let i = 1; i <= pages; i++) doc.addPage([300, 200]).drawText(`${label} - page ${i}/${pages}`, { x: 20, y: 100, size: 12 });
+  for (let i = 1; i <= pages; i++) doc.addPage([300, 200]).drawText(`${text} - page ${i}/${pages}`, { x: 20, y: 100, size: 12 });
   return Buffer.from(await doc.save());
 }
 
@@ -218,3 +219,29 @@ export async function makeMidOrg(page: Page) {
 }
 
 export const ring = (page: Page, pct: number) => page.getByRole('img', { name: `Profile ${pct}% complete` }).first();
+
+// ---- US5 helpers (PDF uploads, contract/OEM API shortcuts) ----
+/** Upload a generated PDF through POST /api/vault; returns the created document DTO. */
+export async function uploadPdf(page: Page, fields: { type: string; title: string; expiryDate?: string }) {
+  const multipart: Record<string, string | { name: string; mimeType: string; buffer: Buffer }> = {
+    file: { name: `${fields.title.replace(/\W+/g, '-').toLowerCase()}.pdf`, mimeType: 'application/pdf', buffer: await makePdf(fields.title) },
+    type: fields.type, title: fields.title,
+  };
+  if (fields.expiryDate) multipart.expiryDate = fields.expiryDate;
+  const r = await page.request.post('/api/vault', { multipart });
+  expect(r.status(), await r.text()).toBe(201);
+  return r.json() as Promise<{ id: string; type: string; title: string; expiryDate: string | null }>;
+}
+
+export async function addContract(page: Page, data: Record<string, unknown>) {
+  const r = await page.request.post('/api/past-contracts', { data: { buyerType: 'central', ...data } });
+  expect(r.status(), await r.text()).toBe(201);
+  return r.json() as Promise<{ id: string; title: string; cracDocumentId: string | null; value: number }>;
+}
+
+/** Action names from the dashboard activity feed (newest first). */
+export async function activityActions(page: Page): Promise<string[]> {
+  const r = await page.request.get('/api/dashboard');
+  expect(r.status()).toBe(200);
+  return ((await r.json()) as { activity: { action: string }[] }).activity.map((a) => a.action);
+}

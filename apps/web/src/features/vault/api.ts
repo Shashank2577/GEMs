@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { VaultDocumentDto, VaultSummary, VaultUpdateInput } from '@tp/core/contracts/vault';
+import type { VaultDocumentDto, VaultSummary, VaultUpdateInput, VaultVersionDto } from '@tp/core/contracts/vault';
 import type { DocCategory, DocStatus, DocType } from '@tp/core/vault/status';
 import { api, apiFetch, ApiError, type Paged } from '@/lib/api';
 import { notificationKeys } from '@/features/notifications/api';
@@ -35,13 +35,16 @@ function useInvalidate() {
 
 export interface UploadFields {
   type: DocType; title: string; number?: string; issuer?: string; issueDate?: string; expiryDate?: string; financialYear?: string; tags?: string[];
+  /** Store the file even though the same content is already in the vault (FR-067). */
+  allowDuplicate?: boolean;
 }
 
 export function useUploadVault() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: ({ file, fields }: { file: File; fields: UploadFields }) => {
-      const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== '' && v !== undefined));
+      const { allowDuplicate, ...rest } = fields;
+      const clean = { ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== '' && v !== undefined)), ...(allowDuplicate ? { allowDuplicate: '1' } : {}) };
       return api.upload<VaultDocumentDto>('/vault', file, clean);
     },
     onSuccess: inv,
@@ -53,12 +56,18 @@ export function useUpdateVault() {
   return useMutation({ mutationFn: ({ id, ...body }: VaultUpdateInput & { id: string }) => api.patch<VaultDocumentDto>(`/vault/${id}`, body), onSuccess: inv });
 }
 
+/** Renewal fields sent with the replacement file (FR-064). `undefined` = keep; '' = clear. */
+export interface ReplaceFields { issueDate?: string; expiryDate?: string; number?: string; allowDuplicate?: boolean }
+
 export function useReplaceVaultFile() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: ({ id, file }: { id: string; file: File }) => {
+    mutationFn: ({ id, file, fields = {} }: { id: string; file: File; fields?: ReplaceFields }) => {
       const fd = new FormData();
       fd.append('file', file);
+      const { allowDuplicate, ...rest } = fields;
+      for (const [k, v] of Object.entries(rest)) if (v !== undefined) fd.append(k, v);
+      if (allowDuplicate) fd.append('allowDuplicate', '1');
       return apiFetch<VaultDocumentDto>(`/vault/${id}/file`, { method: 'PUT', body: fd });
     },
     onSuccess: inv,
@@ -68,6 +77,11 @@ export function useReplaceVaultFile() {
 export function useDeleteVault() {
   const inv = useInvalidate();
   return useMutation({ mutationFn: (id: string) => api.delete<{ ok: true }>(`/vault/${id}`), onSuccess: inv });
+}
+
+/** Previous files of a document, newest first (FR-066). Refreshed with every vault invalidation. */
+export function useVaultVersions(id: string | null) {
+  return useQuery({ queryKey: ['vault', 'versions', id], queryFn: () => api.get<{ items: VaultVersionDto[] }>(`/vault/${id}/versions`), enabled: !!id });
 }
 
 export function useVaultDoc(id: string | null) {

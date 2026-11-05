@@ -1,11 +1,11 @@
 /** Shared presentational bits for vault documents: type icon, expiry badge, status copy. */
 import {
   Award, BadgeCheck, Banknote, BookOpen, Building2, Calculator, ClipboardCheck, CreditCard, File, FileSpreadsheet, FileText, Flag,
-  FlaskConical, Handshake, Landmark, PenLine, Percent, Receipt, Rocket, ShieldCheck, type LucideIcon,
+  FlaskConical, Handshake, Landmark, PenLine, Percent, Receipt, Rocket, ShieldCheck, Copy, type LucideIcon,
 } from 'lucide-react';
 import type { DocStatus } from '@tp/core/vault/status';
 import { docTypeInfo, type DocCategory } from '@tp/core/vault/status';
-import { Badge } from '@/components/ui';
+import { Badge, Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -45,3 +45,18 @@ export function ExpiryBadge({ status, days, size = 'sm', className }: { status: 
 }
 
 export const STATUS_LABEL: Record<DocStatus, string> = { valid: 'Valid', expiring: 'Expiring soon', expired: 'Expired' };
+
+/** "This file is already in your vault as “<title>”." with **Open existing** / **Upload anyway** (FR-067). */
+export function DuplicatePrompt({ title, onOpenExisting, onUploadAnyway, busy }: {
+  title: string; onOpenExisting: () => void; onUploadAnyway: () => void; busy?: boolean;
+}) {
+  return (
+    <div role="alert" className="grid gap-2.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2.5 text-sm" data-testid="duplicate-prompt">
+      <p className="flex items-start gap-2"><Copy className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />{`This file is already in your vault as “${title}”.`}</p>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={onOpenExisting} disabled={busy}>Open existing</Button>
+        <Button type="button" size="sm" onClick={onUploadAnyway} loading={busy}>Upload anyway</Button>
+      </div>
+    </div>
+  );
+}

@@ -5,11 +5,12 @@ import {
   Avatar, Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState,
   ErrorState, Field, Input, ResponsiveTable, Select, SkeletonList, toast, type Column,
 } from '@/components/ui';
-import { errorMessage } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { ROLE_LABEL, type Role } from '@/lib/types';
-import { copyText, useChangeRole, useInvite, useMembers, useRemoveMember, useRevokeInvite } from '../api';
+import { copyText, useChangeRole, useInvite, useMembers, useRemoveMember, useResendInvite, useRevokeInvite } from '../api';
+import { LeaveOrgPanel } from './LeaveOrgPanel';
 import { Panel, fieldErrors } from './Panel';
 
 export const ROLE_INFO: Record<Role, string> = {
@@ -25,6 +26,7 @@ export default function TeamSection() {
   const changeRole = useChangeRole();
   const remove = useRemoveMember();
   const revoke = useRevokeInvite();
+  const resend = useResendInvite();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [removing, setRemoving] = useState<Member | null>(null);
   const isOwner = can('owner');
@@ -73,7 +75,7 @@ export default function TeamSection() {
       </Panel>
 
       {q.data && q.data.invitations.length > 0 && (
-        <Panel title="Pending invitations" description="Invitations expire after 7 days. Revoke one to invalidate its link.">
+        <Panel title="Pending invitations" description="Invitations expire after 7 days. Resend one for a fresh link, or revoke it to invalidate the link.">
           <ul className="divide-y">
             {q.data.invitations.map((i) => (
               <li key={i.id} className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
@@ -83,10 +85,18 @@ export default function TeamSection() {
                   <span className="block text-xs text-muted-foreground">{ROLE_LABEL[i.role]} · invited {relativeTime(i.createdAt)}{i.invitedBy ? ` by ${i.invitedBy.name}` : ''} · expires {formatDateIST(i.expiresAt)}</span>
                 </span>
                 {can('bid_manager') && (
-                  <Button variant="ghost" size="sm" loading={revoke.isPending && revoke.variables === i.id}
-                    onClick={() => revoke.mutate(i.id, { onSuccess: () => toast.success('Invitation revoked'), onError: (e) => toast.error(errorMessage(e)) })}>
-                    Revoke
-                  </Button>
+                  <span className="flex items-center gap-1">
+                    {(isOwner || i.role !== 'owner') && (
+                      <Button variant="ghost" size="sm" loading={resend.isPending && resend.variables === i.id}
+                        onClick={() => resend.mutate(i.id, { onSuccess: (r) => toast.success(`Invitation resent to ${r.email}`), onError: (e) => toast.error(errorMessage(e)) })}>
+                        Resend
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" loading={revoke.isPending && revoke.variables === i.id}
+                      onClick={() => revoke.mutate(i.id, { onSuccess: () => toast.success('Invitation revoked'), onError: (e) => toast.error(errorMessage(e)) })}>
+                      Revoke
+                    </Button>
+                  </span>
                 )}
               </li>
             ))}
@@ -104,6 +114,8 @@ export default function TeamSection() {
           ))}
         </dl>
       </Panel>
+
+      <LeaveOrgPanel members={q.data?.items} />
 
       <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} allowOwner={isOwner} />
       <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title={`Remove ${removing?.name}?`}
@@ -134,7 +146,8 @@ function InviteDialog({ open, onOpenChange, allowOwner }: { open: boolean; onOpe
     setErr(null);
     invite.mutate({ email: email.trim(), role }, {
       onSuccess: (inv) => setCreated(inv),
-      onError: (e2) => setErr(fieldErrors(e2).email ?? errorMessage(e2)),
+      // 409: "<email> is already a member of this organization" under the email field (US2 scenario 3).
+      onError: (e2) => setErr(e2 instanceof ApiError && e2.isConflict ? e2.message : fieldErrors(e2).email ?? errorMessage(e2)),
     });
   };
   const roles = (Object.keys(ROLE_LABEL) as Role[]).filter((r) => allowOwner || r !== 'owner');

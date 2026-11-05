@@ -1,0 +1,37 @@
+
+ RUN  v2.1.9 /home/user/wt-us3/apps/api
+
+ ✓ test/vault.test.ts (68 tests) 3879ms
+ ✓ test/auth.test.ts (33 tests) 3096ms
+stdout | test/analyse.test.ts > US1 documents: messages, bid-number check, removal, staleness (FR-002, FR-005, FR-008..FR-010, FR-044) > answers the exact spec messages for empty, missing, non-PDF, oversize and unreadable uploads; nothing is stored (US1 #4–#7)
+Warning: Indexing all PDF objects
+
+ ✓ test/analyse.test.ts (25 tests) 1512ms
+ ✓ test/ingest.test.ts (20 tests) 1637ms
+   ✓ targeted keyword search pass (FR-012, NFR-001) > scheduled runs search up to 10 active watchlist keywords, rotating across runs, through the throttled client 311ms
+ ✓ test/workspace.test.ts (30 tests) 1242ms
+ ✓ test/identify.test.ts (18 tests) 1178ms
+ ✓ test/isolation.test.ts (4 tests) 1273ms
+ ✓ test/dashboard.test.ts (13 tests) 1008ms
+ ✓ test/rate-limit.test.ts (16 tests) 2654ms
+   ✓ login rate limiting > a successful login resets the email counter 417ms
+   ✓ login rate limiting > 30 failures from one IP block that IP for every email, other IPs are unaffected 656ms
+   ✓ accept-invite (existing user) and change-password share the limits > existing-user accept-invite: 11th attempt is 429; success resets the counter 336ms
+ ✓ test/roles-matrix.test.ts (60 tests) 1198ms
+ ✓ test/demo.test.ts (9 tests) 751ms
+ ✓ test/password-reset.test.ts (10 tests) 996ms
+ ✓ test/packet.test.ts (10 tests) 996ms
+ ✓ test/sessions.test.ts (8 tests) 896ms
+ ✓ test/foundation.test.ts (10 tests) 112ms
+ ✓ test/security.test.ts (8 tests) 550ms
+ ✓ test/gem-documents.test.ts (7 tests) 679ms
+ ✓ test/assist.test.ts (6 tests) 750ms
+ ↓ test/perf/dashboard.perf.test.ts (1 test | 1 skipped)
+ ✓ test/staleness.test.ts (6 tests) 503ms
+ ✓ test/vault.perf.test.ts (4 tests) 668ms
+
+ Test Files  20 passed | 1 skipped (21)
+      Tests  365 passed | 1 skipped (366)
+   Start at  03:52:23
+   Duration  42.11s (transform 1.29s, setup 0ms, collect 12.66s, tests 25.58s, environment 5ms, prepare 1.09s)
+
