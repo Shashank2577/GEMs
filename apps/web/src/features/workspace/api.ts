@@ -145,8 +145,15 @@ export async function previewAnnexure(wsId: string, key: string, title: string, 
   });
   if (!res.ok) {
     let msg = 'Preview failed';
-    try { msg = (await res.json()).error?.message ?? msg; } catch { /* ignore */ }
-    throw new ApiError(res.status, 'preview_failed', msg);
+    let code = 'preview_failed';
+    let details: unknown;
+    try {
+      const err = (await res.json()).error;
+      msg = err?.message ?? msg;
+      code = err?.code ?? code;
+      details = err?.details;
+    } catch { /* ignore */ }
+    throw new ApiError(res.status, code, msg, details);
   }
   return URL.createObjectURL(await res.blob());
 }
