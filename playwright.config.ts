@@ -12,7 +12,7 @@ export const E2E_DB = process.env.E2E_DATABASE_URL || 'postgres://tp:tp@localhos
 export default defineConfig({
   testDir: 'e2e',
   testMatch: /.*\.e2e\.ts/,
-  outputDir: 'qa/.runs/artifacts',
+  outputDir: `qa/.runs/${E2E_PORT}/artifacts`,
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
@@ -20,8 +20,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: [
     ['list'],
-    ['html', { outputFolder: 'qa/.runs/report', open: 'never' }],
-    ['json', { outputFile: 'qa/.runs/results.json' }],
+    ['html', { outputFolder: `qa/.runs/${E2E_PORT}/report`, open: 'never' }],
+    ['json', { outputFile: `qa/.runs/${E2E_PORT}/results.json` }],
   ],
   use: {
     baseURL: `http://localhost:${E2E_PORT}`,
