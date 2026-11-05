@@ -8,11 +8,11 @@ import { test, expect, signupViaApi, seedDemo, a11y, evidence005, addPastContrac
 
 const STORY = 'HARDEN';
 /**
- * Whole page, shell included — except the two app-shell menu triggers (owned by 002/007, outside /profile and /vault)
- * whose aria-label does not contain their visible text (axe label-content-name-mismatch); tracked in #505.
+ * Whole page, shell included. The app-shell menu triggers (UserMenu, OrgSwitcher) were once excluded here for an
+ * aria-label / visible-text mismatch; their names are now fixed (sr-only text), so nothing is excluded. They carry
+ * stable data-testid hooks (`user-menu`, `org-switcher`) should an exclusion ever be needed again.
  */
-const SHELL_OUT_OF_SCOPE = ['[aria-label="Account menu"]', '[aria-label^="Organization:"]'];
-const scan = (page: Page, name: string) => a11y(page, name, { spec: '005', story: STORY, exclude: SHELL_OUT_OF_SCOPE });
+const scan = (page: Page, name: string) => a11y(page, name, { spec: '005', story: STORY });
 const shot = (page: Page, name: string) => evidence005(page, STORY, `${name}-${test.info().project.name}`);
 
 /** Keyboard activation: on phones the sticky section bar, bottom-sheet dialogs and smooth scrolling make pointer clicks race the layout. */

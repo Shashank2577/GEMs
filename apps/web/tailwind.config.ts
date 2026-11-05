@@ -23,7 +23,7 @@ export default {
         border: token('border'),
         input: token('input'),
         ring: token('ring'),
-        primary: { DEFAULT: token('primary'), foreground: token('primary-foreground'), soft: token('primary-soft') },
+        primary: { DEFAULT: token('primary'), foreground: token('primary-foreground'), soft: token('primary-soft'), ink: token('primary-ink') },
         accent: { DEFAULT: token('accent'), foreground: token('accent-foreground'), soft: token('accent-soft') },
         success: { DEFAULT: token('success'), foreground: token('success-foreground'), soft: token('success-soft') },
         warning: { DEFAULT: token('warning'), foreground: token('warning-foreground'), soft: token('warning-soft') },

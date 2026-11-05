@@ -122,7 +122,7 @@ function MobileTabBar({ onMore }: { onMore: () => void }) {
       <ul className="grid grid-cols-5">
         {MOBILE_TABS.map((t) => (
           <li key={t.to}>
-            <NavLink to={t.to} className={({ isActive }) => cn('flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring', isActive ? 'text-primary' : 'text-muted-foreground')}>
+            <NavLink to={t.to} className={({ isActive }) => cn('flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring', isActive ? 'text-primary-ink' : 'text-muted-foreground')}>
               {({ isActive }) => (
                 <>
                   <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-primary-soft')}>

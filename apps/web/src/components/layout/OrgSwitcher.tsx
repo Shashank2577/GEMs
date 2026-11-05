@@ -23,6 +23,7 @@ export function OrgSwitcher({ collapsed, className }: { collapsed?: boolean; cla
     // Non-modal: a modal menu aria-hides the whole shell while its links stay focusable (axe aria-hidden-focus).
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
+        data-testid="org-switcher"
         className={cn('group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring', collapsed && 'justify-center', className)}
       >
         {/* Name comes from the visible text (WCAG 2.5.3 label-in-name); the chip's initials are decorative. */}

@@ -296,7 +296,8 @@ export const tenderDocuments = pgTable('tender_documents', {
   fileName: text('file_name').notNull(),
   blobKey: text('blob_key').notNull(),
   sizeBytes: integer('size_bytes').notNull(),
-  pageCount: integer('page_count'),
+  pageCount: integer('page_count'), // pages actually read (capped, 004/NFR-005)
+  totalPages: integer('total_pages'), // the PDF's real page count; null for rows that predate the column
   text: text('text'), // extracted text, pages separated by \f
   sourceUrl: text('source_url'),
   textSource: text('text_source').$type<'pdf' | 'ocr'>().notNull().default('pdf'), // FR-052
@@ -536,4 +537,7 @@ export const activityLog = pgTable('activity_log', {
   entityId: text('entity_id'),
   meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: createdAt(),
-}, (t) => ({ orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt) }));
+}, (t) => ({
+  orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt),
+  orgTypeIdx: index('activity_org_type_idx').on(t.orgId, t.entityType, t.createdAt),
+}));
