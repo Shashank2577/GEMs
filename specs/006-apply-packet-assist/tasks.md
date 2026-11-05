@@ -265,7 +265,7 @@ task is sized at ≤ 1 day.
 
 - [x] T096 [P] Update the Apply section of `specs/001-gem-tender-copilot/contracts/api.md` with the new errors/endpoints (`invalid_transition`, `nothing_to_override`, `unknown_placeholder`, `packet_too_large`, `DELETE …/comments/:commentId`, token `scope`) FR-008, FR-027, FR-033, FR-041, FR-056, FR-074 (#288)
 - [x] T097 [P] dnd-kit screen-reader announcements for packet reordering ("Picked up <title>. Position 3 of 8." …) in `apps/web/src/features/workspace/PacketStep.tsx` NFR-006 (#289)
-- [ ] T098 Cairn review of the 006 changes (spec ↔ code traceability, Constitution I checklist) and QA summary `qa/evidence/006/SUMMARY.md` linking the seven `VERDICT.md` files SC-006 (#290)
+- [x] T098 Cairn review of the 006 changes (spec ↔ code traceability, Constitution I checklist) and QA summary `qa/evidence/006/SUMMARY.md` linking the seven `VERDICT.md` files SC-006 (#290)
 
 ---
 

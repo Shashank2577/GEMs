@@ -1,0 +1,9 @@
+PATCH stage=won before submitted -> 409 invalid_transition
+POST overrides gst (present) -> 409 nothing_to_override
+PUT template {{company.gstn}} -> 400 unknown_placeholder details={"unknown":["company.gstn"]}
+PUT assist-values unit_price -> 400 forbidden_field
+DELETE comment (author) -> 204
+DELETE comment again -> 404
+DELETE comment (analyst, other's) -> 403 forbidden
+POST comment with scope=read token -> 403 read_only_token "This API token is read-only"
+GET workspace with scope=read token -> 200
