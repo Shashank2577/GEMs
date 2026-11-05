@@ -1,10 +1,10 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Eye, Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck } from 'lucide-react';
+import { Eye, Menu, MoreHorizontal, WifiOff, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck } from 'lucide-react';
 import { cn, isMac } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import { useLocalStorage } from '@/lib/hooks';
+import { useLocalStorage, useOnline } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/misc';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/dialog';
@@ -22,6 +22,21 @@ import { RouteErrorBoundary } from './RouteErrorBoundary';
 /** Slot for the bell so feature code can render it elsewhere if needed. */
 export function NotificationsBellSlot() {
   return <NotificationsBell />;
+}
+
+/** Polite live region (always mounted so screen readers announce changes) that explains stale data while offline (007/FR-096). */
+export function OfflineBanner() {
+  const online = useOnline();
+  return (
+    <div role="status" aria-live="polite" data-testid="offline-banner">
+      {!online && (
+        <div className="flex items-center justify-center gap-2 border-b border-warning/25 bg-warning-soft px-4 py-2 text-center text-[13px] font-medium text-warning">
+          <WifiOff className="size-4 shrink-0" aria-hidden />
+          <span>You’re offline — showing the last loaded data</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function openCommand() { window.dispatchEvent(new CustomEvent('tp:open-command')); }
@@ -221,6 +236,8 @@ export function AppShell() {
             <div className="ml-1"><UserMenu compact /></div>
           </div>
         </header>
+
+        <div className="sticky top-14 z-10"><OfflineBanner /></div>
 
         <main id="main" tabIndex={-1} className="flex-1 outline-none">
           <div className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pb-12 lg:px-8">

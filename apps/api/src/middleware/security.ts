@@ -10,6 +10,11 @@
  * browser extension) are not affected: a cross-site page cannot attach a bearer token without a CORS preflight,
  * which the API never grants. OPTIONS is not exempt either; preflights carry no cookie, so they pass anyway.
  *
+ * One route is exempt: `POST /api/notifications/unsubscribe` (003/FR-048). It is authenticated by the signed `?token=`
+ * alone and never reads the session cookie, so — like a Bearer request — a forged cross-site POST gains nothing a
+ * holder of the token could not already do. Its own confirmation page posts with `Origin: null` (the page is served
+ * with `Referrer-Policy: no-referrer`), which would otherwise be refused for a signed-in browser. Exact path, POST only.
+ *
  * Local development: when APP_URL itself is a loopback URL (http://localhost:8787 by default), any loopback origin
  * is accepted, so the Vite dev server (:5173, proxying /api to :8787) keeps working. A deployed APP_URL is never
  * loopback, so production stays strict. APP_URL must therefore match the origin the app is served from.
@@ -23,6 +28,8 @@ import { SESSION_COOKIE, isHttps } from '../lib/session';
 import type { AppEnv } from '../types';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
+/** Token-authenticated (never cookie-authenticated) mutation exempt from the check; see the header comment. */
+const TOKEN_ONLY_POST = '/api/notifications/unsubscribe';
 const LOOPBACK = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
 
 export const BAD_ORIGIN_MESSAGE = 'This request came from another website and was blocked. Reload TenderPilot and try again.';
@@ -40,6 +47,7 @@ export const originCheck = createMiddleware<AppEnv>(async (c, next) => {
   // Same test as resolveAuth: a `Bearer tp_…` header wins over the cookie, so the cookie is not what authenticates.
   const bearer = c.req.header('authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
   if (bearer?.startsWith(API_TOKEN_PREFIX)) return next();
+  if (c.req.method === 'POST' && c.req.path === TOKEN_ONLY_POST) return next();
   if (!getCookie(c, SESSION_COOKIE)) return next();
   const origin = c.req.header('origin');
   if (!origin) {

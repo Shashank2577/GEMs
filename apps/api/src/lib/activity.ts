@@ -8,6 +8,8 @@ export interface ActivityInput {
   entityType: string;
   entityId?: string | null;
   meta?: Record<string, unknown>;
+  /** Defaults to the database time; pass deps.clock.now() when the entry is compared with app-clock times. */
+  createdAt?: Date;
 }
 
 /** `db` may be a transaction, so the entry commits (or rolls back) with the change it describes. */
@@ -19,5 +21,6 @@ export async function logActivity(db: Pick<Db, 'insert'>, a: ActivityInput): Pro
     entityType: a.entityType,
     entityId: a.entityId ?? null,
     meta: a.meta ?? {},
+    ...(a.createdAt ? { createdAt: a.createdAt } : {}),
   });
 }
