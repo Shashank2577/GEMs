@@ -2,6 +2,8 @@
  * Vault & profile read performance (T042; NFR-003). One org with 500 vault documents on local Postgres:
  * the median of 5 timed requests (after one warm-up) must stay under the budget —
  * `GET /api/vault` and `GET /api/vault/summary` < 400 ms, `GET /api/profile` < 300 ms.
+ * NFR-003 is stated as p95; five samples cannot estimate a p95, so the median is a stable local proxy
+ * that catches regressions (an N+1 query or unbounded scan) without flaking.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { companyProfiles, pastContracts, vaultDocuments } from '@tp/db';
@@ -65,6 +67,7 @@ describe('vault performance with 500 documents (NFR-003)', () => {
   it('lists all 500 documents', async () => {
     const r = await request(ctx.app, 'GET', '/vault', { cookie: owner.cookie });
     expect(r.body.total).toBe(DOCS);
+    expect(r.body.items).toHaveLength(DOCS);
   });
 
   it('GET /vault median < 400 ms (including sorted and searched variants)', async () => {

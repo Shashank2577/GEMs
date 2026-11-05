@@ -163,11 +163,11 @@ const gemKeywords = (type: DocType) => Object.entries(GEM_SELLER_DOC_LABELS).fil
 
 export const DOC_TYPES: readonly DocTypeInfo[] = [
   { type: 'gst', label: 'GST registration', icon: 'Receipt', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'GST registration certificate (Form GST REG-06) showing your GSTIN.', keywords: ['gst', 'gstin', 'reg-06', 'reg06'] },
+    description: 'GST registration certificate (Form GST REG-06) showing your GSTIN.', keywords: ['gst', 'gstin', 'reg-06', 'reg06', 'जीएसटी'] },
   { type: 'pan', label: 'PAN card', icon: 'CreditCard', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'Permanent Account Number card of the bidding entity.', keywords: ['pan'] },
+    description: 'Permanent Account Number card of the bidding entity.', keywords: ['pan', 'पैन कार्ड'] },
   { type: 'udyam', label: 'Udyam (MSE) certificate', icon: 'BadgeCheck', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
-    description: 'Udyam registration — needed to claim MSE EMD exemption and purchase preference.', keywords: ['udyam', 'msme', 'mse', 'udyog', ...gemKeywords('udyam')] },
+    description: 'Udyam registration — needed to claim MSE EMD exemption and purchase preference.', keywords: ['udyam', 'msme', 'mse', 'udyog', 'उद्यम', ...gemKeywords('udyam')] },
   { type: 'startup_dpiit', label: 'Startup (DPIIT) recognition', icon: 'Rocket', category: 'Statutory', expires: true, typicalValidityMonths: 120, perFinancialYear: false, commonInBids: false,
     description: 'DPIIT recognition certificate — exempts eligible startups from turnover/experience criteria.', keywords: ['dpiit', 'startup', 'dipp', ...gemKeywords('startup_dpiit')] },
   { type: 'incorporation', label: 'Incorporation certificate', icon: 'Building2', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: false,
@@ -185,7 +185,7 @@ export const DOC_TYPES: readonly DocTypeInfo[] = [
   { type: 'work_order', label: 'Work / purchase order', icon: 'FileText', category: 'Experience', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,
     description: 'Past contract, purchase order or GeM contract as proof of experience.', keywords: ['work order', 'wo', 'purchase order', 'po', 'contract', 'supply order', ...gemKeywords('work_order')] },
   { type: 'iso', label: 'ISO certificate', icon: 'Award', category: 'Quality', expires: true, typicalValidityMonths: 36, perFinancialYear: false, commonInBids: true,
-    description: 'ISO 9001 / 14001 / 27001 etc. Valid for 3 years subject to surveillance audits.', keywords: ['iso', '9001', '14001', '27001', '45001'] },
+    description: 'ISO 9001 / 14001 / 27001 etc. Valid for 3 years subject to surveillance audits.', keywords: ['iso', '9001', '14001', '27001', '45001', 'iso9001', 'iso14001', 'iso27001', 'iso45001'] },
   { type: 'bis', label: 'BIS licence', icon: 'ShieldCheck', category: 'Quality', expires: true, typicalValidityMonths: 24, perFinancialYear: false, commonInBids: false,
     description: 'Bureau of Indian Standards licence / CRS registration for the product.', keywords: ['bis', 'isi', 'crs'] },
   { type: 'mii_certificate', label: 'Make in India declaration', icon: 'Flag', category: 'Statutory', expires: false, typicalValidityMonths: null, perFinancialYear: false, commonInBids: true,

@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
 import { activityLog, companyProfiles, notifications, vaultDocuments } from '@tp/db';
 import { createApp } from '../src/app';
+import { contentDisposition, safeFileName } from '../src/routes/vault';
 import type { AppDeps } from '../src/deps';
 import { runExpiryReminders } from '../src/services/reminders';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
@@ -299,8 +300,8 @@ describe('vault — headers, replace, isolation and rollback (T033)', () => {
     expect(d.status).toBe(200);
     const cd = d.headers.get('content-disposition')!;
     expect(cd).toMatch(/^attachment; /);
-    const ascii = cd.match(/filename="([^"]*)"/)![1]!;
-    expect(ascii).toMatch(/^[\x20-\x7e]+\.pdf$/);
+    // No ASCII letters/digits survive → generic ASCII fallback; the real name travels in filename*.
+    expect(cd).toContain('filename="document.pdf"');
     expect(cd).toContain(`filename*=UTF-8''${encodeURIComponent('प्रमाणपत्र.pdf')}`);
     expect(d.headers.get('cache-control')).toBe('private, no-store');
     expect(d.headers.get('x-content-type-options')).toBe('nosniff');
@@ -308,7 +309,7 @@ describe('vault — headers, replace, isolation and rollback (T033)', () => {
     expect(new Uint8Array(await d.res.arrayBuffer())).toEqual(bytes);
 
     const inline = await request(ctx.app, 'GET', `/vault/${up.body.id}/download?inline=1`, { cookie: b.viewer.cookie });
-    expect(inline.headers.get('content-disposition')).toMatch(/^inline; filename="[\x20-\x7e]+\.pdf"; filename\*=UTF-8''/);
+    expect(inline.headers.get('content-disposition')).toMatch(/^inline; filename="document\.pdf"; filename\*=UTF-8''/);
     expect(inline.headers.get('cache-control')).toBe('private, no-store');
     expect(inline.headers.get('x-content-type-options')).toBe('nosniff');
   });
@@ -608,5 +609,109 @@ describe('expiry reminders — isolation, IST boundary, renewals and manual run 
       expect(bell.status).toBe(200);
       expect(JSON.stringify(bell.body).includes(`/vault?doc=${docA}`)).toBe(m === a.owner);
     }
+  });
+});
+
+/** Review fixes on PR #477: stored names stay within filesystem limits and headers stay well-formed (FR-030). */
+describe('safeFileName / contentDisposition', () => {
+  const bytes = (x: string) => new TextEncoder().encode(x).length;
+  const wellFormed = (x: string) => { expect(() => encodeURIComponent(x)).not.toThrow(); };
+
+  it('keeps any script and caps the base at 180 UTF-8 bytes on a grapheme boundary', () => {
+    const long = 'प्रमाणपत्र '.repeat(40) + '.pdf';
+    const out = safeFileName(long, 'application/pdf');
+    expect(out.endsWith('.pdf')).toBe(true);
+    expect(bytes(out.slice(0, -4))).toBeLessThanOrEqual(180);
+    expect(bytes(out)).toBeLessThan(255);
+    expect(out.startsWith('प्रमाणपत्र')).toBe(true);
+    wellFormed(out);
+    // Never ends in a dangling combining mark (virama/vowel sign) cut off from its base consonant.
+    expect(out.slice(0, -4).normalize('NFC')).toBe(out.slice(0, -4));
+  });
+
+  it('does not split an astral character at the boundary', () => {
+    const out = safeFileName(`${'a'.repeat(178)}𝐀𝐀.pdf`, 'application/pdf');
+    expect(out).toBe(`${'a'.repeat(178)}.pdf`);
+    wellFormed(out);
+    const exact = safeFileName(`${'a'.repeat(176)}𝐀.pdf`, 'application/pdf');
+    expect(exact).toBe(`${'a'.repeat(176)}𝐀.pdf`);
+  });
+
+  it('neutralises CR/LF, path tricks and bidi overrides', () => {
+    expect(safeFileName('bad\r\nname.pdf', 'application/pdf')).toBe('bad_name.pdf');
+    expect(safeFileName('..', 'application/pdf')).toBe('document.pdf');
+    expect(safeFileName('../../etc/passwd', 'application/pdf')).toBe('passwd.pdf');
+    expect(safeFileName('...hidden.pdf', 'application/pdf')).toBe('hidden.pdf');
+    expect(safeFileName('invoice\u202Efdp.exe', 'application/pdf')).toBe('invoice_fdp.pdf');
+    expect(safeFileName('C:\\scans\\gst.PDF', 'image/png')).toBe('gst.png');
+  });
+
+  it('falls back to document.<ext> in the ASCII filename and RFC 8187-escapes filename*', () => {
+    expect(contentDisposition('प्रमाणपत्र.pdf', false)).toBe(`attachment; filename="document.pdf"; filename*=UTF-8''${encodeURIComponent('प्रमाणपत्र.pdf')}`);
+    expect(contentDisposition('GST (copy) it\'s*.png', true)).toBe(`inline; filename="GST (copy) it's*.png"; filename*=UTF-8''GST%20%28copy%29%20it%27s%2A.png`);
+    expect(contentDisposition('ISO प्रमाणपत्र.pdf', false)).toMatch(/^attachment; filename="ISO _+\.pdf"/);
+  });
+
+  it('uploads a very long Devanagari file name without a filesystem error', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Long Names Traders');
+    const name = `${'प्रमाणपत्र_'.repeat(30)}.pdf`;
+    const r = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), name), type: 'other', title: 'Long name' } });
+    expect(r.status).toBe(201);
+    expect(bytes(r.body.fileName)).toBeLessThan(255);
+    const d = await request(ctx.app, 'GET', `/vault/${r.body.id}/download`, { cookie: o.viewer.cookie });
+    expect(d.status).toBe(200);
+    expect(d.headers.get('content-disposition')).toContain(`filename*=UTF-8''${encodeURIComponent(r.body.fileName)}`);
+  });
+});
+
+describe('vault delete — review fixes (FR-041)', () => {
+  it('deletes a document in an org that has no company profile row', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'No Profile Traders');
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'pan.pdf'), type: 'pan', title: 'PAN' } });
+    expect(await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId))).toHaveLength(0);
+    const d = await request(ctx.app, 'DELETE', `/vault/${doc.body.id}`, { cookie: o.analyst.cookie });
+    expect(d.status).toBe(200);
+    expect(await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.body.id))).toHaveLength(0);
+    expect(await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId))).toHaveLength(0);
+  });
+
+  it('matches the OEM documentId case-insensitively', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Upper Case Traders');
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'maf.pdf'), type: 'oem_authorization', title: 'Lenovo MAF' } });
+    const put = await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Lenovo', products: 'Laptops', documentId: String(doc.body.id).toUpperCase() }] } });
+    expect(put.status).toBe(200);
+    expect((await request(ctx.app, 'DELETE', `/vault/${doc.body.id}`, { cookie: o.analyst.cookie })).status).toBe(200);
+    const [row] = await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId));
+    expect(row!.oemAuthorizations[0]).toMatchObject({ oem: 'Lenovo', documentId: null });
+  });
+
+  it('rolls back every unlink when the row delete fails', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Rollback Traders');
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'crac.pdf'), type: 'crac', title: 'CRAC' } });
+    await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title: 'T', value: 1000, cracDocumentId: doc.body.id } });
+    await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Dell', products: 'x', documentId: doc.body.id }] } });
+    const failingTx = new Proxy(ctx.db, {
+      get(target, prop, recv) {
+        if (prop === 'transaction') {
+          return (fn: (tx: unknown) => Promise<unknown>) => target.transaction((tx) => fn(new Proxy(tx, {
+            get(t, p, r) {
+              if (p === 'delete') return () => { throw new Error('simulated delete failure'); };
+              const v = Reflect.get(t, p, r);
+              return typeof v === 'function' ? v.bind(t) : v;
+            },
+          })));
+        }
+        const v = Reflect.get(target, prop, recv);
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+    const app = createApp({ ...ctx.deps, db: failingTx });
+    expect((await request(app, 'DELETE', `/vault/${doc.body.id}`, { cookie: o.analyst.cookie })).status).toBe(500);
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.body.id));
+    expect(await ctx.deps.blobs.head(row!.blobKey)).not.toBeNull();
+    const pcs = await request(ctx.app, 'GET', '/past-contracts', { cookie: o.viewer.cookie });
+    expect(pcs.body.items[0].cracDocumentId).toBe(doc.body.id);
+    const [prof] = await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId));
+    expect(prof!.oemAuthorizations[0]!.documentId).toBe(doc.body.id);
   });
 });

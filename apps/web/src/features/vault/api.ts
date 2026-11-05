@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { VaultDocumentDto, VaultSummary, VaultUpdateInput } from '@tp/core/contracts/vault';
 import type { DocCategory, DocStatus, DocType } from '@tp/core/vault/status';
-import { api, apiFetch, type Paged } from '@/lib/api';
+import { api, apiFetch, ApiError, type Paged } from '@/lib/api';
 import { notificationKeys } from '@/features/notifications/api';
 
 export interface VaultFilters { type?: DocType | null; status?: DocStatus | null; category?: DocCategory | null; q?: string; sort?: 'recent' | 'expiry' | 'title' | 'type' }
@@ -84,4 +84,15 @@ export function useRunReminders() {
       qc.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
+}
+
+/** Text of the toast shown when `?doc=<id>` points at a document that no longer exists (FR-040). */
+export const DOC_NOT_FOUND_MESSAGE = 'That document could not be found. It may have been deleted.';
+
+/**
+ * Should the page drop `?doc=<id>` and toast {@link DOC_NOT_FOUND_MESSAGE}? Only for a 404 on the
+ * single-document lookup when the id is not in the loaded list (other errors keep the URL so a retry works).
+ */
+export function isStaleDocLink(docId: string | null, inList: boolean, error: unknown): boolean {
+  return !!docId && !inList && error instanceof ApiError && error.status === 404;
 }

@@ -114,7 +114,7 @@ export const companyProfiles = pgTable('company_profiles', {
   categories: jsonb('categories').$type<string[]>().notNull().default([]),
   hsnCodes: jsonb('hsn_codes').$type<string[]>().notNull().default([]),
   operatingStates: jsonb('operating_states').$type<string[]>().notNull().default([]),
-  oemAuthorizations: jsonb('oem_authorizations').$type<{ oem: string; products: string; validTill?: string; documentId?: string }[]>().notNull().default([]),
+  oemAuthorizations: jsonb('oem_authorizations').$type<{ oem: string; products: string; validTill?: string | null; documentId?: string | null }[]>().notNull().default([]),
   certifications: jsonb('certifications').$type<string[]>().notNull().default([]), // e.g. ISO 9001, BIS
   maxEmdCapacity: bigint('max_emd_capacity', { mode: 'number' }),
   updatedAt: updatedAt(),
