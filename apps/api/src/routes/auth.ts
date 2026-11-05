@@ -264,6 +264,10 @@ authRoutes.post('/auth/accept-invite', async (c) => {
   let uid: string;
   let needsSession = true;
   if (current && current.kind === 'session') {
+    // 002/FR-018: an invitation is bound to its email; a different signed-in account cannot redeem it.
+    if (current.user.email.toLowerCase() !== inv.email.toLowerCase()) {
+      throw new HttpError(403, 'invite_email_mismatch', `This invitation was sent to ${inv.email}. Sign out and continue as that account.`);
+    }
     uid = current.user.id;
     needsSession = false;
   } else {

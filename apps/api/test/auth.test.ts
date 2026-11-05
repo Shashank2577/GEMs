@@ -247,15 +247,49 @@ describe('invitations & roles', () => {
     expect(login.body.org.name).toBe('Alpha Supplies');
   });
 
-  it('a signed-in user accepting an invite joins with their current account', async () => {
+  it('a signed-in user accepting an invite for their email joins with their current account', async () => {
     const host = await signup(ctx.app, { orgName: 'Host Org' });
     const guest = await signup(ctx.app, { orgName: 'Guest Org' });
-    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: host.cookie, json: { email: uniqueEmail('alias'), role: 'viewer' } });
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: host.cookie, json: { email: guest.email, role: 'viewer' } });
     const token = inv.body.inviteUrl.split('/invite/')[1];
     const acc = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: guest.cookie, json: { token } });
     expect(acc.status).toBe(200);
+    expect(acc.cookie).toBeNull(); // keeps the existing session
     expect(acc.body).toMatchObject({ user: { email: guest.email }, org: { name: 'Host Org' }, role: 'viewer' });
     expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: guest.cookie })).body.org.name).toBe('Host Org');
+  });
+
+  it('002/FR-018: a signed-in user with a different email cannot redeem the invitation', async () => {
+    const host = await signup(ctx.app, { orgName: 'Bound Org' });
+    const ravi = await signup(ctx.app, { orgName: 'Ravi Org' });
+    const asha = uniqueEmail('asha');
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: host.cookie, json: { email: asha, role: 'analyst' } });
+    const token = inv.body.inviteUrl.split('/invite/')[1];
+
+    const r = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: ravi.cookie, json: { token } });
+    expect(r.status).toBe(403);
+    expect(r.body.error).toMatchObject({
+      code: 'invite_email_mismatch',
+      message: `This invitation was sent to ${asha}. Sign out and continue as that account.`,
+    });
+    expect(r.cookie).toBeNull();
+    // no membership, active org unchanged, invitation still usable by the right person
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: ravi.cookie });
+    expect(me.body.org.name).toBe('Ravi Org');
+    expect(me.body.orgs.map((o: any) => o.name)).toEqual(['Ravi Org']);
+    const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: host.cookie });
+    expect(members.body.items.map((m: any) => m.email)).not.toContain(ravi.email);
+    expect(members.body.invitations.map((i: any) => i.email)).toEqual([asha]);
+    const acts = await request(ctx.app, 'GET', '/api/activity?pageSize=100', { cookie: host.cookie });
+    expect(acts.body.items.some((i: any) => i.action === 'member.joined' && i.user?.id === ravi.me.user.id)).toBe(false);
+
+    // a name/password in the body does not bypass the binding
+    const r2 = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: ravi.cookie, json: { token, name: 'Ravi', password: ravi.password } });
+    expect(r2.status).toBe(403);
+
+    const ok = await request(ctx.app, 'POST', '/api/auth/accept-invite', { json: { token, name: 'Asha', password: 'pass-word-1' } });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ user: { email: asha }, org: { name: 'Bound Org' }, role: 'analyst' });
   });
 
   it('expired and invalid invitations are rejected', async () => {
@@ -334,6 +368,63 @@ describe('invitations & roles', () => {
     expect(act.body.items.map((i: any) => i.action)).toEqual(expect.arrayContaining(['member.removed', 'member.role_changed', 'member.joined']));
   });
 
+  it('002/FR-020: bid managers can resend a pending invitation with a fresh link and expiry', async () => {
+    const { owner, bidManager, analyst } = await seedOrgWithRoles(ctx.app, 'Resend Co');
+    const email = uniqueEmail('resend');
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email, role: 'analyst' } });
+    const oldToken = inv.body.inviteUrl.split('/invite/')[1];
+    const mailsTo = () => ctx.mailer.sent.filter((m) => m.to === email);
+    expect(mailsTo()).toHaveLength(1);
+    try {
+      ctx.clock.advance(3 * 24 * 60 * 60 * 1000);
+      expect((await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: analyst.cookie })).status).toBe(403);
+
+      const r = await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: bidManager.cookie });
+      expect(r.status).toBe(201);
+      expect(r.body).toMatchObject({ id: inv.body.id, email, role: 'analyst' });
+      expect(r.body.inviteUrl).toMatch(new RegExp(`^${TEST_APP_URL}/invite/[A-Za-z0-9_-]+$`));
+      expect(r.body.inviteUrl).not.toBe(inv.body.inviteUrl);
+      expect(new Date(r.body.expiresAt).getTime()).toBe(ctx.clock.now().getTime() + 7 * 24 * 60 * 60 * 1000);
+      expect(mailsTo()).toHaveLength(2);
+      expect(mailsTo().at(-1)).toMatchObject({ to: email, subject: expect.stringContaining('Resend Co'), text: expect.stringContaining(r.body.inviteUrl) });
+
+      // the old link stops working, the new one previews; still exactly one pending row
+      expect((await request(ctx.app, 'GET', `/api/auth/invite/${oldToken}`)).status).toBe(404);
+      const newToken = r.body.inviteUrl.split('/invite/')[1];
+      const preview = await request(ctx.app, 'GET', `/api/auth/invite/${newToken}`);
+      expect(preview.body).toMatchObject({ email, role: 'analyst', orgName: 'Resend Co', expiresAt: r.body.expiresAt });
+      const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: owner.cookie });
+      expect(members.body.invitations.filter((i: any) => i.email === email)).toHaveLength(1);
+      expect(members.body.invitations.find((i: any) => i.email === email).expiresAt).toBe(r.body.expiresAt);
+
+      const act = await request(ctx.app, 'GET', '/api/activity?entityType=invitation', { cookie: owner.cookie });
+      expect(act.body.items[0]).toMatchObject({ action: 'member.invite_resent', entityId: inv.body.id, meta: { email, role: 'analyst' }, user: { id: bidManager.me.user.id } });
+
+      // an expired, unaccepted invitation can be revived
+      ctx.clock.advance(8 * 24 * 60 * 60 * 1000);
+      expect((await request(ctx.app, 'GET', `/api/auth/invite/${newToken}`)).status).toBe(404);
+      const revived = await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: owner.cookie });
+      expect(revived.status).toBe(201);
+      const accepted = await request(ctx.app, 'POST', '/api/auth/accept-invite', { json: { token: revived.body.inviteUrl.split('/invite/')[1], name: 'Resent', password: 'pass-word-1' } });
+      expect(accepted.status).toBe(200);
+      // accepted invitations cannot be resent
+      expect((await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: owner.cookie })).status).toBe(404);
+    } finally { ctx.clock.set(new Date()); }
+
+    // unknown ids and malformed ids are 404
+    expect((await request(ctx.app, 'POST', `/api/org/invitations/${crypto.randomUUID()}/resend`, { cookie: owner.cookie })).status).toBe(404);
+    expect((await request(ctx.app, 'POST', '/api/org/invitations/not-a-uuid/resend', { cookie: owner.cookie })).status).toBe(404);
+  });
+
+  it('only an Owner can resend an Owner invitation', async () => {
+    const { owner, bidManager } = await seedOrgWithRoles(ctx.app);
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: uniqueEmail(), role: 'owner' } });
+    const r = await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: bidManager.cookie });
+    expect(r.status).toBe(403);
+    expect(r.body.error.message).toBe('Only an Owner can invite another Owner');
+    expect((await request(ctx.app, 'POST', `/api/org/invitations/${inv.body.id}/resend`, { cookie: owner.cookie })).status).toBe(201);
+  });
+
   it('bid managers can revoke pending invitations', async () => {
     const { owner, bidManager, analyst } = await seedOrgWithRoles(ctx.app);
     const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: owner.cookie, json: { email: uniqueEmail(), role: 'viewer' } });
@@ -376,6 +467,8 @@ describe('organization isolation (Constitution IV)', () => {
     // nor revoke org B's invitations
     const invB = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: b.owner.cookie, json: { email: uniqueEmail(), role: 'viewer' } });
     expect((await request(ctx.app, 'DELETE', `/api/org/invitations/${invB.body.id}`, { cookie: a.owner.cookie })).status).toBe(404);
+    // nor resend them
+    expect((await request(ctx.app, 'POST', `/api/org/invitations/${invB.body.id}/resend`, { cookie: a.owner.cookie })).status).toBe(404);
   });
 
   it('activity supports filters and pagination', async () => {

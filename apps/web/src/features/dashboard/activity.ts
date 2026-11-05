@@ -30,6 +30,8 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'profile.updated': return 'updated the';
     case 'profile.past_contract_added': return 'added a past contract to the';
     case 'member.invited': return 'invited';
+    case 'member.invite_resent': return 'resent the invitation to';
+    case 'member.invite_revoked': return 'revoked the invitation for';
     case 'member.joined': return 'joined the team';
     case 'member.role_changed': return 'changed the role of';
     case 'member.removed': return 'removed';
