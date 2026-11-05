@@ -57,7 +57,9 @@ PranavTamada/Tender_Scraper, IshanMaheshwari-777/GEM-SCRAPER, Mujahid-Alam/gem-t
    `ci-gate` on its head commit, and must be **up to date with `main`** (strict). Watch them with GitHub MCP
    `pull_request_read` (method `get_check_runs`) or `actions_list`; on a red check read the job log (`get_job_logs`),
    fix the cause on the branch and push (never skip or delete a test; an infra flake may be re-run with
-   `actions_run_trigger`). `dod` passes only when `qa/evidence/<NNN>/US<n>/VERDICT.md` is approved with every row `met`.
+   `actions_run_trigger`). `dod` passes only when `qa/evidence/<NNN>/US<n>/VERDICT.md` is approved with every row `met`,
+   every PR commit carries the trailers (merge commits and main's commits are exempt), and the PR body has `Closes #n` or
+   `Part of #n` and no unticked `- [ ]` box (mark a deliberate deferral `- [~]` with the reason).
    Note: GitHub does not run `pull_request` workflows while the PR has merge conflicts, so a conflicted PR shows no
    checks at all — merge main first. Then merge the PR with GitHub MCP `merge_pull_request` (method `squash`, message
    keeps the trailers). If the API reports conflicts/behind (main moved meanwhile), `git merge origin/main` again,
