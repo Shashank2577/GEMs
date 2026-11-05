@@ -3,7 +3,7 @@
  * Creating / changing a watchlist back-fills matches against currently open tenders silently
  * (no alert storm); alerts fire only for tenders ingested afterwards.
  */
-import { and, desc, eq, gte, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { tenderMatches, tenders, users, watchlists, type WatchlistCriteria } from '@tp/db';
 import {
@@ -13,7 +13,7 @@ import { uuidSchema } from '@tp/core/contracts/common';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
-import { notFound, validationError } from '../lib/errors';
+import { HttpError, notFound, validationError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { matchAndNotify } from '../services/ingest';
@@ -23,33 +23,67 @@ import { decorateTenders } from './tenders';
 export const watchlistsRoutes = new Hono<AppEnv>();
 
 type TenderRow = typeof tenders.$inferSelect;
-const CANDIDATE_LIMIT = 5000;
+/** Keyset page size for scanning candidate tenders (FR-028: no overall cap, every open tender is considered). */
+const CANDIDATE_PAGE = 2000;
+/** FR-027: maximum watchlists per organization. */
+export const WATCHLIST_LIMIT = 50;
+
+const clean = (xs: string[] | undefined | null) => (xs ?? []).map((x) => x.trim()).filter(Boolean);
+const escapeLike = (s: string) => s.replace(/[%_\\]/g, (m) => `\\${m}`);
+/** `%a%b%` for a phrase: the matcher treats space/hyphen/underscore/slash runs between words as interchangeable. */
+const phraseLike = (s: string) => `%${s.split(/\s+/).map(escapeLike).join('%')}%`;
 
 /**
- * Open tenders that could match the criteria: a cheap SQL pre-filter (state, value, keyword ILIKE)
- * followed by the exact matcher in JS.
+ * Open tenders that could match the criteria: a cheap SQL pre-filter (state, value, bid type, keyword / category /
+ * ministry ILIKE — always a superset of what the matcher accepts) followed by the exact matcher in JS.
+ * Scans keyset pages ordered by `id` until exhausted, keeping only matching rows (FR-028, NFR-003).
  */
 export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteriaDto): Promise<{ row: TenderRow; reasons: string[]; relevance: number }[]> {
   const now = deps.clock.now();
   const conds: SQL[] = [eq(tenders.status, 'open'), or(isNull(tenders.endAt), gte(tenders.endAt, now))!];
-  if (criteria.states.length) conds.push(inArray(tenders.state, criteria.states));
+  // States match case-insensitively in the matcher, so the pre-filter must too.
+  const states = clean(criteria.states).map((x) => x.toLowerCase());
+  if (states.length) conds.push(inArray(sql`lower(${tenders.state})`, states));
   if (criteria.minValue != null) conds.push(or(isNull(tenders.estimatedValue), gte(tenders.estimatedValue, criteria.minValue))!);
   if (criteria.maxValue != null) conds.push(or(isNull(tenders.estimatedValue), sql`${tenders.estimatedValue} <= ${criteria.maxValue}`)!);
   if (criteria.bidTypes.length) conds.push(inArray(tenders.bidType, criteria.bidTypes));
-  if (criteria.keywords.length) {
+  const keywords = clean(criteria.keywords);
+  if (keywords.length) {
     const ors: SQL[] = [];
-    for (const kw of criteria.keywords) {
-      const like = `%${kw.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
+    for (const kw of keywords) {
+      const like = phraseLike(kw);
       ors.push(ilike(tenders.title, like), ilike(tenders.category, like), ilike(tenders.department, like), ilike(tenders.ministry, like),
         ilike(tenders.organisation, like), ilike(tenders.buyerOffice, like), sql`${tenders.items}::text ilike ${like}`);
     }
     conds.push(or(...ors)!);
   }
-  const rows = await deps.db.select().from(tenders).where(and(...conds)).orderBy(desc(tenders.createdAt)).limit(CANDIDATE_LIMIT);
+  // Categories substring-match category, item names and title.
+  const categories = clean(criteria.categories);
+  if (categories.length) {
+    conds.push(or(...categories.flatMap((c) => {
+      const like = `%${escapeLike(c)}%`;
+      return [ilike(tenders.category, like), ilike(tenders.title, like), sql`${tenders.items}::text ilike ${like}`];
+    }))!);
+  }
+  // Ministries substring-match ministry, department, organisation or buyer office.
+  const ministries = clean(criteria.ministries);
+  if (ministries.length) {
+    conds.push(or(...ministries.flatMap((m) => {
+      const like = `%${escapeLike(m)}%`;
+      return [ilike(tenders.ministry, like), ilike(tenders.department, like), ilike(tenders.organisation, like), ilike(tenders.buyerOffice, like)];
+    }))!);
+  }
   const out: { row: TenderRow; reasons: string[]; relevance: number }[] = [];
-  for (const row of rows) {
-    const r = matchTender(row, criteria, { now });
-    if (r.matched) out.push({ row, reasons: r.reasons, relevance: r.relevance });
+  let after: string | null = null;
+  for (;;) {
+    const where: SQL = after ? and(...conds, gt(tenders.id, after))! : and(...conds)!;
+    const rows: TenderRow[] = await deps.db.select().from(tenders).where(where).orderBy(asc(tenders.id)).limit(CANDIDATE_PAGE);
+    for (const row of rows) {
+      const r = matchTender(row, criteria, { now });
+      if (r.matched) out.push({ row, reasons: r.reasons, relevance: r.relevance });
+    }
+    if (rows.length < CANDIDATE_PAGE) break;
+    after = rows[rows.length - 1].id;
   }
   return out;
 }
@@ -129,7 +163,8 @@ watchlistsRoutes.post('/watchlists/preview', requireAuth, async (c) => {
   const { criteria } = await parseJson(c, watchlistPreviewSchema);
   if (criteriaIsEmpty(criteria)) return c.json({ count: 0, sample: [] });
   const cands = await candidateTenders(deps, criteria);
-  cands.sort((a, b) => b.relevance - a.relevance || (a.row.endAt?.getTime() ?? 0) - (b.row.endAt?.getTime() ?? 0));
+  cands.sort((a, b) => b.relevance - a.relevance || (a.row.endAt?.getTime() ?? 0) - (b.row.endAt?.getTime() ?? 0)
+    || b.row.createdAt.getTime() - a.row.createdAt.getTime());
   const sample = await decorateTenders(deps, orgId(c), cands.slice(0, 5).map((x) => x.row));
   // Show the reasons this *draft* would produce.
   const reasonBy = new Map(cands.map((x) => [x.row.id, x.reasons]));
@@ -141,6 +176,10 @@ watchlistsRoutes.post('/watchlists', requireRole('analyst'), async (c) => {
   const body = await parseJson(c, watchlistCreateSchema);
   requireCriteria(body.criteria);
   const org = orgId(c);
+  const [{ n }] = await deps.db.select({ n: count() }).from(watchlists).where(eq(watchlists.orgId, org));
+  if (n >= WATCHLIST_LIMIT) {
+    throw new HttpError(409, 'watchlist_limit', `You can have up to ${WATCHLIST_LIMIT} watchlists — pause or delete one first.`, { limit: WATCHLIST_LIMIT });
+  }
   const now = deps.clock.now();
   const [w] = await deps.db.insert(watchlists).values({
     orgId: org, name: body.name, criteria: body.criteria as WatchlistCriteria, active: body.active ?? true,
