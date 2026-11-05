@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<title>TenderPilot Concept Note</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 300 900; src: url(fonts/ss4-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 300 900; src: url(fonts/ss4-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 300 900; src: url(fonts/ss4-italic.woff2) format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 400; src: local("Inter"), local("Inter Regular"), url(fonts/Inter-Regular.otf); }
+@font-face { font-family: "Inter"; font-weight: 500; src: local("Inter Medium"), url(fonts/Inter-Medium.otf); }
+@font-face { font-family: "Inter"; font-weight: 600; src: local("Inter SemiBold"), url(fonts/Inter-SemiBold.otf); }
+@font-face { font-family: "Inter"; font-weight: 700; src: local("Inter Bold"), url(fonts/Inter-Bold.otf); }
+
+:root {
+  --navy: #0B2545;
+  --navy-2: #13315C;
+  --ink: #1C2533;
+  --body: #3A4556;
+  --grey: #6B7686;
+  --grey-2: #9AA3B0;
+  --rule: #DCE1E8;
+  --wash: #F3F5F8;
+  --wash-2: #E9EDF2;
+  --teal: #0F8B80;
+  --teal-dk: #0B6B63;
+  --teal-wash: #E3F3F1;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+}
+@page { size: A4; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; }
+body { font-family: var(--sans); color: var(--body); font-size: 9.4pt; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-feature-settings: "tnum" 0, "cv11" 1; }
+@media screen { body { background: #8a93a0; } .page { margin: 10mm auto; box-shadow: 0 4px 24px rgba(0,0,0,.25); } }
+
+.page { width: 210mm; height: 297mm; position: relative; overflow: hidden; background: #fff; page-break-after: always; break-after: page; padding: 17mm 18mm 20mm; display: flex; flex-direction: column; }
+.page:last-child { page-break-after: auto; break-after: auto; }
+
+/* running header + footer */
+.eyebrow { font-size: 7.4pt; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); display: flex; align-items: center; gap: 3mm; }
+.eyebrow .n { color: var(--navy); }
+.eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+h1.action { font-family: var(--serif); font-weight: 600; color: var(--navy); font-size: 20.5pt; line-height: 1.18; letter-spacing: -.005em; margin: 4.5mm 0 3.5mm; max-width: 168mm; }
+.lede { font-size: 10.6pt; line-height: 1.55; color: var(--ink); max-width: 160mm; }
+.footer { position: absolute; left: 18mm; right: 18mm; bottom: 9mm; display: flex; justify-content: space-between; font-size: 7.2pt; color: var(--grey); border-top: 1px solid var(--rule); padding-top: 2.4mm; letter-spacing: .02em; }
+.footer b { color: var(--navy); font-weight: 600; }
+
+h2 { font-family: var(--serif); font-weight: 600; color: var(--navy); font-size: 12.5pt; line-height: 1.25; margin-bottom: 1.6mm; }
+h3 { font-size: 9.4pt; font-weight: 600; color: var(--ink); margin-bottom: 1mm; }
+p + p { margin-top: 2mm; }
+strong { color: var(--ink); font-weight: 600; }
+.muted { color: var(--grey); }
+.small { font-size: 8.2pt; }
+.teal { color: var(--teal); }
+
+/* exhibits */
+.exhibit { margin-top: 5mm; }
+.ex-cap { display: flex; align-items: baseline; gap: 2.5mm; font-size: 8.4pt; color: var(--ink); font-weight: 600; margin-bottom: 2.4mm; padding-bottom: 1.6mm; border-bottom: 1.5px solid var(--navy); }
+.ex-cap .ex-n { font-size: 7.2pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); white-space: nowrap; }
+.source { font-size: 6.9pt; color: var(--grey); margin-top: 2mm; }
+
+/* screenshot frames */
+.browser { border-radius: 2.2mm; overflow: hidden; background: #fff; border: 1px solid #CDD3DC; box-shadow: 0 1.2mm 4mm rgba(11,37,69,.10), 0 6mm 14mm rgba(11,37,69,.10); }
+.browser .bar { height: 5.6mm; background: linear-gradient(#F6F7F9, #ECEFF3); border-bottom: 1px solid #D5DAE1; display: flex; align-items: center; padding: 0 2.6mm; gap: 1.3mm; }
+.browser .bar i { width: 1.9mm; height: 1.9mm; border-radius: 50%; background: #D2D7DE; display: block; }
+.browser .bar i:nth-child(1) { background: #EC6A5E; } .browser .bar i:nth-child(2) { background: #F4BF4F; } .browser .bar i:nth-child(3) { background: #61C554; }
+.browser .bar span { margin-left: 3mm; flex: 0 1 62mm; height: 3.4mm; border-radius: 1.7mm; background: #fff; border: 1px solid #DDE1E7; font-size: 5.6pt; color: var(--grey); display: flex; align-items: center; padding-left: 2mm; }
+.browser img { display: block; width: 100%; }
+.phone { border-radius: 6.5mm; background: #111827; padding: 1.7mm; box-shadow: 0 1.5mm 5mm rgba(11,37,69,.18), 0 8mm 18mm rgba(11,37,69,.16); position: relative; }
+.phone img { display: block; width: 100%; border-radius: 5mm; }
+.phone::before { content: ""; position: absolute; top: 3mm; left: 50%; transform: translateX(-50%); width: 11mm; height: 1.9mm; border-radius: 1mm; background: #111827; z-index: 2; }
+.shot-cap { font-size: 7.4pt; color: var(--grey); margin-top: 2.6mm; }
+.shot-cap b { color: var(--ink); font-weight: 600; }
+
+/* generic layouts */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7mm; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; }
+.spacer { flex: 1; }
+
+/* KPI callouts */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1.5px solid var(--navy); border-bottom: 1px solid var(--rule); }
+.kpi { padding: 3.6mm 3.4mm 3.4mm 0; }
+.kpi + .kpi { padding-left: 3.6mm; border-left: 1px solid var(--rule); }
+.kpi .v { font-family: var(--serif); font-size: 19pt; font-weight: 600; color: var(--teal-dk); line-height: 1.05; letter-spacing: -.01em; white-space: nowrap; }
+.kpi .v small { font-size: 11pt; color: var(--grey); font-weight: 400; }
+.kpi .l { font-size: 8pt; color: var(--ink); margin-top: 1.6mm; line-height: 1.35; font-weight: 500; }
+.tag { display: inline-block; font-size: 6.3pt; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--grey); border: 1px solid var(--rule); border-radius: 1mm; padding: .3mm 1.2mm; margin-top: 1.6mm; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 8.4pt; }
+th { text-align: left; font-size: 7pt; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); font-weight: 600; padding: 0 2.5mm 1.8mm 0; border-bottom: 1.5px solid var(--navy); }
+td { padding: 2.3mm 2.5mm 2.3mm 0; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.42; }
+td.k { font-weight: 600; color: var(--ink); }
+table.roomy td { padding-top: 3.3mm; padding-bottom: 3.3mm; font-size: 8.8pt; }
+tr.total td { border-bottom: 1.5px solid var(--navy); border-top: 1.5px solid var(--navy); font-weight: 600; color: var(--ink); background: var(--wash); }
+.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.after { color: var(--teal-dk); }
+
+/* ---------- COVER ---------- */
+.cover { background: var(--navy); color: #fff; padding: 22mm 20mm 16mm; }
+.brand { display: flex; align-items: center; gap: 2.6mm; font-weight: 600; font-size: 11.5pt; letter-spacing: -.01em; }
+.brand .mark { width: 7.5mm; height: 7.5mm; border-radius: 1.8mm; background: var(--teal); display: flex; align-items: center; justify-content: center; }
+.brand .mark svg { width: 4.4mm; height: 4.4mm; }
+.cover .kicker { margin-top: 22mm; font-size: 8pt; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: #7FD3CA; }
+.cover h1 { font-family: var(--serif); font-weight: 600; font-size: 33pt; line-height: 1.1; letter-spacing: -.012em; margin-top: 5mm; max-width: 160mm; }
+.cover h1 em { font-style: italic; font-weight: 400; color: #BFE7E2; }
+.cover .sub { margin-top: 7mm; font-size: 11pt; line-height: 1.55; color: #C9D4E3; max-width: 128mm; }
+.cover .meta { margin-top: 9mm; display: flex; gap: 10mm; font-size: 8pt; color: #9FB0C6; }
+.cover .meta b { display: block; color: #fff; font-weight: 600; font-size: 9pt; margin-top: .8mm; }
+.cover .hero { position: absolute; left: 20mm; width: 200mm; top: 172mm; bottom: 0; }
+.cover .hero .browser { height: 100%; border-bottom: 0; border-radius: 2.2mm 0 0 0; }
+.cover .heroimg { height: calc(100% - 5.6mm); background: #fff url(img/dashboard.jpg) left top / 100% auto no-repeat; }
+.cover .hero .browser { border-color: rgba(255,255,255,.18); box-shadow: 0 10mm 30mm rgba(0,0,0,.45); }
+.cover .conf { margin-top: 6mm; font-size: 7.2pt; color: #8FA1B8; line-height: 1.45; }
+.cover .glow { position: absolute; width: 180mm; height: 180mm; right: -70mm; top: -60mm; border-radius: 50%; background: radial-gradient(closest-side, rgba(15,139,128,.35), rgba(15,139,128,0)); }
+.cover .lines { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 12mm 12mm; }
+.cover > *:not(.glow):not(.lines) { position: relative; }
+.cover > .hero { position: absolute !important; }
+
+/* ---------- EXEC SUMMARY ---------- */
+.moves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 6mm; }
+.move { padding: 0 5mm 0 0; display: flex; flex-direction: column; }
+.move .thumb { margin-top: auto; }
+.move ul { margin-bottom: 3.4mm; }
+.move + .move { padding-left: 5mm; border-left: 1px solid var(--rule); }
+.move .no { font-family: var(--serif); font-size: 26pt; color: var(--teal); line-height: 1; font-weight: 400; }
+.move h2 { margin-top: 2mm; font-size: 13.5pt; }
+.move p { font-size: 8.9pt; }
+.thumb { margin-top: 3.4mm; height: 27mm; border-radius: 1.4mm; overflow: hidden; border: 1px solid var(--rule); box-shadow: 0 1mm 3mm rgba(11,37,69,.08); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; object-position: left top; display: block; }
+.move ul { margin-top: 2mm; list-style: none; font-size: 8.4pt; }
+.move li { padding-left: 3.5mm; position: relative; margin-top: 1mm; }
+.move li::before { content: ""; position: absolute; left: 0; top: 1.9mm; width: 1.4mm; height: 1.4mm; background: var(--teal); }
+.callout { background: var(--wash); border-left: 1.2mm solid var(--teal); padding: 4mm 5mm; }
+.callout h3 { color: var(--navy); font-size: 9.6pt; }
+.so-what { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; margin-top: 2.2mm; }
+.so-what div { font-size: 8.5pt; }
+.so-what b { display: block; color: var(--ink); font-weight: 600; font-size: 8.8pt; margin-bottom: .6mm; }
+
+/* ---------- PROBLEM ---------- */
+.funnel { display: flex; flex-direction: column; gap: 2.6mm; }
+.fbar { display: flex; align-items: center; gap: 3mm; }
+.fbar .bar { height: 14mm; background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: flex-end; padding-right: 3mm; font-family: var(--serif); font-weight: 600; font-size: 13pt; border-radius: .6mm; }
+.fbar .bar.t { background: var(--teal); }
+.fbar .lab { font-size: 8pt; line-height: 1.3; color: var(--ink); flex: 1; }
+.fbar .lab span { display: block; color: var(--grey); font-size: 7.3pt; }
+.pains { list-style: none; counter-reset: p; }
+.pains li { counter-increment: p; display: grid; grid-template-columns: 7mm 1fr; gap: 1mm; padding: 3.6mm 0; border-bottom: 1px solid var(--rule); font-size: 8.5pt; }
+.pains li:first-child { padding-top: 0; }
+.pains li::before { content: counter(p, decimal-leading-zero); font-family: var(--serif); color: var(--teal); font-weight: 600; font-size: 10pt; line-height: 1.3; }
+.pains b { color: var(--ink); font-weight: 600; display: block; }
+.gloss { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1.5px solid var(--navy); }
+.gloss div { padding: 3.2mm 3mm 3.2mm 0; border-bottom: 1px solid var(--rule); font-size: 7.7pt; line-height: 1.38; }
+.gloss div:not(:nth-child(4n+1)) { padding-left: 3mm; border-left: 1px solid var(--rule); }
+.gloss b { display: block; color: var(--navy); font-weight: 700; font-size: 8.4pt; margin-bottom: .4mm; }
+
+/* ---------- APPROACH 2x2 ---------- */
+.matrix { position: relative; height: 82mm; margin-left: 7mm; margin-bottom: 7mm; }
+.matrix .q { position: absolute; width: 50%; height: 50%; padding: 3mm; font-size: 7.8pt; line-height: 1.35; }
+.matrix .q b { display: block; color: var(--ink); font-size: 8.6pt; margin-bottom: .6mm; }
+.matrix .q.tl { left: 0; top: 0; background: var(--wash); border-right: 1px solid #fff; border-bottom: 1px solid #fff; }
+.matrix .q.tr { right: 0; top: 0; background: var(--wash-2); border-bottom: 1px solid #fff; }
+.matrix .q.bl { left: 0; bottom: 0; background: var(--wash); border-right: 1px solid #fff; }
+.matrix .q.br { right: 0; bottom: 0; background: var(--teal); color: #E3F3F1; }
+.matrix .q.br b { color: #fff; font-size: 10pt; font-family: var(--serif); }
+.matrix .yax { position: absolute; left: -7mm; top: 0; bottom: 0; width: 5mm; display: flex; align-items: center; justify-content: center; }
+.matrix .yax span { transform: rotate(-90deg); white-space: nowrap; font-size: 6.8pt; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); font-weight: 600; }
+.matrix .xax { position: absolute; left: 0; right: 0; bottom: -6mm; text-align: center; font-size: 6.8pt; letter-spacing: .1em; text-transform: uppercase; color: var(--grey); font-weight: 600; }
+.matrix .arrow-y { position: absolute; left: -1.6mm; top: 0; bottom: 0; width: 1px; background: var(--grey-2); }
+.matrix .arrow-x { position: absolute; left: 0; right: 0; bottom: -1.6mm; height: 1px; background: var(--grey-2); }
+.matrix .lo, .matrix .hi { position: absolute; font-size: 6.4pt; color: var(--grey); }
+.split { display: grid; grid-template-columns: 1fr 1fr; border-top: 1.5px solid var(--navy); }
+.split > div { padding: 3mm 0 0; }
+.split > div + div { padding-left: 4mm; border-left: 1px solid var(--rule); }
+.split > div:first-child { padding-right: 4mm; }
+.split h3 { font-size: 7.2pt; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 2mm; }
+.split ul { list-style: none; font-size: 8.3pt; }
+.split li { padding: 1.4mm 0 1.4mm 4.5mm; position: relative; border-bottom: 1px dotted var(--rule); line-height: 1.38; }
+.split li::before { content: "✓"; position: absolute; left: 0; top: 1.3mm; color: var(--teal); font-weight: 700; font-size: 8pt; }
+.split .you li::before { content: "●"; color: var(--navy); font-size: 6pt; top: 2mm; }
+
+/* feature list */
+.feat { display: grid; grid-template-columns: 8mm 1fr; gap: 2mm; padding: 2.8mm 0; border-bottom: 1px solid var(--rule); }
+.feat:first-child { padding-top: 0; }
+.feat .ic { width: 7mm; height: 7mm; border-radius: 1.6mm; background: var(--teal-wash); display: flex; align-items: center; justify-content: center; }
+.feat .ic svg { width: 4mm; height: 4mm; stroke: var(--teal-dk); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.feat p { font-size: 8.4pt; line-height: 1.45; }
+.feat h3 { margin-bottom: .4mm; }
+
+/* callout markers on screenshots */
+.annot { position: relative; }
+.pin { position: absolute; width: 5.2mm; height: 5.2mm; border-radius: 50%; background: var(--teal); color: #fff; font-weight: 700; font-size: 7.6pt; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1mm rgba(255,255,255,.95), 0 1mm 3mm rgba(0,0,0,.25); z-index: 3; }
+.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; margin-top: 4mm; }
+.keys div { font-size: 8pt; line-height: 1.42; }
+.keys .kn { display: inline-flex; width: 4.6mm; height: 4.6mm; border-radius: 50%; background: var(--teal); color: #fff; font-size: 7pt; font-weight: 700; align-items: center; justify-content: center; margin-bottom: 1.2mm; }
+.keys b { display: block; color: var(--ink); font-weight: 600; font-size: 8.6pt; margin-bottom: .4mm; }
+.chips { display: flex; flex-wrap: wrap; gap: 1.6mm; margin-top: 2mm; }
+.chips span { font-size: 7.6pt; border: 1px solid var(--rule); background: var(--wash); border-radius: 4mm; padding: .7mm 2.6mm; color: var(--ink); }
+
+/* chevrons */
+.chev { display: flex; gap: 1mm; }
+.chev > div { flex: 1; position: relative; background: var(--navy); color: #fff; padding: 3.2mm 4mm 3.2mm 7mm; font-size: 7.8pt; line-height: 1.35; clip-path: polygon(0 0, calc(100% - 4mm) 0, 100% 50%, calc(100% - 4mm) 100%, 0 100%, 4mm 50%); }
+.chev > div:first-child { clip-path: polygon(0 0, calc(100% - 4mm) 0, 100% 50%, calc(100% - 4mm) 100%, 0 100%); padding-left: 4mm; }
+.chev > div b { display: block; font-size: 9pt; font-weight: 600; }
+.chev > div span { color: #B9C6D8; }
+.chev > div.h { background: var(--teal); }
+.chev > div.h span { color: #D6F0ED; }
+.chev > div.you { background: var(--wash-2); color: var(--ink); }
+.chev > div.you span { color: var(--grey); }
+
+/* bars (impact) */
+.hbar { display: grid; grid-template-columns: 32mm 1fr; align-items: center; gap: 3mm; margin-top: 2.4mm; font-size: 8pt; }
+.hbar .track { display: flex; height: 7mm; align-items: stretch; }
+.hbar .seg { height: 100%; border-right: 1px solid #fff; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 6.4pt; white-space: nowrap; overflow: hidden; }
+.legend { display: flex; flex-wrap: wrap; gap: 4mm; margin-top: 3mm; font-size: 7.2pt; color: var(--grey); }
+.legend i { display: inline-block; width: 2.6mm; height: 2.6mm; margin-right: 1.2mm; vertical-align: -.3mm; }
+
+/* trust tiles */
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1.5px solid var(--navy); }
+.tile { padding: 4.4mm 4mm 4.4mm 0; border-bottom: 1px solid var(--rule); }
+.tile:not(:nth-child(3n+1)) { padding-left: 4mm; border-left: 1px solid var(--rule); }
+.tile .ic { width: 8mm; height: 8mm; border-radius: 1.8mm; background: var(--navy); display: flex; align-items: center; justify-content: center; margin-bottom: 2.6mm; }
+.tile .ic svg { width: 4.4mm; height: 4.4mm; stroke: #fff; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tile h3 { font-family: var(--serif); font-size: 10.6pt; color: var(--navy); margin-bottom: 1mm; }
+.tile p { font-size: 8.2pt; line-height: 1.45; }
+.never { background: var(--navy); color: #DCE5F0; padding: 5mm 6mm; border-radius: 1.4mm; }
+.never h2 { color: #fff; font-size: 12pt; }
+.never .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3mm; margin-top: 3mm; }
+.never .row div { border-top: 1px solid rgba(255,255,255,.22); padding-top: 2mm; font-size: 7.9pt; line-height: 1.35; }
+.never .row b { display: block; color: #fff; font-weight: 600; font-size: 8.6pt; margin-bottom: .6mm; }
+.never .x { color: #F2A99B; font-weight: 700; margin-right: 1mm; }
+
+/* pricing */
+.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+.plan { border: 1px solid var(--rule); border-radius: 1.4mm; padding: 3.4mm 4mm; }
+.plan.f { border: 1.5px solid var(--teal); background: linear-gradient(180deg, var(--teal-wash), #fff 60%); }
+.plan .pn { font-size: 7.2pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--teal-dk); }
+.plan .pp { font-family: var(--serif); font-size: 17pt; font-weight: 600; color: var(--navy); line-height: 1.15; margin-top: 1mm; }
+.plan .pp small { font-family: var(--sans); font-size: 7.6pt; color: var(--grey); font-weight: 400; }
+.plan .pb { font-size: 7.6pt; color: var(--grey); margin-top: .6mm; line-height: 1.35; }
+.plan ul { list-style: none; margin-top: 2mm; font-size: 7.6pt; line-height: 1.3; }
+.plan li { padding: .7mm 0 .7mm 3.4mm; position: relative; }
+.plan li::before { content: "✓"; position: absolute; left: 0; color: var(--teal); font-weight: 700; }
+
+/* back page */
+.back { background: var(--navy); color: #fff; padding: 22mm 20mm 16mm; }
+.back .steps { margin-top: 10mm; display: grid; gap: 0; border-top: 1px solid rgba(255,255,255,.2); }
+.back .step { display: grid; grid-template-columns: 16mm 1fr 36mm; gap: 4mm; padding: 5.5mm 0; border-bottom: 1px solid rgba(255,255,255,.2); align-items: baseline; }
+.back .step .sn { font-family: var(--serif); font-size: 24pt; color: #7FD3CA; line-height: 1; }
+.back .step h3 { color: #fff; font-family: var(--serif); font-size: 13pt; font-weight: 600; margin-bottom: 1mm; }
+.back .step p { color: #C2CEDD; font-size: 9pt; }
+.back .step .when { font-size: 7.4pt; letter-spacing: .1em; text-transform: uppercase; color: #9FB0C6; text-align: right; font-weight: 600; }
+.contact { margin-top: 12mm; display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; align-items: end; }
+.contact .card { border: 1px solid rgba(255,255,255,.25); border-radius: 1.6mm; padding: 5mm 6mm; }
+.contact .card .k { font-size: 7.2pt; letter-spacing: .14em; text-transform: uppercase; color: #7FD3CA; font-weight: 600; }
+.contact .card .v { font-family: var(--serif); font-size: 13.5pt; margin-top: 2mm; color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ============ 1. COVER ============ -->
+<section class="page cover">
+  <div class="lines"></div>
+  <div class="glow"></div>
+  <div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2 21 21 12 16.5 3 21Z"/></svg></span>TenderPilot</div>
+  <div class="kicker">Concept note</div>
+  <h1>Win more GeM bids with a <span style="white-space:nowrap">co-pilot</span> that <em>never takes the wheel</em></h1>
+  <p class="sub">How TenderPilot helps MSMEs, OEMs and resellers find the right Government e-Marketplace bids, decide faster, and submit complete, compliant bids, while your team keeps control of every price and signature.</p>
+  <div class="meta">
+    <div>Date<b>November 2026</b></div>
+    <div>Prepared for<b>Leadership and bid team</b></div>
+    <div>Document<b>Concept note, v1.0</b></div>
+  </div>
+  <div class="conf">Confidential. Prepared for the named recipient only; not for onward distribution.</div>
+  <div class="hero"><div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Dashboard</span></div><div class="heroimg" role="img" aria-label="TenderPilot dashboard"></div></div></div>
+</section>
+
+<!-- ============ 2. EXECUTIVE SUMMARY ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">01</span> Executive summary</div>
+  <h1 class="action">TenderPilot turns GeM bidding from a late-night scramble into a ten-minute routine that your team still signs off</h1>
+  <p class="lede">GeM publishes more opportunity than any bid desk can read. Most of a bid team's day goes on finding, reading and assembling, not on winning. TenderPilot does that groundwork continuously, explains every recommendation, and hands your team a ready packet. Price, authentication and the final click stay with your people.</p>
+
+  <div class="moves">
+    <div class="move">
+      <div class="no">1</div>
+      <h2>Identify</h2>
+      <p>TenderPilot watches GeM around the clock for bids that match what you sell, where you sell and to whom.</p>
+      <ul><li>Alerts on WhatsApp, email and in-app</li><li>Corrigenda flagged the moment they appear</li></ul>
+      <div class="thumb"><img src="img/t-identify.jpg" alt="Matched bids"></div>
+    </div>
+    <div class="move">
+      <div class="no">2</div>
+      <h2>Analyse</h2>
+      <p>It reads the bid documents, checks them against your company profile and gives a Go/No-Go score with its reasons.</p>
+      <ul><li>Each reason linked to the page it came from</li><li>Exemptions and preferences applied</li></ul>
+      <div class="thumb"><img src="img/t-analyse.jpg" alt="Go/No-Go score"></div>
+    </div>
+    <div class="move">
+      <div class="no">3</div>
+      <h2>Apply</h2>
+      <p>It pulls certificates from your vault, fills the undertakings and merges one bid packet in the order GeM expects.</p>
+      <ul><li>Expiry alerts before a certificate lapses</li><li>A checklist for the steps only a person can do</li></ul>
+      <div class="thumb"><img src="img/t-apply.jpg" alt="Bid packet"></div>
+    </div>
+  </div>
+
+  <div class="exhibit" style="margin-top:8mm">
+    <div class="ex-cap"><span class="ex-n">Exhibit 1</span> What changes for a typical bid desk</div>
+    <div class="kpis">
+      <div class="kpi"><div class="v">3 h <small>→</small> 10 min</div><div class="l">to assemble a complete bid packet</div><span class="tag">Target</span></div>
+      <div class="kpi"><div class="v">&lt; 1 hour</div><div class="l">from publication on GeM to an alert on your phone</div><span class="tag">Target</span></div>
+      <div class="kpi"><div class="v">Minutes</div><div class="l">to a Go/No-Go decision, with reasons and evidence</div><span class="tag">Illustrative</span></div>
+      <div class="kpi"><div class="v">Zero</div><div class="l">GeM passwords held. Your team does every submission.</div><span class="tag">By design</span></div>
+    </div>
+    <div class="source">Source: TenderPilot team analysis; illustrative. Figures are targets, not measured client results. They will be baselined during your pilot.</div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="callout">
+    <h3>What this means for leadership</h3>
+    <div class="so-what">
+      <div><b>More of the right bids</b>Your team sees every relevant bid early and does not lose one to a missed corrigendum or deadline.</div>
+      <div><b>Fewer wasted bids</b>Bids you cannot win are ruled out in minutes, before anyone spends a day on them.</div>
+      <div><b>No risk to the account</b>Humans keep price, OTP/DSC/e-Sign and the final submit, so your GeM seller account stays protected.</div>
+    </div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>2</span></div>
+</section>
+
+<!-- ============ 3. PROBLEM ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">02</span> The problem</div>
+  <h1 class="action">GeM is a large market, but bid teams spend most of their time before they even decide to bid</h1>
+  <p class="lede">GeM handled more than ₹4 lakh crore of public orders in FY 2023-24, and thousands of bids go live on a typical working day. For a seller the hard part is not access. It is separating the few bids you can win from the many you cannot, and then getting each one right.</p>
+
+  <div class="grid2" style="grid-template-columns: 1.05fr 1fr; gap: 9mm; margin-top: 6mm;">
+    <div class="exhibit" style="margin-top:0">
+      <div class="ex-cap"><span class="ex-n">Exhibit 2</span> From the daily flood to the bids worth your time</div>
+      <div class="funnel">
+        <div class="fbar"><div class="bar" style="width:100%">3,000+</div></div>
+        <div class="fbar"><div class="lab">Bids published on GeM on a typical working day<span>All categories, all states, all buyers</span></div></div>
+        <div class="fbar"><div class="bar" style="width:62%">~60</div><div class="lab">In your product categories</div></div>
+        <div class="fbar"><div class="bar" style="width:38%">~12</div><div class="lab">In your states and value range</div></div>
+        <div class="fbar"><div class="bar t" style="width:22%">~4</div><div class="lab"><strong>You are eligible for and can win</strong><span>This is where your team's time should go</span></div></div>
+      </div>
+      <div class="source">Source: GeM public statements (order value); TenderPilot team analysis for a typical IT-hardware seller; illustrative.</div>
+    </div>
+    <div>
+      <div class="ex-cap" style="margin-bottom:3mm"><span class="ex-n">Where bids are lost</span></div>
+      <ol class="pains">
+        <li><div><b>Volume and noise</b>Someone scans the portal every day. Relevant bids get found late, or not at all.</div></li>
+        <li><div><b>Eligibility fine print</b>Turnover, experience, OEM authorisation and Make in India clauses sit deep in long bid documents.</div></li>
+        <li><div><b>Corrigenda</b>Changed dates, specifications or terms are easy to miss once a bid is being prepared.</div></li>
+        <li><div><b>Document chasing</b>Certificates live in inboxes and on personal drives. An expired one is found on the closing day.</div></li>
+        <li><div><b>Deadlines and rework</b>Undertakings are retyped and PDFs merged by hand at night. A slip can disqualify the bid.</div></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="ex-cap" style="border-bottom:0;margin-bottom:0"><span class="ex-n">GeM terms in plain words</span></div>
+  <div class="gloss">
+    <div><b>EMD</b>Earnest money deposit: a refundable amount that guarantees you will honour your bid.</div>
+    <div><b>ePBG</b>Performance bank guarantee: security the winning seller gives, usually a % of the order value.</div>
+    <div><b>MSE</b>Micro and small enterprise (Udyam-registered). Often exempt from EMD and some turnover or experience rules.</div>
+    <div><b>Make in India Class-I / II</b>Local-content classes (≥50% / ≥20%). Class-I suppliers get purchase preference.</div>
+    <div><b>ATC</b>Additional terms and conditions a buyer adds to the standard GeM terms. Often where the traps are.</div>
+    <div><b>BOQ</b>Bill of quantities: the itemised list of what the buyer wants, in what quantity.</div>
+    <div><b>Corrigendum</b>An official change to a published bid, such as a new date, specification or term.</div>
+    <div><b>OTP / DSC / e-Sign</b>The ways a person legally authenticates a GeM submission: one-time password, digital signature certificate or Aadhaar e-Sign.</div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>3</span></div>
+</section>
+
+<!-- ============ 4. APPROACH ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">03</span> Our approach</div>
+  <h1 class="action">A co-pilot, not an autopilot: TenderPilot prepares everything, and your team keeps the controls that protect your GeM account</h1>
+  <p class="lede">GeM expects a named person to enter the price and authenticate every bid. Shared logins and bots that submit on your behalf risk your seller account. TenderPilot is built around that rule, so it does the most preparation for the least account risk.</p>
+
+  <div class="grid2" style="grid-template-columns: 1.08fr 1fr; gap: 9mm; margin-top: 6mm;">
+    <div class="exhibit" style="margin-top:0">
+      <div class="ex-cap"><span class="ex-n">Exhibit 3</span> Bid preparation done for you vs. risk to your account</div>
+      <div class="matrix">
+        <div class="arrow-y"></div><div class="arrow-x"></div>
+        <div class="yax"><span>Risk to your GeM account &nbsp;→</span></div>
+        <div class="q tl"><b>Consultant with your login</b>Some work done for you, but your credentials are shared outside the company.</div>
+        <div class="q tr"><b>Auto-submit bots</b>Fast, but automated logins and submissions can get a seller account suspended.</div>
+        <div class="q bl"><b>Do it yourself</b>Safe, but slow: portal checks, spreadsheets and late nights.</div>
+        <div class="q br"><b>TenderPilot</b>Most of the work prepared for you. Your login, price and signature never leave your hands.</div>
+        <div class="xax">Bid preparation done for you &nbsp;→</div>
+      </div>
+      <div class="source">Source: TenderPilot team analysis; illustrative positioning.</div>
+    </div>
+    <div>
+      <div class="split">
+        <div>
+          <h3 class="teal">TenderPilot prepares</h3>
+          <ul>
+            <li>Finds and filters matching bids</li>
+            <li>Reads bid documents and corrigenda</li>
+            <li>Checks eligibility and scores Go/No-Go</li>
+            <li>Fills undertakings and annexures</li>
+            <li>Merges the bid packet in order</li>
+            <li>Pre-fills non-financial GeM fields, only when you click</li>
+          </ul>
+        </div>
+        <div class="you">
+          <h3 style="color:var(--navy)">Your team always does</h3>
+          <ul>
+            <li>Decides whether to bid</li>
+            <li>Enters the price on GeM</li>
+            <li>Authenticates with OTP, DSC or e-Sign</li>
+            <li>Solves the CAPTCHA</li>
+            <li>Clicks Final Submit</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="grid2" style="grid-template-columns: 1.35fr 1fr; gap: 7mm; align-items: end;">
+    <div>
+      <div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Bid workspace · Submit</span></div><img src="img/submit.jpg" alt="Submit step with human-only steps"></div>
+    </div>
+    <div>
+      <div class="ex-cap"><span class="ex-n">Exhibit 4</span> The human-only steps are part of the product</div>
+      <p class="small">At the submit step every bid workspace lists the four actions only your team performs: enter the price, upload the packet, authenticate, and click Final Submit. When the bid is in, a named person marks it submitted, so the pipeline and audit trail stay accurate.</p>
+      <p class="small" style="margin-top:2.5mm"><strong>Why it matters:</strong> your compliance position is simple to explain to auditors, OEM partners and buyers. TenderPilot never holds your GeM password.</p>
+      <div class="shot-cap"><b>Screenshot:</b> TenderPilot bid workspace, submit step.</div>
+    </div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>4</span></div>
+</section>
+
+<!-- ============ 5. IDENTIFY ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">04</span> Identify</div>
+  <h1 class="action">Every bid you can win reaches the right person within the hour, on the channel they already use</h1>
+  <p class="lede">Your team describes what you sell once. TenderPilot watches GeM continuously and brings back only the bids that fit, already sorted by closing date and fit.</p>
+
+  <div class="exhibit" style="margin-top:5mm">
+    <div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Tenders</span></div><img src="img/feed.jpg" alt="Tender feed"></div>
+    <div class="shot-cap"><b>Exhibit 5:</b> The tender feed shows live GeM bids matched to your watchlists, with filters by state, ministry, closing date and value.</div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="grid2" style="grid-template-columns: 1fr 44mm; gap: 9mm; align-items: end;">
+    <div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></div><div><h3>Always-on watchlists</h3><p>Match by product and keyword, GeM category, state and city, buyer ministry or organisation, and order value. One watchlist per product line or region.</p></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div><h3>Instant alerts, wherever you are</h3><p>New matches, corrigenda, closing-day reminders and expiring certificates go out on WhatsApp, email and in-app, with a daily digest for the owner.</p></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 6h18M6 12h12M10 18h4"/></svg></div><div><h3>Triage in one view</h3><p>Saved views such as "closing this week" or "Go verdicts" let the bid manager plan the week in a few minutes.</p></div></div>
+    </div>
+    <div>
+      <div class="phone"><img src="img/m-alerts.jpg" alt="Mobile notifications"></div>
+      <div class="shot-cap" style="text-align:center"><b>Exhibit 6:</b> Alerts on mobile</div>
+    </div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>5</span></div>
+</section>
+
+<!-- ============ 6. ANALYSE ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">05</span> Analyse</div>
+  <h1 class="action">A Go/No-Go verdict in minutes, with every reason traced back to the page of the bid it came from</h1>
+  <p class="lede">TenderPilot reads the bid document and any corrigenda, checks each condition against your company profile and vault, and explains its verdict. In the example below it stops a bid early: the bid needs an OEM authorisation that expired five days ago.</p>
+
+  <div class="exhibit" style="margin-top:5mm">
+    <div class="annot">
+      <div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Tender analysis</span></div><img src="img/analysis.jpg" alt="Tender analysis with score"></div>
+      <div class="pin" style="left:3.5%; top:9%">1</div>
+      <div class="pin" style="left:61.5%; top:24.5%">2</div>
+      <div class="pin" style="left:4.2%; top:73.5%">3</div>
+      <div class="pin" style="left:68.5%; top:6.5%">4</div>
+    </div>
+    <div class="shot-cap"><b>Exhibit 7:</b> Tender analysis for a desktop-computer bid from the Indian Army. Illustrative sample company.</div>
+  </div>
+
+  <div class="keys">
+    <div><span class="kn">1</span><b>Score and verdict</b>A single score with a plain-language Go, Review or No-Go, and how confident TenderPilot is.</div>
+    <div><span class="kn">2</span><b>Hard blockers first</b>Disqualifying conditions override the score, so a high number never hides a fatal gap.</div>
+    <div><span class="kn">3</span><b>Evidence, not opinion</b>Each factor quotes the bid text and page. Your analyst can check it, or override it with a note.</div>
+    <div><span class="kn">4</span><b>Document checklist</b>Every document the bid asks for, mapped to your vault, with the ones TenderPilot can generate marked.</div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="callout" style="padding:3.4mm 5mm">
+    <h3>What TenderPilot checks on every bid</h3>
+    <div class="chips">
+      <span>Average annual turnover</span><span>Years of experience</span><span>Similar work value</span><span>OEM authorisation</span><span>MSE and Startup exemptions</span><span>Make in India Class-I / II</span><span>EMD and ePBG</span><span>Certificates and validity</span><span>Delivery location and time</span><span>Time left to prepare</span><span>ATC clauses</span><span>Documents in your vault</span>
+    </div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>6</span></div>
+</section>
+
+<!-- ============ 7. APPLY ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">06</span> Apply</div>
+  <h1 class="action">From a Go decision to a submission-ready bid packet in about ten minutes, with nothing expired and nothing missing</h1>
+
+  <div class="chev" style="margin-top:4mm">
+    <div><b>1 · Vault</b><span>Certificates matched to the bid's checklist</span></div>
+    <div><b>2 · Annexures</b><span>Undertakings filled from your profile</span></div>
+    <div class="h"><b>3 · Packet</b><span>One merged PDF in GeM order</span></div>
+    <div class="you"><b>4 · Submit</b><span>Your team prices and signs on GeM</span></div>
+  </div>
+
+  <div style="position:relative; margin-top: 8mm; padding-right: 18mm;">
+    <div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Bid workspace · Packet</span></div><img src="img/packet.jpg" alt="Bid packet builder"></div>
+    <div class="phone" style="position:absolute; right:0; top:40mm; width:46mm;"><img src="img/m-vault.jpg" alt="Document vault on mobile"></div>
+  </div>
+  <div class="shot-cap" style="max-width:118mm"><b>Exhibit 8:</b> The bid workspace: twelve documents, four of them generated annexures, merged into one 13-page packet. <b>Exhibit 9 (phone):</b> the document vault with its expiry timeline.</div>
+
+  <div class="spacer"></div>
+  <div class="grid3" style="border-top:1.5px solid var(--navy); padding-top:4mm; gap:6mm; font-size:9pt;">
+    <div><h3>Document vault with expiry alerts</h3><p class="small">GST, PAN, Udyam, ISO, balance sheets, CA certificates, completion certificates and OEM authorisations in one place. Reminders go out 30, 7 and 1 day before expiry.</p></div>
+    <div><h3>Undertakings, written for you</h3><p class="small">EMD exemption requests, Make in India self-certificates, non-blacklisting undertakings and covering letters are filled from your profile and the bid, ready to sign and stamp.</p></div>
+    <div><h3>One click to a packet, then you submit</h3><p class="small">The packet comes with a cover index and the file order GeM expects. A submission assistant lists the values to enter and the steps your team completes on GeM.</p></div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>7</span></div>
+</section>
+
+<!-- ============ 8. IMPACT ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">07</span> Impact</div>
+  <h1 class="action">Your bid desk gets back about three hours on every bid, and spends them on price and buyer relationships</h1>
+  <p class="lede">The work does not disappear. It moves from people to TenderPilot, and the time that is left goes to the decisions only your team can make.</p>
+
+  <div class="exhibit" style="margin-top:5mm">
+    <div class="ex-cap"><span class="ex-n">Exhibit 10</span> One bid, before and after TenderPilot</div>
+    <table>
+      <thead><tr><th style="width:24%">Step</th><th style="width:31%">Today</th><th style="width:33%">With TenderPilot</th><th style="width:12%;text-align:right">Time saved</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Find the bid</td><td>Daily manual scan of the portal across categories and states</td><td class="after">Matched automatically; alert within the hour</td><td class="num" style="text-align:right">~30 min</td></tr>
+        <tr><td class="k">Read and qualify</td><td>Read a 20 to 60 page bid and ATC; check eligibility by hand</td><td class="after">Go/No-Go with reasons and page references</td><td class="num" style="text-align:right">~45 min</td></tr>
+        <tr><td class="k">Track corrigenda</td><td>Re-open the bid page and hope nothing changed</td><td class="after">Changes flagged and re-checked automatically</td><td class="num" style="text-align:right">~10 min</td></tr>
+        <tr><td class="k">Gather documents</td><td>Chase colleagues and drives; expired certificates found late</td><td class="after">Pulled from the vault; expiries flagged weeks ahead</td><td class="num" style="text-align:right">~40 min</td></tr>
+        <tr><td class="k">Undertakings and annexures</td><td>Retype last bid's Word templates, fix names and numbers</td><td class="after">Generated from your profile and the bid</td><td class="num" style="text-align:right">~25 min</td></tr>
+        <tr><td class="k">Assemble the packet</td><td>Convert, merge, rename and order PDFs by hand</td><td class="after">One click; merged PDF with index</td><td class="num" style="text-align:right">~20 min</td></tr>
+        <tr class="total"><td>Total per bid</td><td>~3 hours, often after hours</td><td>~10 minutes of review</td><td class="num" style="text-align:right">~2 h 50 min</td></tr>
+      </tbody>
+    </table>
+    <div class="source">Source: TenderPilot team analysis of a typical goods bid; illustrative. Price entry and authentication on GeM are not included and stay with your team.</div>
+  </div>
+
+  <div class="exhibit" style="margin-top:8mm">
+    <div class="ex-cap"><span class="ex-n">Exhibit 11</span> Minutes of team effort per bid, by step</div>
+    <div class="hbar"><span><strong>Today</strong></span>
+      <div class="track" style="width:100%">
+        <div class="seg" style="width:17%;background:#0B2545">Find</div>
+        <div class="seg" style="width:27%;background:#1F3E66">Read & qualify</div>
+        <div class="seg" style="width:6%;background:#3B5A82"></div>
+        <div class="seg" style="width:23%;background:#56739A">Documents</div>
+        <div class="seg" style="width:15%;background:#7D93B2">Annexures</div>
+        <div class="seg" style="width:12%;background:#A3B3C9">Packet</div>
+      </div></div>
+    <div class="hbar"><span><strong>With TenderPilot</strong></span>
+      <div class="track"><div class="seg" style="width:5.6%;background:var(--teal)"></div><span style="font-size:7.6pt;color:var(--teal-dk);font-weight:600;align-self:center;margin-left:2mm">~10 min of review</span></div></div>
+    <div class="legend"><span>Bar length is proportional to minutes per bid (today ≈ 180 minutes).</span></div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="kpis">
+    <div class="kpi"><div class="v">~45 h</div><div class="l">returned each month at 15 bids a month</div><span class="tag">Illustrative</span></div>
+    <div class="kpi"><div class="v">0</div><div class="l">bids lost to expired documents or missed corrigenda</div><span class="tag">Target</span></div>
+    <div class="kpi"><div class="v">2×</div><div class="l">bids your current team can pursue each month</div><span class="tag">Target</span></div>
+    <div class="kpi"><div class="v">Earlier</div><div class="l">No-Go calls, so effort goes only to bids you can win</div><span class="tag">Expected</span></div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>8</span></div>
+</section>
+
+<!-- ============ 9. ROLES ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">08</span> Built for every role</div>
+  <h1 class="action">Each person on the bid desk sees the part of the work they own, from the owner's phone to the analyst's checklist</h1>
+
+  <div class="exhibit" style="margin-top:3mm">
+    <div class="ex-cap"><span class="ex-n">Exhibit 12</span> Who uses TenderPilot, and for what</div>
+    <table class="roomy">
+      <thead><tr><th style="width:21%">Role</th><th style="width:44%">What they see</th><th>The question it answers</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Owner / MD</td><td>Mobile dashboard: new matches, bids closing, EMD at stake, win rate, documents expiring</td><td>"Are we bidding on the right things, and is anything about to slip?"</td></tr>
+        <tr><td class="k">Bid manager</td><td>Pipeline board from Identified to Won or Lost, with owners, due dates and packet readiness</td><td>"Who is on which bid, and what is blocking it?"</td></tr>
+        <tr><td class="k">Bid analyst</td><td>Tender analysis, requirement checklist, annexures and the packet builder</td><td>"Do we qualify, and what is still missing?"</td></tr>
+        <tr><td class="k">Compliance / accounts</td><td>Document vault, expiry timeline and the audit trail of who did what</td><td>"Is every certificate valid on the closing date?"</td></tr>
+        <tr><td class="k">Viewer</td><td>Read-only access for partners, OEMs or auditors you invite</td><td>"What was submitted, and on what basis?"</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="grid2" style="grid-template-columns: 1fr 50mm; gap: 8mm; align-items: end;">
+    <div>
+      <div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Pipeline</span></div><img src="img/pipeline.jpg" alt="Pipeline board"></div>
+      <div class="shot-cap"><b>Exhibit 13:</b> The bid manager's pipeline: every bid by stage, with score, closing time, EMD and packet readiness.</div>
+    </div>
+    <div>
+      <div class="phone"><img src="img/m-dashboard.jpg" alt="Owner dashboard on mobile"></div>
+      <div class="shot-cap" style="text-align:center"><b>Exhibit 14:</b> The owner's dashboard</div>
+    </div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>9</span></div>
+</section>
+
+<!-- ============ 10. TRUST ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">09</span> Trust, security and compliance</div>
+  <h1 class="action">Your data, your GeM account and your decisions stay yours: security is part of the design</h1>
+  <p class="lede">Bid documents, financials and certificates are among the most sensitive files a company holds. TenderPilot treats them that way and keeps your GeM seller account out of reach.</p>
+
+  <div class="tiles" style="margin-top:5mm">
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><h3>A separate space for each company</h3><p>Every company's bids, documents and analyses are kept apart. No other customer can see or reach them.</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M17 11l2 2 4-4"/></svg></div><h3>Role-based access</h3><p>Owners, bid managers, analysts and viewers each see and do only what their role allows. You invite and remove people yourself.</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg></div><h3>Complete audit trail</h3><p>Every analysis, override, document change, packet and submission record shows who did it and when.</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3>Your data stays yours</h3><p>You own everything you upload or create. Export it whenever you like, and have it deleted if you leave.</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><path d="M4 4l16 16"/></svg></div><h3>No GeM credentials stored</h3><p>TenderPilot reads public bid information only. It never asks for, stores or uses your GeM login.</p></div>
+    <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.5 12 3.5 3.5 0 0 0 6 19z"/></svg></div><h3>Enterprise-grade cloud</h3><p>Hosted on enterprise-grade cloud infrastructure, with encrypted connections and continuous monitoring.</p></div>
+  </div>
+
+  <div class="grid2" style="grid-template-columns: 1fr 1fr; gap: 6mm; margin-top: 10mm; align-items: start;">
+    <div><div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Settings · Team and roles</span></div><img src="img/roles.jpg" alt="Roles"></div>
+      <div class="shot-cap"><b>Exhibit 18:</b> Four roles, with least access by default. Viewers suit compliance reviewers and promoters.</div></div>
+    <div><div class="browser"><div class="bar"><i></i><i></i><i></i><span>TenderPilot · Settings · Activity log</span></div><img src="img/activity.jpg" alt="Activity log"></div>
+      <div class="shot-cap"><b>Exhibit 19:</b> The activity log records who did what, and when, in IST.</div></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="never">
+    <h2>What TenderPilot never does</h2>
+    <p style="font-size:8.6pt;color:#B9C6D8">These limits are fixed in the product. No setting or plan turns them off.</p>
+    <div class="row">
+      <div><b><span class="x">✕</span>Ask for your password</b>Your GeM login stays with your team.</div>
+      <div><b><span class="x">✕</span>Enter or suggest a price</b>Your financial bid is yours alone.</div>
+      <div><b><span class="x">✕</span>Authenticate for you</b>No OTP, DSC or Aadhaar e-Sign.</div>
+      <div><b><span class="x">✕</span>Solve a CAPTCHA</b>No bots on your seller account.</div>
+      <div><b><span class="x">✕</span>Click Final Submit</b>A named person does that, every time.</div>
+    </div>
+  </div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>10</span></div>
+</section>
+
+<!-- ============ 11. ENGAGEMENT ============ -->
+<section class="page">
+  <div class="eyebrow"><span class="n">10</span> Engagement model</div>
+  <h1 class="action">Live in days, proven in a four-week pilot, then scaled on success metrics we agree at the start</h1>
+
+  <div class="exhibit" style="margin-top:3mm">
+    <div class="ex-cap"><span class="ex-n">Exhibit 15</span> From kick-off to full rollout</div>
+    <div class="chev">
+      <div><b>Onboard · days 1 to 5</b><span>Company profile, watchlists for each product line, upload certificates to the vault</span></div>
+      <div class="h"><b>Pilot · weeks 1 to 4</b><span>Live bids and alerts; weekly review with your bid manager; tune watchlists and templates</span></div>
+      <div><b>Rollout · month 2 onward</b><span>Whole team on board, WhatsApp digests, more categories, entities and regions</span></div>
+    </div>
+  </div>
+
+  <div class="grid2" style="grid-template-columns: 1.15fr 1fr; gap: 8mm; margin-top: 10mm;">
+    <div>
+      <div class="ex-cap"><span class="ex-n">Exhibit 16</span> Success metrics we track together</div>
+      <table class="roomy">
+        <thead><tr><th>Metric</th><th style="text-align:right">Pilot target</th></tr></thead>
+        <tbody>
+          <tr><td>Time from GeM publication to alert</td><td class="num after" style="text-align:right">&lt; 1 hour</td></tr>
+          <tr><td>Time to a Go/No-Go decision</td><td class="num after" style="text-align:right">same day</td></tr>
+          <tr><td>Time to assemble a bid packet</td><td class="num after" style="text-align:right">~10 min</td></tr>
+          <tr><td>Relevant bids reviewed per week</td><td class="num after" style="text-align:right">vs. baseline</td></tr>
+          <tr><td>Bids missed or lost on documents</td><td class="num after" style="text-align:right">zero</td></tr>
+          <tr><td>Win rate on bids submitted</td><td class="num after" style="text-align:right">tracked</td></tr>
+        </tbody>
+      </table>
+      <div class="source">Baselines are measured in week 1 of the pilot. Targets are indicative.</div>
+    </div>
+    <div>
+      <div class="ex-cap"><span class="ex-n">What you provide</span></div>
+      <ul class="pains" style="counter-reset:p">
+        <li><div><b>A named bid owner</b>About 2 hours in week 1, then 30 minutes a week</div></li>
+        <li><div><b>Company documents</b>Registrations, financials, experience and OEM letters</div></li>
+        <li><div><b>Your product focus</b>Categories, states and value bands you want to win</div></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="ex-cap"><span class="ex-n">Exhibit 17</span> Indicative pricing, per company per month, excluding GST</div>
+  <div class="plans">
+    <div class="plan"><div class="pn">Starter</div><div class="pp">₹2,999 <small>/ month</small></div><div class="pb">For a founder-led MSME bidding a few times a month</div>
+      <ul><li>3 team members, 5 watchlists</li><li>Email and in-app alerts</li><li>Go/No-Go scoring, vault, packet builder</li></ul></div>
+    <div class="plan f"><div class="pn">Pro · recommended</div><div class="pp">₹7,999 <small>/ month</small></div><div class="pb">For growing teams bidding every week</div>
+      <ul><li>10 members, unlimited watchlists</li><li>WhatsApp alerts and daily digest</li><li>Assisted bid reading, annexure templates</li><li>Form-fill assistant, pipeline and win-rate analytics</li></ul></div>
+    <div class="plan"><div class="pn">Enterprise</div><div class="pp">Custom</div><div class="pb">For OEMs, distributors and consultants with many entities</div>
+      <ul><li>Unlimited members and entities</li><li>Single sign-on and audit exports</li><li>Custom eligibility rules, success manager</li></ul></div>
+  </div>
+  <div class="source">Indicative only; final commercials are agreed in the proposal. Every plan starts with a 14-day free trial of Pro.</div>
+  <div class="footer"><span><b>TenderPilot</b> | Confidential</span><span>11</span></div>
+</section>
+
+<!-- ============ 12. BACK PAGE ============ -->
+<section class="page back">
+  <div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2 21 21 12 16.5 3 21Z"/></svg></span>TenderPilot</div>
+  <div class="eyebrow" style="margin-top:26mm;color:#7FD3CA"><span class="n" style="color:#fff">Next steps</span></div>
+  <h1 class="action" style="color:#fff;font-size:26pt;max-width:175mm">See it on your own bids in thirty minutes</h1>
+  <p class="lede" style="color:#C9D4E3">We run TenderPilot live on your product categories, so the first bids you see are ones you could bid on this week.</p>
+
+  <div class="steps">
+    <div class="step"><div class="sn">1</div><div><h3>A 30-minute walkthrough</h3><p>Live on GeM bids in your categories and states, with your bid manager in the room.</p></div><div class="when">This week</div></div>
+    <div class="step"><div class="sn">2</div><div><h3>Onboarding in days</h3><p>Company profile, watchlists and document vault set up together. Alerts start the same day.</p></div><div class="when">Days 1 to 5</div></div>
+    <div class="step"><div class="sn">3</div><div><h3>Four-week pilot review</h3><p>We compare the success metrics with your baseline and agree the rollout plan.</p></div><div class="when">Week 4</div></div>
+  </div>
+
+  <div class="contact">
+    <div class="card"><div class="k">Your contact</div><div class="v">[Your name] · [email] · [phone]</div></div>
+    <div style="font-size:7.4pt;color:#8FA1B8;line-height:1.5">Product screenshots show TenderPilot with a sample company, Aarav Technologies Pvt Ltd, and illustrative bid data. Figures marked target or illustrative are not measured client results. GeM is the Government of India's procurement platform; TenderPilot is an independent product and is not affiliated with or endorsed by GeM.</div>
+  </div>
+  <div style="position:absolute;left:20mm;right:20mm;bottom:12mm;display:flex;justify-content:space-between;font-size:7.2pt;color:#8FA1B8;border-top:1px solid rgba(255,255,255,.18);padding-top:2.4mm"><span><b style="color:#fff">TenderPilot</b> | Confidential</span><span>12</span></div>
+</section>
+
+</body>
+</html>
