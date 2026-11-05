@@ -8,6 +8,8 @@ const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'));
 const SignupPage = lazy(() => import('@/features/auth/SignupPage'));
 const AcceptInvitePage = lazy(() => import('@/features/auth/AcceptInvitePage'));
+const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'));
 const OnboardingPage = lazy(() => import('@/features/onboarding/OnboardingPage'));
 const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage'));
 const FeedPage = lazy(() => import('@/features/feed/FeedPage'));
@@ -53,9 +55,12 @@ export const routes: RouteObject[] = [
       { path: '/', element: <LandingPage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/signup', element: <SignupPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
     ],
   },
   { path: '/invite/:token', element: <S><AcceptInvitePage /></S> },
+  // Not public-only: a signed-in user may open an emailed link; a successful reset replaces their session.
+  { path: '/reset-password/:token', element: <S><ResetPasswordPage /></S> },
   {
     element: <Protected />,
     children: [

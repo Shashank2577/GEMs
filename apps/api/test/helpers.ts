@@ -75,6 +75,8 @@ export interface TestContextOptions {
   gemBaseUrl?: string;
   fetch?: typeof fetch;
   databaseUrl?: string;
+  /** TRUST_PROXY for client-IP rate limiting (default unset = no trusted proxy, IP limits skipped). */
+  trustProxy?: 'cloudflare' | 'xff';
 }
 
 export async function createTestContext(opts: TestContextOptions = {}) {
@@ -86,7 +88,7 @@ export async function createTestContext(opts: TestContextOptions = {}) {
   const clock = createFixedClock(opts.now ?? new Date());
   const mailer = createLogMailer(silentLogger);
   const whatsapp = createLogWhatsApp(silentLogger);
-  const env = { APP_URL: TEST_APP_URL, NODE_ENV: 'test', GEM_BASE_URL: opts.gemBaseUrl ?? 'http://127.0.0.1:4010', GEM_MIN_INTERVAL_MS: '0' };
+  const env = { APP_URL: TEST_APP_URL, NODE_ENV: 'test', GEM_BASE_URL: opts.gemBaseUrl ?? 'http://127.0.0.1:4010', GEM_MIN_INTERVAL_MS: '0', TRUST_PROXY: opts.trustProxy };
   const deps: AppDeps = {
     db,
     blobs: createFsBlobStore(blobDir),
