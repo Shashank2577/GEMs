@@ -1,12 +1,12 @@
 {
   "closingSoon": [
     {
-      "id": "463239cc-7ac8-4aa9-8304-602b32d583ce",
+      "id": "477748b8-3c64-4add-8653-b8d387697341",
       "bidNumber": "GEM/2026/B/6448851",
       "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
       "buyer": "Maharashtra State Police",
       "state": "Maharashtra",
-      "endAt": "2026-11-05T08:02:00.000Z",
+      "endAt": "2026-11-05T08:09:00.000Z",
       "emdAmount": 19000,
       "estimatedValue": 962000,
       "analysis": {
@@ -14,17 +14,17 @@
         "verdict": "go"
       },
       "workspace": {
-        "id": "3fc203d0-5b8b-470e-8fab-501f6bf9fb85",
+        "id": "d5b5091e-962e-4974-8823-ab8db2c3a0d0",
         "stage": "ready"
       }
     },
     {
-      "id": "c3926ac5-93d4-4491-a0c7-9d60b9d9fdd7",
+      "id": "8ec4b2c3-cb6e-49ec-a157-7ce308be21d3",
       "bidNumber": "GEM/2026/B/6456770",
       "title": "LED Monitor 24\" IPS, Full HD (MII Class-I)",
       "buyer": "Indian Army",
       "state": "Maharashtra",
-      "endAt": "2026-11-05T12:02:00.000Z",
+      "endAt": "2026-11-05T12:09:00.000Z",
       "emdAmount": 0,
       "estimatedValue": 332000,
       "analysis": {
@@ -34,7 +34,7 @@
       "workspace": null
     },
     {
-      "id": "dfaa3e55-5d5a-4031-9670-c46991e26e91",
+      "id": "33f0098e-3e30-4dd2-9928-e38391c0b3ad",
       "bidNumber": "GEM/2026/B/6464689",
       "title": "Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor",
       "buyer": "Indian Army",
@@ -47,12 +47,12 @@
         "verdict": "no_go"
       },
       "workspace": {
-        "id": "669d1b20-66f4-4903-9304-3763a830d473",
+        "id": "ea321136-64ad-41d0-9946-db2445a0c5fd",
         "stage": "preparing"
       }
     },
     {
-      "id": "4b687eea-2008-4dc7-9b4d-e67c53300777",
+      "id": "fefdf31c-9b45-4fd4-84a1-7f9c3d718767",
       "bidNumber": "GEM/2026/B/6472608",
       "title": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
       "buyer": "CRPF",
@@ -65,12 +65,12 @@
         "verdict": "go"
       },
       "workspace": {
-        "id": "473e1245-3f9b-409a-abec-d1c89192a4a4",
+        "id": "828d8848-1ace-4cde-8a85-c11b92810cf7",
         "stage": "preparing"
       }
     },
     {
-      "id": "e7c889c7-1f1e-4788-a459-53e0944157fd",
+      "id": "4615e2ad-88d6-40c9-bade-f0c694e98bae",
       "bidNumber": "GEM/2026/B/6480527",
       "title": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
       "buyer": "Indian Institute of Technology Bombay",
@@ -83,12 +83,12 @@
         "verdict": "go"
       },
       "workspace": {
-        "id": "053d6e57-9868-4f89-8e2e-6cff30d098df",
+        "id": "5a4f4772-7cef-434e-8e1f-ab5176e0b9b2",
         "stage": "go"
       }
     },
     {
-      "id": "614ef00a-3b00-43a8-9743-eac001280c3f",
+      "id": "cbbc20b6-89ec-489c-9e45-f167bd363f48",
       "bidNumber": "GEM/2026/B/6488446",
       "title": "Multifunction Machine MFM (Q2) – A3 mono laser, 35 ppm, duplex",
       "buyer": "Directorate of Education, Goa",
@@ -101,12 +101,12 @@
         "verdict": "go"
       },
       "workspace": {
-        "id": "75c79a8f-7c79-400e-aad0-928e88cbf57b",
+        "id": "ef06ce9d-0c6a-450f-940e-ed9cf055bd58",
         "stage": "analysing"
       }
     },
     {
-      "id": "75f566c6-49cc-4999-8768-4295da30585e",
+      "id": "c79fa968-9687-4c27-a403-80f69d43df39",
       "bidNumber": "GEM/2026/B/6496365",
       "title": "Network Switch – Layer 2 Managed, 24 x 1G PoE+ with 4 x 10G SFP+",
       "buyer": "Bharat Petroleum Corporation Limited",
@@ -121,7 +121,7 @@
       "workspace": null
     },
     {
-      "id": "cd80444d-1567-46b8-b693-b55902250135",
+      "id": "3cd941c8-85c8-41d8-85b9-32a443494a2c",
       "bidNumber": "GEM/2026/B/6504284",
       "title": "Next Generation Firewall (NGFW) – 5 Gbps threat protection, 3-year subscription",
       "buyer": "NIC",
@@ -134,7 +134,7 @@
         "verdict": "go"
       },
       "workspace": {
-        "id": "275fe227-b5c6-46dd-84c2-e6562f9674d0",
+        "id": "1c526186-c085-40b2-8d94-d6b83d7549c6",
         "stage": "go"
       }
     }

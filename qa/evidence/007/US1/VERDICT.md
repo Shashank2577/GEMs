@@ -1,9 +1,11 @@
-## QA verdict — REJECTED
+## QA verdict — APPROVED (round 2)
+
+> Round 1 (commit `e3de2a8`, comment on #292) was REJECTED for US1-3 `setupComplete`. Round 2 re-reviews rework commit `29c85c2`; evidence below was regenerated from that commit. The round-1 text of the rejected row is kept in the Findings section for the record.
 
 **Work item:** #292 · **PR:** #480 · **Reviewer:** qa (claude-code/Opus 5.5) · **Session:** https://claude.ai/code/session_01BUi6mGCHY2BZng3gMKswFn
 
-Commit under test: `e3de2a8` on `story/GEM-292-owner-dashboard`. Spec: `specs/007-experience-growth/spec.md`, User Story 1, scenarios US1-1 … US1-15, FR-001…FR-013, SC-002, SC-008.
-Run: `pnpm exec playwright test e2e/007-experience-growth/US1*` (projects `desktop` + `mobile`), executed twice with identical results (no flakes); 19 tests passed, 1 failed (US1-3). The PR's own `apps/api/test/dashboard.test.ts` (11 tests) also passes — see Finding 1 for why it misses the defect.
+Commit under test: `29c85c2` (round 1: `e3de2a8`) on `story/GEM-292-owner-dashboard`. Spec: `specs/007-experience-growth/spec.md`, User Story 1, scenarios US1-1 … US1-15, FR-001…FR-013, SC-002, SC-008.
+Run: `pnpm exec playwright test e2e/007-experience-growth/US1*` (projects `desktop` + `mobile`), executed twice on `29c85c2`: 20 passed / 0 failed both times (no flakes). API tests: `pnpm --filter @tp/api exec vitest run test/dashboard.test.ts` -> 13 passed, including the two new tests (single-member demo org is setupComplete while `team` stays not done; non-demo org still blocked by the team step, US3-12).
 
 Evidence base: `https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/` (file names below are relative to it). Test: `e2e/007-experience-growth/US1-dashboard.e2e.ts`.
 
@@ -18,7 +20,7 @@ Evidence base: `https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-da
 | US1-3a | demo org: `pipeline` equals `{ identified: 3, analysing: 2, go: 2, preparing: 2, ready: 1, submitted: 3, won: 2, lost: 1, dropped: 0 }` | met | [US1-03-demo-org-response.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-03-demo-org-response.json) |
 | US1-3b | `tiles.activeBids = 13`, `tiles.winRate = 67`, `tiles.expiringDocs = 3`, `stats.expiredDocs = 1` | met | same file |
 | US1-3c | `verdicts.go + verdicts.review + verdicts.no_go = 20`; `recentMatches` has 6 entries; `activity` has ≤ 15 entries including one `demo.seeded` | met | same file |
-| US1-3d | "`setupComplete = true` and `demo = true`" | **not met** — `demo = true` but `setupComplete = false` | same file (`setup[5]` = `{ key: "team", done: false }`), [trace](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/trace-US1-03-demo-org-api-desktop.zip), [screenshot](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-03-demo-org-dashboard.png) |
+| US1-3d | "`setupComplete = true` and `demo = true`" | met (round 2) — `demo=true`, `setupComplete=true`; `team` step stays honestly `done:false` | [US1-03-demo-org-response.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-03-demo-org-response.json), [screenshot](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-03-demo-org-dashboard.png) (Go / No-Go card now occupies the slot; no "Finish setting up" card) |
 | US1-4a | `closingSoon` has 1–8 entries sorted by `endAt` ascending, every `endAt` between now and now + 7 days | met | [US1-04-closing-soon.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-04-closing-soon.json), [screenshot](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-04-closing-soon-card.png) |
 | US1-4b | `tiles.closingThisWeek ≥ closingSoon.length`, `stats.closingToday ≥ 1`, at least one entry has `workspace.stage = "ready"` | met | same files |
 | US1-5 | `tiles.emdAtStake` equals `SUM(tenders.emd_amount)` over the org's workspaces in identified…submitted, and > 0 | met | [US1-05-emd-ground-truth.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-05-emd-ground-truth.json), [screenshot](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-05-emd-at-stake.png) |
@@ -43,7 +45,7 @@ Evidence base: `https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-da
 | US1-14a | background refresh fails (503): "the widgets stay visible and a non-blocking banner "Couldn’t refresh — showing data from HH:MM IST" with "Retry" appears" (HH:MM = `generatedAt` in IST) | met | [US1-14-stale-banner-with-data.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-14-stale-banner-with-data.png) |
 | US1-14b | "the full-page error state is used only when there is no data at all" | met (no alert while data cached; Retry clears the banner) | [US1-14-recovered-after-retry.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-14-recovered-after-retry.png) |
 | US1-15 | second org after the first was demo-seeded: `activeBids = 0`, `closingSoon = []`, `recentMatches = []`, activity only its own `org.created` | met | [US1-15-second-org-response.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-15-second-org-response.json), [screenshot](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-15-second-org-dashboard-empty.png) |
-| FR-001…FR-007 | API contract (401, tiles, stats, closingSoon, recentMatches/expiringDocuments, activity, setup) | met except FR-007's `setupComplete` outcome for a demo org (see US1-3d / Finding 1) | files above |
+| FR-001…FR-007 | API contract (401, tiles, stats, closingSoon, recentMatches/expiringDocuments, activity, setup) | met (FR-007 as amended in `29c85c2`: for a demo org the `team` step does not block `setupComplete`) | files above |
 | FR-008 | IST-hour greeting boundaries, date, summary, Demo badge, "Pipeline"/"Review matches" buttons | met (04:59 Working late, 05:00/11:59 Good morning, 12:00/16:59 Good afternoon, 17:00/23:30 Good evening) | [US1-06-greeting-boundaries.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-06-greeting-boundaries.json) |
 | FR-009 | tile deep-links, hints, and EMD tooltip "Earnest Money Deposit on your active bids. MSEs with Udyam are usually exempt." | met (tooltip text asserted on hover) | US1-07 / US1-08 files |
 | FR-010 | skeletons, specific empty states, error state with "Try again" | met | US1-10, US1-11, US1-12 files |
@@ -56,7 +58,9 @@ Evidence base: `https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-da
 
 ### Findings
 
-1. **blocking** — A freshly demo-seeded org reports `setupComplete = false`; US1-3 requires `true`.
+None open. Round-1 finding, now resolved in `29c85c2`:
+
+1. ~~**blocking**~~ (resolved) — A freshly demo-seeded org reports `setupComplete = false`; US1-3 requires `true`.
    - Observed: `pnpm exec playwright test e2e/007-experience-growth/US1* -g "US1-3"` -> `expect(d.setupComplete).toBe(true)` received `false`. Org = sign up + `POST /api/demo/seed` only. Response `setup` is `company/categories/watchlist/documents/analysis = true`, `team = false`.
    - Expected: "Given a demo org, When the dashboard API is called, Then … `setupComplete = true` and `demo = true`."
    - Where: `apps/api/src/routes/dashboard.ts:247` — the `team` step is `done` only when the org has > 1 member or a pending invitation, and `POST /demo/seed` creates neither. `apps/api/test/dashboard.test.ts:113` asserts `true` but passes because its fixture org already has extra members (`org.viewer`, etc.), so it never exercises a demo-only org. Fix options (developer's call): make demo seeding satisfy the `team` step (e.g. seed a teammate/pending invite), or exclude `team` from `setupComplete` for demo orgs — or, if the owner's intent is that an unfinished team step should keep `setupComplete=false`, amend US1-3/FR-007 (separate issue; criterion not edited here).
@@ -64,12 +68,14 @@ Evidence base: `https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-da
 
 ### Observations (do not decide the verdict)
 
+0. **Spec amended by the rework** — `29c85c2` edits FR-007 in `spec.md` (area-lead decision relayed by the coordinator: demo orgs are not held back by the `team` step). QA verified against the amended text; US1-3 as quoted is satisfied. Non-demo orgs still need every step (covered by the new API test).
+
 1. **Accessibility (US7 scope, not a US1 criterion)** — axe WCAG 2.1 A/AA on the demo dashboard (desktop, [dashboard-demo-desktop.axe.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/dashboard-demo-desktop.axe.json)): 3 serious violations — `aria-progressbar-name` (1 node), `color-contrast` (7 nodes), `label-content-name-mismatch` (2 nodes). Recorded only.
 2. **Layout shift on load** — page-wide CLS during the 2 s slow load is 0.0999 (just under the 0.1 "good" limit), caused by the "Closing soon" card growing from its 346 px skeleton to 548 px and pushing the cards beneath it (non-header). The header itself holds position; the "Demo data" badge appearing widens the action-button group leftwards (buttons keep their right edge) and button y drifts ≤ 1 px ([US1-12-header-layout.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-dashboard/qa/evidence/007/US1/US1-12-header-layout.json)). Not required by US1-12 as written; a skeleton sized to the real card would remove it.
 3. **Slow first error** — a 500 on first load shows the error state only after react-query's two retries (~3 s of skeleton first). Within the criterion, but a user waits.
 4. **Onboarding redirect timing** — the redirect to `/onboarding` is decided client-side after `/api/me` resolves, so two back-to-back `goto('/dashboard')` calls (before `me` arrives) redirect on the second one. Behaviour matches FR-013 once the first redirect has actually happened; tests wait for it.
 5. **UI sentence for `org.created`** — "created the organization" with no target; correct per `SELF_CONTAINED`.
-6. No flakes: two complete runs, identical outcomes (19 pass / US1-3 fail).
+6. No flakes: two complete runs per round; round 2: 20/20 pass both times.
 
 ### Not checked
 
@@ -79,7 +85,7 @@ Evidence base: `https://github.com/Shashank2577/GEMs/blob/story/GEM-292-owner-da
 
 - Cross-org access by id (NFR-005): only US1-15's list-level isolation was exercised.
 
-An approval would have covered only what is in the table above; this is a rejection.
+An approval covers what is in the table above. It is not a statement that the change is free of defects.
 
 ### Bug issues filed
 
@@ -87,4 +93,4 @@ An approval would have covered only what is in the table above; this is a reject
 
 ### Verdict
 
-`qa:rejected` — criterion US1-3 ("`setupComplete = true`" for a demo org) not met. Rejection 1 of 3 on this item. All other criteria (US1-1, 2, 4–15), FR-008…FR-013, SC-002, SC-008 and the donut-ring regression are met.
+`qa:approved` — every criterion met, evidence above. Round 2: US1-3d moved from not met to met; all other rows unchanged.

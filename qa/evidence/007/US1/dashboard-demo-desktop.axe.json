@@ -1,60 +1,7 @@
 {
   "url": "http://localhost:8788/dashboard",
-  "timestamp": "2026-11-05T03:03:16.375Z",
+  "timestamp": "2026-11-05T03:10:09.239Z",
   "violations": [
-    {
-      "id": "aria-progressbar-name",
-      "impact": "serious",
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag111",
-        "EN-301-549",
-        "EN-9.1.1.1",
-        "RGAAv4",
-        "RGAA-11.1.1"
-      ],
-      "description": "Ensure every ARIA progressbar node has an accessible name",
-      "help": "ARIA progressbar nodes must have an accessible name",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-progressbar-name?application=playwright",
-      "nodes": [
-        {
-          "any": [
-            {
-              "id": "aria-label",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "aria-label attribute does not exist or is empty"
-            },
-            {
-              "id": "aria-labelledby",
-              "data": null,
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
-            },
-            {
-              "id": "non-empty-title",
-              "data": {
-                "messageKey": "noAttr"
-              },
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "Element has no title attribute"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"83\" aria-valuetext=\"83%\" role=\"progressbar\" data-state=\"loading\" data-value=\"83\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-2 mt-2\">",
-          "target": [
-            ".bg-muted"
-          ],
-          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
-        }
-      ]
-    },
     {
       "id": "color-contrast",
       "impact": "serious",
@@ -343,7 +290,7 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: own Traders mw2ynsvf18. Switch organization\">",
+          "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: own Traders mw2ywnhp20. Switch organization\">",
           "target": [
             "#radix-\\:r3\\:"
           ],
@@ -438,7 +385,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(1) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(1) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -451,7 +398,7 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">96</span>",
           "target": [
-            "li:nth-child(1) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(1) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -470,7 +417,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -483,7 +430,7 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">96</span>",
           "target": [
-            "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -502,7 +449,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(3) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(3) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -515,7 +462,7 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">82</span>",
           "target": [
-            "li:nth-child(3) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(3) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -534,7 +481,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(4) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(4) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -547,7 +494,7 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">100</span>",
           "target": [
-            "li:nth-child(4) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(4) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -566,7 +513,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -579,7 +526,7 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">100</span>",
           "target": [
-            "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -598,7 +545,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(6) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(6) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -611,7 +558,7 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">100</span>",
           "target": [
-            "li:nth-child(6) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(6) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -630,7 +577,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -643,7 +590,7 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">94</span>",
           "target": [
-            "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -662,7 +609,7 @@
                 {
                   "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
                   "target": [
-                    "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                    "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
                   ]
                 }
               ],
@@ -675,7 +622,71 @@
           "impact": "serious",
           "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">92</span>",
           "target": [
-            "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+            "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .relative.justify-center[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "18.0pt (24px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "3:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\">",
+                  "target": [
+                    "svg[viewBox=\"0 0 120 120\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular text-2xl font-semibold tracking-tight\">20</span>",
+          "target": [
+            ".pointer-events-none > .text-2xl.tracking-tight.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\">",
+                  "target": [
+                    "svg[viewBox=\"0 0 120 120\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-2xs font-medium uppercase tracking-wider text-muted-foreground\">analysed</span>",
+          "target": [
+            ".pointer-events-none > .uppercase.tracking-wider.text-2xs"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -1068,70 +1079,6 @@
             {
               "id": "color-contrast",
               "data": {
-                "contrastRatio": 0,
-                "fontSize": "18.0pt (24px)",
-                "fontWeight": "normal",
-                "messageKey": "imgNode",
-                "expectedContrastRatio": "3:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\">",
-                  "target": [
-                    "svg[viewBox=\"0 0 120 120\"]"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because element contains an image node"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span class=\"tabular text-2xl font-semibold tracking-tight\">20</span>",
-          "target": [
-            ".pointer-events-none > .text-2xl.tracking-tight.font-semibold"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "contrastRatio": 0,
-                "fontSize": "8.3pt (11px)",
-                "fontWeight": "normal",
-                "messageKey": "imgNode",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\">",
-                  "target": [
-                    "svg[viewBox=\"0 0 120 120\"]"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because element contains an image node"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span class=\"text-2xs font-medium uppercase tracking-wider text-muted-foreground\">analysed</span>",
-          "target": [
-            ".pointer-events-none > .uppercase.tracking-wider.text-2xs"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
                 "fontSize": "8.3pt (11px)",
                 "fontWeight": "normal",
                 "messageKey": "pseudoContent",
@@ -1185,7 +1132,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(1) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium"
+            "li:nth-child(1) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1214,9 +1161,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T03:03:14.719Z\" title=\"05 Nov 2026, 8:33 am IST\">just now</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T03:10:07.643Z\" title=\"05 Nov 2026, 8:40 am IST\">just now</time>",
           "target": [
-            "time[datetime=\"2026-11-05T03:03:14.719Z\"]"
+            "time[datetime=\"2026-11-05T03:10:07.643Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1278,7 +1225,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(2) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium"
+            "li:nth-child(2) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1307,9 +1254,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T03:02:02.735Z\" title=\"05 Nov 2026, 8:32 am IST\">1 minute ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T03:08:55.657Z\" title=\"05 Nov 2026, 8:38 am IST\">1 minute ago</time>",
           "target": [
-            "time[datetime=\"2026-11-05T03:02:02.735Z\"]"
+            "time[datetime=\"2026-11-05T03:08:55.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1371,7 +1318,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(3) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(3) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1400,9 +1347,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T00:03:14.735Z\" title=\"05 Nov 2026, 5:33 am IST\">3 hours ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T00:10:07.657Z\" title=\"05 Nov 2026, 5:40 am IST\">3 hours ago</time>",
           "target": [
-            "time[datetime=\"2026-11-05T00:03:14.735Z\"]"
+            "time[datetime=\"2026-11-05T00:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1464,7 +1411,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(4) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(4) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1493,9 +1440,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T23:03:14.735Z\" title=\"05 Nov 2026, 4:33 am IST\">4 hours ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T23:10:07.657Z\" title=\"05 Nov 2026, 4:40 am IST\">4 hours ago</time>",
           "target": [
-            "time[datetime=\"2026-11-04T23:03:14.735Z\"]"
+            "time[datetime=\"2026-11-04T23:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1557,7 +1504,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(5) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(5) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1586,9 +1533,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T20:03:14.735Z\" title=\"05 Nov 2026, 1:33 am IST\">7 hours ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T20:10:07.657Z\" title=\"05 Nov 2026, 1:40 am IST\">7 hours ago</time>",
           "target": [
-            "time[datetime=\"2026-11-04T20:03:14.735Z\"]"
+            "time[datetime=\"2026-11-04T20:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1650,7 +1597,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(6) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(6) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1679,9 +1626,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T19:03:14.735Z\" title=\"05 Nov 2026, 12:33 am IST\">8 hours ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T19:10:07.657Z\" title=\"05 Nov 2026, 12:40 am IST\">8 hours ago</time>",
           "target": [
-            "time[datetime=\"2026-11-04T19:03:14.735Z\"]"
+            "time[datetime=\"2026-11-04T19:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1743,7 +1690,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(7) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(7) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1772,9 +1719,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T01:03:14.735Z\" title=\"04 Nov 2026, 6:33 am IST\">yesterday</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T01:10:07.657Z\" title=\"04 Nov 2026, 6:40 am IST\">yesterday</time>",
           "target": [
-            "time[datetime=\"2026-11-04T01:03:14.735Z\"]"
+            "time[datetime=\"2026-11-04T01:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1814,38 +1761,6 @@
             {
               "id": "color-contrast",
               "data": {
-                "contrastRatio": 0,
-                "fontSize": "9.8pt (13px)",
-                "fontWeight": "normal",
-                "messageKey": "elmPartiallyObscured",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
-                  "target": [
-                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because it's partially obscured by another element"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-muted-foreground\">",
-          "target": [
-            "li:nth-child(8) > .leading-snug.text-\\[13px\\].flex-1 > p"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
                 "fontSize": "9.8pt (13px)",
                 "fontWeight": "normal",
                 "messageKey": "pseudoContent",
@@ -1868,41 +1783,9 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(8) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(8) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "contrastRatio": 0,
-                "fontSize": "9.8pt (13px)",
-                "fontWeight": "normal",
-                "messageKey": "elmPartiallyObscured",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
-                  "target": [
-                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because it's partially obscured by another element"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/tenders/dfaa3e55-5d5a-4031-9670-c46991e26e91\">Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor</a>",
-          "target": [
-            "li:nth-child(8) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
         {
           "any": [
@@ -1929,9 +1812,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T21:03:14.735Z\" title=\"04 Nov 2026, 2:33 am IST\">yesterday</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T21:10:07.657Z\" title=\"04 Nov 2026, 2:40 am IST\">yesterday</time>",
           "target": [
-            "time[datetime=\"2026-11-03T21:03:14.735Z\"]"
+            "time[datetime=\"2026-11-03T21:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -1971,38 +1854,6 @@
             {
               "id": "color-contrast",
               "data": {
-                "contrastRatio": 0,
-                "fontSize": "9.8pt (13px)",
-                "fontWeight": "normal",
-                "messageKey": "elmPartiallyObscured",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
-                  "target": [
-                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because it's partially obscured by another element"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-muted-foreground\">",
-          "target": [
-            "li:nth-child(9) > .leading-snug.text-\\[13px\\].flex-1 > p"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
                 "fontSize": "9.8pt (13px)",
                 "fontWeight": "normal",
                 "messageKey": "pseudoContent",
@@ -2025,41 +1876,9 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(9) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(9) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "contrastRatio": 0,
-                "fontSize": "9.8pt (13px)",
-                "fontWeight": "normal",
-                "messageKey": "elmPartiallyObscured",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
-                  "target": [
-                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because it's partially obscured by another element"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/workspaces/6d28c39c-80f6-411c-b192-7bb0edc0b8d8\">Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor</a>",
-          "target": [
-            "li:nth-child(9) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
         {
           "any": [
@@ -2086,9 +1905,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T11:03:14.735Z\" title=\"03 Nov 2026, 4:33 pm IST\">2 days ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T11:10:07.657Z\" title=\"03 Nov 2026, 4:40 pm IST\">2 days ago</time>",
           "target": [
-            "time[datetime=\"2026-11-03T11:03:14.735Z\"]"
+            "time[datetime=\"2026-11-03T11:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2151,7 +1970,7 @@
           "impact": "serious",
           "html": "<p class=\"text-muted-foreground\">",
           "target": [
-            "li:nth-child(10) > .leading-snug.text-\\[13px\\].flex-1 > p"
+            "li:nth-child(10) > .leading-snug.min-w-0.text-\\[13px\\] > p"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
@@ -2182,7 +2001,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(10) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(10) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2212,9 +2031,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/workspaces/b7ececcb-585d-45ad-992c-59c314e7ab01\">Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based</a>",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/workspaces/7a9f596f-a593-4967-9955-9fbf5d66686f\">Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based</a>",
           "target": [
-            "li:nth-child(10) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
+            "li:nth-child(10) > .leading-snug.min-w-0.text-\\[13px\\] > p > .hover\\:underline.rounded.text-foreground"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
@@ -2243,9 +2062,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T03:03:14.735Z\" title=\"03 Nov 2026, 8:33 am IST\">2 days ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T03:10:07.657Z\" title=\"03 Nov 2026, 8:40 am IST\">2 days ago</time>",
           "target": [
-            "time[datetime=\"2026-11-03T03:03:14.735Z\"]"
+            "time[datetime=\"2026-11-03T03:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2308,7 +2127,7 @@
           "impact": "serious",
           "html": "<p class=\"text-muted-foreground\">",
           "target": [
-            "li:nth-child(11) > .leading-snug.text-\\[13px\\].flex-1 > p"
+            "li:nth-child(11) > .leading-snug.min-w-0.text-\\[13px\\] > p"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
@@ -2339,7 +2158,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(11) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(11) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2369,9 +2188,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/tenders/e7c889c7-1f1e-4788-a459-53e0944157fd\">Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based</a>",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/tenders/4615e2ad-88d6-40c9-bade-f0c694e98bae\">Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based</a>",
           "target": [
-            "li:nth-child(11) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
+            "li:nth-child(11) > .leading-snug.min-w-0.text-\\[13px\\] > p > .hover\\:underline.rounded.text-foreground"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
@@ -2400,9 +2219,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T01:03:14.735Z\" title=\"03 Nov 2026, 6:33 am IST\">2 days ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T01:10:07.657Z\" title=\"03 Nov 2026, 6:40 am IST\">2 days ago</time>",
           "target": [
-            "time[datetime=\"2026-11-03T01:03:14.735Z\"]"
+            "time[datetime=\"2026-11-03T01:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2465,7 +2284,7 @@
           "impact": "serious",
           "html": "<p class=\"text-muted-foreground\"><span class=\"font-medium text-foreground\">Priya Sharma</span> created the watchlist <a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/watchlists\">CCTV &amp; surveillance – West India</a></p>",
           "target": [
-            "li:nth-child(12) > .leading-snug.text-\\[13px\\].flex-1 > p"
+            "li:nth-child(12) > .leading-snug.min-w-0.text-\\[13px\\] > p"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
@@ -2496,7 +2315,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(12) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(12) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2557,9 +2376,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-02T09:03:14.735Z\" title=\"02 Nov 2026, 2:33 pm IST\">3 days ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-02T09:10:07.657Z\" title=\"02 Nov 2026, 2:40 pm IST\">3 days ago</time>",
           "target": [
-            "time[datetime=\"2026-11-02T09:03:14.735Z\"]"
+            "time[datetime=\"2026-11-02T09:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2622,7 +2441,7 @@
           "impact": "serious",
           "html": "<p class=\"text-muted-foreground\"><span class=\"font-medium text-foreground\">Priya Sharma</span> uploaded <a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/vault\">Audited balance sheet FY 2024-25</a></p>",
           "target": [
-            "li:nth-child(13) > .leading-snug.text-\\[13px\\].flex-1 > p"
+            "li:nth-child(13) > .leading-snug.min-w-0.text-\\[13px\\] > p"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         },
@@ -2653,7 +2472,7 @@
           "impact": "serious",
           "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
           "target": [
-            "li:nth-child(13) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+            "li:nth-child(13) > .leading-snug.min-w-0.text-\\[13px\\] > p > .text-foreground.font-medium:nth-child(1)"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         },
@@ -2714,9 +2533,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-02T05:03:14.735Z\" title=\"02 Nov 2026, 10:33 am IST\">3 days ago</time>",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-02T05:10:07.657Z\" title=\"02 Nov 2026, 10:40 am IST\">3 days ago</time>",
           "target": [
-            "time[datetime=\"2026-11-02T05:03:14.735Z\"]"
+            "time[datetime=\"2026-11-02T05:10:07.657Z\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
         }

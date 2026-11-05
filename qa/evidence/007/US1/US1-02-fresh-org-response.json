@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-05T03:02:12.885Z",
+  "generatedAt": "2026-11-05T03:09:11.982Z",
   "tiles": {
     "newMatchesToday": 0,
     "closingThisWeek": 0,
@@ -107,20 +107,20 @@
   "expiringDocuments": [],
   "activity": [
     {
-      "id": "b94da368-871a-4387-8f3c-8a409aae2feb",
+      "id": "7341feaa-11c0-4d1b-ac6b-643b3ca25ae1",
       "action": "org.created",
       "entityType": "organization",
-      "entityId": "3d5e8083-25d4-4cb4-9da9-990a7eddc8ce",
+      "entityId": "fd2a50bc-2b58-4c11-b871-ae3476c3eb1e",
       "meta": {
-        "name": "qa Traders mw2ymh4k1"
+        "name": "qa Traders mw2yvgiv1"
       },
-      "createdAt": "2026-11-05T03:02:12.843Z",
+      "createdAt": "2026-11-05T03:09:11.956Z",
       "user": {
-        "id": "5847f514-6cc9-4eb4-a15b-82923185c6b4",
-        "name": "QA qa mw2ymh4k1"
+        "id": "9cba4f46-64cf-4727-aee7-53112d16fc04",
+        "name": "QA qa mw2yvgiv1"
       },
       "target": {
-        "label": "qa Traders mw2ymh4k1",
+        "label": "qa Traders mw2yvgiv1",
         "href": "/dashboard"
       }
     }
