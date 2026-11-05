@@ -70,7 +70,7 @@ organisation answers **404** `not_found` (e.g. "Bid workspace not found") — ne
 > "Balance sheet 2024-25" (FY 2024-25, 3 pages) and "Dell MAF" (`oem_authorization`, expired 35 days ago, 1 page). No Udyam
 > certificate is uploaded. "Demo org" = a fresh org after `POST /api/demo/seed` (16 workspaces across all stages).
 
-### User Story 1 - Start a bid workspace and move it through the stages with a "Ready to submit" guard (Priority: P1)
+### User Story 1 - Start a bid workspace and move it through the stages with a "Ready to submit" guard (Priority: P1) (#176)
 
 From an analysed tender an Analyst clicks **Start bid**. TenderPilot creates (or reopens) the single bid workspace for
 that tender in the organisation, picks the starting stage from the analysis (verdict Go → **Go**, analysis still running
@@ -141,7 +141,7 @@ technical disqualification on GeM).
 
 ---
 
-### User Story 2 - Map the checklist to vault documents and see bid readiness (Priority: P1)
+### User Story 2 - Map the checklist to vault documents and see bid readiness (Priority: P1) (#179)
 
 The **Documents** step lists every checklist item from the latest analysis with its state — Ready, Expiring soon,
 Generated, Overridden, Missing, Expired — whether it is Required or Optional, and the vault document chosen for it.
@@ -205,7 +205,7 @@ row turns **Ready** with an **Auto-matched** badge without any mapping call.
 
 ---
 
-### User Story 3 - Override a blocking item with a reason and coordinate in comments (Priority: P2)
+### User Story 3 - Override a blocking item with a reason and coordinate in comments (Priority: P2) (#181)
 
 When a mandatory document will only arrive at the last minute (a renewed MAF, a CA certificate being signed), a Bid
 Manager can override that item with a written reason. The item turns **Overridden**, stops blocking "Ready to submit"
@@ -258,7 +258,7 @@ from Dell" → readiness 100 %, then PATCH stage `ready` as Analyst → 200; del
 
 ---
 
-### User Story 4 - Generate annexures and undertakings from editable templates (Priority: P1)
+### User Story 4 - Generate annexures and undertakings from editable templates (Priority: P1) (#184)
 
 The **Annexures** step lists the annexures relevant to the bid — the covering letter first, then the undertakings the
 checklist requires (in checklist order), the OEM authorisation request (MAF) when the checklist needs an OEM document,
@@ -321,7 +321,7 @@ bid numbers or GSTINs on them are a classic rejection reason.
 
 ---
 
-### User Story 5 - Build one merged, bookmarked packet for the GeM technical upload (Priority: P1)
+### User Story 5 - Build one merged, bookmarked packet for the GeM technical upload (Priority: P1) (#186)
 
 The **Packet** step proposes a default order — cover page & index, covering letter, the annexures the checklist requires,
 then each mapped vault document once, in checklist order — and lets the user reorder (drag, touch or keyboard, or the
@@ -403,7 +403,7 @@ outline is "Cover, Index, Covering Letter for Technical Bid, …, OEM authorisat
 
 ---
 
-### User Story 6 - Assisted submission: copy-ready values and the browser extension, never prices (Priority: P2)
+### User Story 6 - Assisted submission: copy-ready values and the browser extension, never prices (Priority: P2) (#188)
 
 The **Submit** step shows "Human-only steps" (enter the price, upload the documents, authenticate with OTP/DSC/e-Sign,
 click Final Submit), the **Values to enter on GeM** — 14 allow-listed, non-financial fields (Make, Brand, Model, OEM name,
@@ -487,7 +487,7 @@ price/CAPTCHA/OTP/DSC inputs stay empty and the form is not submitted.
 
 ---
 
-### User Story 7 - Record the submission and the outcome (Priority: P2)
+### User Story 7 - Record the submission and the outcome (Priority: P2) (#191)
 
 After the human presses Final Submit on GeM, they click **Mark as submitted** in TenderPilot and confirm three
 statements (price entered personally, authenticated with OTP/DSC/e-Sign, Final Submit clicked and confirmation seen).

@@ -58,7 +58,7 @@ returns `403 {"error":{"code":"forbidden","message":"You need to be at least an 
 > ≥ 3 days from now (`/tenders/<id>`). API errors always have the shape `{ "error": { "code", "message", "details?" } }`.
 > Numbers in the scenarios below were produced by running the real engine on these fixtures.
 
-### User Story 1 - Get the bid documents into TenderPilot (fetch from GeM or upload) (Priority: P1)
+### User Story 1 - Get the bid documents into TenderPilot (fetch from GeM or upload) (Priority: P1) (#167)
 
 An analyst opens a tender and either clicks **Fetch from GeM** (TenderPilot politely downloads the public bid document
 `/showbidDocument/<gemBidId>` once and shares it with every org) or drags in a PDF they downloaded themselves — the bid
@@ -96,7 +96,7 @@ Then click **Fetch from GeM** and verify the GeM copy is added once.
 
 ---
 
-### User Story 2 - Deterministic eligibility extraction with page-level evidence (Priority: P1)
+### User Story 2 - Deterministic eligibility extraction with page-level evidence (Priority: P1) (#168)
 
 When an analysis runs, TenderPilot reads every attached document (bid → ATC → BOQ → other → corrigendum, then by upload
 time), strips the Hindi half of GeM's bilingual labels ("बोली समाप्ति तिथि/समय/Bid End Date/Time"), finds ~26 known
@@ -132,7 +132,7 @@ score whose inputs they can check against the page in seconds.
 
 ---
 
-### User Story 3 - Explainable Go/No-Go score with exemptions and blockers (Priority: P1)
+### User Story 3 - Explainable Go/No-Go score with exemptions and blockers (Priority: P1) (#169)
 
 The scoring engine compares the extracted requirements with the org's company profile, past contracts, vault and
 scoring weights and produces ten factors — turnover, experience, similar work, EMD, Make in India, OEM authorisation,
@@ -172,7 +172,7 @@ blocked No-Go.
 
 ---
 
-### User Story 4 - Override a factor with a reason and tune scoring weights (Priority: P2)
+### User Story 4 - Override a factor with a reason and tune scoring weights (Priority: P2) (#170)
 
 A Bid Manager who knows something the documents don't (a JV partner's experience, an OEM letter in transit) overrides a
 factor's status with a mandatory reason; the score, verdict, confidence and summary are recalculated instantly, the factor
@@ -205,7 +205,7 @@ analysis uses them.
 
 ---
 
-### User Story 5 - Required-documents checklist from the bid (Priority: P2)
+### User Story 5 - Required-documents checklist from the bid (Priority: P2) (#171)
 
 Every analysis produces a checklist of what to submit: GST and PAN always; audited balance sheets and a CA turnover
 certificate when turnover is asked; work orders + CRAC for experience and similar work; OEM authorisation (MAF); each
@@ -230,7 +230,7 @@ item ids are stable so the bid workspace's checklist→vault mapping survives re
 
 ---
 
-### User Story 6 - Know when an analysis is outdated and re-analyse (Priority: P2)
+### User Story 6 - Know when an analysis is outdated and re-analyse (Priority: P2) (#172)
 
 A verdict is only valid for the inputs it was computed from. When ingestion detects a corrigendum (end/opening date,
 quantity, items, EMD, estimated value, ePBG, document URL or title changed), every org's analysis of that tender is marked
@@ -257,7 +257,7 @@ reload the tender and verify the banner, badges and that **Re-analyse now** clea
 
 ---
 
-### User Story 7 - AI enrichment and OCR for scanned documents with Claude (Priority: P3)
+### User Story 7 - AI enrichment and OCR for scanned documents with Claude (Priority: P3) (#174)
 
 When `ANTHROPIC_API_KEY` is configured, after the rules each document's text is sent to Claude (default model
 `claude-sonnet-5-5`) to find what rules miss — ATC-specific documents and certificates (labour licence, ESI/EPF, PSARA),

@@ -54,8 +54,8 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 - [x] T011 [P] Web API client (`ApiError`, `api.*`, `queryClient` retry rules) in `apps/web/src/lib/api.ts` FR-049
 - [x] T012 Web `AuthProvider`, `useAuth`, `can`, `useCan`, `RoleGate`, `RequireAuth`, `safeNext`, `ME_KEY` in `apps/web/src/lib/auth.tsx` FR-009 FR-026
 - [x] T013 API test harness (`createTestApp`, truncate, helpers) in `apps/api/test/helpers.ts` NFR-008
-- [ ] T014 [P] Add `@axe-core/playwright` dev dependency and an `a11y(page, spec, story, name)` helper that runs axe (WCAG 2.1 AA tags), writes the JSON report to `qa/evidence/<spec>/<story>/axe-<name>.json` and fails on serious/critical violations in `e2e/support/fixtures.ts`, `package.json` NFR-004 SC-005
-- [ ] T015 [P] Add `createOrgWithRoles(request)` helper (owner signup + invite/accept bid_manager, analyst, viewer via API; returns credentials and storage states) in `e2e/support/platform.ts` SC-006
+- [ ] T014 [P] Add `@axe-core/playwright` dev dependency and an `a11y(page, spec, story, name)` helper that runs axe (WCAG 2.1 AA tags), writes the JSON report to `qa/evidence/<spec>/<story>/axe-<name>.json` and fails on serious/critical violations in `e2e/support/fixtures.ts`, `package.json` NFR-004 SC-005 (#10)
+- [ ] T015 [P] Add `createOrgWithRoles(request)` helper (owner signup + invite/accept bid_manager, analyst, viewer via API; returns credentials and storage states) in `e2e/support/platform.ts` SC-006 (#11)
 
 **Checkpoint**: Foundation ready — user story work can proceed in parallel
 
@@ -80,17 +80,17 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T024 [US1] Add `auth_attempts` table (`key`, `kind`, `window_start`, `count`, pk `(key, kind)`) and generate the migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-010
-- [ ] T025 [US1] Implement Postgres-backed limiter `check/hit/reset(db, key, kind, {limit, windowMs})` with atomic upsert and client-IP extraction (`cf-connecting-ip` → first `x-forwarded-for` hop) plus unit/API tests in `apps/api/src/lib/rate-limit.ts`, `apps/api/test/rate-limit.test.ts` FR-010 NFR-002
-- [ ] T026 [US1] Wire the limiter into `POST /auth/login`, `POST /auth/accept-invite` (existing-user path) and `POST /me/password` (10/email, 30/IP per 15 min; 429 `rate_limited` + `Retry-After`; reset on success) with tests for the 11th attempt in `apps/api/src/routes/auth.ts`, `apps/api/test/rate-limit.test.ts` FR-010 SC-007
-- [ ] T027 [P] [US1] Show the 429 message ("Too many attempts. Try again in N minutes.") on the login and accept-invite forms instead of the generic credentials error in `apps/web/src/features/auth/LoginPage.tsx`, `apps/web/src/features/auth/AcceptInvitePage.tsx` FR-010
-- [ ] T028 [US1] Add `password_resets` table + migration and `POST /api/auth/forgot-password` (always 200, 60-min single-use token, email via mailer, 3/email/hour) and `POST /api/auth/reset-password` (set password, delete all sessions, mark used, start session; 400 `reset_invalid`) with API tests in `packages/db/src/schema.ts`, `apps/api/src/routes/auth.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/password-reset.test.ts` FR-011 NFR-003
-- [ ] T029 [P] [US1] Add `/forgot-password` and `/reset-password/:token` pages (neutral confirmation copy, expired-link state with "Request a new link") and replace "Forgot? Ask your org owner" with a "Forgot password?" link in `apps/web/src/features/auth/ForgotPasswordPage.tsx`, `apps/web/src/features/auth/ResetPasswordPage.tsx`, `apps/web/src/app/router.tsx`, `apps/web/src/features/auth/LoginPage.tsx` FR-011
-- [ ] T030 [US1] Add `sessions.user_agent` and `sessions.last_seen_at` (migration), set them in `startSession` and refresh `last_seen_at` at most every 5 minutes in `resolveAuth` in `packages/db/src/schema.ts`, `apps/api/src/lib/session.ts` FR-012
-- [ ] T031 [US1] Add `GET /api/me/sessions`, `DELETE /api/me/sessions/:id`, `POST /api/me/sessions/revoke-others` (session-only, own sessions only, 404 otherwise) with API tests in `apps/api/src/routes/auth.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/sessions.test.ts` FR-012 FR-036
-- [ ] T032 [P] [US1] "Where you’re signed in" panel (browser/OS summary, "This device" badge, last active, per-row "Sign out", "Sign out of all other devices", confirm dialog) in `apps/web/src/features/settings/sections/SessionsPanel.tsx`, `apps/web/src/features/settings/sections/AccountSection.tsx`, `apps/web/src/features/settings/api.ts` FR-012
-- [ ] T033 [US1] Global session-end handling: `QueryCache`/`MutationCache` `onError` → on 401 while signed in clear cache, set `ME_KEY` null, single toast "Your session ended. Please sign in again." (RequireAuth redirects with `next`) in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-013
-- [ ] T034 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in qa/evidence/002/US1/ — scenarios 1–13 (+14–17 once shipped) on desktop and `@mobile`, axe on `/login` and `/signup`, in `e2e/002-platform/US1-auth.e2e.ts`, `qa/evidence/002/US1/VERDICT.md` FR-001..FR-013 SC-001
+- [ ] T024 [US1] Add `auth_attempts` table (`key`, `kind`, `window_start`, `count`, pk `(key, kind)`) and generate the migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-010 (#12)
+- [ ] T025 [US1] Implement Postgres-backed limiter `check/hit/reset(db, key, kind, {limit, windowMs})` with atomic upsert and client-IP extraction (`cf-connecting-ip` → first `x-forwarded-for` hop) plus unit/API tests in `apps/api/src/lib/rate-limit.ts`, `apps/api/test/rate-limit.test.ts` FR-010 NFR-002 (#13)
+- [ ] T026 [US1] Wire the limiter into `POST /auth/login`, `POST /auth/accept-invite` (existing-user path) and `POST /me/password` (10/email, 30/IP per 15 min; 429 `rate_limited` + `Retry-After`; reset on success) with tests for the 11th attempt in `apps/api/src/routes/auth.ts`, `apps/api/test/rate-limit.test.ts` FR-010 SC-007 (#14)
+- [ ] T027 [P] [US1] Show the 429 message ("Too many attempts. Try again in N minutes.") on the login and accept-invite forms instead of the generic credentials error in `apps/web/src/features/auth/LoginPage.tsx`, `apps/web/src/features/auth/AcceptInvitePage.tsx` FR-010 (#15)
+- [ ] T028 [US1] Add `password_resets` table + migration and `POST /api/auth/forgot-password` (always 200, 60-min single-use token, email via mailer, 3/email/hour) and `POST /api/auth/reset-password` (set password, delete all sessions, mark used, start session; 400 `reset_invalid`) with API tests in `packages/db/src/schema.ts`, `apps/api/src/routes/auth.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/password-reset.test.ts` FR-011 NFR-003 (#16)
+- [ ] T029 [P] [US1] Add `/forgot-password` and `/reset-password/:token` pages (neutral confirmation copy, expired-link state with "Request a new link") and replace "Forgot? Ask your org owner" with a "Forgot password?" link in `apps/web/src/features/auth/ForgotPasswordPage.tsx`, `apps/web/src/features/auth/ResetPasswordPage.tsx`, `apps/web/src/app/router.tsx`, `apps/web/src/features/auth/LoginPage.tsx` FR-011 (#17)
+- [ ] T030 [US1] Add `sessions.user_agent` and `sessions.last_seen_at` (migration), set them in `startSession` and refresh `last_seen_at` at most every 5 minutes in `resolveAuth` in `packages/db/src/schema.ts`, `apps/api/src/lib/session.ts` FR-012 (#18)
+- [ ] T031 [US1] Add `GET /api/me/sessions`, `DELETE /api/me/sessions/:id`, `POST /api/me/sessions/revoke-others` (session-only, own sessions only, 404 otherwise) with API tests in `apps/api/src/routes/auth.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/sessions.test.ts` FR-012 FR-036 (#19)
+- [ ] T032 [P] [US1] "Where you’re signed in" panel (browser/OS summary, "This device" badge, last active, per-row "Sign out", "Sign out of all other devices", confirm dialog) in `apps/web/src/features/settings/sections/SessionsPanel.tsx`, `apps/web/src/features/settings/sections/AccountSection.tsx`, `apps/web/src/features/settings/api.ts` FR-012 (#20)
+- [ ] T033 [US1] Global session-end handling: `QueryCache`/`MutationCache` `onError` → on 401 while signed in clear cache, set `ME_KEY` null, single toast "Your session ended. Please sign in again." (RequireAuth redirects with `next`) in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-013 (#21)
+- [ ] T034 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in qa/evidence/002/US1/ — scenarios 1–13 (+14–17 once shipped) on desktop and `@mobile`, axe on `/login` and `/signup`, in `e2e/002-platform/US1-auth.e2e.ts`, `qa/evidence/002/US1/VERDICT.md` FR-001..FR-013 SC-001 (#22)
 
 **Checkpoint**: US1 independently functional and verified
 
@@ -114,10 +114,10 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T042 [US2] Reject accept-invite when a signed-in user's email differs from the invitation email with 403 `invite_email_mismatch` "This invitation was sent to <email>. Sign out and continue as that account." (no membership created) + API test in `apps/api/src/routes/auth.ts`, `apps/api/test/auth.test.ts` FR-018
-- [ ] T043 [US2] Load `GET /api/auth/invite/:token` before rendering: skeleton while loading; card "<Inviter> invited you to join <Org> as <Role> · Expires <date>"; `existingUser` + signed out → read-only email + password-only "Sign in & join"; invalid → ErrorState "Ask your admin for a new invitation" + "Go to sign in"; mismatch message with "Sign out" action in `apps/web/src/features/auth/AcceptInvitePage.tsx`, `apps/web/src/features/auth/api.ts` FR-019 FR-018
-- [ ] T044 [US2] Add `POST /api/org/invitations/:id/resend` (Bid Manager+, new token + 7-day expiry, re-email, `member.invite_resent` activity) with API test, and a "Resend" button with toast "Invitation resent to <email>" in `apps/api/src/routes/org.ts`, `apps/api/test/auth.test.ts`, `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/features/settings/api.ts` FR-020
-- [ ] T045 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in qa/evidence/002/US2/ — scenarios 1–15 incl. two browser contexts (inviter/invitee), mobile accept flow `@mobile`, captured invite email from log mailer, in `e2e/002-platform/US2-invitations.e2e.ts`, `qa/evidence/002/US2/VERDICT.md` FR-014..FR-021 SC-002
+- [ ] T042 [US2] Reject accept-invite when a signed-in user's email differs from the invitation email with 403 `invite_email_mismatch` "This invitation was sent to <email>. Sign out and continue as that account." (no membership created) + API test in `apps/api/src/routes/auth.ts`, `apps/api/test/auth.test.ts` FR-018 (#23)
+- [ ] T043 [US2] Load `GET /api/auth/invite/:token` before rendering: skeleton while loading; card "<Inviter> invited you to join <Org> as <Role> · Expires <date>"; `existingUser` + signed out → read-only email + password-only "Sign in & join"; invalid → ErrorState "Ask your admin for a new invitation" + "Go to sign in"; mismatch message with "Sign out" action in `apps/web/src/features/auth/AcceptInvitePage.tsx`, `apps/web/src/features/auth/api.ts` FR-019 FR-018 (#24)
+- [ ] T044 [US2] Add `POST /api/org/invitations/:id/resend` (Bid Manager+, new token + 7-day expiry, re-email, `member.invite_resent` activity) with API test, and a "Resend" button with toast "Invitation resent to <email>" in `apps/api/src/routes/org.ts`, `apps/api/test/auth.test.ts`, `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/features/settings/api.ts` FR-020 (#25)
+- [ ] T045 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in qa/evidence/002/US2/ — scenarios 1–15 incl. two browser contexts (inviter/invitee), mobile accept flow `@mobile`, captured invite email from log mailer, in `e2e/002-platform/US2-invitations.e2e.ts`, `qa/evidence/002/US2/VERDICT.md` FR-014..FR-021 SC-002 (#26)
 
 **Checkpoint**: US1 and US2 work independently
 
@@ -139,13 +139,13 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T051 [P] [US3] Table-driven role-matrix test: every mutating route in `contracts/api.md` × {viewer, analyst, bid_manager, owner} asserting 403 below the minimum and non-403 at/above, plus a guard that fails when a new route is added without a matrix entry, in `apps/api/test/roles-matrix.test.ts` FR-022 NFR-008 SC-003
-- [ ] T052 [P] [US3] Cross-org isolation sweep: create one of each org-scoped resource in org A (tender analysis, watchlist, vault doc, workspace, packet, comment, notification, API token, invitation, member) and assert org B gets 404 on every read/update/delete by id and that A's rows are unchanged, in `apps/api/test/isolation.test.ts` FR-023 NFR-008 SC-003
-- [ ] T053 [US3] Add `DELETE /api/org/members/me` (session-only; deletes own membership + own tokens for the org; 409 `last_owner`; `member.left` activity; returns `nextOrgId` and moves the session's active org) with API tests in `apps/api/src/routes/org.ts`, `apps/api/test/auth.test.ts` FR-027 FR-042
-- [ ] T054 [P] [US3] "Leave organization" danger panel in Team section with confirm dialog; on success switch to `nextOrgId` or sign out to `/login` with toast "You left <Org>." in `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/features/settings/api.ts`, `apps/web/src/lib/auth.tsx` FR-027
-- [ ] T055 [US3] Origin check middleware: cookie-authenticated non-GET/HEAD requests with an `Origin` not equal to `config.appUrl` origin → 403 `bad_origin`; bearer requests and missing Origin pass; tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/test/security.test.ts` FR-028
-- [ ] T056 [P] [US3] On a mutation 403 `forbidden`, toast the server message and invalidate `ME_KEY` so role-gated UI refreshes in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-029
-- [ ] T057 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in qa/evidence/002/US3/ — viewer/analyst/bid manager/owner walkthroughs showing hidden actions, owner role change taking effect live, member removal, last-owner error, cross-org 404 via `request` context, in `e2e/002-platform/US3-roles-tenancy.e2e.ts`, `qa/evidence/002/US3/VERDICT.md` FR-022..FR-029
+- [ ] T051 [P] [US3] Table-driven role-matrix test: every mutating route in `contracts/api.md` × {viewer, analyst, bid_manager, owner} asserting 403 below the minimum and non-403 at/above, plus a guard that fails when a new route is added without a matrix entry, in `apps/api/test/roles-matrix.test.ts` FR-022 NFR-008 SC-003 (#27)
+- [ ] T052 [P] [US3] Cross-org isolation sweep: create one of each org-scoped resource in org A (tender analysis, watchlist, vault doc, workspace, packet, comment, notification, API token, invitation, member) and assert org B gets 404 on every read/update/delete by id and that A's rows are unchanged, in `apps/api/test/isolation.test.ts` FR-023 NFR-008 SC-003 (#28)
+- [ ] T053 [US3] Add `DELETE /api/org/members/me` (session-only; deletes own membership + own tokens for the org; 409 `last_owner`; `member.left` activity; returns `nextOrgId` and moves the session's active org) with API tests in `apps/api/src/routes/org.ts`, `apps/api/test/auth.test.ts` FR-027 FR-042 (#29)
+- [ ] T054 [P] [US3] "Leave organization" danger panel in Team section with confirm dialog; on success switch to `nextOrgId` or sign out to `/login` with toast "You left <Org>." in `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/features/settings/api.ts`, `apps/web/src/lib/auth.tsx` FR-027 (#30)
+- [ ] T055 [US3] Origin check middleware: cookie-authenticated non-GET/HEAD requests with an `Origin` not equal to `config.appUrl` origin → 403 `bad_origin`; bearer requests and missing Origin pass; tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/test/security.test.ts` FR-028 (#31)
+- [ ] T056 [P] [US3] On a mutation 403 `forbidden`, toast the server message and invalidate `ME_KEY` so role-gated UI refreshes in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-029 (#32)
+- [ ] T057 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in qa/evidence/002/US3/ — viewer/analyst/bid manager/owner walkthroughs showing hidden actions, owner role change taking effect live, member removal, last-owner error, cross-org 404 via `request` context, in `e2e/002-platform/US3-roles-tenancy.e2e.ts`, `qa/evidence/002/US3/VERDICT.md` FR-022..FR-029 (#33)
 
 **Checkpoint**: US1–US3 (the P1 set) complete
 
@@ -168,11 +168,11 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T064 [P] [US4] API tests: prefs default when no row, full-object PUT round-trip, preferences isolated per org for a two-org user, viewer can edit own prefs in `apps/api/test/prefs.test.ts` FR-031
-- [ ] T065 [P] [US4] Account section: when clearing the mobile while WhatsApp alerts are on, show the inline warning "WhatsApp alerts will stop until you add a mobile number." before saving in `apps/web/src/features/settings/sections/AccountSection.tsx` FR-032
-- [ ] T066 [US4] Add `POST /api/me/notifications/test` (1/min per user; in-app row "Test alert from TenderPilot"; email/WhatsApp attempted only when enabled; returns per-channel `sent|skipped|failed|off`) with API test using log adapters in `apps/api/src/routes/notifications.ts`, `apps/api/test/prefs.test.ts` FR-034 NFR-007
-- [ ] T067 [P] [US4] "Send a test alert" button in Notifications section with per-channel outcome toast in `apps/web/src/features/settings/sections/NotificationsSection.tsx`, `apps/web/src/features/settings/api.ts` FR-034
-- [ ] T068 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in qa/evidence/002/US4/ — defaults, WhatsApp without number error, save + reload persistence, profile edit and invalid mobile, `@mobile` layout, axe on account + notifications in `e2e/002-platform/US4-account-prefs.e2e.ts`, `qa/evidence/002/US4/VERDICT.md` FR-030..FR-034
+- [ ] T064 [P] [US4] API tests: prefs default when no row, full-object PUT round-trip, preferences isolated per org for a two-org user, viewer can edit own prefs in `apps/api/test/prefs.test.ts` FR-031 (#34)
+- [ ] T065 [P] [US4] Account section: when clearing the mobile while WhatsApp alerts are on, show the inline warning "WhatsApp alerts will stop until you add a mobile number." before saving in `apps/web/src/features/settings/sections/AccountSection.tsx` FR-032 (#35)
+- [ ] T066 [US4] Add `POST /api/me/notifications/test` (1/min per user; in-app row "Test alert from TenderPilot"; email/WhatsApp attempted only when enabled; returns per-channel `sent|skipped|failed|off`) with API test using log adapters in `apps/api/src/routes/notifications.ts`, `apps/api/test/prefs.test.ts` FR-034 NFR-007 (#36)
+- [ ] T067 [P] [US4] "Send a test alert" button in Notifications section with per-channel outcome toast in `apps/web/src/features/settings/sections/NotificationsSection.tsx`, `apps/web/src/features/settings/api.ts` FR-034 (#37)
+- [ ] T068 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in qa/evidence/002/US4/ — defaults, WhatsApp without number error, save + reload persistence, profile edit and invalid mobile, `@mobile` layout, axe on account + notifications in `e2e/002-platform/US4-account-prefs.e2e.ts`, `qa/evidence/002/US4/VERDICT.md` FR-030..FR-034 (#38)
 
 **Checkpoint**: US4 independently functional
 
@@ -194,11 +194,11 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T074 [US5] Add `api_tokens.expires_at` (nullable) and `api_tokens.token_hint` (last 4 chars) + migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-037
-- [ ] T075 [US5] Accept `expiresInDays` (30|90|365|null, default 90), store hint, reject expired tokens in `resolveAuth`, enforce 10 active tokens per user per org (409 `token_limit`), return `expiresAt`/`hint` in summaries, with API tests in `apps/api/src/routes/auth.ts`, `apps/api/src/lib/session.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/tokens.test.ts` FR-037
-- [ ] T076 [P] [US5] Create dialog expiry select (30 days / 90 days / 1 year / Never) and list rows showing `tp_…<hint>` and "Expires in N days" (amber < 7 days, red "Expired") in `apps/web/src/features/settings/sections/TokensSection.tsx`, `apps/web/src/features/settings/api.ts` FR-037
-- [ ] T077 [P] [US5] API tests: bearer token refused (403 "This action requires signing in on the web app") on `POST /me/api-tokens`, `POST /me/password`, `POST /auth/switch-org`; token stops working after member removal; role change applies to token requests in `apps/api/test/tokens.test.ts` FR-036
-- [ ] T078 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in qa/evidence/002/US5/ — create/copy/revoke in UI, bearer calls via `request` context before/after revoke, secret not shown after dialog closes, `@mobile` layout, in `e2e/002-platform/US5-api-tokens.e2e.ts`, `qa/evidence/002/US5/VERDICT.md` FR-035..FR-037
+- [ ] T074 [US5] Add `api_tokens.expires_at` (nullable) and `api_tokens.token_hint` (last 4 chars) + migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-037 (#39)
+- [ ] T075 [US5] Accept `expiresInDays` (30|90|365|null, default 90), store hint, reject expired tokens in `resolveAuth`, enforce 10 active tokens per user per org (409 `token_limit`), return `expiresAt`/`hint` in summaries, with API tests in `apps/api/src/routes/auth.ts`, `apps/api/src/lib/session.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/tokens.test.ts` FR-037 (#40)
+- [ ] T076 [P] [US5] Create dialog expiry select (30 days / 90 days / 1 year / Never) and list rows showing `tp_…<hint>` and "Expires in N days" (amber < 7 days, red "Expired") in `apps/web/src/features/settings/sections/TokensSection.tsx`, `apps/web/src/features/settings/api.ts` FR-037 (#41)
+- [ ] T077 [P] [US5] API tests: bearer token refused (403 "This action requires signing in on the web app") on `POST /me/api-tokens`, `POST /me/password`, `POST /auth/switch-org`; token stops working after member removal; role change applies to token requests in `apps/api/test/tokens.test.ts` FR-036 (#42)
+- [ ] T078 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in qa/evidence/002/US5/ — create/copy/revoke in UI, bearer calls via `request` context before/after revoke, secret not shown after dialog closes, `@mobile` layout, in `e2e/002-platform/US5-api-tokens.e2e.ts`, `qa/evidence/002/US5/VERDICT.md` FR-035..FR-037 (#43)
 
 **Checkpoint**: US5 independently functional
 
@@ -220,11 +220,11 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T084 [P] [US6] Add index `activity_org_type_idx (org_id, entity_type, created_at)` + migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-043 NFR-001
-- [ ] T085 [US6] Activity log page at `/settings/activity`: sentences via `describeActivity`, relative time with IST tooltip, Member and Type filters (mapped to `entityType`), 25 per page with "Showing a–b of n", skeleton/empty ("No activity yet")/error states, responsive list on phones; add nav item "Activity log" in `apps/web/src/features/settings/sections/ActivitySection.tsx`, `apps/web/src/features/settings/SettingsPage.tsx`, `apps/web/src/features/settings/api.ts`, `apps/web/src/features/dashboard/activity.ts` FR-044 FR-039
-- [ ] T086 [US6] Log `auth.password_changed` and `auth.sessions_revoked` (active org, no secrets in meta) and add verbs for `member.left`, `member.invite_revoked`, `member.invite_resent`, `auth.*` in `apps/api/src/routes/auth.ts`, `apps/web/src/features/dashboard/activity.ts` FR-042
-- [ ] T087 [US6] API test asserting every FR-042 action produces exactly one activity row with expected `entityType`, actor and safe `meta` in `apps/api/test/activity.test.ts` FR-042 SC-008
-- [ ] T088 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in qa/evidence/002/US6/ — rename org (and disabled state for Analyst), scoring weights change/reset/zero-total, Sync now against mock-gem, activity log filters and pagination, `@mobile` settings tab strip, in `e2e/002-platform/US6-org-admin.e2e.ts`, `qa/evidence/002/US6/VERDICT.md` FR-038..FR-044
+- [ ] T084 [P] [US6] Add index `activity_org_type_idx (org_id, entity_type, created_at)` + migration in `packages/db/src/schema.ts`, `packages/db/migrations/` FR-043 NFR-001 (#44)
+- [ ] T085 [US6] Activity log page at `/settings/activity`: sentences via `describeActivity`, relative time with IST tooltip, Member and Type filters (mapped to `entityType`), 25 per page with "Showing a–b of n", skeleton/empty ("No activity yet")/error states, responsive list on phones; add nav item "Activity log" in `apps/web/src/features/settings/sections/ActivitySection.tsx`, `apps/web/src/features/settings/SettingsPage.tsx`, `apps/web/src/features/settings/api.ts`, `apps/web/src/features/dashboard/activity.ts` FR-044 FR-039 (#45)
+- [ ] T086 [US6] Log `auth.password_changed` and `auth.sessions_revoked` (active org, no secrets in meta) and add verbs for `member.left`, `member.invite_revoked`, `member.invite_resent`, `auth.*` in `apps/api/src/routes/auth.ts`, `apps/web/src/features/dashboard/activity.ts` FR-042 (#46)
+- [ ] T087 [US6] API test asserting every FR-042 action produces exactly one activity row with expected `entityType`, actor and safe `meta` in `apps/api/test/activity.test.ts` FR-042 SC-008 (#47)
+- [ ] T088 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in qa/evidence/002/US6/ — rename org (and disabled state for Analyst), scoring weights change/reset/zero-total, Sync now against mock-gem, activity log filters and pagination, `@mobile` settings tab strip, in `e2e/002-platform/US6-org-admin.e2e.ts`, `qa/evidence/002/US6/VERDICT.md` FR-038..FR-044 (#48)
 
 **Checkpoint**: US6 independently functional
 
@@ -247,10 +247,10 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T095 [P] [US7] Add a "Settings" group to the palette listing all settings sub-pages (Organization, Your account, Team & roles, Notifications, Scoring weights, API tokens & extension, Sync health, Activity log) with keywords, sourced from a shared `SETTINGS_ITEMS` export in `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/features/settings/items.ts`, `apps/web/src/features/settings/SettingsPage.tsx` FR-046
-- [ ] T096 [P] [US7] "?" opens a "Keyboard shortcuts" dialog (⌘K, /, G+D/T/W/P/V/C/S/N, Esc), also reachable from the user menu in `apps/web/src/components/layout/ShortcutsDialog.tsx`, `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/components/layout/UserMenu.tsx` FR-046 NFR-004
-- [ ] T097 [US7] Fix every serious/critical axe finding and contrast issue reported by T034/T045/T057/T068/T078/T088/T098 across shell, auth and settings in light and dark at 375/1440 px in `apps/web/src/components/**`, `apps/web/src/features/auth/**`, `apps/web/src/features/settings/**`, `apps/web/src/index.css` NFR-004 NFR-005 SC-005
-- [ ] T098 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in qa/evidence/002/US7/ — sidebar collapse persistence, mobile tab bar + drawer `@mobile`, palette open/filter/quick actions per role, G-shortcuts, theme persistence without flash, skip link + focus, 404 page, axe scans light/dark at 375/1440 in `e2e/002-platform/US7-shell.e2e.ts`, `qa/evidence/002/US7/VERDICT.md` FR-045..FR-048 NFR-004 NFR-005
+- [ ] T095 [P] [US7] Add a "Settings" group to the palette listing all settings sub-pages (Organization, Your account, Team & roles, Notifications, Scoring weights, API tokens & extension, Sync health, Activity log) with keywords, sourced from a shared `SETTINGS_ITEMS` export in `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/features/settings/items.ts`, `apps/web/src/features/settings/SettingsPage.tsx` FR-046 (#49)
+- [ ] T096 [P] [US7] "?" opens a "Keyboard shortcuts" dialog (⌘K, /, G+D/T/W/P/V/C/S/N, Esc), also reachable from the user menu in `apps/web/src/components/layout/ShortcutsDialog.tsx`, `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/components/layout/UserMenu.tsx` FR-046 NFR-004 (#50)
+- [ ] T097 [US7] Fix every serious/critical axe finding and contrast issue reported by T034/T045/T057/T068/T078/T088/T098 across shell, auth and settings in light and dark at 375/1440 px in `apps/web/src/components/**`, `apps/web/src/features/auth/**`, `apps/web/src/features/settings/**`, `apps/web/src/index.css` NFR-004 NFR-005 SC-005 (#51)
+- [ ] T098 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in qa/evidence/002/US7/ — sidebar collapse persistence, mobile tab bar + drawer `@mobile`, palette open/filter/quick actions per role, G-shortcuts, theme persistence without flash, skip link + focus, 404 page, axe scans light/dark at 375/1440 in `e2e/002-platform/US7-shell.e2e.ts`, `qa/evidence/002/US7/VERDICT.md` FR-045..FR-048 NFR-004 NFR-005 (#52)
 
 **Checkpoint**: All user stories independently functional
 
@@ -260,14 +260,14 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T099 [P] Security headers middleware (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS on https, CSP for SPA responses with the theme-script hash) for Node and Worker static responses, with tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/src/node.ts`, `apps/api/test/security.test.ts` FR-050
-- [ ] T100 [P] Secret-leak scanner test: run auth/org/token/invite/reset flows with a capturing logger and assert no password, `tp_` token, invite/reset token or hash appears in logs, list responses or activity `meta` in `apps/api/test/secrets-leak.test.ts` NFR-003 SC-004
-- [ ] T101 [P] Query-count/perf test for `GET /api/auth/me` (≤ 4 queries via instrumented Drizzle logger) and p95 timing smoke for login/me in `apps/api/test/perf-auth.test.ts` NFR-001
-- [ ] T102 [P] Record in `NOTICE` (or confirm no change) that spec 002 ports no third-party code from `/home/user/refs` FR-048
-- [ ] T103 Update `specs/001-gem-tender-copilot/contracts/api.md § Platform` with the new endpoints and error codes (`rate_limited`, `invite_email_mismatch`, `bad_origin`, `reset_invalid`, `token_limit`) FR-010 FR-011 FR-012 FR-018 FR-027 FR-028 FR-037
-- [ ] T104 Run `/cairn-taskstoissues` to create GitHub issues for the 7 stories and every open task (labels `spec:002`, `area:platform`, `type`, `priority`, `role`) per `CONVENTIONS.md`
-- [ ] T105 `cairn-reviewer` review of each 002 PR, findings recorded on the issue, no blocking findings open (review only via cairn; no Codex) per `CONVENTIONS.md`
-- [ ] T106 Run `/cairn-analyze` on `specs/002-platform-tenancy/` and resolve any spec/plan/tasks inconsistencies
+- [ ] T099 [P] Security headers middleware (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS on https, CSP for SPA responses with the theme-script hash) for Node and Worker static responses, with tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/src/node.ts`, `apps/api/test/security.test.ts` FR-050 (#53)
+- [ ] T100 [P] Secret-leak scanner test: run auth/org/token/invite/reset flows with a capturing logger and assert no password, `tp_` token, invite/reset token or hash appears in logs, list responses or activity `meta` in `apps/api/test/secrets-leak.test.ts` NFR-003 SC-004 (#54)
+- [ ] T101 [P] Query-count/perf test for `GET /api/auth/me` (≤ 4 queries via instrumented Drizzle logger) and p95 timing smoke for login/me in `apps/api/test/perf-auth.test.ts` NFR-001 (#55)
+- [ ] T102 [P] Record in `NOTICE` (or confirm no change) that spec 002 ports no third-party code from `/home/user/refs` FR-048 (#56)
+- [ ] T103 Update `specs/001-gem-tender-copilot/contracts/api.md § Platform` with the new endpoints and error codes (`rate_limited`, `invite_email_mismatch`, `bad_origin`, `reset_invalid`, `token_limit`) FR-010 FR-011 FR-012 FR-018 FR-027 FR-028 FR-037 (#57)
+- [ ] T104 Run `/cairn-taskstoissues` to create GitHub issues for the 7 stories and every open task (labels `spec:002`, `area:platform`, `type`, `priority`, `role`) per `CONVENTIONS.md` (#58)
+- [ ] T105 `cairn-reviewer` review of each 002 PR, findings recorded on the issue, no blocking findings open (review only via cairn; no Codex) per `CONVENTIONS.md` (#59)
+- [ ] T106 Run `/cairn-analyze` on `specs/002-platform-tenancy/` and resolve any spec/plan/tasks inconsistencies (#60)
 
 ---
 

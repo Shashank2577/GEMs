@@ -1,0 +1,26 @@
+TenderPilot
+Copyright (c) 2026 TenderPilot contributors
+
+This product includes code and field knowledge adapted from the following projects. The
+constitution (.cairn/workflow/memory/constitution.md) requires every external reuse to be
+listed here with its licence.
+
+1. india-government-tenders-scraper — https://github.com/erenmyeager15/india-government-tenders-scraper
+   Licence: Apache License 2.0
+   Used in: packages/core/src/gem/client.ts (BidPlus /all-bids → /all-bids-data request shape and CSRF
+   bootstrap), packages/core/src/gem/parse.ts (field names and the bid-type → document-route mapping),
+   packages/core/src/gem/normalize.ts (Solr response unwrapping approach).
+
+2. gem-search — https://github.com/arush15june/gem-search
+   Licence: MIT License, Copyright (c) 2026 Aarush Jain
+   Used in: packages/core/src/gem/client.ts and packages/core/src/gem/parse.ts (public endpoint payload
+   fields and pagination parameters).
+
+3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
+   Licence: MIT License
+   Used in: CONVENTIONS.md and .aisdlc/ (review and QA process templates only; no runtime code).
+
+Other reference repositories in the owner's reference set (Giridar33/gem-tender-tracker,
+PranavTamada/Tender_Scraper, IshanMaheshwari-777/GEM-SCRAPER, Mujahid-Alam/gem-tender-pdf-extractor,
+Giri-Aayush/gem, rounittxx/gem-bid-scraper) were consulted for portal behaviour but no code or text from
+them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.

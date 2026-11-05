@@ -46,7 +46,7 @@ organisation answers **404** `not_found` (never 403, never data).
 > identifiers used below: valid GSTIN `27AAPFU0939F1ZV` (Maharashtra, PAN `AAPFU0939F`, a Firm/LLP), invalid-checksum GSTIN
 > `27AAPFU0939F1ZA`, invalid PAN `AAPXU0939F`.
 
-### User Story 1 - Maintain a validated company profile (Priority: P1)
+### User Story 1 - Maintain a validated company profile (Priority: P1) (#114)
 
 An Owner or Analyst opens **Company profile** (`/profile`) and fills the statutory identity of the bidding entity (legal
 and trade name, GSTIN, PAN, CIN, incorporation date, registered address, state, PIN code, maximum EMD), registrations
@@ -120,7 +120,7 @@ legal name, click **Save profile**, reload, and verify the values persisted (`GE
 
 ---
 
-### User Story 2 - See profile completeness and keep 3 years of financials (Priority: P1)
+### User Story 2 - See profile completeness and keep 3 years of financials (Priority: P1) (#115)
 
 The profile page shows a live completeness score (0–100%) with up to six prioritised, clickable suggestions (errors
 first, then warnings, then info) that jump to the right field or open the vault upload dialog for missing backing
@@ -179,7 +179,7 @@ certificate to the vault and return: it becomes **32%**; add FY 2025-26, 2024-25
 
 ---
 
-### User Story 3 - Store, find, preview and manage bid documents in a private vault (Priority: P1)
+### User Story 3 - Store, find, preview and manage bid documents in a private vault (Priority: P1) (#116)
 
 An Analyst uploads certificates (PDF, PNG or JPG up to 20 MB) via the **Upload document** button, the onboarding tiles,
 the "Commonly asked for" chips, `?upload=1`, or by dropping a file anywhere on `/vault`. TenderPilot guesses type, title
@@ -259,7 +259,7 @@ open it, click **Download**, and verify the bytes equal the original.
 
 ---
 
-### User Story 4 - Know what is expiring and get reminded 30, 7 and 1 day before (Priority: P1)
+### User Story 4 - Know what is expiring and get reminded 30, 7 and 1 day before (Priority: P1) (#117)
 
 Every vault document with an expiry date is classified as **Valid**, **Expiring soon** (0–30 days left, still valid on
 its expiry date) or **Expired** (expiry before today, IST). On every scheduler tick (every 30 minutes) TenderPilot sends
@@ -309,7 +309,7 @@ lose eligible bids; reminders are a key reason to keep using the product.
 
 ---
 
-### User Story 5 - Record past contracts with CRACs and OEM authorisations (Priority: P2)
+### User Story 5 - Record past contracts with CRACs and OEM authorisations (Priority: P2) (#118)
 
 In the Experience section, an Analyst records completed orders (buyer, buyer type, work/supply, category, value,
 start/completion dates, GeM contract number) and links the CRAC / completion certificate from the vault; they are saved
@@ -360,7 +360,7 @@ Railway, Mumbai Division" worth ₹58,20,000 linked to that CRAC, and verify the
 
 ---
 
-### User Story 6 - Renew a document in one step and keep its history (Priority: P3) *(gap)*
+### User Story 6 - Renew a document in one step and keep its history (Priority: P3) *(gap)* (#119)
 
 When a renewed certificate arrives, the Analyst clicks **Renew** on the document, picks the new file and confirms the new
 issue/expiry dates (pre-filled with the suggested validity) in one dialog. The previous file is kept as a version that can

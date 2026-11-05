@@ -49,7 +49,7 @@ answers **401** `unauthorized`. API errors always have the shape `{ "error": { "
 > ago). Other roles are added by inviting users from Settings → Team (`seedOrgWithRoles` in API tests). All dates and
 > times are IST. "Today" is the IST calendar day.
 
-### User Story 1 - Owner's morning dashboard (Priority: P1)
+### User Story 1 - Owner's morning dashboard (Priority: P1) (#292)
 
 An Owner opens `/dashboard` (on a phone or desktop) and, in one screen, sees a greeting with today's IST date, a one-line
 summary of what is urgent, six KPI tiles (New matches today, Closing this week, Active bids, EMD at stake, Win rate, Docs
@@ -112,7 +112,7 @@ Win rate **67%** ("2 won · 1 lost"), Docs expiring **3** ("1 expired"); click e
 
 ---
 
-### User Story 2 - Run bids on the pipeline Kanban (Priority: P1)
+### User Story 2 - Run bids on the pipeline Kanban (Priority: P1) (#293)
 
 A Bid Manager opens **Pipeline** (`/pipeline`) and sees every bid workspace as a card in eight columns — Identified,
 Analysing, Go, Preparing, Ready to submit, Submitted, Won, Lost — with per-column counts and EMD totals. Cards show the
@@ -192,7 +192,7 @@ submit yet" toast listing the missing items.
 
 ---
 
-### User Story 3 - Guided onboarding to a matched feed in under 5 minutes (Priority: P1)
+### User Story 3 - Guided onboarding to a matched feed in under 5 minutes (Priority: P1) (#294)
 
 A new seller signs up and lands on `/onboarding`, a five-step wizard: **Company basics** (registered name, GSTIN with
 live validation that derives State and PAN, home state, MSE/Udyam, DPIIT Startup, Make in India Class-I), **What you
@@ -274,7 +274,7 @@ scripted time < 90 s.
 
 ---
 
-### User Story 4 - Explore with demo data, then remove it (Priority: P2)
+### User Story 4 - Explore with demo data, then remove it (Priority: P2) (#295)
 
 Before GeM data arrives, an Owner or Bid Manager loads a realistic sample company ("Aarav Technologies Pvt Ltd", Pune)
 from the empty dashboard banner or the onboarding Done step. `POST /api/demo/seed` fills the org with a profile (if the
@@ -331,7 +331,7 @@ pipeline cards and 15 vault documents; create one real watchlist; *(gap)* click 
 
 ---
 
-### User Story 5 - Persona-aware dashboard widgets (Priority: P2)
+### User Story 5 - Persona-aware dashboard widgets (Priority: P2) (#296)
 
 The same dashboard adapts to who is looking. Owners and Bid Managers see an **Awaiting your decision** card listing
 analysed bids still in "Analysing" with their score and verdict and one-tap **Go** / **Drop** buttons (the "Approve Go /
@@ -370,7 +370,7 @@ decision" row and verify the card moves to Go.
 
 ---
 
-### User Story 6 - Marketing landing page & pricing for prospects (Priority: P2)
+### User Story 6 - Marketing landing page & pricing for prospects (Priority: P2) (#297)
 
 A signed-out visitor on `/` sees a fast, phone-friendly marketing page: sticky nav (How it works, Compliance, For teams,
 Pricing, FAQ, Sign in, Start free trial), a hero ("Win more GeM bids. Spend minutes, not nights, on each one.") with a
@@ -425,7 +425,7 @@ FAQ item with the keyboard, click "Start free trial" and land on `/signup`; then
 
 ---
 
-### User Story 7 - Responsive, accessible pages with honest states everywhere (Priority: P2)
+### User Story 7 - Responsive, accessible pages with honest states everywhere (Priority: P2) (#298)
 
 Every screen is usable on a 375 px phone and a 1440 px desktop, in light and dark themes, with the keyboard, with a
 screen reader and with reduced motion; every data screen shows loading, empty and error states; navigation errors and

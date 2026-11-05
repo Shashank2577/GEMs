@@ -42,7 +42,7 @@ Role hierarchy: `owner` > `bid_manager` > `analyst` > `viewer`. "At least X" mea
 > {days}`; reset: `POST /__admin/reset`. API errors always have the shape `{ "error": { "code", "message", "details?" } }`.
 > All times are shown in IST.
 
-### User Story 1 - Polite, reliable GeM BidPlus ingestion with visible sync health (Priority: P1)
+### User Story 1 - Polite, reliable GeM BidPlus ingestion with visible sync health (Priority: P1) (#62)
 
 Every 30 minutes (Cloudflare Cron `*/30 * * * *`; Node in-process cron locally) and whenever a Bid Manager clicks
 **Sync now**, TenderPilot fetches the newest public GeM BidPlus listing pages through a polite client (CSRF session
@@ -102,7 +102,7 @@ outage produces a `failed` run without losing data.
 
 ---
 
-### User Story 2 - Build, preview and manage watchlists (Priority: P1)
+### User Story 2 - Build, preview and manage watchlists (Priority: P1) (#63)
 
 A Bid Analyst (or higher) describes what the company sells: include keywords, exclude keywords, GeM categories, HSN codes,
 buyer states, ministries/buyers, an estimated-value range, a minimum time-to-prepare and bid types. While typing, a live
@@ -170,7 +170,7 @@ Maharashtra), confirm the preview shows 2 bids before saving, save, and confirm 
 
 ---
 
-### User Story 3 - Triage the tender feed: search, filters, sort, views (Priority: P1)
+### User Story 3 - Triage the tender feed: search, filters, sort, views (Priority: P1) (#64)
 
 The `/tenders` feed is the hero screen. It lists open GeM bids (newest first by default) as cards or a table with bid
 number, type badge (Reverse auction / Bunch bid / Service), corrigendum badge, title, buyer, location, matched watchlist and
@@ -238,7 +238,7 @@ verify its "New" dot is gone; dismiss it and undo.
 
 ---
 
-### User Story 4 - Get alerted in-app, by email and on WhatsApp — instantly or as a daily digest (Priority: P1)
+### User Story 4 - Get alerted in-app, by email and on WhatsApp — instantly or as a daily digest (Priority: P1) (#65)
 
 When ingestion creates a new match, every member of that org gets alerts on the channels they chose in **Settings →
 Notifications**: in-app (bell + `/notifications`), email (Resend) and WhatsApp (Meta Cloud API, approved template
@@ -303,7 +303,7 @@ delivery status is visible, and that a second sync sends nothing new.
 
 ---
 
-### User Story 5 - Corrigendum & change tracking with clear change summaries (Priority: P2)
+### User Story 5 - Corrigendum & change tracking with clear change summaries (Priority: P2) (#66)
 
 GeM buyers frequently amend bids (end-date extensions, quantity or EMD changes, new documents). TenderPilot compares each
 re-ingested bid with the stored copy on tracked fields; a change to end date, opening date, quantity, items, EMD, estimated
@@ -348,7 +348,7 @@ on the card, and an alert that names the change.
 
 ---
 
-### User Story 6 - Bid results, award status and competitor intelligence (Priority: P3)
+### User Story 6 - Bid results, award status and competitor intelligence (Priority: P3) (#67)
 
 After a tracked bid closes, sellers want to know who won and at what price — to learn L1 price levels, spot frequent
 competitors and decide whether to bid on similar tenders. TenderPilot periodically checks the public GeM results for closed

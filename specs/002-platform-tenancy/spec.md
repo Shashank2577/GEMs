@@ -34,7 +34,7 @@ Error responses always have the shape `{ "error": { "code", "message", "details?
 `details.fields` (map of field → message). "Toast" means a sonner toast in the bottom corner. "Phone" = 375×812 viewport
 (Playwright project `mobile` / Pixel 7), "desktop" = 1440×900.
 
-### User Story 1 - Sign up, sign in, sign out and stay signed in (Priority: P1)
+### User Story 1 - Sign up, sign in, sign out and stay signed in (Priority: P1) (#3)
 
 A seller visits TenderPilot, creates an account together with their company's organization, lands in onboarding, and
 can later sign in and out from any device. Sessions last 30 days and slide while used; changing a password signs out
@@ -68,7 +68,7 @@ sign back in, and verify `/api/auth/me` returns the same user and org. Can be fu
 
 ---
 
-### User Story 2 - Invite teammates and join an organization (Priority: P1)
+### User Story 2 - Invite teammates and join an organization (Priority: P1) (#4)
 
 A Bid Manager or Owner invites a colleague by email with a role. The invitee opens the link, sees which organization
 invited them and with which role, and joins — creating an account, signing in with an existing one, or accepting with
@@ -101,7 +101,7 @@ browser context, create the account and verify the member appears in Team with r
 
 ---
 
-### User Story 3 - Roles are enforced and organizations are isolated (Priority: P1)
+### User Story 3 - Roles are enforced and organizations are isolated (Priority: P1) (#5)
 
 Every action is allowed or denied on the server according to the role hierarchy Owner > Bid Manager > Analyst > Viewer,
 and every row of org data is visible only to members of that org. The UI hides what a role cannot do and explains why
@@ -129,7 +129,7 @@ mutating endpoint and the cross-org matrix (A's ids requested with B's session) 
 
 ---
 
-### User Story 4 - Personal account and notification preferences (Priority: P2)
+### User Story 4 - Personal account and notification preferences (Priority: P2) (#6)
 
 Each user manages their own name, mobile number and password, and decides — per organization — how TenderPilot alerts
 them: in-app, email, WhatsApp, instant or daily digest, and vault expiry reminders.
@@ -153,7 +153,7 @@ Daily, save, reload and verify the values persisted (`GET /api/me/notification-p
 
 ---
 
-### User Story 5 - API tokens for the Chrome extension (Priority: P2)
+### User Story 5 - API tokens for the Chrome extension (Priority: P2) (#7)
 
 A user creates a personal API token, pastes it into the TenderPilot Chrome extension, and can revoke it at any time.
 Tokens act as that user in that organization but cannot manage the account.
@@ -179,7 +179,7 @@ works without it.
 
 ---
 
-### User Story 6 - Organization administration: settings, scoring weights, sync health and activity log (Priority: P3)
+### User Story 6 - Organization administration: settings, scoring weights, sync health and activity log (Priority: P3) (#8)
 
 Owners and Bid Managers rename the organization, see the plan, tune Go/No-Go scoring weights, check that GeM sync is
 healthy (and trigger one), and review an audit trail of who did what.
@@ -202,7 +202,7 @@ then open the activity log and see the three corresponding entries with actor an
 
 ---
 
-### User Story 7 - App shell, navigation, command palette, theme and design system (Priority: P2)
+### User Story 7 - App shell, navigation, command palette, theme and design system (Priority: P2) (#9)
 
 Every signed-in page lives in one shell: a collapsible sidebar on desktop, a bottom tab bar and drawer on phones, a top
 bar with search (⌘K), notifications bell, theme toggle and account menu. Users can navigate entirely by keyboard and
