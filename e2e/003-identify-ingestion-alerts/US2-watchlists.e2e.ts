@@ -338,6 +338,51 @@ test.describe('US2 watchlists', () => {
     expect(api.sample.map((s: { bidNumber: string }) => s.bidNumber).sort()).toEqual(['QA/US2/LATER', 'QA/US2/NOVAL']);
   });
 
+  test('FR-020 / FR-022: API limits on criteria; categories + ministries matching; closed and past-deadline bids never match', async ({ page }) => {
+    await login(page, S.analyst!);
+    const bad = async (data: unknown, label: string) => {
+      const r = await page.request.post('/api/watchlists', { data });
+      expect(r.status(), `${label}: ${await r.text()}`).toBe(400);
+      expect((await r.json()).error.code).toBe('validation_error');
+    };
+    const base = { keywords: ['laptop'] };
+    const before = count('watchlists');
+    await bad({ name: 'x'.repeat(81), criteria: base }, 'name 81 chars');
+    await bad({ name: '', criteria: base }, 'empty name');
+    await bad({ name: 'Too many', criteria: { keywords: Array.from({ length: 51 }, (_, i) => `kw${i}`) } }, '51 keywords');
+    await bad({ name: 'Long value', criteria: { keywords: ['y'.repeat(121)] } }, '121-char keyword');
+    await bad({ name: 'HSN 9', criteria: { hsnCodes: ['123456789'] } }, '9-digit HSN');
+    await bad({ name: 'HSN 1', criteria: { hsnCodes: ['8'] } }, '1-digit HSN');
+    await bad({ name: 'Days', criteria: { ...base, minDaysToClose: 366 } }, 'minDaysToClose 366');
+    await bad({ name: 'Neg', criteria: { ...base, minValue: -1 } }, 'negative minValue');
+    await bad({ name: 'Type', criteria: { ...base, bidTypes: ['auction'] } }, 'bad bid type');
+    expect(count('watchlists'), 'no rejected request created a watchlist').toBe(before);
+    // boundary values are accepted (preview does not save anything)
+    const okp = await page.request.post('/api/watchlists/preview', { data: { criteria: { keywords: ['laptop', 'Laptop', 'laptop'], hsnCodes: ['84', '12345678'], minDaysToClose: 365, bidTypes: ['bid', 'ra', 'bunch', 'service'] } } });
+    expect(okp.status()).toBe(200);
+    expect(count('watchlists')).toBe(before);
+    // categories / ministries / closed / past-deadline (arranged SQL tenders in Goa)
+    sql("delete from tenders where bid_number in ('QA/US2/CAT','QA/US2/CLOSED','QA/US2/PAST')");
+    sql(`insert into tenders (bid_number, title, items, category, ministry, state, hsn_codes, end_at, status, source_url, content_hash, bid_type) values
+      ('QA/US2/CAT', 'Misc stores', '[]', 'Zzcat Widgets', 'Ministry of Zzland', 'Goa', '[]', now() + interval '20 days', 'open', 'http://example.invalid/cat', 'qa-cat', 'bid'),
+      ('QA/US2/CLOSED', 'Printer closed lot', '[]', null, null, 'Goa', '[]', now() + interval '20 days', 'closed', 'http://example.invalid/closed', 'qa-closed', 'bid'),
+      ('QA/US2/PAST', 'Printer past deadline lot', '[]', null, null, 'Goa', '[]', now() - interval '1 day', 'open', 'http://example.invalid/past', 'qa-past', 'bid')`);
+    const pv = async (criteria: unknown) => (await (await page.request.post('/api/watchlists/preview', { data: { criteria } })).json());
+    const cat = await pv({ categories: ['zzcat'], states: ['Goa'] });
+    expect(cat.sample.map((x: { bidNumber: string }) => x.bidNumber)).toEqual(['QA/US2/CAT']);
+    expect(cat.sample[0].previewReasons).toContain('Category: zzcat');
+    const min = await pv({ ministries: ['zzland'], states: ['Goa'] });
+    expect(min.sample.map((x: { bidNumber: string }) => x.bidNumber)).toEqual(['QA/US2/CAT']);
+    expect(min.sample[0].previewReasons).toContain('Buyer: zzland');
+    const pr = await pv({ keywords: ['printer'], states: ['Goa'] });
+    const nums = pr.sample.map((x: { bidNumber: string }) => x.bidNumber);
+    expect(nums).not.toContain('QA/US2/CLOSED');
+    expect(nums).not.toContain('QA/US2/PAST');
+    expect(pr.count).toBe(4); // NOVAL, SOON, LATER, CHEAP from S8 only
+    // AND across dimensions: right category text, wrong state -> no match
+    expect((await pv({ keywords: ['zzcat'], states: ['Kerala'] })).count).toBe(0);
+  });
+
   test('S9: pause -> PATCH 200, "Paused" badge, toast, no matches for new ingestions; resume -> toast, silent back-fill', async ({ page }) => {
     await login(page, S.analyst!);
     await page.goto('/watchlists');
@@ -374,6 +419,10 @@ test.describe('US2 watchlists', () => {
     // silent back-fill: the bid published while paused is now matched, no notification created
     await expect.poll(() => count('tender_matches', `watchlist_id='${S.wlId}'`)).toBe(3);
     expect(count('notifications'), 'resume back-fills silently').toBe(0);
+    // FR-023: one row per (org, tender, watchlist), human-readable reasons, relevance in 0.05-1.00
+    expect(count('tender_matches', `watchlist_id='${S.wlId}'`)).toBe(Number(sql(`select count(distinct (org_id, tender_id, watchlist_id)) from tender_matches where watchlist_id='${S.wlId}'`)));
+    expect(count('tender_matches', `watchlist_id='${S.wlId}' and (jsonb_array_length(reasons) = 0 or relevance < 0.05 or relevance > 1)`)).toBe(0);
+    expect(sql(`select reasons::text from tender_matches m join tenders t on t.id=m.tender_id where m.watchlist_id='${S.wlId}' and t.bid_number='GEM/2026/B/6421101'`)).toContain('State: Maharashtra');
     expect(await bidNumbersOf(page.request, S.wlId!)).toEqual(['GEM/2026/B/6421001', 'GEM/2026/B/6421010', 'GEM/2026/B/6421101']);
     await shot(page, 'S9b-resumed-toast-silent-backfill');
   });
