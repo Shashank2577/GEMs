@@ -80,11 +80,11 @@ export const asMappable = (d: VaultRow): MappableDoc => ({
   tags: d.tags, fileName: d.fileName, createdAt: d.createdAt,
 });
 
-/** Not analysed yet → honest 0 % (not "100 % of nothing") and cannot be marked ready (T021; 006/FR-009). */
+/** No finished analysis yet (none, pending, running or failed) → honest 0 % (not "100 % of nothing") and cannot be marked ready (T021; 006/FR-009). */
 const notAnalysed = (): Readiness => ({ items: [], percent: 0, total: 0, covered: 0, blockers: [], warnings: [], canMarkReady: false, analysed: false });
 
 export function readinessFor(w: WorkspaceRow, a: AnalysisRow | null, docs: VaultRow[], now: Date): Readiness {
-  if (!a) return notAnalysed();
+  if (!a || a.status !== 'done') return notAnalysed();
   return computeReadiness(a?.checklist ?? [], w.docMapping ?? {}, docs.map(asMappable), w.overrides ?? [], now);
 }
 

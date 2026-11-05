@@ -32,11 +32,13 @@ export function WorkspaceHeader({ data, onGoToStep }: { data: WorkspaceDetail; o
       toast.success(`Moved to ${STAGE_LABEL[stage as Stage]}`);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
-        const blockers = ((e.details as { blockers?: { label: string }[] })?.blockers ?? []).map((b) => b.label);
-        toast.error(e.message, {
-          description: blockers.length ? blockers.slice(0, 3).join(' · ') : undefined,
-          action: { label: 'Fix documents', onClick: () => onGoToStep('documents') },
-        });
+        const details = e.details as { blockers?: { label: string }[]; reason?: string } | undefined;
+        const blockers = (details?.blockers ?? []).map((b) => b.label);
+        // Point the user at the step that resolves the conflict.
+        const action = e.code === 'invalid_transition' ? { label: 'Go to Submit', onClick: () => onGoToStep('submit') } // FR-008
+          : details?.reason === 'not_analysed' ? { label: 'Go to Qualify', onClick: () => onGoToStep('qualify') } // FR-005
+            : { label: 'Fix documents', onClick: () => onGoToStep('documents') }; // not_ready
+        toast.error(e.message, { description: blockers.length ? blockers.slice(0, 3).join(' · ') : undefined, action });
       } else toast.error(errorMessage(e));
     }
   };
@@ -74,7 +76,10 @@ export function WorkspaceHeader({ data, onGoToStep }: { data: WorkspaceDetail; o
                   // FR-008: Won/Lost only after the bid was submitted on GeM (the API enforces it too).
                   const blocked = s !== w.stage && !canTransition(w.stage, s).ok;
                   return (
-                  <DropdownMenuItem key={s} disabled={update.isPending || blocked} onSelect={() => setStage(s)} className="justify-between">
+                  // aria-disabled (not `disabled`) keeps the item focusable so screen readers reach the hint.
+                  <DropdownMenuItem key={s} disabled={update.isPending} aria-disabled={blocked || undefined}
+                    onSelect={(ev) => { if (blocked) { ev.preventDefault(); return; } void setStage(s); }}
+                    className={cn('justify-between', blocked && 'cursor-not-allowed opacity-50')}>
                     <StageBadge stage={s as Stage} size="sm" />
                     {blocked && <span className="text-2xs text-muted-foreground">Mark as submitted first</span>}
                     {s === 'ready' && data.readiness.blockers.length > 0 && <span className="text-2xs text-danger">{data.readiness.blockers.length} blocker{data.readiness.blockers.length === 1 ? '' : 's'}</span>}

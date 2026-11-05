@@ -155,8 +155,8 @@ workspacesRoutes.patch('/workspaces/:id', requireRole('analyst'), async (c) => {
   }
   if (stage && stage !== w.stage) {
     if (stage === 'ready') {
-      const { readiness, analysis } = await readinessOf(deps, org, w);
-      if (!analysis) throw conflict('Analyse the tender before marking the bid ready to submit.', { blockers: [], reason: 'not_analysed' });
+      const { readiness } = await readinessOf(deps, org, w);
+      if (!readiness.analysed) throw conflict('Analyse the tender before marking the bid ready to submit.', { blockers: [], reason: 'not_analysed' });
       if (!readiness.canMarkReady) {
         throw new HttpError(409, 'not_ready', `${readiness.blockers.length} required document${readiness.blockers.length === 1 ? ' is' : 's are'} missing or expired. Replace ${readiness.blockers.length === 1 ? 'it' : 'them'} in the vault, or ask a Bid Manager to override with a reason.`, { blockers: readiness.blockers });
       }
