@@ -11,6 +11,9 @@ export const SESSION_COOKIE = 'tp_session';
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Re-extend a session when less than this much lifetime remains (sliding expiry). */
 const SESSION_REFRESH_MS = 15 * 24 * 60 * 60 * 1000;
+/** `sessions.last_seen_at` is refreshed at most this often (002/FR-012). */
+export const SESSION_SEEN_INTERVAL_MS = 5 * 60 * 1000;
+const USER_AGENT_MAX = 512;
 
 export interface ResolvedAuth {
   user: AuthUser;
@@ -42,7 +45,10 @@ export async function startSession(c: Context<AppEnv>, userId: string, activeOrg
   const { db, clock } = c.var.deps;
   const token = randomToken();
   const expiresAt = new Date(clock.now().getTime() + SESSION_TTL_MS);
-  const [row] = await db.insert(sessions).values({ userId, tokenHash: await sha256Hex(token), activeOrgId, expiresAt }).returning({ id: sessions.id });
+  const userAgent = c.req.header('user-agent')?.slice(0, USER_AGENT_MAX) || null;
+  const [row] = await db.insert(sessions).values({
+    userId, tokenHash: await sha256Hex(token), activeOrgId, expiresAt, userAgent, lastSeenAt: clock.now(),
+  }).returning({ id: sessions.id });
   setSessionCookie(c, token, expiresAt);
   return { sessionId: row.id, token, expiresAt };
 }
@@ -124,6 +130,7 @@ export async function resolveAuth(c: Context<AppEnv>): Promise<ResolvedAuth | nu
     patch.expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
     setSessionCookie(c, token, patch.expiresAt);
   }
+  if (!s.lastSeenAt || now.getTime() - s.lastSeenAt.getTime() >= SESSION_SEEN_INTERVAL_MS) patch.lastSeenAt = now;
   if (Object.keys(patch).length) await db.update(sessions).set(patch).where(eq(sessions.id, s.id));
 
   return { user, org: m?.org ?? null, role: m?.role ?? null, kind: 'session', sessionId: s.id, apiTokenId: null };

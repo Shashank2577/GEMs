@@ -1,22 +1,24 @@
 /**
- * Auth & current-user routes (FR-030): /auth/*, /me, /me/notification-prefs, /me/api-tokens.
- * Mounted at /api.
+ * Auth & current-user routes (FR-030): /auth/*, /me, /me/notification-prefs, /me/api-tokens, /me/sessions.
+ * Mounted at /api. Rate limiting: 002/FR-010; password reset: 002/FR-011; sessions: 002/FR-012.
  */
-import { and, desc, eq, gt, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
-  apiTokens, invitations, memberships, notificationPrefs, organizations, sessions, users, type Db,
+  apiTokens, invitations, memberships, notificationPrefs, organizations, passwordResets, sessions, users, type Db,
 } from '@tp/db';
 import {
-  API_TOKEN_PREFIX, acceptInviteInputSchema, changePasswordInputSchema, createApiTokenInputSchema, loginInputSchema,
-  notificationPrefsSchema, passwordSchema, signupInputSchema, switchOrgInputSchema, updateMeInputSchema,
-  type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
+  API_TOKEN_PREFIX, PASSWORD_RESET_TTL_MINUTES, acceptInviteInputSchema, changePasswordInputSchema, createApiTokenInputSchema,
+  forgotPasswordInputSchema, loginInputSchema, notificationPrefsSchema, passwordSchema, resetPasswordInputSchema,
+  signupInputSchema, summarizeUserAgent, switchOrgInputSchema, updateMeInputSchema,
+  type ApiTokenSummary, type InvitePreview, type NotificationPrefs, type RevokeOtherSessionsResponse, type SessionsResponse,
 } from '@tp/core/contracts/auth';
 import { requireAuth, requireSession, orgId, userId } from '../middleware/auth';
 import { logActivity } from '../lib/activity';
 import { getDummyHash, hashPassword, randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
 import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/errors';
 import { buildMe } from '../lib/me';
+import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reset } from '../lib/rate-limit';
 import { clearSessionCookie, firstMembership, loadMembership, loadUser, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
 import { parseJson, parseWith } from '../lib/validate';
@@ -78,19 +80,35 @@ authRoutes.post('/auth/signup', async (c) => {
   return respondMe(c, ids.userId, ids.orgId, 201);
 });
 
+const NO_ORGANIZATION = () => new HttpError(403, 'no_organization', 'You are not a member of any organization. Ask an owner to invite you.');
+
+/** The org to sign into: the most recently used one the user is still a member of, else the oldest membership. */
+async function pickSignInOrg(db: Db, uid: string) {
+  const [last] = await db.select({ orgId: sessions.activeOrgId }).from(sessions)
+    .where(eq(sessions.userId, uid)).orderBy(desc(sessions.createdAt)).limit(1);
+  let m = last?.orgId ? await loadMembership(db, uid, last.orgId) : null;
+  if (!m) m = await firstMembership(db, uid);
+  return m;
+}
+
 authRoutes.post('/auth/login', async (c) => {
   const body = await parseJson(c, loginInputSchema);
-  const { db } = c.var.deps;
+  const { db, clock } = c.var.deps;
+  // 002/FR-010: 10 failures per email, 30 per IP per 15 min. Checked before the password so a full window
+  // rejects even the right password.
+  const limiter = credentialLimiter(db, body.email, clientIp(c), clock.now());
+  await limiter.assert();
   const [u] = await db.select({ id: users.id, passwordHash: users.passwordHash }).from(users).where(eq(users.email, body.email));
   const ok = await verifyPassword(body.password, u?.passwordHash ?? (await getDummyHash()));
-  if (!u || !ok) throw new HttpError(401, 'invalid_credentials', 'Incorrect email or password');
+  if (!u || !ok) {
+    await limiter.fail();
+    throw new HttpError(401, 'invalid_credentials', 'Incorrect email or password');
+  }
+  await limiter.succeed();
 
   // Keep the org the user last worked in when possible.
-  const [last] = await db.select({ orgId: sessions.activeOrgId }).from(sessions)
-    .where(eq(sessions.userId, u.id)).orderBy(desc(sessions.createdAt)).limit(1);
-  let m = last?.orgId ? await loadMembership(db, u.id, last.orgId) : null;
-  if (!m) m = await firstMembership(db, u.id);
-  if (!m) throw new HttpError(403, 'no_organization', 'You are not a member of any organization. Ask an owner to invite you.');
+  const m = await pickSignInOrg(db, u.id);
+  if (!m) throw NO_ORGANIZATION();
   await startSession(c, u.id, m.org.id);
   return respondMe(c, u.id, m.org.id);
 });
@@ -113,6 +131,78 @@ authRoutes.post('/auth/switch-org', requireSession, async (c) => {
   if (!m) throw notFound('Organization');
   await db.update(sessions).set({ activeOrgId: target }).where(eq(sessions.id, c.var.sessionId!));
   return respondMe(c, c.var.user.id, target);
+});
+
+// ───────────── Password reset (002/FR-011) ─────────────
+
+const RESET_INVALID = () => new HttpError(400, 'reset_invalid', 'This password reset link is invalid, already used or has expired. Request a new one.');
+
+/** Always 200 `{ok:true}` (no account enumeration). Emails a single-use 60-minute link to existing users. */
+authRoutes.post('/auth/forgot-password', async (c) => {
+  const { email } = await parseJson(c, forgotPasswordInputSchema);
+  const { db, clock, config, mailer, logger } = c.var.deps;
+  const now = clock.now();
+  // Counted for every email (existing or not) so the 429 reveals nothing about accounts.
+  const st = await hit(db, email, 'reset_email', RESET_EMAIL_LIMIT, now);
+  if (st.count > RESET_EMAIL_LIMIT.limit) throw rateLimited(st.retryAfterSec);
+
+  const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+  if (u) {
+    const token = randomToken();
+    const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TTL_MINUTES * 60_000);
+    // A new link replaces any earlier unused one.
+    await db.delete(passwordResets).where(and(eq(passwordResets.userId, u.id), isNull(passwordResets.usedAt)));
+    await db.insert(passwordResets).values({ userId: u.id, tokenHash: await sha256Hex(token), expiresAt });
+    const resetUrl = `${config.appUrl}/reset-password/${token}`;
+    try {
+      await mailer.send({
+        to: email,
+        subject: 'Reset your TenderPilot password',
+        text: `Someone asked to reset the password for your TenderPilot account.\n\nSet a new password: ${resetUrl}\n\n`
+          + `This link expires in 1 hour and can be used once. If you didn’t ask for this, you can ignore this email.`,
+        html: `<p>Someone asked to reset the password for your TenderPilot account.</p><p><a href="${resetUrl}">Set a new password</a></p>`
+          + `<p style="color:#666">This link expires in 1 hour and can be used once. If you didn’t ask for this, you can ignore this email.</p>`,
+      });
+    } catch (e) {
+      logger.warn('password reset email failed', { error: (e as Error).message });
+    }
+  }
+  return c.json({ ok: true as const });
+});
+
+/** Set a new password from a reset link: signs out every session, consumes the link and starts a new session. */
+authRoutes.post('/auth/reset-password', async (c) => {
+  const body = await parseJson(c, resetPasswordInputSchema);
+  const { db, clock } = c.var.deps;
+  const now = clock.now();
+  const ip = clientIp(c);
+  if (ip) {
+    const st = await check(db, ip, 'login_ip', LOGIN_IP_LIMIT, now);
+    if (st?.limited) throw rateLimited(st.retryAfterSec);
+  }
+  const tokenHash = await sha256Hex(body.token);
+  const passwordHash = await hashPassword(body.newPassword);
+  const uid = await db.transaction(async (tx) => {
+    const [r] = await tx.update(passwordResets).set({ usedAt: now })
+      .where(and(eq(passwordResets.tokenHash, tokenHash), isNull(passwordResets.usedAt), gt(passwordResets.expiresAt, now)))
+      .returning({ userId: passwordResets.userId });
+    if (!r) return null;
+    await tx.update(users).set({ passwordHash }).where(eq(users.id, r.userId));
+    await tx.delete(sessions).where(eq(sessions.userId, r.userId));
+    await tx.delete(passwordResets).where(and(eq(passwordResets.userId, r.userId), isNull(passwordResets.usedAt)));
+    return r.userId;
+  });
+  if (!uid) {
+    if (ip) await hit(db, ip, 'login_ip', LOGIN_IP_LIMIT, now);
+    throw RESET_INVALID();
+  }
+  // Proving control of the mailbox lifts a sign-in lockout for this email.
+  const user = await loadUser(db, uid);
+  if (user) await reset(db, user.email, 'login_email');
+  const m = await pickSignInOrg(db, uid);
+  if (!m) throw NO_ORGANIZATION();
+  await startSession(c, uid, m.org.id);
+  return respondMe(c, uid, m.org.id);
 });
 
 // ───────────── Invitations (public side) ─────────────
@@ -163,9 +253,14 @@ authRoutes.post('/auth/accept-invite', async (c) => {
   } else {
     const [u] = await db.select({ id: users.id, passwordHash: users.passwordHash }).from(users).where(eq(users.email, inv.email));
     if (u) {
+      // Existing-user path acts as a sign-in: same limits as login (002/FR-010).
+      const limiter = credentialLimiter(db, inv.email, clientIp(c), clock.now());
+      await limiter.assert();
       if (!body.password || !(await verifyPassword(body.password, u.passwordHash))) {
+        await limiter.fail();
         throw new HttpError(401, 'invalid_credentials', 'Enter the password for your existing TenderPilot account', { fields: { password: 'Incorrect password' } });
       }
+      await limiter.succeed();
       uid = u.id;
     } else {
       if (!body.name) throw badRequest('Your name is required', { fields: { name: 'Required' } });
@@ -200,11 +295,15 @@ authRoutes.patch('/me', requireAuth, async (c) => {
 
 authRoutes.post('/me/password', requireSession, async (c) => {
   const body = await parseJson(c, changePasswordInputSchema);
-  const { db } = c.var.deps;
+  const { db, clock } = c.var.deps;
+  const limiter = credentialLimiter(db, c.var.user.email, clientIp(c), clock.now());
+  await limiter.assert();
   const [u] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, userId(c)));
   if (!u || !(await verifyPassword(body.currentPassword, u.passwordHash))) {
+    await limiter.fail();
     throw new HttpError(400, 'invalid_credentials', 'Current password is incorrect', { fields: { currentPassword: 'Incorrect password' } });
   }
+  await limiter.succeed();
   await db.update(users).set({ passwordHash: await hashPassword(body.newPassword) }).where(eq(users.id, userId(c)));
   // Sign out other sessions.
   await db.delete(sessions).where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!)));
@@ -228,6 +327,46 @@ authRoutes.put('/me/notification-prefs', requireAuth, async (c) => {
   await c.var.deps.db.insert(notificationPrefs).values({ orgId: orgId(c), userId: userId(c), ...body })
     .onConflictDoUpdate({ target: [notificationPrefs.orgId, notificationPrefs.userId], set: body });
   return c.json(body);
+});
+
+// ───────────── Sessions (002/FR-012, session-only per FR-036) ─────────────
+
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+authRoutes.get('/me/sessions', requireSession, async (c) => {
+  const { db, clock } = c.var.deps;
+  const current = c.var.sessionId!;
+  const rows = await db.select({
+    id: sessions.id, userAgent: sessions.userAgent, createdAt: sessions.createdAt, lastSeenAt: sessions.lastSeenAt,
+  }).from(sessions)
+    .where(and(eq(sessions.userId, userId(c)), gt(sessions.expiresAt, clock.now())))
+    .orderBy(sql`${sessions.id} = ${current} desc`, sql`coalesce(${sessions.lastSeenAt}, ${sessions.createdAt}) desc`);
+  const out: SessionsResponse = {
+    items: rows.map((r) => ({
+      id: r.id, current: r.id === current, userAgent: r.userAgent, device: summarizeUserAgent(r.userAgent),
+      createdAt: r.createdAt.toISOString(), lastSeenAt: r.lastSeenAt?.toISOString() ?? null,
+    })),
+    total: rows.length,
+  };
+  return c.json(out);
+});
+
+authRoutes.post('/me/sessions/revoke-others', requireSession, async (c) => {
+  const deleted = await c.var.deps.db.delete(sessions)
+    .where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!))).returning({ id: sessions.id });
+  const out: RevokeOtherSessionsResponse = { revoked: deleted.length };
+  return c.json(out);
+});
+
+/** Revoke one of your own sessions (404 for anyone else's). Revoking the current one signs you out. */
+authRoutes.delete('/me/sessions/:id', requireSession, async (c) => {
+  const id = c.req.param('id');
+  if (!UUID_RE.test(id)) throw notFound('Session');
+  const deleted = await c.var.deps.db.delete(sessions)
+    .where(and(eq(sessions.id, id), eq(sessions.userId, userId(c)))).returning({ id: sessions.id });
+  if (!deleted.length) throw notFound('Session');
+  if (id === c.var.sessionId) clearSessionCookie(c);
+  return c.json({ ok: true as const });
 });
 
 // ───────────── API tokens (browser extension) ─────────────
