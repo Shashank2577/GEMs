@@ -14,11 +14,12 @@ let ctx: TestContext;
 let owner: SignedUp;
 let calls: { url: string; body: unknown }[] = [];
 let failCall: number | null = null;
+let failStatus = 422;
 
 const resendFetch = (async (url: string, init?: RequestInit) => {
   const body = JSON.parse(String(init?.body));
   calls.push({ url, body });
-  if (failCall === calls.length) return new Response('{"message":"rate limited"}', { status: 429 });
+  if (failCall === calls.length) return new Response('{"message":"provider refused"}', { status: failStatus });
   if (url.endsWith('/emails/batch')) return Response.json({ data: (body as unknown[]).map((_, i) => ({ id: `re_${calls.length}_${i}` })) });
   return Response.json({ id: `re_${calls.length}` });
 }) as unknown as typeof fetch;
@@ -39,6 +40,7 @@ afterAll(() => ctx?.close());
 beforeEach(async () => {
   calls = [];
   failCall = null;
+  failStatus = 422;
   await ctx.db.delete(notifications).where(eq(notifications.orgId, owner.me.org.id));
 });
 
@@ -60,16 +62,29 @@ describe('Resend batch sending (US7 scenario 6)', () => {
     expect(n).toBe(120);
   });
 
-  it('a failed batch call marks only its rows failed; the next batch is still sent', async () => {
+  it('a failed batch call affects only its rows (permanent 4xx → failed, 429 → retried later); the next batch is still sent', async () => {
     await queueEmails(150);
+    failStatus = 422;
     failCall = 1;
     const report = await dispatchNotifications(deps());
     expect(calls).toHaveLength(2);
-    expect(report).toMatchObject({ sent: 50, failed: 100 });
+    expect(report).toMatchObject({ sent: 50, failed: 100, retried: 0 });
     const failed = await ctx.db.select({ error: notifications.error }).from(notifications)
       .where(sql`${notifications.orgId} = ${owner.me.org.id} and ${notifications.status} = 'failed'`);
     expect(failed).toHaveLength(100);
-    expect(failed[0]!.error).toMatch(/Resend error 429/);
+    expect(failed[0]!.error).toMatch(/Resend error 422/);
+
+    await ctx.db.delete(notifications).where(eq(notifications.orgId, owner.me.org.id));
+    calls = [];
+    await queueEmails(120);
+    failStatus = 429;
+    failCall = 2;
+    const transient = await dispatchNotifications(deps());
+    expect(calls).toHaveLength(2);
+    expect(transient).toMatchObject({ sent: 100, retried: 20, failed: 0 });
+    const pending = await ctx.db.select({ attempts: notifications.attempts }).from(notifications)
+      .where(sql`${notifications.orgId} = ${owner.me.org.id} and ${notifications.status} = 'pending'`);
+    expect(pending.map((p) => p.attempts)).toEqual(Array(20).fill(1));
   });
 
   it('sendMany maps the provider ids back in order', async () => {

@@ -296,8 +296,9 @@ delivery status is visible, and that a second sync sends nothing new.
     their settings.
 11. *(gap)* **Given** an email or WhatsApp send fails with a transient error (network, 429, 5xx), **Then** the row is retried
     on the next 2 dispatches with back-off and only marked `failed` after 3 attempts; the attempt count is stored.
-12. *(gap)* **Given** an alert email, **Then** it carries `List-Unsubscribe` / `List-Unsubscribe-Post` headers whose one-click
-    link turns off email match alerts for that user/org and shows "You won’t get match emails from <org> any more."
+12. *(gap)* **Given** an alert email, **Then** it carries `List-Unsubscribe` / `List-Unsubscribe-Post` headers; the one-click
+    POST turns off email (alerts, digests, reminders) for that user/org, while opening the link (GET) only shows a
+    confirmation page whose button does the same and then confirms "You are unsubscribed".
 13. *(gap)* **Given** `GET /api/notifications?kind=bogus`, **Then** the API returns `400` `validation_error` (today the value is
     passed through unvalidated).
 
@@ -412,6 +413,8 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **Creating/editing a watchlist** never sends alerts for existing bids (silent back-fill).
 - **User without phone but WhatsApp on** (phone removed later): WhatsApp row `skipped` with a reason.
 - **Daily digest timing** uses the IST calendar day; rows created before 08:00 IST wait for that day's digest.
+  Rows already held for the digest stay held until the next 08:00 IST even if the user switches Daily → Instant meanwhile
+  (only rows queued after the switch go out instantly).
 - **Notification for a deleted tender**: email falls back to a plain card with title/body.
 - **Large feed**: pagination 25 per page (max 100); facets limited to 60 values per dimension.
 - **Org isolation**: tenders are global public data; matches, seen/dismissed, analyses, notifications are always scoped to
@@ -669,8 +672,8 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **SC-004**: A new user creates their first watchlist with a non-zero preview in under 2 minutes from opening `/watchlists`
   (template or manual).
 - **SC-005**: Feed filter/search changes render updated results in < 1 s at p95 with 50,000 tenders.
-- **SC-006**: 100 % of email/WhatsApp alert rows reach a terminal status (`sent`/`skipped`/`failed`) within 2 dispatch cycles;
-  none stay `pending` for instant users.
+- **SC-006**: 100 % of email/WhatsApp alert rows reach a terminal status (`sent`/`skipped`/`failed`) within 3 dispatch attempts
+  (FR-047: back-off +5 / +25 min, inside the 30-min cron); none stay `pending` for instant users.
 - **SC-007**: 100 % of end-date corrigenda on tracked tenders produce a history entry, a stale flag on existing analyses and an
   alert naming the new date.
 - **SC-008**: Each user story US1–US6 has a passing Playwright E2E with screenshots, video and trace in `qa/evidence/003/US<n>/`

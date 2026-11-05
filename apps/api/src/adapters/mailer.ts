@@ -1,5 +1,6 @@
 /** Email via the Resend HTTP API; logs and skips when RESEND_API_KEY is absent. */
 import type { EmailMessage, Logger, Mailer, SendResult } from '../deps';
+import { isTransientStatus, ProviderError, providerFetch } from './provider-error';
 
 /** Resend's `/emails/batch` accepts at most 100 messages per call (008/FR-074). */
 export const RESEND_BATCH_MAX = 100;
@@ -12,15 +13,17 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetch?:
     subject: msg.subject,
     html: msg.html, text: msg.text,
     ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
+    ...(msg.headers ? { headers: msg.headers } : {}),
   });
   const post = async (path: string, body: unknown): Promise<string> => {
-    const res = await f(`https://api.resend.com${path}`, {
+    const res = await providerFetch('Resend', f, `https://api.resend.com${path}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${opts.apiKey}`, 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
     const text = await res.text();
-    if (!res.ok) throw new Error(`Resend error ${res.status}: ${text.slice(0, 500)}`);
+    // 408/429/5xx are transient (retried by the dispatcher); other 4xx (validation, auth, domain) are permanent.
+    if (!res.ok) throw new ProviderError(`Resend error ${res.status}: ${text.slice(0, 500)}`, isTransientStatus(res.status), res.status);
     return text;
   };
   return {
@@ -29,6 +32,7 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetch?:
       const body = await post('/emails', payload(msg));
       try { return { id: (JSON.parse(body) as { id?: string }).id }; } catch { return {}; }
     },
+    /** 008/FR-074: `/emails/batch`, ≤ 100 messages per call; a failed call rejects (the caller fails that batch). */
     async sendMany(msgs: EmailMessage[]): Promise<SendResult[]> {
       const out: SendResult[] = [];
       for (let i = 0; i < msgs.length; i += RESEND_BATCH_MAX) {

@@ -1,5 +1,5 @@
 {
-  "id": "f4b1e93c-7d14-46bc-9fab-0e46b06dd38c",
+  "id": "21b034ea-0032-4d4b-a459-5bd2c4a682c8",
   "prevId": "e6871fdb-d49a-4cc9-8e15-08c9c826a57a",
   "version": "7",
   "dialect": "postgresql",
@@ -1444,58 +1444,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.job_runs": {
-      "name": "job_runs",
-      "schema": "",
-      "columns": {
-        "job": {
-          "name": "job",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "day": {
-          "name": "day",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "finished_at": {
-          "name": "finished_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "summary": {
-          "name": "summary",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "job_runs_job_day_pk": {
-          "name": "job_runs_job_day_pk",
-          "columns": [
-            "job",
-            "day"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.memberships": {
       "name": "memberships",
       "schema": "",
@@ -1733,6 +1681,19 @@
         "error": {
           "name": "error",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -2657,30 +2618,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'pdf'"
-        },
-        "requirements": {
-          "name": "requirements",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extractor_version": {
-          "name": "extractor_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extracted_at": {
-          "name": "extracted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extracted_method": {
-          "name": "extracted_method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
