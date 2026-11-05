@@ -7,7 +7,7 @@ import { eq, sql } from 'drizzle-orm';
 import { createNodeDb, gemThrottle, ingestionRuns, tenders } from '@tp/db';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import type { Logger } from '../src/deps';
-import { acquireGemSlot, createPgGemLease, GEM_BUSY_MESSAGE, reserveGemSlot } from '../src/lib/gem-lease';
+import { acquireGemSlot, ClockOffset, createPgGemLease, GEM_BUSY_MESSAGE, reserveGemSlot } from '../src/lib/gem-lease';
 import { HttpError } from '../src/lib/errors';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import { IngestionBusyError, isOneRunningViolation, runIngestion } from '../src/services/ingest';
@@ -44,6 +44,33 @@ beforeAll(async () => {
 });
 afterAll(() => ctx?.close());
 beforeEach(async () => { await ctx.db.delete(gemThrottle); });
+
+describe('ClockOffset (DB clock → local clock bounds)', () => {
+  it('intersects samples: pool/lock waits widen only the upper bound, a late-noticed reply only the lower one', () => {
+    const o = new ClockOffset();
+    expect(o.width).toBe(Infinity);
+    // True offset +5000 ms. Sample 1 queued 300 ms for a pool connection before the DB read its clock (t = 1300).
+    o.add(1000, 1301, 6300);
+    // Sample 2's reply was noticed 250 ms late by a busy event loop (DB read at t = 2001).
+    o.add(2000, 2252, 7001);
+    expect(o.width).toBeLessThanOrEqual(4);
+    // A slot at DB time 10000 is local 5000 ± 2.
+    expect(o.earliestLocal(10_000)).toBeGreaterThanOrEqual(4997);
+    expect(o.latestLocal(10_000)).toBeLessThanOrEqual(5003);
+    expect(o.earliestLocal(10_000)).toBeLessThanOrEqual(5000);
+    expect(o.latestLocal(10_000)).toBeGreaterThanOrEqual(5000);
+  });
+
+  it('starts over on a clock step (empty intersection) and after maxAgeMs', () => {
+    const o = new ClockOffset(1000);
+    o.add(0, 2, 5001);
+    o.add(10, 12, 9011); // offset jumped to ~+9000
+    expect(o.latestLocal(9011)).toBeGreaterThanOrEqual(10);
+    expect(o.earliestLocal(9011)).toBeLessThanOrEqual(12);
+    o.add(5000, 5400, 14_200); // stale bounds dropped: only this (wide) sample counts
+    expect(o.width).toBe(402);
+  });
+});
 
 describe('acquireGemSlot (FR-024)', () => {
   it('spaces 20 concurrent callers ≥ interval apart, on the DB clock and in real time', async () => {

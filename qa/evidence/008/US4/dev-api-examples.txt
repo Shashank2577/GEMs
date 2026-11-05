@@ -26,17 +26,19 @@ $ POST /api/tenders/9f4de855-ea57-452c-8465-a05060c6dbe5/analyse   # Analyse
 → 422 Unprocessable Entity  (4 ms)
 {"error":{"code":"scanned_document","message":"This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.","details":{"documents":["scanned-bid.pdf"]}}}
 
-## 4. 413 packet_too_large — 41 items, and 45 MB of selected files (FR-032, scenario 10)
+## 4. 413 packet_too_large — 41 items, and 45 MB of selected files (FR-032, scenario 10; size via 006/FR-056's PACKET_MAX_INPUT_BYTES)
 $ POST /api/workspaces/29cf5b48-0e5b-4cb5-88e1-42b15cd55e5d/packets {"items":[{"kind":"cover","title":"Item 1"},{"kind":"cover","title":"Item 2"},{"kind":"cover","title":"Item 3"},{"kind":"cover","title":"Item 4"},{"kind":"cover","title":"Item 5"},{"kind":"cover","title":"Item 6"},{"kind":"cover","title":"Item 7"},{"kind":"cover","title":"Item 8"},{"kind":"cover","title":"Item 9"},{"kind":"cover","title":"Item 10"},{"kind":"cover","title":"Item 11"},{"kind":"cover","title":"Item 12"},{"kind":"cover","title":"Item 13"},{"kind":"cover","title":"Item 14"},{"kind":"cover","title":"Item 15"},{"kind":"cover","title":"Item 16"},{"kind":"cover","title":"Item 17"},{"kind":"cover","title":"Item 18"},{"kind":"cover","title":"Item 19"},{"kind":"cover","title":"Item 20"}…   # 41 items
 → 413 Payload Too Large  (5 ms)
 {"error":{"code":"packet_too_large","message":"This packet has 41 items (limit 40). Deselect some items and try again.","details":{"items":41,"maxItems":40}}}
 
-(uploaded 3 vault scans: 16.0 MB, 15.0 MB, 14.0 MB)
-$ POST /api/workspaces/29cf5b48-0e5b-4cb5-88e1-42b15cd55e5d/packets {"items":[{"kind":"vault","refId":"efcd92db-08ef-47f1-8391-7b3c7991abe9","title":"Signed annexure 1"},{"kind":"vault","refId":"54c9dbaa-75f8-4421-9283-611ef9ea990c","title":"Signed annexure 2"},{"kind":"vault","refId":"a4c2bfa3-3b57-4ded-9a33-0a845d74383e","title":"Signed annexure 3"}]}   # 3 vault files ≈ 45 MB
-→ 413 Payload Too Large  (15 ms)
-{"error":{"code":"packet_too_large","message":"This packet would be 45 MB (limit 40 MB). Deselect large attachments and try again.","details":{"bytes":47205820,"maxBytes":41943040}}}
+# Re-run after merging main (006/FR-056's single size check, re-captured 2026-11-05):
+(server started with PACKET_MAX_INPUT_BYTES=41943040, i.e. 008/FR-032's 40 MB; default is 006/FR-056's 60 MB)
+(uploaded 3 vault files: 16.0 MB, 15.0 MB, 14.0 MB)
+$ POST /api/workspaces/ea4335ba-932c-459d-be4a-6751683be499/packets {"items":[{"kind":"vault","refId":"78390f89-0434-428a-8605-b3534b8014e6","title":"Signed annexure 1"},{"kind":"vault","refId":"ccce3cad-a38b-4e35-8007-40b296353e52","title":"Signed annexure 2"},{"kind":"vault","refId":"cc765e22-0f71-4711-901d-8c056b75a4b5","title":"Signed annexure 3"}]}   # 3 vault files = 45 MB
+→ 413 Payload Too Large  (33 ms)
+{"error":{"code":"packet_too_large","message":"These documents add up to 45.0 MB — remove or compress some before building (limit 40 MB).","details":{"totalBytes":47185920,"limitBytes":41943040,"items":[{"title":"Signed annexure 1","sizeBytes":16777216},{"title":"Signed annexure 2","sizeBytes":15728640},{"title":"Signed annexure 3","sizeBytes":14680064}]}}}
 
-packets rows before/after the refused builds: 0 / 0
+packets rows before/after the refused build: 0 / 0
 
 ## 5. 503 gem_busy — 30 concurrent fetch-documents; the cluster-wide lease (1 request/s) has slots for ~25 s only (FR-024, scenario 1)
 $ 30 × POST /api/tenders/:id/fetch-documents at the same instant (30 orgs, 30 bulk-fixture tenders; mock-gem answers 404 for those synthetic bids, so the granted calls end in 502 gem_unavailable — what matters is when GeM was asked)
