@@ -234,6 +234,10 @@ describe('ingestion routes', () => {
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.viewer.cookie, json: {} })).status).toBe(403);
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 99 } })).status).toBe(400);
     ctx.clock.advance(60_000);
+    // FR-013: the setup's manual run finished < 2 min ago → cooldown; allowed again from retryAt.
+    const cool = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.owner.cookie, json: { pages: 1 } });
+    expect(cool.status).toBe(429);
+    ctx.clock.set(new Date(cool.body.error.details.retryAt));
     const ok = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.owner.cookie, json: { pages: 1 } });
     expect(ok.body).toMatchObject({ status: 'success', pagesFetched: 1, tendersCreated: 0 });
     const runs = await get('/ingestion/runs', team.viewer);
@@ -241,6 +245,36 @@ describe('ingestion routes', () => {
     expect(runs.body).toMatchObject({ totalTenders: 36, openTenders: 36, lastRun: { trigger: 'manual', status: 'success' } });
     expect(runs.body.lastSuccessAt).toBeTruthy();
     expect(runs.body.items[0].durationMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('manual sync cooldown (FR-013)', () => {
+  it('rejects a manual sync within 2 min of a finished manual run with 429 sync_cooldown and retryAt', async () => {
+    const [last] = (await get('/ingestion/runs', team.viewer)).body.items;
+    expect(last).toMatchObject({ trigger: 'manual', status: 'success' });
+    const retryAt = new Date(Date.parse(last.finishedAt) + 2 * 60_000);
+    ctx.clock.set(new Date(retryAt.getTime() - 1_000));
+    const r = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
+    expect(r.status).toBe(429);
+    expect(r.body.error).toMatchObject({ code: 'sync_cooldown', details: { retryAt: retryAt.toISOString() } });
+    const ist = retryAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+    expect(r.body.error.message).toBe(`GeM was synced moments ago. Next manual sync at ${ist} IST.`);
+    // Nothing was started.
+    expect((await get('/ingestion/runs', team.viewer)).body.items).toHaveLength(2);
+    // Role checks still come first.
+    expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.analyst.cookie, json: {} })).status).toBe(403);
+    // A scheduled run does not start a manual cooldown, and does not extend it.
+    ctx.clock.set(retryAt);
+    const cron = await runIngestion(ctx.deps, { trigger: 'cron', pages: 1 });
+    expect(cron.status).toBe('success');
+    const ok = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 1 } });
+    expect(ok.status).toBe(200);
+    expect(ok.body.trigger).toBe('manual');
+    // …but this finished manual run does — across orgs (GeM is shared by every tenant).
+    const rival = await request(ctx.app, 'POST', '/ingestion/run', { cookie: other.cookie, json: {} });
+    expect(rival.status).toBe(429);
+    expect(rival.body.error.code).toBe('sync_cooldown');
+    ctx.clock.advance(2 * 60_000);
   });
 });
 

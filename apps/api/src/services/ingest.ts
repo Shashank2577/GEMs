@@ -3,7 +3,10 @@
  *
  *   runIngestion(deps, { trigger: 'manual', pages: 3 }) → ingestion_runs row
  *
- * 1. Fetch N BidPlus listing pages through the polite GemClient (≤ 1 req/s, back-off).
+ * 1. Fetch BidPlus listing pages through the polite GemClient (≤ 1 req/s, back-off): incremental — stop after
+ *    a page of known, unchanged bids — with a 20-page catch-up cap after a > 2 h gap (FR-011); scheduled runs
+ *    then search up to 10 rotating watchlist keywords (FR-012). > 50 % docs without a bid number or a missing
+ *    `response.response.docs` fails the run as format drift and logs `ingestion.format_drift` (FR-014).
  * 2. Upsert tenders by (source, bidNumber); unchanged content hash → only `fetchedAt` moves.
  * 3. Record tender_events: created / updated / corrigendum / closed / cancelled with a field diff.
  *    A corrigendum (end date, quantity, EMD, …) marks existing analyses `stale`.
@@ -12,18 +15,22 @@
  *    (pending → services/alerts.ts). Deduped by (user, channel, `tender:<tenderId>:<orgId>`).
  * GeM being down never loses data: the run is recorded as `failed` (or `partial`) with the error.
  */
-import { and, eq, gt, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
 import {
   analyses, ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
   type WatchlistCriteria,
 } from '@tp/db';
 import { GemClient } from '@tp/core/gem/client';
-import { diffTenders, isCorrigendum, type NormalizedTender } from '@tp/core/gem/parse';
+import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 
 export interface RunIngestionOptions {
   trigger?: 'cron' | 'manual' | 'seed';
+  /**
+   * Fetch exactly up to this many listing pages (operator override, 1–20): no early stop, no catch-up.
+   * When omitted the run pages incrementally (FR-011) up to `deps.gem.maxPages`, or the catch-up cap after a gap.
+   */
   pages?: number;
   /** Optional free-text search sent to GeM. */
   search?: string;
@@ -35,6 +42,12 @@ export type IngestionRunRow = typeof ingestionRuns.$inferSelect;
 
 /** A run that has been "running" longer than this is considered dead and does not block new runs. */
 export const RUN_LOCK_MS = 15 * 60_000;
+
+/** A run more than this long after the last success pages up to CATCH_UP_PAGES (FR-011). */
+export const CATCH_UP_AFTER_MS = 2 * 3_600_000;
+export const CATCH_UP_PAGES = 20;
+/** Keyword searches per scheduled run (FR-012); each is one GeM request on the same ≤ 1 req/s client. */
+export const SEARCH_KEYWORDS_PER_RUN = 10;
 
 export class IngestionBusyError extends Error {
   constructor(readonly run: IngestionRunRow) {
@@ -51,7 +64,6 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}): Promise<IngestionRunRow> {
   const { db, clock, logger } = deps;
   const now = clock.now();
-  const pages = Math.max(1, Math.min(20, opts.pages ?? deps.gem.maxPages));
 
   // Single-flight: don't start while another fresh run is going.
   const [busy] = await db.select().from(ingestionRuns)
@@ -75,21 +87,45 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
   });
 
   try {
-    // 1. Fetch pages.
+    // 1. Fetch listing pages (FR-011): incremental with catch-up after a gap.
     const fetched = new Map<string, NormalizedTender>();
+    const plan = await planPages(deps, opts, now);
     let rawSeen = 0;
-    for (let page = 1; page <= pages; page++) {
+    for (let page = 1; page <= plan.maxPages; page++) {
+      let res: Awaited<ReturnType<typeof client.fetchTenders>>;
       try {
-        const res = await client.fetchTenders({ page, search: opts.search, now });
-        stats.pagesFetched++;
-        for (const t of res.tenders) fetched.set(t.bidNumber, t);
-        rawSeen += res.rawCount;
-        if (res.rawCount === 0 || rawSeen >= res.numFound) break;
+        res = await client.fetchTenders({ page, search: opts.search, now });
       } catch (e) {
+        if (isFormatDriftError(e)) throw driftFailure(deps, e, { page });
         errors.push(`page ${page}: ${errMsg(e)}`);
         logger.warn('ingestion: page failed', { page, error: errMsg(e) });
         break; // stay polite: don't hammer a failing portal
       }
+      stats.pagesFetched++;
+      for (const t of res.tenders) fetched.set(t.bidNumber, t);
+      rawSeen += res.rawCount;
+      if (res.rawCount === 0 || rawSeen >= res.numFound) break;
+      // Stop once a whole page is already known and unchanged — the rest is older news.
+      if (plan.incremental && res.tenders.length && await allKnownUnchanged(deps, res.tenders)) break;
+    }
+    logger.info('ingestion: listing pages fetched', { runId: run.id, pages: stats.pagesFetched, cap: plan.maxPages, catchUp: plan.catchUp, incremental: plan.incremental });
+
+    // 1b. Targeted keyword search pass (FR-012) on scheduled runs, through the same throttled client.
+    if (shouldSearch(opts) && errors.length === 0) {
+      const keywords = await searchKeywordsForRun(deps, run.id);
+      for (const kw of keywords) {
+        try {
+          const res = await client.fetchTenders({ page: 1, search: kw, now });
+          // GeM search is token-OR; results still go through the exact matcher below.
+          for (const t of res.tenders) if (!fetched.has(t.bidNumber)) fetched.set(t.bidNumber, t);
+        } catch (e) {
+          if (isFormatDriftError(e)) throw driftFailure(deps, e, { search: kw });
+          errors.push(`search "${kw}": ${errMsg(e)}`);
+          logger.warn('ingestion: keyword search failed', { keyword: kw, error: errMsg(e) });
+          break;
+        }
+      }
+      if (keywords.length) logger.info('ingestion: keyword search pass', { runId: run.id, keywords });
     }
     stats.tendersSeen = fetched.size;
 
@@ -136,6 +172,63 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
       .where(eq(ingestionRuns.id, run.id)).returning();
     return failed;
   }
+}
+
+const clampPages = (n: number) => Math.max(1, Math.min(CATCH_UP_PAGES, Math.floor(n) || 1));
+
+/** Latest finish time of a successful/partial run (excluding running ones). */
+export async function lastSuccessAt(deps: AppDeps): Promise<Date | null> {
+  const [row] = await deps.db.select({ at: ingestionRuns.finishedAt }).from(ingestionRuns)
+    .where(and(or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial')), isNotNull(ingestionRuns.finishedAt)))
+    .orderBy(desc(ingestionRuns.finishedAt)).limit(1);
+  return row?.at ?? null;
+}
+
+/**
+ * Paging plan (FR-011). Explicit `pages` → fetch up to that many pages, no early stop. Otherwise incremental:
+ * stop after a page of known, unchanged bids; normal cap `gem.maxPages`, or CATCH_UP_PAGES when the last
+ * success is older than 2 h (or there never was one).
+ */
+async function planPages(deps: AppDeps, opts: RunIngestionOptions, now: Date): Promise<{ maxPages: number; incremental: boolean; catchUp: boolean }> {
+  if (opts.pages != null) return { maxPages: clampPages(opts.pages), incremental: false, catchUp: false };
+  const last = await lastSuccessAt(deps);
+  const catchUp = !last || now.getTime() - last.getTime() > CATCH_UP_AFTER_MS;
+  return { maxPages: catchUp ? CATCH_UP_PAGES : clampPages(deps.gem.maxPages), incremental: true, catchUp };
+}
+
+/** True when every bid on the page is already stored with the same content hash. */
+async function allKnownUnchanged(deps: AppDeps, page: NormalizedTender[]): Promise<boolean> {
+  const rows = await deps.db.select({ bidNumber: tenders.bidNumber, contentHash: tenders.contentHash }).from(tenders)
+    .where(and(eq(tenders.source, 'gem'), inArray(tenders.bidNumber, page.map((t) => t.bidNumber))));
+  const hashes = new Map(rows.map((r) => [r.bidNumber, r.contentHash]));
+  return page.every((t) => hashes.get(t.bidNumber) === t.contentHash);
+}
+
+/** FR-012: only scheduled runs without an explicit free-text search add the keyword pass. */
+const shouldSearch = (opts: RunIngestionOptions) => (opts.trigger ?? 'cron') === 'cron' && !opts.search;
+
+/**
+ * Up to SEARCH_KEYWORDS_PER_RUN distinct active watchlist keywords (all orgs), rotating across runs.
+ * The rotation cursor is derived from the number of earlier scheduled runs that completed (success/partial),
+ * so it persists in `ingestion_runs` without extra state: run k searches keywords [10k, 10k + 10) mod n.
+ */
+export async function searchKeywordsForRun(deps: AppDeps, currentRunId: string): Promise<string[]> {
+  const lists = await deps.db.select({ criteria: watchlists.criteria }).from(watchlists).where(eq(watchlists.active, true));
+  const all = [...new Set(lists.flatMap((w) => ((w.criteria as WatchlistCriteria).keywords ?? [])
+    .map((k) => k.trim().toLowerCase()).filter((k) => k.length >= 2)))].sort();
+  if (!all.length) return [];
+  if (all.length <= SEARCH_KEYWORDS_PER_RUN) return all;
+  const [{ n }] = await deps.db.select({ n: sql<number>`count(*)::int` }).from(ingestionRuns)
+    .where(and(eq(ingestionRuns.trigger, 'cron'), ne(ingestionRuns.id, currentRunId),
+      or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial'))));
+  const start = (Number(n) * SEARCH_KEYWORDS_PER_RUN) % all.length;
+  return Array.from({ length: SEARCH_KEYWORDS_PER_RUN }, (_, i) => all[(start + i) % all.length]);
+}
+
+/** FR-014: log `ingestion.format_drift` at error level and fail the whole run with the drift message. */
+function driftFailure(deps: AppDeps, e: unknown, where: Record<string, unknown>): Error {
+  deps.logger.error('ingestion.format_drift', { ...where, error: errMsg(e) });
+  return e instanceof Error ? e : new Error(errMsg(e));
 }
 
 async function upsertTender(
