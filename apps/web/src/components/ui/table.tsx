@@ -78,7 +78,7 @@ export function ResponsiveTable<T>({
           </TableBody>
         </Table>
       </div>
-      <ul className="grid gap-2 md:hidden">
+      <ul className="grid grid-cols-1 gap-2 md:hidden">
         {rows.map((r) => (
           <li key={rowKey(r)}>
             {/*

@@ -1,0 +1,15 @@
+ ✓ src/features/pipeline/position.test.ts (2 tests) 4ms
+ ✓ src/features/settings/token-scope.test.ts (3 tests) 8ms
+ ✓ src/features/vault/stale-doc.test.ts (2 tests) 2ms
+ ✓ src/features/workspace/labels.test.ts (2 tests) 4ms
+ ✓ src/features/notifications/filter.test.ts (3 tests) 3ms
+ ✓ src/features/feed/reasonChips.test.ts (3 tests) 8ms
+ ✓ src/components/layout/CommandPalette.test.ts (2 tests) 6ms
+ ✓ src/features/feed/SampleBadge.test.tsx (1 test) 18ms
+
+ Test Files  42 passed (42)
+      Tests  295 passed (295)
+   Start at  09:12:13
+   Duration  7.57s (transform 1.62s, setup 0ms, collect 10.70s, tests 547ms, environment 7ms, prepare 2.93s)
+
+exit=0

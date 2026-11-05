@@ -2,17 +2,20 @@
  * T038 — ingestion idempotency, corrigenda, matching → notifications, dispatch & digests, failure modes.
  * Runs against the in-process mock BidPlus (tools/mock-gem) through deps.fetch.
  */
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, ingestionRuns, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
+import { analyses, ingestionRuns, notificationPrefs, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
+import type { NormalizedTender } from '@tp/core/gem/parse';
 import { toGemSolrDate } from '@tp/core/gem/normalize';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { createResendMailer } from '../src/adapters/mailer';
 import { isTransientSendError, isTransientStatus, PROVIDER_TIMEOUT_MS, ProviderError } from '../src/adapters/provider-error';
 import { createMetaWhatsApp } from '../src/adapters/whatsapp';
-import { CLAIM_LEASE_MS, DISPATCH_BATCH, LEASE_SAFETY_MARGIN_MS, dispatchNotifications } from '../src/services/alerts';
+import { CLAIM_LEASE_MS, DISPATCH_BATCH, LEASE_SAFETY_MARGIN_MS, dispatchNotifications, renderAlertEmail } from '../src/services/alerts';
 import type { AppDeps } from '../src/deps';
 import { IngestionBusyError, planPages, runIngestion } from '../src/services/ingest';
+import { gemCopyOutdated } from '../src/services/analyse';
+import { keepStaleOnCompletion } from '../src/services/staleness';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z'); // fixture reference = 10:00 IST
@@ -147,7 +150,10 @@ describe('runIngestion', () => {
 
   it('acceptance #4: a corrigendum updates the end date, records history and marks analyses stale', async () => {
     const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/6421001'));
-    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go' });
+    const analysedAt = new Date(ctx.clock.now().getTime() - 86_400_000);
+    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go', createdAt: analysedAt, updatedAt: analysedAt });
+    // A failed attempt has no result to invalidate: markStale leaves it alone (004/T074).
+    const [failed] = await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'failed', error: 'x', createdAt: new Date(0) }).returning();
     const r = await admin(`/__admin/corrigendum/${encodeURIComponent('GEM/2026/B/6421001')}`, { days: 7 });
     expect(r.status).toBe(200);
     ctx.clock.advance(30 * 60_000);
@@ -158,18 +164,155 @@ describe('runIngestion', () => {
     const events = await ctx.db.select().from(tenderEvents).where(and(eq(tenderEvents.tenderId, t.id), eq(tenderEvents.kind, 'corrigendum')));
     expect(events).toHaveLength(1);
     expect(events[0].changes).toEqual({ endAt: { from: t.endAt!.toISOString(), to: after.endAt!.toISOString() } });
-    const [a] = await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id));
+    const [a] = await ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, t.id), eq(analyses.status, 'done')));
     expect(a.stale).toBe(true);
     expect(a.staleReason).toBe('corrigendum'); // Re-score refuses it: a corrigendum needs a re-analysis (004/FR-037)
-    expect(a.staleAt).not.toBeNull();
+    expect(a.staleAt).toEqual(ctx.clock.now()); // via markStale (004/FR-043, T074): when the corrigendum was seen
+    expect(a.updatedAt).toEqual(analysedAt); // "Analysed <time>" is not moved
+    expect((await ctx.db.select().from(analyses).where(eq(analyses.id, failed.id)))[0]).toMatchObject({ stale: false, staleReason: null, staleAt: null });
     // Members who track it get an in-app heads-up; the match itself is not duplicated.
-    expect(await count(notifications, and(eq(notifications.kind, 'deadline'), eq(notifications.orgId, team.orgId))!)).toBe(4);
+    // FR-053: a dedicated `corrigendum` kind (not `deadline`), one in-app row per member plus a queued email each.
+    expect(await count(notifications, and(eq(notifications.kind, 'deadline'), eq(notifications.orgId, team.orgId))!)).toBe(0);
+    const corr = and(eq(notifications.kind, 'corrigendum'), eq(notifications.orgId, team.orgId))!;
+    expect(await count(notifications, and(corr, eq(notifications.channel, 'in_app'))!)).toBe(4);
+    expect(await count(notifications, and(corr, eq(notifications.channel, 'email'), eq(notifications.status, 'pending'))!)).toBe(4);
+    const [inApp] = await ctx.db.select().from(notifications).where(and(corr, eq(notifications.channel, 'in_app')));
+    expect(inApp).toMatchObject({ status: 'sent', link: `/tenders/${t.id}` });
+    expect(inApp.title).toMatch(/^Corrigendum: /);
+    expect(inApp.body).toMatch(/^GEM\/2026\/B\/6421001 was amended on GeM — now closes .* IST\. Changed: Bid end date: .* → .* IST\. Re-check the analysis before you bid\.$/);
     expect(await count(tenderMatches, eq(tenderMatches.tenderId, t.id))).toBe(1);
     // Detail API shows the history.
     const d = await request(ctx.app, 'GET', `/tenders/${t.id}`, { cookie: team.analyst.cookie });
     expect(d.body.events[0]).toMatchObject({ kind: 'corrigendum' });
     expect(d.body.hasCorrigendum).toBe(true);
     expect(d.body.analysis).toMatchObject({ stale: true, verdict: 'go' });
+  });
+
+  it('FR-052/053: corrigendum email carries the change summary; quantity + EMD changes are listed; no duplicates on re-sync', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const [before] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    const r = await admin(`/__admin/corrigendum/${encodeURIComponent(bid)}`, { days: 1, quantity: 90, emd: 300_000 });
+    expect(await r.json()).toMatchObject({ ok: true, quantity: 90, emd: 300_000 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    expect(t).toMatchObject({ quantity: 90, emdAmount: 300_000 });
+    const ev = await ctx.db.select().from(tenderEvents).where(and(eq(tenderEvents.tenderId, t.id), eq(tenderEvents.kind, 'corrigendum')));
+    expect(ev).toHaveLength(2);
+    const [mail] = await ctx.db.select().from(notifications)
+      .where(and(eq(notifications.dedupeKey, `corrigendum:${t.id}:${t.contentHash}:${team.orgId}`), eq(notifications.channel, 'email'), eq(notifications.userId, team.owner.me.user.id)));
+    expect(mail).toMatchObject({ kind: 'corrigendum', status: 'pending' });
+    expect(mail.body).toContain(`Quantity: ${before.quantity} → 90`);
+    expect(mail.body).toContain('EMD: ₹2.4 L → ₹3 L');
+    // Identical re-sync: nothing new.
+    const total = await count(notifications, eq(notifications.kind, 'corrigendum'));
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(notifications, eq(notifications.kind, 'corrigendum'))).toBe(total);
+    // The dispatcher sends it as an "amended" email with the Changed section.
+    ctx.mailer.sent.length = 0;
+    await dispatchNotifications(ctx.deps);
+    const sent = ctx.mailer.sent.filter((m) => m.to === team.owner.email && m.subject.startsWith('Corrigendum:')).at(-1); // newest amendment
+    expect(sent).toBeTruthy();
+    expect(sent!.html).toContain('A tracked GeM bid was amended');
+    expect(sent!.html).toContain('Changed:');
+    expect(sent!.html).toContain('EMD: ₹2.4 L → ₹3 L');
+    // ?kind=corrigendum filters the bell list.
+    const list = await request(ctx.app, 'GET', '/notifications?kind=corrigendum', { cookie: team.owner.cookie });
+    expect(list.status).toBe(200);
+    expect(list.body.items.length).toBeGreaterThan(0);
+    expect(list.body.items.every((n: { kind: string }) => n.kind === 'corrigendum')).toBe(true);
+  });
+
+  it('FR-052: digests list amended bids under a "Changed" section after the new matches', () => {
+    const mk = (kind: 'tender_match' | 'corrigendum', title: string, body: string) =>
+      ({ n: { kind, title, body, link: null } as typeof notifications.$inferSelect });
+    const html = renderAlertEmail({
+      heading: 'h', intro: 'i', appUrl: 'http://tp.test', orgName: 'O', now: REF,
+      rows: [mk('corrigendum', 'Amended bid', 'B was amended on GeM — now closes x IST. Changed: Quantity: 75 → 90. Re-check the analysis before you bid.'), mk('tender_match', 'Fresh match', 'b')],
+    });
+    expect(html.indexOf('Fresh match')).toBeLessThan(html.indexOf('>Changed<'));
+    expect(html.indexOf('>Changed<')).toBeLessThan(html.indexOf('Amended bid'));
+    expect(html).toContain('<strong>Changed:</strong>');
+  });
+
+  it('FR-054: cancelling a tracked tender on GeM alerts tracking orgs on every channel, once', async () => {
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber, title: tenders.title }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), sql`${tenders.bidNumber} <> 'GEM/2026/B/6421001'`)).limit(1);
+    const r = await admin(`/__admin/cancel/${encodeURIComponent(m.bid)}`);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true, cancelled: true });
+    expect((await admin('/__admin/cancel/GEM%2F2026%2FB%2F0000000')).status).toBe(404);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    const [after] = await ctx.db.select().from(tenders).where(eq(tenders.id, m.id));
+    expect(after.status).toBe('cancelled');
+    expect(await count(tenderEvents, and(eq(tenderEvents.tenderId, m.id), eq(tenderEvents.kind, 'cancelled'))!)).toBe(1);
+    const cancelled = and(eq(notifications.orgId, team.orgId), eq(notifications.dedupeKey, `cancelled:${m.id}:${team.orgId}`))!;
+    expect(await count(notifications, and(cancelled, eq(notifications.channel, 'in_app'))!)).toBe(4);
+    expect(await count(notifications, and(cancelled, eq(notifications.channel, 'email'), eq(notifications.status, 'pending'))!)).toBe(4);
+    const [n] = await ctx.db.select().from(notifications).where(and(cancelled, eq(notifications.channel, 'in_app')));
+    expect(n.title).toBe(`Cancelled on GeM: ${m.title}`);
+    expect(n.link).toBe(`/tenders/${m.id}`);
+    // Re-sync: no duplicate alerts; the detail API exposes the status the banner reads.
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(notifications, and(cancelled, eq(notifications.channel, 'in_app'))!)).toBe(4);
+    const d = await request(ctx.app, 'GET', `/tenders/${m.id}`, { cookie: team.analyst.cookie });
+    expect(d.body).toMatchObject({ status: 'cancelled' });
+    expect(d.body.events[0]).toMatchObject({ kind: 'cancelled' });
+  });
+
+  it('B2: a re-cased title is not a corrigendum: no event, no stale analysis, no alerts', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    await ctx.db.update(analyses).set({ stale: false, staleReason: null }).where(eq(analyses.tenderId, t.id));
+    // Stored copy differs from GeM only by case/whitespace (hash forced stale so the diff path runs).
+    await ctx.db.update(tenders).set({ title: `  ${t.title.toUpperCase()}  `, contentHash: 'stale-hash' }).where(eq(tenders.id, t.id));
+    const events = await count(tenderEvents, eq(tenderEvents.tenderId, t.id));
+    const notes = await count(notifications, sql`true`);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(tenderEvents, eq(tenderEvents.tenderId, t.id))).toBe(events);
+    expect(await count(notifications, sql`true`)).toBe(notes);
+    const stale = await ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, t.id), eq(analyses.stale, true)));
+    expect(stale).toHaveLength(0);
+  });
+
+  it('B3: corrigendum and cancellation WhatsApp payloads lead with the notification title', async () => {
+    await ctx.db.update(users).set({ phone: '+919812345678' }).where(eq(users.email, team.analyst.email));
+    await ctx.db.update(notificationPrefs).set({ whatsapp: true }).where(eq(notificationPrefs.userId, team.analyst.me.user.id));
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber, title: tenders.title }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), sql`${tenders.status} <> 'cancelled' and ${tenders.bidNumber} <> 'GEM/2026/B/6421001'`)).limit(1);
+    await admin(`/__admin/corrigendum/${encodeURIComponent(m.bid)}`, { days: 2, quantity: 111 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    await admin(`/__admin/cancel/${encodeURIComponent(m.bid)}`);
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    const sent = ctx.whatsapp as unknown as { sent: { to: string; template?: { name: string; params?: string[] } }[] };
+    sent.sent.length = 0;
+    await dispatchNotifications(ctx.deps);
+    const params = sent.sent.filter((x) => x.to === '+919812345678').map((x) => x.template?.params ?? []);
+    expect(params).toEqual(expect.arrayContaining([
+      [`Corrigendum: ${m.title}`, m.bid, expect.any(String), expect.stringContaining(`/tenders/${m.id}`)],
+      [`Cancelled on GeM: ${m.title}`, m.bid, expect.any(String), expect.stringContaining(`/tenders/${m.id}`)],
+    ]));
+  });
+
+  it('N3: tracking alerts skip orgs with no match or only dismissed matches', async () => {
+    const other = await seedOrgWithRoles(ctx.app, 'Other Org');
+    const [m] = await ctx.db.select({ id: tenders.id, bid: tenders.bidNumber }).from(tenderMatches)
+      .innerJoin(tenders, eq(tenders.id, tenderMatches.tenderId)).where(and(eq(tenderMatches.orgId, team.orgId), eq(tenders.status, 'open'))).limit(1);
+    // other org: a dismissed match on this tender; team org: dismiss too, so nobody tracks it.
+    const [w] = await ctx.db.insert(watchlists).values({ orgId: other.orgId, name: 'w', criteria: {}, active: false } as never).returning();
+    await ctx.db.insert(tenderMatches).values({ orgId: other.orgId, tenderId: m.id, watchlistId: w!.id, reasons: [], relevance: 1, dismissed: true } as never);
+    await ctx.db.update(tenderMatches).set({ dismissed: true }).where(and(eq(tenderMatches.tenderId, m.id), eq(tenderMatches.orgId, team.orgId)));
+    const onTender = and(eq(notifications.kind, 'corrigendum'), eq(notifications.link, `/tenders/${m.id}`))!;
+    const before = await count(notifications, onTender);
+    await admin(`/__admin/corrigendum/${encodeURIComponent(m.bid)}`, { days: 3 });
+    ctx.clock.advance(30 * 60_000);
+    await runIngestion(ctx.deps, { trigger: 'cron', pages: 5 });
+    expect(await count(notifications, onTender)).toBe(before);
+    expect(await count(tenderEvents, and(eq(tenderEvents.tenderId, m.id), eq(tenderEvents.kind, 'corrigendum'))!)).toBeGreaterThan(0);
   });
 
   it('GeM down → run failed with error, nothing lost; HTML → failed too', async () => {
@@ -501,6 +644,66 @@ describe('format-drift guard (FR-014)', () => {
     expect(d.logs.filter((l) => l.level === 'error' && l.msg === 'ingestion.format_drift')).toHaveLength(1);
     const runs = await request(ctx.app, 'GET', '/ingestion/runs', { cookie: team.viewer.cookie });
     expect(runs.body.lastRun).toMatchObject({ status: 'failed', error: expect.stringMatching(/^GeM response format changed/) });
+  });
+});
+
+// Review B1: a run's corrigendum writes are stamped when they happen, not when the run started (which can be up to
+// the run budget earlier), because analyses and GeM copies created meanwhile carry their own write times.
+describe('corrigendum event and stale time are the time of the write (004/FR-045, FR-046)', () => {
+  const RUN_TAKES = 5 * 60_000;
+  /** A run whose listing request takes RUN_TAKES; `during` runs mid-request; GeM then returns `bid` with `change`. */
+  async function slowRun(bid: string, change: Partial<NormalizedTender>, during: () => Promise<void>) {
+    const [row] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    const t: NormalizedTender = {
+      source: 'gem', bidNumber: row.bidNumber, gemBidId: row.gemBidId, bidType: row.bidType, title: row.title, items: row.items,
+      category: row.category, quantity: row.quantity, ministry: row.ministry, department: row.department, organisation: row.organisation,
+      buyerOffice: row.buyerOffice, state: row.state, city: row.city, startAt: row.startAt, endAt: row.endAt, openingAt: row.openingAt,
+      emdAmount: row.emdAmount, estimatedValue: row.estimatedValue, epbgPercent: row.epbgPercent, hsnCodes: row.hsnCodes, status: row.status,
+      documentUrl: row.documentUrl, sourceUrl: row.sourceUrl, raw: row.raw ?? {}, contentHash: `${row.contentHash}:b1:${ctx.clock.now().getTime()}`,
+      ...change,
+    };
+    const client = {
+      fetchTenders: async () => {
+        ctx.clock.advance(RUN_TAKES);
+        await during();
+        ctx.clock.advance(1000); // the corrigendum is written after `during`
+        return { tenders: [t], rawCount: 1, numFound: 1 };
+      },
+    };
+    ctx.clock.advance(60_000);
+    const started = ctx.clock.now();
+    const run = await runIngestion(ctx.deps, { trigger: 'manual', pages: 1, client });
+    expect(run).toMatchObject({ status: 'success', tendersUpdated: 1 });
+    const [event] = await ctx.db.select().from(tenderEvents)
+      .where(and(eq(tenderEvents.tenderId, row.id), eq(tenderEvents.kind, 'corrigendum'))).orderBy(desc(tenderEvents.createdAt)).limit(1);
+    expect(event.createdAt).toEqual(new Date(started.getTime() + RUN_TAKES + 1000));
+    return { row, event };
+  }
+
+  it('an analysis that started after the run started but before the corrigendum was written completes stale (FR-045)', async () => {
+    let runningId = '';
+    const { row, event } = await slowRun('GEM/2026/B/6421010', { endAt: new Date('2026-12-24T09:30:00Z') }, async () => {
+      const [t] = await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/6421010'));
+      const [a] = await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'running', createdAt: ctx.clock.now(), updatedAt: ctx.clock.now() }).returning();
+      runningId = a.id;
+    });
+    expect(row.id).toBeTruthy();
+    // The run's own completion write (analyseTender) keeps a flag set at or after its created_at.
+    const [done] = await ctx.db.update(analyses).set({ status: 'done', ...keepStaleOnCompletion() }).where(eq(analyses.id, runningId)).returning();
+    expect(done).toMatchObject({ status: 'done', stale: true, staleReason: 'corrigendum', staleAt: event.createdAt });
+  });
+
+  it('a GeM copy fetched after the run started but before the documentUrl corrigendum was written is re-fetched (FR-046)', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const { row } = await slowRun(bid, { documentUrl: `${GEM}/showbidDocument/7421001-amended` }, async () => {
+      const [t] = await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, bid));
+      await ctx.db.insert(tenderDocuments).values({
+        tenderId: t.id, orgId: null, kind: 'bid', fileName: 'bid.pdf', blobKey: 'b1/bid.pdf', sizeBytes: 10, pageCount: 1, text: 'bid', createdAt: ctx.clock.now(),
+      });
+    });
+    const copies = await ctx.db.select().from(tenderDocuments).where(and(eq(tenderDocuments.tenderId, row.id), isNull(tenderDocuments.orgId)));
+    expect(copies).toHaveLength(1);
+    expect(await gemCopyOutdated(ctx.db, row.id, copies)).toBe(true);
   });
 });
 

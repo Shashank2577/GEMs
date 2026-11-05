@@ -57,6 +57,19 @@ export const canRescoreFor = (reason: StaleReason | null | undefined) => isResco
 
 export const staleReasonCopy = (reason: StaleReason | null | undefined) => STALE_REASON_COPY[reason ?? 'corrigendum'] ?? STALE_REASON_COPY.corrigendum;
 
+/**
+ * When the analysis became stale, for the banner heading "Re-analysis needed · since 2 hours ago" (FR-043, US6 #7):
+ * "since 2 hours ago", "since just now" (also for a `stale_at` slightly in the future, i.e. clock skew). Null when
+ * there is no usable `stale_at` (analyses flagged before FR-043 recorded the time): the heading then shows no time.
+ */
+export function staleSinceCopy(staleAt: string | null | undefined, now: Date = new Date()): string | null {
+  if (!staleAt) return null;
+  const at = Date.parse(staleAt);
+  if (Number.isNaN(at)) return null;
+  const rel = relativeTime(Math.min(at, now.getTime()), now);
+  return `since ${rel}`;
+}
+
 export const DOC_TYPE_LABEL: Record<string, string> = {
   gst: 'GST', pan: 'PAN', udyam: 'Udyam', startup_dpiit: 'DPIIT', incorporation: 'Incorporation', balance_sheet: 'Balance sheet', itr: 'ITR',
   ca_turnover_certificate: 'CA certificate', oem_authorization: 'OEM authorisation', crac: 'CRAC', work_order: 'Work order', iso: 'ISO', bis: 'BIS',
@@ -184,6 +197,7 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   'tender.analysed': 'ran the eligibility analysis',
   'tender.document_uploaded': 'uploaded a document',
   'tender.document_fetched': 'fetched the bid document from GeM',
+  'tender.document_fetch_failed': 'couldn’t fetch the updated bid document from GeM',
   'analysis.factor_overridden': 'overrode a factor',
   'analysis.rescored': 're-scored the analysis',
   'tender.dismissed': 'dismissed this tender',

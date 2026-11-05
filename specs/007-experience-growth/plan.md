@@ -6,6 +6,8 @@
 
 **Note**: This template is filled in by the `/cairn-plan` command; its definition describes the execution workflow.
 
+**As delivered (T080, 2026-11-05)**: every `(gap)` marker and `Gap` status below was the plan-time state; all gaps are delivered (see `tasks.md` and `qa/evidence/007/README.md`) except FR-067 on the dashboard lists and pipeline cards (#523). Where the code differs from the plan, the affected row or paragraph carries an *As delivered* note.
+
 ## Summary
 
 The experience layer of TenderPilot is built (001 tasks T070–T076): one-round-trip dashboard aggregates
@@ -142,19 +144,19 @@ All endpoints are under `/api`, JSON, cookie session or bearer API token. Errors
 | Method | Path | Role | Request | Response | Errors | Status |
 |---|---|---|---|---|---|---|
 | GET | `/dashboard` | viewer+ | — | `DashboardResponse` (tiles, stats, closingSoon[≤8], pipeline, pipelineValue, verdicts, matchesByDay[14], recentMatches[≤6], expiringDocuments[≤6], activity[≤15], setup[6], setupComplete, demo, generatedAt) | 401 | Built |
-| GET | `/dashboard` (+fields) | viewer+ | — | adds `myWork: MyWorkItem[≤5]` `{id, tenderId, title, bidNumber, stage, dueAt, endAt, readiness:{percent, blockers}}` and `awaitingDecision: DecisionItem[≤5]` `{id, tenderId, title, bidNumber, endAt, analysis:{score, verdict}}` | 401 | Gap (FR-070) |
+| GET | `/dashboard` (+fields) | viewer+ | — | adds `myWork: MyWorkItem[≤5]` `{workspaceId, tenderId, bidNumber, title, stage, dueAt, endAt, readiness:{percent, blockers, analysed}}` (excludes won/lost/dropped/submitted) and `awaitingDecision: DecisionItem[≤5]` flat `{tenderId, workspaceId, bidNumber, title, score, verdict, endAt}` | 401 | Built (FR-070). *As delivered:* the first draft of this row had `id` and a nested `analysis:{score, verdict}`; the code is flat (#527) |
 | GET | `/workspaces` | viewer+ | `?stage=a,b&mine=1&q=` | `{ items: WorkspaceCard[], total, byStage }` | 400 `validation_error` (unknown stage), 401 | Built |
 | PATCH | `/workspaces/:id` | analyst+ | `{ stage?, position?, ownerId?, assigneeIds?, dueAt?, outcome? }` (strict) | `WorkspaceDto` | 400, 401, 403, 404, 409 `conflict` (`reason: not_analysed`), 409 `not_ready` (`details.blockers`) | Built (+ renumber gap FR-033) |
-| PATCH | `/org` | bid_manager+ | `{ name?, onboardingState?: Partial<Record<OnboardingKey, boolean>>, scoringWeights? }` | `MeOrg` | 400 (gap: unknown key / > 16 keys), 401, 403 | Built (+ whitelist gap FR-048) |
+| PATCH | `/org` | bid_manager+ | `{ name?, onboardingState?: Partial<Record<OnboardingKey, boolean>>, scoringWeights? }` | `MeOrg` | 400 (unknown key / > 16 keys, `details.fields.onboardingState`), 401, 403 | Built. *As delivered:* `z.record(string, boolean)` + `superRefine` (not `Partial<Record<OnboardingKey, boolean>>`); FR-048 delivered |
 | POST | `/demo/seed` | bid_manager+ | — | `DemoSeedResponse { ok, created, tenders, watchlists, matches, analyses, workspaces, vaultDocuments, pastContracts }` | 401, 403 | Built (201 / 200) |
-| DELETE | `/demo` | bid_manager+ | — | `DemoRemoveResponse { ok: true, removed: { workspaces, analyses, matches, comments, notifications, activity, pastContracts, vaultDocuments, watchlists, profileReset: boolean } }` | 401, 403 | Gap (FR-065) |
+| DELETE | `/demo` | bid_manager+ | — | `DemoRemoveResponse { ok: true, removed: { workspaces, analyses, matches, comments, notifications, activity, pastContracts, vaultDocuments, watchlists, profileReset: boolean } }` | 401, 403 | Built (FR-065). Shape as planned |
 | POST | `/watchlists` | analyst+ | onboarding step 3 | `WatchlistDto` 201 | 400, 403 | Built (003) |
 | PUT | `/profile` | analyst+ | onboarding steps 1–2 | `ProfileResponse` | 400 `details.fields` | Built (005) |
 | POST | `/vault` | analyst+ | multipart (onboarding step 4) | `VaultDocumentDto` 201 | 400, 413, 415 | Built (005) |
-| GET | `/tenders/:id/result-hint` | analyst+ | — | `{ bidders: [{rank, level, price}], l1Price } \| { available: false }` | 404 | Gap (P3, optional, FR-030 helper) |
+| GET | `/tenders/:id/result-hint` | analyst+ | — | `{ bidders: [{rank, level, price}], l1Price } \| { available: false }` | 404 | Built with US2 (#491); response is `BidResultHint` in `specs/001-gem-tender-copilot/contracts/api.md`; follow-ups in #497 |
 
 Activity actions written in this area: `workspace.stage_changed`, `workspace.outcome_recorded`, `demo.seeded`,
-*(gap)* `demo.removed`, *(gap)* `onboarding.completed {durationSec}`.
+`demo.removed`, `onboarding.completed {durationSec}` (both delivered; `demo.seeded` records `meta.watchlistIds`, the removal's provenance).
 
 ## Data Model Touch-points
 
@@ -215,13 +217,13 @@ Skip → PATCH /org {skipped:true} → /dashboard (setup checklist)
 (gap) PATCH failure → retry once → toast
 ```
 
-### 4. Demo seed and removal (seed built; removal gap FR-065)
+### 4. Demo seed and removal (built; FR-065 delivered)
 
 ```text
 POST /demo/seed (bid_manager+) → seedDemo(db,{orgId,userId,now,blobs}) → upsert 40 tenders (raw.demo) →
   profile if empty → past contracts → vault docs + PDFs → 3 watchlists → matches → 20 analyses → 16 workspaces →
   comments, in-app notifications, activity (meta.demo) → onboardingState.demo = true → 201/200
-(gap) DELETE /demo (bid_manager+) → removeDemo(db,{orgId, blobs}) in one transaction:
+DELETE /demo (bid_manager+; built) → removeDemo(db,{orgId, blobs}) in one transaction:
   delete comments → packets/annexures of demo workspaces → workspaces → analyses → matches → demo watchlists →
   notifications (dedupe demo:%) → activity (meta.demo) → past contracts (seeded) → vault docs (seeded) [+ blobs after commit]
   → reset profile if still demo → onboardingState.demo = false → log demo.removed → 200 { removed }

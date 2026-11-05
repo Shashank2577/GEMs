@@ -2,7 +2,7 @@
  * Settings sub-pages (002/FR-039, FR-046): one list shared by the Settings side nav and the command palette's
  * "Settings" group, so both always offer the same sections with the same labels.
  */
-import { Activity, BellRing, Building2, History, KeyRound, SlidersHorizontal, UserRound, Users, type LucideIcon } from 'lucide-react';
+import { Activity, BellRing, Building2, Gauge, History, KeyRound, SlidersHorizontal, UserRound, Users, type LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/types';
 
 export interface SettingsItem {
@@ -24,6 +24,8 @@ export interface SettingsItem {
 
 export const SETTINGS_ITEMS: SettingsItem[] = [
   { to: 'organization', label: 'Organization', icon: Building2, description: 'Name and plan', keywords: ['org', 'company name', 'plan', 'rename'] },
+  // 008/FR-041c
+  { to: 'usage', label: 'Plan & usage', icon: Gauge, description: 'Limits, trial and meters', keywords: ['usage', 'plan', 'limits', 'trial', 'quota', 'billing', 'upgrade'] },
   { to: 'account', label: 'Your account', icon: UserRound, description: 'Name, mobile, password', keywords: ['profile', 'password', 'mobile', 'sessions', 'leave organization'] },
   { to: 'team', label: 'Team & roles', icon: Users, description: 'Members and invitations', keywords: ['team', 'members', 'invite', 'roles', 'teammates', 'users'] },
   { to: 'notifications', label: 'Notifications', icon: BellRing, description: 'Email, WhatsApp, digests', keywords: ['notification settings', 'email', 'whatsapp', 'digest', 'alerts', 'preferences'] },

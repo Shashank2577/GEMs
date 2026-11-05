@@ -673,6 +673,14 @@ describe('notifications ?kind validation (003/FR-049)', () => {
     expect(ok.body.items.every((i: { kind: string }) => i.kind === 'tender_match')).toBe(true);
     expect((await get('/notifications?kind=digest', team.owner)).body.total).toBe(0);
   });
+
+  it('accepts the corrigendum and result kinds (US5)', async () => {
+    for (const kind of ['corrigendum', 'result']) {
+      const r = await get(`/notifications?kind=${kind}`, team.owner);
+      expect(r.status).toBe(200);
+      expect(r.body.items.every((i: { kind: string }) => i.kind === kind)).toBe(true);
+    }
+  });
 });
 
 describe('one-click email unsubscribe (003/FR-048)', () => {

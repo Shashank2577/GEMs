@@ -5,6 +5,7 @@ import type {
 } from '@tp/core/contracts/auth';
 import type { ScoringWeights } from '@tp/core/contracts/analyse';
 import type { IngestionRunsResponse } from '@tp/core/contracts/identify';
+import type { OrgUsageResponse } from '@tp/core/contracts/plans';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/toaster';
 import { api, type Paged } from '@/lib/api';
@@ -18,6 +19,7 @@ export const settingsKeys = {
   sessions: ['me', 'sessions'] as const,
   weights: ['scoring-weights'] as const,
   runs: ['ingestion', 'runs'] as const,
+  usage: ['org', 'usage'] as const,
   activity: ['activity'] as const,
 };
 
@@ -31,7 +33,18 @@ export function useUpdateOrg() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { name?: string; onboardingState?: Record<string, boolean> }) => api.patch('/org', body),
+    meta: { handlesNetworkError: true }, // call site toasts its own failure (incl. offline) — skip the global offline toast
     onSuccess: () => qc.invalidateQueries({ queryKey: ME_KEY }),
+  });
+}
+
+// ── Plan & usage (008/FR-039, FR-041c) ──
+export function useOrgUsage() {
+  const { me } = useAuth();
+  return useQuery({
+    queryKey: [...settingsKeys.usage, me?.org.id, me?.org.plan],
+    queryFn: () => api.get<OrgUsageResponse>('/org/usage'),
+    staleTime: 15_000,
   });
 }
 

@@ -67,7 +67,7 @@ export default function LoginPage() {
         <Field
           label="Password"
           error={errors.password}
-          labelAside={<Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">Forgot password?</Link>}
+          labelAside={<Link to="/forgot-password" className="inline-flex min-h-6 items-center text-xs font-medium text-primary hover:underline">Forgot password?</Link>}
         >
           <PasswordInput name="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>

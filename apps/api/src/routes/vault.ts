@@ -31,11 +31,13 @@ import {
 import { DOC_TYPES, docStatus, EXPIRING_WITHIN_DAYS, guessDocType, guessFinancialYear, nextReminder, type DocType } from '@tp/core/vault/status';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
+import { assertWithinPlan } from '../lib/plan';
 import { runExpiryReminders } from '../services/reminders';
 import { badRequest, HttpError, notFound, validationError } from '../lib/errors';
 import { parseQuery, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { VAULT_TOO_LARGE, VAULT_UPLOAD_MAX_BYTES, bodyLimit } from '../middleware/body-limit';
+import { markStale } from '../services/staleness';
 import { rateLimit } from '../middleware/rate-limit';
 import type { AppEnv } from '../types';
 
@@ -303,18 +305,24 @@ vaultRoutes.post('/vault', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_LARGE), r
   }, 'form');
   const contentSha256 = await sha256Hex(file.bytes);
   await rejectDuplicate(deps, org, body, contentSha256, file.bytes.length);
+  await assertWithinPlan(deps, org, 'vaultBytes', file.bytes.length); // 008/FR-036
   const id = crypto.randomUUID();
   const fileName = safeFileName(file.name, file.mime);
   const blobKey = blobKeyFor(org, id, fileName);
   await deps.blobs.put(blobKey, file.bytes, { contentType: file.mime });
   let row: VaultRow;
   try {
-    [row] = (await deps.db.insert(vaultDocuments).values({
-      id, orgId: org, type: meta.type as DocType, title: meta.title ?? titleFromFileName(file.name), number: meta.number ?? null,
-      issuer: meta.issuer ?? null, issueDate: meta.issueDate ?? null, expiryDate: meta.expiryDate ?? null,
-      financialYear: meta.financialYear ?? null, tags: meta.tags ?? [], blobKey, fileName, mimeType: file.mime,
-      sizeBytes: file.bytes.length, pageCount, uploadedBy: userId(c), contentSha256,
-    }).returning()) as [VaultRow];
+    row = await deps.db.transaction(async (tx) => {
+      const [inserted] = (await tx.insert(vaultDocuments).values({
+        id, orgId: org, type: meta.type as DocType, title: meta.title ?? titleFromFileName(file.name), number: meta.number ?? null,
+        issuer: meta.issuer ?? null, issueDate: meta.issueDate ?? null, expiryDate: meta.expiryDate ?? null,
+        financialYear: meta.financialYear ?? null, tags: meta.tags ?? [], blobKey, fileName, mimeType: file.mime,
+        sizeBytes: file.bytes.length, pageCount, uploadedBy: userId(c), contentSha256,
+      }).returning()) as [VaultRow];
+      // The vault feeds scoring (FR-044); flagged with the write so it commits with it or not at all (S2).
+      await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now());
+      return inserted;
+    });
   } catch (e) {
     await deps.blobs.delete(blobKey).catch(() => {});
     throw e;
@@ -338,8 +346,13 @@ vaultRoutes.patch('/vault/:id', requireRole('analyst'), async (c) => {
   if (issue && expiry && expiry < issue) throw validationError('expiryDate: Expiry date is before the issue date', { fields: { expiryDate: 'Expiry date is before the issue date' } });
   // A renewed expiry date restarts the 30/7/1 reminder cycle.
   if (patch.expiryDate !== undefined && patch.expiryDate !== existing.expiryDate) patch.lastReminderDays = null;
-  const [row] = await deps.db.update(vaultDocuments).set({ ...patch, updatedAt: deps.clock.now() })
-    .where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id))).returning();
+  const [row] = await deps.db.transaction(async (tx) => {
+    const rows = await tx.update(vaultDocuments).set({ ...patch, updatedAt: deps.clock.now() })
+      .where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id))).returning();
+    if (rows.length && Object.keys(patch).length) await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now()); // with the write (S2)
+    return rows;
+  });
+  if (!row) throw notFound('Document');
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.updated', entityType: 'vault_document', entityId: existing.id, meta: { fields: Object.keys(input) } });
   return c.json(await dto(deps, row!));
 });
@@ -350,6 +363,8 @@ vaultRoutes.put('/vault/:id/file', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_L
   const uid = userId(c);
   const existing = await getDoc(deps, org, c.req.param('id'));
   const { body, file, pageCount } = await readFile(c);
+  // 008/FR-036: the previous file is kept as a version, so the new file adds its full size.
+  await assertWithinPlan(deps, org, 'vaultBytes', file.bytes.length);
   // Renewal fields (FR-064): only the ones sent are applied; '' clears, like PATCH.
   const sent = Object.fromEntries((['issueDate', 'expiryDate', 'number'] as const)
     .filter((k) => typeof body[k] === 'string').map((k) => [k, body[k] as string]));
@@ -393,6 +408,7 @@ vaultRoutes.put('/vault/:id/file', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_L
       if (drop.length) {
         await tx.delete(vaultDocumentVersions).where(and(eq(vaultDocumentVersions.orgId, org), inArray(vaultDocumentVersions.id, drop.map((v) => v.id))));
       }
+      await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now()); // with the write (S2)
       return { row: updated, pruned: drop.map((v) => v.blobKey) };
     }));
   } catch (e) {
@@ -428,6 +444,7 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
     const [gone] = await tx.delete(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id)))
       .returning({ blobKey: vaultDocuments.blobKey });
     if (!gone) throw notFound('Document');
+    await markStale(tx, { orgId: org, openOnly: true }, 'vault_changed', deps.clock.now()); // with the write (S2)
     return [gone.blobKey, ...versions.map((v) => v.blobKey)];
   });
   // After commit: the blobs (current file + versions) and the activity entry.

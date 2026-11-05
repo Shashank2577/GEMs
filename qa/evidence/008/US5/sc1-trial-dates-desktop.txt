@@ -1,0 +1,13 @@
+# sc1-trial-dates — project desktop — 2026-11-05T09:31:06.934Z
+### GET /api/auth/me
+> GET /api/auth/me
+< 200
+{"user":{"id":"c2a3a83d-d625-4c24-bf28-52695b72641a","name":"QA sc1 mw3cilva1","email":"sc1.mw3cilva1@example.in","phone":null},"org":{"id":"3522c04a-15f9-4a4a-8e54-63668101a681","name":"sc1 Traders mw3cilva1","slug":"sc1-traders-mw3cilva1","plan":"trial","onboardingState":{},"scoringWeights":null,"trialEndsAt":"2026-11-19T09:31:06.974Z"},"role":"owner","orgs":[{"id":"3522c04a-15f9-4a4a-8e54-63668101a681","name":"sc1 Traders mw3cilva1","slug":"sc1-traders-mw3cilva1","role":"owner"}]}
+
+### GET /api/org
+> GET /api/org
+< 200
+{"id":"3522c04a-15f9-4a4a-8e54-63668101a681","name":"sc1 Traders mw3cilva1","slug":"sc1-traders-mw3cilva1","plan":"trial","onboardingState":{},"scoringWeights":null,"trialEndsAt":"2026-11-19T09:31:06.974Z"}
+
+organizations.created_at = 2026-11-05T09:31:06.974Z; trial_ends_at = 2026-11-19T09:31:06.974Z; difference = 336 h
+example: 2026-11-05 10:00 IST + 14 × 24 h = 2026-11-19T04:30:00.000Z

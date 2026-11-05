@@ -1,7 +1,7 @@
 /** Build AppDeps from environment variables + runtime-specific db/blob store. */
 import type { Db } from '@tp/db';
 import type { AppDeps, BlobStore, Clock, ErrorReporter, GemLease, Logger } from '../deps';
-import { loadConfig, loadGemConfig, type AppConfig, type RuntimeEnv } from '../env';
+import { adminTokenWarning, loadConfig, loadGemConfig, type AppConfig, type RuntimeEnv } from '../env';
 import { createPgGemLease } from '../lib/gem-lease';
 import { createPgRateLimiter } from '../lib/rate-limiter';
 import { systemClock } from './clock';
@@ -22,9 +22,13 @@ export interface CreateDepsInput {
   fetch?: typeof fetch;
 }
 
+let adminTokenWarned = false;
+
 export function createDeps({ env, db, blobs, clock, logger, errors, fetch: f }: CreateDepsInput): AppDeps {
   const config = loadConfig(env);
   logger ??= createJsonLogger({ level: config.logLevel });
+  const adminWarning = adminTokenWarning(env);
+  if (adminWarning && !adminTokenWarned) { adminTokenWarned = true; logger.warn(adminWarning); }
   warnMissingUnsubscribeSecret(env, config, logger);
   const gem = loadGemConfig(env);
   const doFetch: typeof fetch = f ?? ((input, init) => fetch(input, init));
