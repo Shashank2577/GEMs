@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
-  ApiTokenSummary, CreatedApiToken, CreatedInvitation, Me, MembersResponse, NotificationPrefs,
+  ApiTokenSummary, CreateApiTokenInput, CreatedApiToken, CreatedInvitation, Me, MembersResponse, NotificationPrefs,
   RevokeOtherSessionsResponse, SessionsResponse, TestAlertResult,
 } from '@tp/core/contracts/auth';
 import type { ScoringWeights } from '@tp/core/contracts/analyse';
@@ -128,7 +128,7 @@ export function useTokens() {
 }
 export function useCreateToken() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (name: string) => api.post<CreatedApiToken>('/me/api-tokens', { name }), onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tokens }) });
+  return useMutation({ mutationFn: (input: CreateApiTokenInput) => api.post<CreatedApiToken>('/me/api-tokens', input), onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tokens }) });
 }
 export function useRevokeToken() {
   const qc = useQueryClient();
