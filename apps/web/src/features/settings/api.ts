@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   ApiTokenSummary, CreatedApiToken, CreatedInvitation, Me, MembersResponse, NotificationPrefs,
+  RevokeOtherSessionsResponse, SessionsResponse,
 } from '@tp/core/contracts/auth';
 import type { ScoringWeights } from '@tp/core/contracts/analyse';
 import type { IngestionRunsResponse } from '@tp/core/contracts/identify';
@@ -11,6 +12,7 @@ export const settingsKeys = {
   members: ['org', 'members'] as const,
   prefs: ['me', 'notification-prefs'] as const,
   tokens: ['me', 'api-tokens'] as const,
+  sessions: ['me', 'sessions'] as const,
   weights: ['scoring-weights'] as const,
   runs: ['ingestion', 'runs'] as const,
 };
@@ -35,7 +37,27 @@ export function useUpdateMe() {
   return useMutation({ mutationFn: (body: { name?: string; phone?: string | null }) => api.patch<Me>('/me', body), onSuccess: setMe });
 }
 export function useChangePassword() {
-  return useMutation({ mutationFn: (body: { currentPassword: string; newPassword: string }) => api.post('/me/password', body) });
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { currentPassword: string; newPassword: string }) => api.post('/me/password', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.sessions }),
+  });
+}
+
+// ── Sessions (002/FR-012) ──
+export function useSessions() {
+  return useQuery({ queryKey: settingsKeys.sessions, queryFn: () => api.get<SessionsResponse>('/me/sessions') });
+}
+export function useRevokeSession() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => api.delete(`/me/sessions/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.sessions }) });
+}
+export function useRevokeOtherSessions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<RevokeOtherSessionsResponse>('/me/sessions/revoke-others'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.sessions }),
+  });
 }
 
 // ── Team ──

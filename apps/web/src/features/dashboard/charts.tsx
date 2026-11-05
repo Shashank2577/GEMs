@@ -1,12 +1,14 @@
 /** Dashboard charts — themed with design tokens (hsl(var(--…))) so light/dark both work. */
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useReducedMotion } from 'framer-motion';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { DashboardResponse, DashboardStage } from '@tp/core/contracts/experience';
 import { formatINRCompact, formatNumberIN, pluralize } from '@/lib/format';
 import { STAGE_LABEL, VERDICT_LABEL, type Verdict } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { verdictColor } from '@/components/ui';
+import { donutSegments } from './donut';
 
 const dayLabel = (iso: string, long = false) =>
   new Date(`${iso}T12:00:00+05:30`).toLocaleDateString('en-IN', long ? { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' } : { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
@@ -25,6 +27,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 /** Single-series area chart: distinct matched tenders per IST day (last 14 days). */
 export function MatchesTrend({ data }: { data: DashboardResponse['matchesByDay'] }) {
   const total = data.reduce((a, b) => a + b.count, 0);
+  const reduce = useReducedMotion(); // FR-093: no chart motion when the user prefers reduced motion
   return (
     <div className="h-56 w-full" role="img" aria-label={`New matches over the last 14 days: ${total} in total`}>
       <ResponsiveContainer width="100%" height="100%">
@@ -41,39 +44,43 @@ export function MatchesTrend({ data }: { data: DashboardResponse['matchesByDay']
           <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeDasharray: '3 3' }} />
           <Area type="monotone" dataKey="count" stroke="hsl(var(--chart-1))" strokeWidth={2} fill="url(#tp-matches-fill)"
-            activeDot={{ r: 4, strokeWidth: 2, stroke: 'hsl(var(--card))' }} dot={false} isAnimationActive />
+            activeDot={{ r: 4, strokeWidth: 2, stroke: 'hsl(var(--card))' }} dot={false} isAnimationActive={!reduce} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-/** Go / Review / No-Go donut with a labelled legend (identity never by colour alone). */
+const RING = { size: 120, r: 50, width: 14 } as const;
+const RING_C = 2 * Math.PI * RING.r;
+
+/**
+ * Go / Review / No-Go donut with a labelled legend (identity never by colour alone).
+ *
+ * Drawn as plain SVG circles (not a recharts Pie): the ring is rendered in its final state on the first paint, so it
+ * never depends on a JS animation frame (recharts drew no sectors until its animation ran and ignored reduced motion),
+ * and colours are applied through the `style` property, where `hsl(var(--token))` is always resolved. The track uses
+ * a visible tint so an org with no analyses still shows a ring (the old `--muted` placeholder was ~1.1:1 on the card).
+ */
 export function VerdictDonut({ verdicts }: { verdicts: DashboardResponse['verdicts'] }) {
   const rows = (['go', 'review', 'no_go'] as Verdict[]).map((v) => ({ key: v, name: VERDICT_LABEL[v], value: verdicts[v] }));
   const total = rows.reduce((a, r) => a + r.value, 0);
+  const segments = donutSegments(rows, RING_C, 3);
+  const c = RING.size / 2;
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row lg:flex-col xl:flex-row">
-      <div className="relative size-40 shrink-0" role="img" aria-label={rows.map((r) => `${r.name} ${r.value}`).join(', ')}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={total ? rows : [{ key: 'none', name: 'None', value: 1 }]} dataKey="value" innerRadius="70%" outerRadius="100%"
-              paddingAngle={total ? 2 : 0} stroke="hsl(var(--card))" strokeWidth={2} cornerRadius={4} startAngle={90} endAngle={-270} isAnimationActive>
-              {(total ? rows : [{ key: 'none' }]).map((r) => (
-                <Cell key={r.key} fill={r.key === 'none' ? 'hsl(var(--muted))' : verdictColor[r.key as Verdict]} />
-              ))}
-            </Pie>
-            {total > 0 && (
-              <Tooltip
-                content={({ active, payload }) => active && payload?.length ? (
-                  <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md">
-                    <span className="font-semibold">{payload[0]!.name}</span>: {payload[0]!.value as number} ({Math.round(((payload[0]!.value as number) / total) * 100)}%)
-                  </div>
-                ) : null}
-              />
-            )}
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="relative size-40 shrink-0" role="img" aria-label={`Go/No-Go verdicts, ${total} analysed: ${rows.map((r) => `${r.name} ${r.value}`).join(', ')}`}>
+        <svg viewBox={`0 0 ${RING.size} ${RING.size}`} width="100%" height="100%" className="block size-full" aria-hidden data-testid="verdict-ring">
+          <circle cx={c} cy={c} r={RING.r} fill="none" strokeWidth={RING.width} style={{ stroke: 'hsl(var(--muted-foreground) / 0.22)' }} />
+          {segments.map((s) => (
+            <circle key={s.key} data-verdict={s.key} cx={c} cy={c} r={RING.r} fill="none" strokeWidth={RING.width}
+              strokeDasharray={`${s.length} ${RING_C}`} strokeDashoffset={-s.start} transform={`rotate(-90 ${c} ${c})`}
+              className="motion-safe:transition-[stroke-dasharray,stroke-dashoffset] motion-safe:duration-700 motion-safe:ease-out"
+              style={{ stroke: verdictColor[s.key] }}>
+              <title>{`${VERDICT_LABEL[s.key]}: ${s.value} (${Math.round((s.value / total) * 100)}%)`}</title>
+            </circle>
+          ))}
+        </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="tabular text-2xl font-semibold tracking-tight">{total}</span>
           <span className="text-2xs font-medium uppercase tracking-wider text-muted-foreground">analysed</span>

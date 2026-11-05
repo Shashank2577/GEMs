@@ -4,10 +4,11 @@
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, ingestionRuns, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users } from '@tp/db';
+import { analyses, ingestionRuns, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
+import { toGemSolrDate } from '@tp/core/gem/normalize';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { dispatchNotifications } from '../src/services/alerts';
-import { IngestionBusyError, runIngestion } from '../src/services/ingest';
+import { IngestionBusyError, planPages, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z'); // fixture reference = 10:00 IST
@@ -225,5 +226,262 @@ describe('runIngestion', () => {
     expect(await count(notifications, and(eq(notifications.userId, daily.me.user.id), eq(notifications.status, 'pending'))!)).toBe(0);
     // Same day: no second digest.
     expect((await dispatchNotifications(ctx.deps)).digests).toBe(0);
+  });
+});
+
+// ───────────── US1 gaps: incremental/catch-up paging, keyword search pass, format drift ─────────────
+
+type Captured = { path: string; searchBid: string | null; page: number | null; at: number };
+/** deps copy whose fetch records every GeM request (payload search + page) before forwarding to mock-gem. */
+function recordingDeps(over: Partial<typeof ctx.deps.gem> = {}, fail?: (c: Captured) => boolean) {
+  const calls: Captured[] = [];
+  const deps = {
+    ...ctx.deps,
+    gem: { ...ctx.deps.gem, ...over },
+    fetch: (async (input: string, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname;
+      let searchBid: string | null = null;
+      let page: number | null = null;
+      if (path === '/all-bids-data' && typeof init?.body === 'string') {
+        const payload = JSON.parse(new URLSearchParams(init.body).get('payload') ?? '{}');
+        searchBid = payload.param?.searchBid ?? '';
+        page = payload.page ?? null;
+      }
+      const call = { path, searchBid, page, at: Date.now() };
+      calls.push(call);
+      if (fail?.(call)) return new Response('Service Unavailable', { status: 503 });
+      return mock.app.fetch(new Request(input, init));
+    }) as typeof fetch,
+  };
+  const listing = () => calls.filter((c) => c.path === '/all-bids-data' && c.searchBid === '');
+  const searches = () => calls.filter((c) => c.path === '/all-bids-data' && c.searchBid !== '').map((c) => c.searchBid!);
+  return { deps, calls, listing, searches };
+}
+
+describe('incremental paging & catch-up (FR-011)', () => {
+  it('after a > 2 h gap, pages past the normal cap until a page of known, unchanged bids', async () => {
+    ctx.clock.advance(3 * 3_600_000);
+    const pub = await (await admin('/__admin/publish', { count: 3 })).json() as { published: string[] };
+    expect(pub.published).toHaveLength(3);
+    const before = await count(tenders);
+    const r = recordingDeps({ maxPages: 1 }); // normal cap 1 page — catch-up must override it
+    const run = await runIngestion(r.deps, { trigger: 'manual' });
+    // page 1: 3 new + 7 known; page 2: all known and unchanged → stop.
+    expect(run).toMatchObject({ status: 'success', pagesFetched: 2, tendersCreated: 3, tendersUpdated: 0 });
+    expect(r.listing().map((c) => c.page)).toEqual([1, 2]);
+    expect(await count(tenders)).toBe(before + 3);
+    for (const bid of pub.published) expect(await count(tenders, eq(tenders.bidNumber, bid))).toBe(1);
+  });
+
+  it('within 2 h keeps to the normal cap; a run that used up its cap makes the next one resume as catch-up', async () => {
+    ctx.clock.advance(30 * 60_000);
+    await admin('/__admin/publish', { count: 12 }); // 10 on page 1, 2 on page 2
+    const capped = recordingDeps({ maxPages: 1 });
+    const run = await runIngestion(capped.deps, { trigger: 'manual' });
+    expect(run).toMatchObject({ status: 'success', pagesFetched: 1, tendersCreated: 10, listingStop: 'cap' });
+    expect(capped.listing()).toHaveLength(1);
+    // Cap 1 again, but the last run hit its cap without an all-known page → catch-up that resumes past page 1:
+    // page 1 (known) doesn't stop it, page 2 has the 2 left over, page 3 is all known → stop.
+    ctx.clock.advance(30 * 60_000);
+    expect(await planPages(ctx.deps, {}, ctx.clock.now())).toMatchObject({ catchUp: true, maxPages: 20, noStopBefore: 2 });
+    const r = recordingDeps({ maxPages: 1 });
+    const next = await runIngestion(r.deps, { trigger: 'manual' });
+    expect(next).toMatchObject({ status: 'success', pagesFetched: 3, tendersCreated: 2, tendersUpdated: 0, listingStop: 'all_known' });
+    expect(r.listing().map((c) => c.page)).toEqual([1, 2, 3]);
+    // Nothing new → page 1 is all known → stop there, even with cap 5.
+    ctx.clock.advance(30 * 60_000);
+    const quiet = recordingDeps({ maxPages: 5 });
+    const idle = await runIngestion(quiet.deps, { trigger: 'manual' });
+    expect(idle).toMatchObject({ status: 'success', pagesFetched: 1, tendersSeen: 10, tendersCreated: 0, listingStop: 'all_known' });
+    expect(await planPages(ctx.deps, {}, ctx.clock.now())).toMatchObject({ catchUp: false, maxPages: 5, noStopBefore: 1 });
+  });
+
+  it('an explicit page count is honoured in full (no early stop)', async () => {
+    ctx.clock.advance(30 * 60_000);
+    const r = recordingDeps({ maxPages: 1 });
+    const full = await runIngestion(r.deps, { trigger: 'manual', pages: 3 });
+    expect(full).toMatchObject({ status: 'success', pagesFetched: 3, tendersSeen: 30, tendersCreated: 0, listingStop: 'explicit' });
+    expect(r.listing().map((c) => c.page)).toEqual([1, 2, 3]);
+    const runs = await request(ctx.app, 'GET', '/ingestion/runs', { cookie: team.viewer.cookie });
+    expect(runs.body.lastRun).toMatchObject({ pagesFetched: 3 });
+  });
+
+  it('a catch-up run that ends partial (listing failed) does not cancel the next catch-up', async () => {
+    ctx.clock.advance(3 * 3_600_000);
+    await admin('/__admin/publish', { count: 3 });
+    const flaky = recordingDeps({ maxPages: 5 }, (c) => c.path === '/all-bids-data' && c.page === 2);
+    const partial = await runIngestion(flaky.deps, { trigger: 'manual' });
+    expect(partial).toMatchObject({ status: 'partial', pagesFetched: 1, tendersCreated: 3, listingStop: 'error' });
+    expect(partial.error).toMatch(/^page 2: /);
+    // Still catch-up: the last *clean* listing is > 2 h old.
+    ctx.clock.advance(60_000);
+    expect(await planPages(ctx.deps, {}, ctx.clock.now())).toMatchObject({ catchUp: true, maxPages: 20 });
+    const r = recordingDeps({ maxPages: 1 });
+    const next = await runIngestion(r.deps, { trigger: 'manual' });
+    expect(next).toMatchObject({ status: 'success', listingStop: 'all_known' });
+    expect(await planPages(ctx.deps, {}, ctx.clock.now())).toMatchObject({ catchUp: false });
+  });
+
+  it('a run that is partial only because of the keyword pass still counts as a clean listing; the keyword stays out of the run row', async () => {
+    ctx.clock.advance(3 * 3_600_000);
+    const r = recordingDeps({ maxPages: 5 }, (c) => c.path === '/all-bids-data' && !!c.searchBid);
+    const run = await runIngestion(r.deps, { trigger: 'cron' });
+    expect(r.searches().length).toBeGreaterThan(0);
+    const searched = r.searches()[0];
+    expect(run).toMatchObject({ status: 'partial', listingStop: 'all_known' });
+    expect(run.error).toMatch(/^keyword search 1\/\d+: GeM listing failed: HTTP 503$/);
+    expect(run.error).not.toContain(searched); // GET /ingestion/runs is visible to every org (Constitution IV)
+    const runs = await request(ctx.app, 'GET', '/ingestion/runs', { cookie: team.viewer.cookie });
+    for (const kw of ['laptop', 'cctv']) expect(JSON.stringify(runs.body)).not.toContain(kw);
+    ctx.clock.advance(60_000);
+    expect(await planPages(ctx.deps, {}, ctx.clock.now())).toMatchObject({ catchUp: false, maxPages: ctx.deps.gem.maxPages });
+  });
+});
+
+describe('targeted keyword search pass (FR-012, NFR-001)', () => {
+  const extra = ['chair', 'desk', 'printer', 'projector', 'router', 'scanner', 'server', 'switch', 'tablet', 'toner', 'ups'];
+
+  it('scheduled runs search up to 10 active watchlist keywords, rotating across runs, through the throttled client', async () => {
+    const w = await request(ctx.app, 'POST', '/watchlists', { cookie: team.owner.cookie, json: { name: 'Office kit', criteria: { keywords: [...extra, 'Laptop'] } } });
+    expect(w.status).toBe(201);
+    // Paused watchlists don't contribute keywords.
+    const paused = await request(ctx.app, 'POST', '/watchlists', { cookie: team.owner.cookie, json: { name: 'Paused', criteria: { keywords: ['submarine'] } } });
+    expect((await request(ctx.app, 'PATCH', `/watchlists/${paused.body.id}`, { cookie: team.owner.cookie, json: { active: false } })).status).toBe(200);
+    const all = [...extra, 'cctv', 'laptop'].sort(); // 13 distinct, case-folded
+
+    ctx.clock.advance(30 * 60_000);
+    const r1 = recordingDeps({ maxPages: 5, minIntervalMs: 15 });
+    const run1 = await runIngestion(r1.deps, { trigger: 'cron' });
+    expect(run1.status).toBe('success');
+    const s1 = r1.searches();
+    expect(s1).toHaveLength(10);
+    expect(new Set(s1).size).toBe(10);
+    for (const k of s1) expect(all).toContain(k);
+    expect(s1).not.toContain('submarine');
+    // Every search is page 1, after the listing pages, on the same ≤ 1 req/interval throttle.
+    const gemCalls = r1.calls.filter((c) => c.path === '/all-bids-data');
+    expect(gemCalls.filter((c) => c.searchBid).every((c) => c.page === 1)).toBe(true);
+    expect(gemCalls.findIndex((c) => c.searchBid)).toBe(r1.listing().length);
+    for (let i = 1; i < r1.calls.length; i++) expect(r1.calls[i].at - r1.calls[i - 1].at).toBeGreaterThanOrEqual(14);
+
+    ctx.clock.advance(30 * 60_000);
+    const r2 = recordingDeps({ maxPages: 5 });
+    await runIngestion(r2.deps, { trigger: 'cron' });
+    const s2 = r2.searches();
+    expect(s2).toHaveLength(10);
+    expect(s2).not.toEqual(s1); // cursor moved
+    expect(new Set([...s1, ...s2])).toEqual(new Set(all)); // two runs cover all 13
+  });
+
+  it('search results go through the same upsert/match path and finds bids beyond the listing pages', async () => {
+    // Keep the active keyword set ≤ 10 so this run searches all of them, whatever the rotation cursor is.
+    await ctx.db.update(watchlists).set({ active: false }).where(eq(watchlists.name, 'Office kit'));
+    // A corrigendum on a recorded-fixture CCTV bid: ~20 newer published bids sit above it, so listing page 1 can't see it.
+    const cctv = await ctx.db.select().from(tenders)
+      .where(sql`${tenders.title} ilike '%cctv%' and ${tenders.status} = 'open' and ${tenders.bidNumber} like 'GEM/2026/B/64210%'`);
+    expect(cctv.length).toBeGreaterThan(0);
+    const target = cctv[0];
+    await admin(`/__admin/corrigendum/${encodeURIComponent(target.bidNumber)}`, { days: 5 });
+    ctx.clock.advance(30 * 60_000);
+    const r = recordingDeps();
+    const run = await runIngestion(r.deps, { trigger: 'cron', pages: 1 });
+    expect(r.listing()).toHaveLength(1);
+    expect(r.searches()).toContain('cctv');
+    expect(run).toMatchObject({ status: 'success', tendersUpdated: 1, tendersCreated: 0 });
+    expect(run.tendersSeen).toBeGreaterThan(10);
+    const [after] = await ctx.db.select().from(tenders).where(eq(tenders.id, target.id));
+    expect(after.endAt!.getTime() - target.endAt!.getTime()).toBe(5 * 86_400_000);
+  });
+
+  it('search hits still need an exact watchlist match: token hits that only contain the keyword are stored, not matched', async () => {
+    // Only the "ups" watchlist (plus earlier laptop/cctv ones) is active → every keyword is searched this run.
+    await ctx.db.update(watchlists).set({ active: false }).where(eq(watchlists.name, 'Office kit'));
+    const ups = await request(ctx.app, 'POST', '/watchlists', { cookie: team.owner.cookie, json: { name: 'UPS', criteria: { keywords: ['ups'] } } });
+    expect(ups.status).toBe(201);
+    // Two old (deep-in-listing) bids that mock-gem's substring search returns for "ups".
+    const base = mock.state.docs.find((d) => String(d.b_bid_number[0]) === 'GEM/2026/B/6421003')!;
+    const end = toGemSolrDate(new Date(ctx.clock.now().getTime() + 10 * 86_400_000));
+    const mk = (n: number, category: string) => {
+      const d = JSON.parse(JSON.stringify(base)) as typeof base;
+      for (const k of ['bbt_title', 'b_title', 'b_hsn_code', 'bd_hsn_code', 'hsn_code']) delete (d as Record<string, unknown>)[k];
+      d.b_id = [7438000 + n];
+      (d as Record<string, unknown>).id = String(7438000 + n);
+      d.b_bid_number = [`GEM/2026/B/643800${n}`];
+      d.b_category_name = [category];
+      d.bd_category_name = [category];
+      d.final_end_date_sort = [end];
+      mock.state.docs.push(d);
+      return d.b_bid_number[0];
+    };
+    const tokenOnly = mk(1, 'Cloud Backups Storage Appliance'); // "ups" only inside "Backups"
+    const exact = mk(2, 'UPS - Online 10 kVA');
+    ctx.clock.advance(30 * 60_000);
+    const r = recordingDeps();
+    const run = await runIngestion(r.deps, { trigger: 'cron', pages: 1 });
+    expect(r.searches()).toContain('ups');
+    expect(run).toMatchObject({ status: 'success' });
+    expect(r.listing()).toHaveLength(1);
+    const [tTok] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, tokenOnly));
+    const [tExact] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, exact));
+    expect(tTok).toBeDefined(); // went through the same upsert path
+    expect(tExact).toBeDefined();
+    expect(await count(tenderMatches, eq(tenderMatches.tenderId, tTok.id))).toBe(0);
+    const m = await ctx.db.select().from(tenderMatches).where(eq(tenderMatches.tenderId, tExact.id));
+    expect(m).toHaveLength(1);
+    expect(m[0]).toMatchObject({ watchlistId: ups.body.id, reasons: ['Keyword “ups”'] });
+  });
+
+  it('manual runs and explicit searches skip the keyword pass', async () => {
+    ctx.clock.advance(30 * 60_000);
+    const r = recordingDeps();
+    await runIngestion(r.deps, { trigger: 'manual' });
+    expect(r.searches()).toEqual([]);
+    ctx.clock.advance(30 * 60_000);
+    const s = recordingDeps();
+    await runIngestion(s.deps, { trigger: 'cron', search: 'laptop', pages: 1 });
+    expect(s.searches()).toEqual(['laptop']);
+  });
+});
+
+describe('format-drift guard (FR-014)', () => {
+  const drifted = (body: unknown) => {
+    const logs: { level: string; msg: string; meta?: Record<string, unknown> }[] = [];
+    const deps = {
+      ...ctx.deps,
+      logger: {
+        info: (msg: string, meta?: Record<string, unknown>) => { logs.push({ level: 'info', msg, meta }); },
+        warn: (msg: string, meta?: Record<string, unknown>) => { logs.push({ level: 'warn', msg, meta }); },
+        error: (msg: string, meta?: Record<string, unknown>) => { logs.push({ level: 'error', msg, meta }); },
+      },
+      fetch: (async (input: string, init?: RequestInit) => {
+        if (new URL(String(input)).pathname === '/all-bids-data') return Response.json(body);
+        return mock.app.fetch(new Request(input, init));
+      }) as typeof fetch,
+    };
+    return { deps, logs };
+  };
+
+  it('fails the run when most docs lack b_bid_number and logs ingestion.format_drift at error level', async () => {
+    const before = await count(tenders);
+    const docs = [{ bidNo: ['GEM/2026/B/1'] }, { bidNo: ['GEM/2026/B/2'] }, { b_bid_number: ['GEM/2026/B/6421001'], b_category_name: ['Laptop'] }];
+    const d = drifted({ code: 200, response: { response: { numFound: 3, start: 0, docs } } });
+    ctx.clock.advance(60_000);
+    const run = await runIngestion(d.deps, { trigger: 'cron' });
+    expect(run.status).toBe('failed');
+    expect(run.error).toMatch(/^GeM response format changed: 2 of 3 listing docs lack b_bid_number/);
+    expect(run.finishedAt).toBeInstanceOf(Date);
+    expect(d.logs).toContainEqual(expect.objectContaining({ level: 'error', msg: 'ingestion.format_drift', meta: expect.objectContaining({ page: 1 }) }));
+    expect(await count(tenders)).toBe(before);
+  });
+
+  it('fails the run when response.response.docs is missing', async () => {
+    const d = drifted({ code: 200, response: { results: [] } });
+    ctx.clock.advance(60_000);
+    const run = await runIngestion(d.deps, { trigger: 'cron', pages: 2 });
+    expect(run.status).toBe('failed');
+    expect(run.error).toMatch(/^GeM response format changed: .*response\.response\.docs missing/);
+    expect(d.logs.filter((l) => l.level === 'error' && l.msg === 'ingestion.format_drift')).toHaveLength(1);
+    const runs = await request(ctx.app, 'GET', '/ingestion/runs', { cookie: team.viewer.cookie });
+    expect(runs.body.lastRun).toMatchObject({ status: 'failed', error: expect.stringMatching(/^GeM response format changed/) });
   });
 });

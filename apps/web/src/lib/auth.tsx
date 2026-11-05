@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Navigate, useLocation } from 'react-router-dom';
-import { api, ApiError } from './api';
+import { api, ApiError, ME_KEY, resetSessionCache } from './api';
 import type { Me, Role } from './types';
 
 export type { Me, Role } from './types';
@@ -14,7 +14,7 @@ export function can(role: Role | null | undefined, min: Role): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[min];
 }
 
-export const ME_KEY = ['auth', 'me'] as const;
+export { ME_KEY };
 
 /** GET /api/auth/me. `data` is null when signed out (401). */
 export function useMe() {
@@ -40,6 +40,8 @@ interface AuthContextValue {
   login: (input: { email: string; password: string }) => Promise<Me>;
   signup: (input: { name: string; email: string; password: string; orgName: string }) => Promise<Me>;
   acceptInvite: (input: { token: string; name?: string; password?: string }) => Promise<Me>;
+  /** Set a new password from an emailed link; signs in (002/FR-011). */
+  resetPassword: (input: { token: string; newPassword: string }) => Promise<Me>;
   logout: () => Promise<void>;
   switchOrg: (orgId: string) => Promise<Me>;
 }
@@ -47,36 +49,38 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const qc = useQueryClient();
   const meQuery = useMe();
   const me = meQuery.data ?? null;
 
-  const setMe = useCallback((m: Me | null) => qc.setQueryData(ME_KEY, m), [qc]);
+  /** Replace the signed-in user and drop every other cached query (keeps the observed ME_KEY query). */
+  const setMe = useCallback((m: Me | null) => resetSessionCache(m), []);
 
-  const loginM = useMutation({ mutationFn: (b: { email: string; password: string }) => api.post<Me>('/auth/login', b) });
-  const signupM = useMutation({ mutationFn: (b: { name: string; email: string; password: string; orgName: string }) => api.post<Me>('/auth/signup', b) });
-  const inviteM = useMutation({ mutationFn: (b: { token: string; name?: string; password?: string }) => api.post<Me>('/auth/accept-invite', b) });
+  // `authFlow`: a 401 here is a form error, not a session end (002/FR-013).
+  const meta = { authFlow: true };
+  const loginM = useMutation({ meta, mutationFn: (b: { email: string; password: string }) => api.post<Me>('/auth/login', b) });
+  const signupM = useMutation({ meta, mutationFn: (b: { name: string; email: string; password: string; orgName: string }) => api.post<Me>('/auth/signup', b) });
+  const inviteM = useMutation({ meta, mutationFn: (b: { token: string; name?: string; password?: string }) => api.post<Me>('/auth/accept-invite', b) });
+  const resetM = useMutation({ meta, mutationFn: (b: { token: string; newPassword: string }) => api.post<Me>('/auth/reset-password', b) });
 
   const value = useMemo<AuthContextValue>(() => ({
     me,
     role: me?.role ?? null,
     isLoading: meQuery.isLoading,
     can: (min) => can(me?.role, min),
-    login: async (b) => { const m = await loginM.mutateAsync(b); qc.clear(); setMe(m); return m; },
-    signup: async (b) => { const m = await signupM.mutateAsync(b); qc.clear(); setMe(m); return m; },
-    acceptInvite: async (b) => { const m = await inviteM.mutateAsync(b); qc.clear(); setMe(m); return m; },
+    login: async (b) => { const m = await loginM.mutateAsync(b); setMe(m); return m; },
+    signup: async (b) => { const m = await signupM.mutateAsync(b); setMe(m); return m; },
+    acceptInvite: async (b) => { const m = await inviteM.mutateAsync(b); setMe(m); return m; },
+    resetPassword: async (b) => { const m = await resetM.mutateAsync(b); setMe(m); return m; },
     logout: async () => {
       try { await api.post('/auth/logout'); } catch { /* ignore */ }
-      qc.clear();
       setMe(null);
     },
     switchOrg: async (orgId) => {
       const m = await api.post<Me>('/auth/switch-org', { orgId });
-      qc.clear();
       setMe(m);
       return m;
     },
-  }), [me, meQuery.isLoading, loginM, signupM, inviteM, qc, setMe]);
+  }), [me, meQuery.isLoading, loginM, signupM, inviteM, resetM, setMe]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

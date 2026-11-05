@@ -175,7 +175,7 @@ details? } }`. Cross-org or malformed ids → 404.
 ```text
 Web "Start bid" → POST /tenders/:id/workspace
   → getTenderRow (404) → select workspace by (org, tender) → exists? 200 created:false
-  → latestAnalysis + vaultRows → autoMap(checklist, docs, now) → keep non-null matches
+  → latestAnalysis + vaultRows → autoMap(checklist, docs, now) → count only (store `{}`, FR-002 amended)
   → stage = go | analysing | identified → insert … onConflictDoNothing → (lost race? select winner, 200)
   → activity workspace.created (workspace + tender) → 201 WorkspaceDto
 ```

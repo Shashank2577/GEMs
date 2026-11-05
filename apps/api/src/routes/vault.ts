@@ -9,20 +9,22 @@
  *   GET    /vault/:id             → VaultDocumentDto                                     viewer+
  *   PATCH  /vault/:id             metadata → VaultDocumentDto                            analyst+
  *   PUT    /vault/:id/file        multipart file — replace the file, keep metadata       analyst+
- *   DELETE /vault/:id             removes the row and the blob                           analyst+
+ *   DELETE /vault/:id             removes the row and the blob, unlinks CRAC + OEM refs   analyst+
  *   GET    /vault/:id/download    streams the file (?inline=1 for preview)               viewer+
+ *   POST   /vault/reminders/run   run expiry reminders for this org now → {documents, notifications}  bid_manager+ (FR-052)
  */
 import { and, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { PDFDocument } from 'pdf-lib';
-import { pastContracts, users, vaultDocuments } from '@tp/db';
+import { companyProfiles, pastContracts, users, vaultDocuments } from '@tp/db';
 import { uuidSchema } from '@tp/core/contracts/common';
 import {
   VAULT_MAX_BYTES, vaultQuerySchema, vaultUpdateSchema, vaultUploadFieldsSchema, type VaultDocumentDto, type VaultSummary,
 } from '@tp/core/contracts/vault';
-import { DOC_TYPES, docStatus, EXPIRING_WITHIN_DAYS, guessDocType, guessFinancialYear, type DocType } from '@tp/core/vault/status';
+import { DOC_TYPES, docStatus, EXPIRING_WITHIN_DAYS, guessDocType, guessFinancialYear, nextReminder, type DocType } from '@tp/core/vault/status';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
+import { runExpiryReminders } from '../services/reminders';
 import { badRequest, HttpError, notFound, validationError } from '../lib/errors';
 import { parseQuery, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
@@ -44,11 +46,48 @@ export function sniffMime(bytes: Uint8Array): 'application/pdf' | 'image/png' | 
   return null;
 }
 
+/** UTF-8 byte budget for the stored base name: well under the 255-byte file-name limit of common filesystems. */
+const BASE_MAX_BYTES = 180;
+const utf8 = new TextEncoder();
+
+/** Cut to at most `max` UTF-8 bytes on a grapheme (or at least code-point) boundary — never a split surrogate. */
+function truncateUtf8(s: string, max: number): string {
+  if (utf8.encode(s).length <= max) return s;
+  const parts = typeof Intl.Segmenter === 'function'
+    ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s), (x) => x.segment)
+    : Array.from(s);
+  let out = '';
+  let bytes = 0;
+  for (const g of parts) {
+    const n = utf8.encode(g).length;
+    if (bytes + n > max) break;
+    out += g;
+    bytes += n;
+  }
+  return out;
+}
+
+/**
+ * Stored file name: last path segment, NFC, letters/marks/digits of any script plus `_ . - ( ) &` and
+ * spaces (control and bidi characters such as CR/LF or U+202E become `_`), no leading dots, base at most
+ * 180 UTF-8 bytes, extension from the sniffed type. Keeps "प्रमाणपत्र.pdf" readable on download (FR-030).
+ */
 export function safeFileName(name: string, mime: string): string {
   const ext = mime === 'application/pdf' ? 'pdf' : mime === 'image/png' ? 'png' : 'jpg';
-  let base = (name.split(/[\\/]/).pop() ?? '').replace(/[^\w.\- ()&]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 120);
-  base = base.replace(/\.[A-Za-z0-9]{1,5}$/, '');
+  let base = (name.split(/[\\/]/).pop() ?? '').normalize('NFC').replace(/[^\p{L}\p{M}\p{N}_.\- ()&]+/gu, '_').replace(/\s+/g, ' ').trim();
+  base = base.replace(/\.[A-Za-z0-9]{1,5}$/, '').replace(/^[.\s]+/, '');
+  base = truncateUtf8(base, BASE_MAX_BYTES).trim();
   return `${base || 'document'}.${ext}`;
+}
+
+/** `content-disposition` value with an ASCII `filename` fallback and an RFC 8187 `filename*` (FR-030). */
+export function contentDisposition(fileName: string, inline: boolean): string {
+  const dot = fileName.lastIndexOf('.');
+  const ext = dot > 0 ? fileName.slice(dot + 1) : 'pdf';
+  let ascii = fileName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '');
+  if (!/[A-Za-z0-9]/.test(dot > 0 ? ascii.slice(0, ascii.lastIndexOf('.')) : ascii)) ascii = `document.${ext}`;
+  const star = encodeURIComponent(fileName).replace(/[()'*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${star}`;
 }
 
 const titleFromFileName = (name: string) =>
@@ -90,7 +129,8 @@ export function toVaultDto(r: VaultRow, now: Date, uploader?: { id: string; name
     id: r.id, type: r.type, title: r.title, number: r.number, issuer: r.issuer, issueDate: r.issueDate, expiryDate: r.expiryDate,
     financialYear: r.financialYear, tags: r.tags, fileName: r.fileName, mimeType: r.mimeType, sizeBytes: r.sizeBytes, pageCount: r.pageCount,
     uploadedBy: uploader ?? null, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
-    status: s.status, daysToExpiry: s.daysToExpiry, downloadUrl: `/api/vault/${r.id}/download`,
+    status: s.status, daysToExpiry: s.daysToExpiry,
+    nextReminder: nextReminder(r.expiryDate, r.lastReminderDays, now), downloadUrl: `/api/vault/${r.id}/download`,
   };
 }
 
@@ -170,6 +210,15 @@ vaultRoutes.get('/vault', requireAuth, async (c) => {
 
 vaultRoutes.get('/vault/summary', requireAuth, async (c) => c.json(await vaultSummary(c.var.deps, orgId(c))));
 
+/** Manual "Send reminders now" (FR-052): same job as the scheduler tick, scoped to the caller's org; idempotent. */
+vaultRoutes.post('/vault/reminders/run', requireRole('bid_manager'), async (c) => {
+  const { deps } = c.var;
+  const org = orgId(c);
+  const report = await runExpiryReminders(deps, { orgId: org });
+  await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.reminders_run', entityType: 'vault_document', meta: { ...report } });
+  return c.json(report);
+});
+
 vaultRoutes.post('/vault', requireRole('analyst'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
@@ -243,8 +292,17 @@ vaultRoutes.delete('/vault/:id', requireRole('analyst'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
   const existing = await getDoc(deps, org, c.req.param('id'));
-  await deps.db.update(pastContracts).set({ cracDocumentId: null }).where(and(eq(pastContracts.orgId, org), eq(pastContracts.cracDocumentId, existing.id)));
-  await deps.db.delete(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id)));
+  // One transaction: CRAC unlink, OEM unlink (FR-041) and the row delete commit together.
+  await deps.db.transaction(async (tx) => {
+    await tx.update(pastContracts).set({ cracDocumentId: null }).where(and(eq(pastContracts.orgId, org), eq(pastContracts.cracDocumentId, existing.id)));
+    // Profile OEM authorisations pointing at this document (case-insensitive id match, order preserved).
+    await tx.update(companyProfiles).set({
+      oemAuthorizations: sql`(select coalesce(jsonb_agg(case when lower(e->>'documentId') = lower(${existing.id}) then jsonb_set(e, '{documentId}', 'null'::jsonb) else e end order by i), '[]'::jsonb)
+        from jsonb_array_elements(${companyProfiles.oemAuthorizations}) with ordinality as t(e, i))`,
+    }).where(and(eq(companyProfiles.orgId, org), sql`exists (select 1 from jsonb_array_elements(${companyProfiles.oemAuthorizations}) as o(e) where lower(e->>'documentId') = lower(${existing.id}))`));
+    await tx.delete(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), eq(vaultDocuments.id, existing.id)));
+  });
+  // After commit: the blob and the activity entry.
   await deps.blobs.delete(existing.blobKey).catch((e) => deps.logger.warn('vault blob delete failed', { key: existing.blobKey, error: String(e) }));
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'vault.deleted', entityType: 'vault_document', entityId: existing.id, meta: { type: existing.type, title: existing.title } });
   return c.json({ ok: true as const });
@@ -255,12 +313,11 @@ vaultRoutes.get('/vault/:id/download', requireAuth, async (c) => {
   const obj = await c.var.deps.blobs.get(doc.blobKey);
   if (!obj) throw notFound('Document file');
   const inline = c.req.query('inline') === '1';
-  const ascii = doc.fileName.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
   return new Response(obj.body, {
     headers: {
       'content-type': doc.mimeType || obj.contentType || 'application/octet-stream',
       'content-length': String(obj.size),
-      'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(doc.fileName)}`,
+      'content-disposition': contentDisposition(doc.fileName, inline),
       'cache-control': 'private, no-store',
       'x-content-type-options': 'nosniff',
     },
