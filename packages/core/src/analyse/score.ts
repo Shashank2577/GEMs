@@ -97,7 +97,8 @@ export const effectiveStatus = (f: ScoreFactor): Status => f.overridden?.status 
 const DAY = 86_400_000;
 const toDate = (d: Date | string | null | undefined) => (d == null ? null : d instanceof Date ? d : new Date(d));
 
-function isValidDoc(d: ScoreVaultDoc, now: Date) {
+/** Scoring validity rule: no expiry, or expiry date ≥ now (expiry is end of day 23:59:59 IST). */
+export function isValidDoc(d: ScoreVaultDoc, now: Date) {
   if (!d.expiryDate) return true;
   const exp = new Date(`${d.expiryDate.slice(0, 10)}T23:59:59+05:30`);
   return exp.getTime() >= now.getTime();

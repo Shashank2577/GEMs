@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ANNEXURE_KEYS, buildChecklist } from '../../src/analyse/checklist';
+import { ANNEXURE_KEYS, buildChecklist, checklistReadiness } from '../../src/analyse/checklist';
+import type { ChecklistItem } from '../../src/analyse/types';
 import { generateBidPdf, getSampleBidSpec } from '../../src/analyse/sample-bid';
 import { extractPages } from '../../src/analyse/pdf-text';
 import { extractRequirementsRules } from '../../src/analyse/rules';
@@ -45,5 +46,38 @@ describe('buildChecklist (FR-015)', () => {
 
   it('empty requirements still ask for GST and PAN', () => {
     expect(ids(buildChecklist([], null))).toEqual(['gst', 'pan', 'non_blacklisting']);
+  });
+});
+
+describe('checklistReadiness (FR-040)', () => {
+  const item = (id: string, docType: ChecklistItem['docType'], generated?: string): ChecklistItem => ({ id, label: id, docType, mandatory: true, reason: '', generated });
+  const now = new Date('2026-03-10T10:00:00+05:30');
+  const items = [item('gst', 'gst'), item('iso', 'iso'), item('udyam', 'udyam'), item('pan', 'pan'), item('emd_exemption', null, 'emd_exemption'), item('gem', null), item('bs', 'balance_sheet')];
+  const r = checklistReadiness(items, [
+    { type: 'gst' },
+    { type: 'iso', expiryDate: '2026-03-20' },
+    { type: 'udyam', expiryDate: '2026-03-09' },
+    { type: 'balance_sheet', expiryDate: '2027-01-01' },
+  ], now);
+
+  it('maps each item', () => {
+    expect(r.gst).toEqual({ status: 'ready' });
+    expect(r.iso).toEqual({ status: 'expiring', days: 10 });
+    expect(r.udyam).toEqual({ status: 'expired' });
+    expect(r.pan).toEqual({ status: 'missing' });
+    expect(r.bs).toEqual({ status: 'ready' });
+  });
+  it('is n/a for generated and non-vault items', () => {
+    expect(r.emd_exemption).toEqual({ status: 'n/a' });
+    expect(r.gem).toEqual({ status: 'n/a' });
+  });
+  it('shares the scoring rule: valid through 23:59:59 IST on the expiry date', () => {
+    const at = (iso: string) => checklistReadiness([item('g', 'gst')], [{ type: 'gst', expiryDate: '2026-03-10' }], new Date(iso)).g;
+    expect(at('2026-03-10T23:59:00+05:30')).toEqual({ status: 'expiring', days: 0 });
+    expect(at('2026-03-11T00:00:01+05:30')).toEqual({ status: 'expired' });
+  });
+  it('prefers a valid document over an expired one of the same type', () => {
+    const res = checklistReadiness([item('g', 'gst')], [{ type: 'gst', expiryDate: '2020-01-01' }, { type: 'gst', expiryDate: '2030-01-01' }], now);
+    expect(res.g).toEqual({ status: 'ready' });
   });
 });
