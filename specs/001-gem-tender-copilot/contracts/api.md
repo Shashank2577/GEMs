@@ -22,7 +22,8 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | POST | /auth/accept-invite | `{token,name?,password?}` | `Me` |
 | PATCH | /me | `{name?,phone?}` | `Me` |
 | GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` | prefs |
-| GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name}` | list / `{token}` shown once |
+| POST | /me/notifications/test | – (session only; 1/min per user → 429 `rate_limited` + Retry-After) | `{inApp:'sent',email,whatsapp}`, email/whatsapp each `sent\|skipped\|failed\|off` (002/FR-034) |
+| GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name, expiresInDays?: 30\|90\|365\|null}` (default 90, null = never) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens (002/FR-037) |
 | GET | /org/members | – | `[{userId,name,email,role,joinedAt}]` + pending invites |
 | POST (M) | /org/invitations | `{email,role}` | `{id, inviteUrl}` |
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member |
@@ -54,7 +55,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | GET | /tenders/:id/documents/:docId/download | streams file |
 | POST (W) | /tenders/:id/analyse | runs rules (+LLM if key) → `Analysis` |
 | GET | /tenders/:id/analysis | latest `Analysis` or 404 |
-| POST (W) | /analyses/:id/override | `{factorKey,status,reason}` → re-scored `Analysis` |
+| POST (M) | /analyses/:id/override | `{factorKey,status,reason}` → re-scored `Analysis` |
 | GET/PUT (M) | /scoring-weights | `Record<factorKey, number>` |
 
 ## Profile & Vault — owner: Vault module (`routes/profile.ts`, `routes/vault.ts`)
@@ -93,7 +94,7 @@ DTOs (`packages/core/src/contracts/vault.ts`):
 | PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?}`; moving to `ready` blocked (409) if mandatory items missing/expired and not overridden |
 | PUT (W) | /workspaces/:id/mapping | `{[itemId]: vaultDocId|null}` |
 | POST (M) | /workspaces/:id/overrides | `{itemId, reason}` |
-| GET/POST | /workspaces/:id/comments | – |
+| GET/POST (W) | /workspaces/:id/comments | POST is Analyst+ (002/FR-022) |
 | GET | /annexure-templates | system + org templates |
 | PUT (M) | /annexure-templates/:key | `{title, body}` org override |
 | GET | /workspaces/:id/annexures/:key.pdf | rendered annexure PDF |

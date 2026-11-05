@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { BellRing, CalendarClock, Mail, MessageCircle, Phone } from 'lucide-react';
+import { BellRing, CalendarClock, Mail, MessageCircle, Phone, Send } from 'lucide-react';
 import type { NotificationPrefs } from '@tp/core/contracts/auth';
 import { toE164IndianMobile } from '@tp/core/vault/validators';
 import { Button, ErrorState, Field, Input, Segmented, SkeletonList, Switch, toast } from '@/components/ui';
-import { errorMessage } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { usePrefs, useSavePrefs, useUpdateMe } from '../api';
+import { cn } from '@/lib/utils';
+import { usePrefs, useSavePrefs, useSendTestAlert, useUpdateMe } from '../api';
+import { testAlertToast } from '../notification-copy';
 import { displayMobile } from './AccountSection';
 import { Panel } from './Panel';
 
@@ -27,6 +29,8 @@ export default function NotificationsSection() {
   const q = usePrefs();
   const save = useSavePrefs();
   const updateMe = useUpdateMe();
+  const testAlert = useSendTestAlert();
+  const [testStatus, setTestStatus] = useState<{ kind: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [p, setP] = useState<NotificationPrefs | null>(null);
   const [phone, setPhone] = useState(displayMobile(me?.user.phone));
   const [phoneErr, setPhoneErr] = useState<string | null>(null);
@@ -51,9 +55,36 @@ export default function NotificationsSection() {
     }
   };
 
+  // T067 (002/FR-034): the server uses the SAVED preferences, so ask for a save first when there are edits.
+  const sendTest = () => {
+    if (dirty) { toast.info('Save your changes first', { description: 'The test alert uses your saved preferences.' }); return; }
+    testAlert.mutate(undefined, {
+      // Per-channel detail goes in the inline status line in the footer (left of / above the buttons) (a toast would cover the buttons
+      // and the mobile tab bar); the toast itself stays one short line.
+      onSuccess: (r) => {
+        const t = testAlertToast(r, !!me?.user.phone);
+        setTestStatus({ kind: t.kind, text: t.lines.join(' · ') });
+        toast[t.kind](t.title);
+      },
+      onError: (e) => {
+        const retry = e instanceof ApiError && e.status === 429 ? Number((e.details as { retryAfter?: number } | undefined)?.retryAfter) : NaN;
+        const msg = Number.isFinite(retry) ? `You can send one test alert a minute. Try again in ${retry} s.` : errorMessage(e);
+        setTestStatus({ kind: 'error', text: msg });
+        toast.error(msg);
+      },
+    });
+  };
+
   return (
     <Panel title="Notifications" description="Choose how TenderPilot tells you about new matches, deadlines and expiring documents. These settings are personal."
-      footer={<Button onClick={submit} disabled={!dirty} loading={save.isPending || updateMe.isPending}>Save preferences</Button>}>
+      footer={<>
+        <p role="status" aria-live="polite" className={cn('basis-full text-xs empty:hidden sm:basis-0 sm:flex-1',
+          testStatus?.kind === 'error' ? 'text-danger' : testStatus?.kind === 'warning' ? 'text-[hsl(32_90%_32%)] dark:text-warning' : 'text-muted-foreground')}>
+          {testStatus && <>Test alert: {testStatus.text}</>}
+        </p>
+        <Button variant="secondary" onClick={sendTest} loading={testAlert.isPending}><Send /> Send a test alert</Button>
+        <Button onClick={submit} disabled={!dirty} loading={save.isPending || updateMe.isPending}>Save preferences</Button>
+      </>}>
       <div className="divide-y">
         <Row htmlFor="n-inapp" icon={<BellRing />} title="In-app" description="The bell in the top bar and the Notifications page.">
           <Switch id="n-inapp" checked={p.inApp} onCheckedChange={(v) => set('inApp', v)} />

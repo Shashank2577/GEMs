@@ -56,6 +56,19 @@ const clean = (xs: string[] | undefined | null) => (xs ?? []).map((x) => x.trim(
 
 /** Word-boundary, case-insensitive regex for a keyword/phrase (handles "CCTV", "A4 paper", "UPS-1kVA"). */
 export function keywordRegex(keyword: string): RegExp {
+  let re = regexCache.get(keyword);
+  if (!re) {
+    re = buildKeywordRegex(keyword);
+    if (regexCache.size >= 1000) regexCache.clear(); // bounded: criteria sets are small, tenders many
+    regexCache.set(keyword, re);
+  }
+  return re;
+}
+
+/** Compiled keyword regexes (no `g` flag, so `test()` is stateless and safe to share). */
+const regexCache = new Map<string, RegExp>();
+
+function buildKeywordRegex(keyword: string): RegExp {
   const parts = keyword.trim().split(/\s+/).map(escapeRe);
   // Allow simple plurals on the last word ("laptop" matches "Laptops").
   const body = parts.join('[\\s\\-_/]+');
@@ -63,7 +76,8 @@ export function keywordRegex(keyword: string): RegExp {
 }
 
 function haystacks(t: MatchableTender) {
-  const items = (t.items ?? []).map((i) => i.name).join(' · ');
+  // `items` is jsonb: tolerate a non-array value or malformed entries in stored data rather than throwing.
+  const items = (Array.isArray(t.items) ? t.items : []).map((i) => i?.name ?? '').filter(Boolean).join(' · ');
   return {
     title: t.title ?? '',
     other: [items, t.category ?? ''].join(' · '),

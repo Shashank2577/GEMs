@@ -22,7 +22,27 @@ const laptop: MatchableTender = {
   status: 'open',
 };
 
+describe('matchTender with malformed stored items', () => {
+  it('treats a non-array items value (jsonb object / scalar) as no items instead of throwing', () => {
+    const asObject = { ...laptop, title: 'Stationery', category: null, items: { name: 'Laptop' } as unknown as MatchableTender['items'] };
+    expect(() => matchTender(asObject, { keywords: ['laptop'] }, { now: NOW })).not.toThrow();
+    expect(matchTender(asObject, { keywords: ['laptop'] }, { now: NOW }).matched).toBe(false);
+    const asScalar = { ...laptop, items: 'laptop' as unknown as MatchableTender['items'] };
+    expect(matchTender(asScalar, { keywords: ['laptop'] }, { now: NOW }).matched).toBe(true); // title still matches
+    const holes = { ...laptop, title: 'x', category: null, items: [null, { name: 'Laptop bag' }] as unknown as MatchableTender['items'] };
+    expect(matchTender(holes, { keywords: ['laptop'] }, { now: NOW }).matched).toBe(true);
+  });
+});
+
 describe('keywordRegex', () => {
+  it('reuses one compiled, stateless regex per keyword (hot path when scanning 50k tenders)', () => {
+    const re = keywordRegex('patient monitor');
+    expect(keywordRegex('patient monitor')).toBe(re);
+    expect(re.global).toBe(false);
+    expect(re.test('Patient-Monitor, 5 para')).toBe(true);
+    expect(re.test('Patient monitors')).toBe(true); // no lastIndex carry-over between calls
+  });
+
   it('matches whole words, case-insensitive, with simple plurals', () => {
     expect(keywordRegex('laptop').test('LAPTOPS for schools')).toBe(true);
     expect(keywordRegex('cctv').test('CCTV Camera (V2)')).toBe(true);

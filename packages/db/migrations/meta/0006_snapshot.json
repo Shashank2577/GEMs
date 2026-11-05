@@ -1,5 +1,5 @@
 {
-  "id": "7c6c7a2c-d29e-4d18-973e-399a8c2af347",
+  "id": "61cc3232-f656-4349-a6bc-12f5143b051c",
   "prevId": "1e2ea001-0693-42fd-aef6-604f87e57eca",
   "version": "7",
   "dialect": "postgresql",
@@ -1697,6 +1697,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "default_uids": {
+          "name": "default_uids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "uuid",
@@ -3141,21 +3147,6 @@
             },
             {
               "expression": "content_sha256",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "vault_expiry_idx": {
-          "name": "vault_expiry_idx",
-          "columns": [
-            {
-              "expression": "expiry_date",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

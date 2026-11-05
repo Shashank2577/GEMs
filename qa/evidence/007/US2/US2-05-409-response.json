@@ -1,0 +1,13 @@
+{
+  "code": "not_ready",
+  "message": "1 required document is missing or expired. Replace it in the vault, or ask a Bid Manager to override with a reason.",
+  "details": {
+    "blockers": [
+      {
+        "itemId": "oem_authorization",
+        "label": "OEM authorisation certificate (MAF) for this bid",
+        "state": "expired"
+      }
+    ]
+  }
+}

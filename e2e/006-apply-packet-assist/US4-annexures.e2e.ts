@@ -232,13 +232,13 @@ test('S4 PDF endpoint: headers, download, alias, 404, Class-I wording and 62%', 
   const r = await getPdf(fx, wsId, 'mii_self_cert.pdf');
   expect(r.status).toBe(200);
   expect(r.headers['content-type']).toBe('application/pdf');
-  expect(r.headers['content-disposition']).toBe('inline; filename="mii_self_cert_GEM_2026_B_700001.pdf"');
+  expect(r.headers['content-disposition']).toBe(`inline; filename="mii_self_cert_GEM_2026_B_700001.pdf"; filename*=UTF-8''mii_self_cert_GEM_2026_B_700001.pdf`);
   expect(r.headers['cache-control']).toBe('private, no-store');
   expect(r.headers['x-content-type-options']).toBe('nosniff');
   expect(r.body.subarray(0, 5).toString()).toBe('%PDF-');
   const dl = await getPdf(fx, wsId, 'mii_self_cert.pdf?download=1');
   expect(dl.status).toBe(200);
-  expect(dl.headers['content-disposition']).toBe('attachment; filename="mii_self_cert_GEM_2026_B_700001.pdf"');
+  expect(dl.headers['content-disposition']).toBe(`attachment; filename="mii_self_cert_GEM_2026_B_700001.pdf"; filename*=UTF-8''mii_self_cert_GEM_2026_B_700001.pdf`);
   const alias = await getPdf(fx, wsId, 'mii_self_certificate.pdf');
   expect(alias.status).toBe(200);
   expect(alias.headers['content-type']).toBe('application/pdf');

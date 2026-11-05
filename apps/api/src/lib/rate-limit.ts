@@ -21,7 +21,7 @@ import { authAttempts, passwordResets, type Db } from '@tp/db';
 import type { TrustProxy } from '../env';
 import { HttpError } from './errors';
 
-export type AttemptKind = 'login_email' | 'login_ip' | 'reset_email' | 'reset_ip';
+export type AttemptKind = 'login_email' | 'login_ip' | 'reset_email' | 'reset_ip' | 'test_alert' | 'gem_result_org' | 'gem_result_bid';
 
 export interface LimitOptions {
   /** Maximum attempts allowed in one window; the attempt after that is rejected. */
@@ -47,6 +47,8 @@ export const LOGIN_IP_LIMIT: LimitOptions = { limit: 30, windowMs: FIFTEEN_MIN }
 export const RESET_EMAIL_LIMIT: LimitOptions = { limit: 3, windowMs: 60 * 60 * 1000 };
 /** Password reset requests per client IP. */
 export const RESET_IP_LIMIT: LimitOptions = { limit: 20, windowMs: 60 * 60 * 1000 };
+/** "Send a test alert" per user (002/FR-034). */
+export const TEST_ALERT_LIMIT: LimitOptions = { limit: 1, windowMs: 60 * 1000 };
 /** Longest window in use; rows older than this are dead and pruned by the scheduled job. */
 const MAX_WINDOW_MS = 60 * 60 * 1000;
 
