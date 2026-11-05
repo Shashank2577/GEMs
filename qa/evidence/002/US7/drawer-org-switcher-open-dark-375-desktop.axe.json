@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8800/dashboard",
-  "timestamp": "2026-11-05T04:57:40.830Z",
+  "url": "http://localhost:8804/dashboard",
+  "timestamp": "2026-11-05T05:30:07.096Z",
   "violations": [],
   "incomplete": [
     {
@@ -55,7 +55,7 @@
               "data": null,
               "relatedNodes": [
                 {
-                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\">Skip to content</a>",
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring\">Skip to content</a>",
                   "target": [
                     ".z-\\[60\\]"
                   ]
@@ -370,20 +370,20 @@
               "id": "aria-valid-attr-value",
               "data": {
                 "messageKey": "controlsWithinPopup",
-                "needsReview": "aria-controls=\"radix-:ru:\""
+                "needsReview": "aria-controls=\"radix-:rv:\""
               },
               "relatedNodes": [],
               "impact": "critical",
-              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:ru:\""
+              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:rv:\""
             }
           ],
           "none": [],
           "impact": "critical",
-          "html": "<button type=\"button\" id=\"radix-:rt:\" aria-haspopup=\"menu\" aria-expanded=\"true\" data-state=\"open\" class=\"group flex w-full it...\" aria-controls=\"radix-:ru:\" data-radix-popper-si...=\"bottom\" data-radix-popper-al...=\"start\">",
+          "html": "<button type=\"button\" id=\"radix-:ru:\" aria-haspopup=\"menu\" aria-expanded=\"true\" data-state=\"open\" class=\"group flex w-full it...\" aria-controls=\"radix-:rv:\" data-radix-popper-si...=\"bottom\" data-radix-popper-al...=\"start\">",
           "target": [
-            "#radix-\\:rt\\:"
+            "#radix-\\:ru\\:"
           ],
-          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:ru:\""
+          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:rv:\""
         }
       ]
     },
@@ -1059,7 +1059,7 @@
                 {
                   "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
                   "target": [
-                    "#radix-\\:rt\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
+                    "#radix-\\:ru\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
                   ]
                 }
               ],
@@ -1072,7 +1072,7 @@
           "impact": "serious",
           "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
           "target": [
-            "#radix-\\:rt\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
+            "#radix-\\:ru\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
         },

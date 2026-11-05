@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8800/dashboard",
-  "timestamp": "2026-11-05T04:57:32.454Z",
+  "url": "http://localhost:8804/dashboard",
+  "timestamp": "2026-11-05T05:29:58.992Z",
   "violations": [],
   "incomplete": [
     {
@@ -670,7 +670,7 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<span class=\"block truncate\">shell Traders mw32qidi1</span>",
+          "html": "<span class=\"block truncate\">shell Traders mw33w8p822</span>",
           "target": [
             ".cursor-default.data-\\[disabled\\]\\:pointer-events-none.data-\\[highlighted\\]\\:bg-muted:nth-child(2) > .flex-1.min-w-0 > .block.truncate"
           ],

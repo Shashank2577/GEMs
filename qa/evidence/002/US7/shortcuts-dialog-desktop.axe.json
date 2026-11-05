@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8800/tenders",
-  "timestamp": "2026-11-05T04:55:04.112Z",
+  "url": "http://localhost:8804/tenders",
+  "timestamp": "2026-11-05T05:27:51.450Z",
   "violations": [],
   "incomplete": [
     {
@@ -55,7 +55,7 @@
               "data": null,
               "relatedNodes": [
                 {
-                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
                   "target": [
                     ".z-\\[60\\]"
                   ]
@@ -67,7 +67,7 @@
           ],
           "none": [],
           "impact": "serious",
-          "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
+          "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
           "target": [
             ".z-\\[60\\]"
           ],
@@ -621,7 +621,7 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<span class=\"cursor-help text-muted-foreground/70\" data-state=\"closed\">ⓘ</span>",
+          "html": "<span class=\"cursor-help text-muted-foreground\" data-state=\"closed\">ⓘ</span>",
           "target": [
             ".cursor-help"
           ],

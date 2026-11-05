@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8800/watchlists",
-  "timestamp": "2026-11-05T04:58:32.335Z",
+  "url": "http://localhost:8804/watchlists",
+  "timestamp": "2026-11-05T05:30:50.942Z",
   "violations": [],
   "incomplete": [],
   "passes": 21
