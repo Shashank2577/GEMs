@@ -203,10 +203,10 @@ DTOs (`packages/core/src/contracts/vault.ts`):
 
 | Method | Path | Notes |
 |---|---|---|
-| POST (W) | /tenders/:id/workspace | create-or-get workspace (stage `identified`, or `go/no_go` hint from analysis) |
+| POST (W) | /tenders/:id/workspace | create-or-get workspace (stage `identified`, or `go/no_go` hint from analysis; a Go verdict starts it in `go` only for bid_manager+, an Analyst's starts in `analysing` — #527) |
 | GET | /workspaces | `stage?` → cards for Kanban: tender summary, score, owner, due, readiness % |
 | GET | /workspaces/:id | workspace + tender + analysis + `readiness` + packets + comments |
-| PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?: {result:'won'\|'lost', l1Price?, ourPrice?, notes?}\|null}`; moving to `ready` is blocked (409 `not_ready`, or `conflict` with `reason:'not_analysed'`) if mandatory items are missing/expired and not overridden; reaching `won`/`lost` (by `stage` or by `outcome`) from any stage other than `submitted`/`won`/`lost` is 409 `invalid_transition` (`details:{from,to}`). A position move renumbers the column in one transaction under a per-(org, stage) advisory lock |
+| PATCH (W) | /workspaces/:id | `{stage?,ownerId?,assigneeIds?,dueAt?,position?,outcome?: {result:'won'\|'lost', l1Price?, ourPrice?, notes?}\|null}`; moving to `ready` is blocked (409 `not_ready`, or `conflict` with `reason:'not_analysed'`) if mandatory items are missing/expired and not overridden; reaching `won`/`lost` (by `stage` or by `outcome`) from any stage other than `submitted`/`won`/`lost` is 409 `invalid_transition` (`details:{from,to}`); moving a bid **into `go` or `dropped`** (the Go/No-Go call) is bid_manager+, otherwise 403 `forbidden` (#527). A position move renumbers the column in one transaction under a per-(org, stage) advisory lock |
 | PUT (W) | /workspaces/:id/mapping | `{[itemId]: vaultDocId|null}` |
 | POST (M) | /workspaces/:id/overrides | `{itemId, reason}` → 201 `{workspace, readiness}`; only a missing or expired item can be overridden, otherwise 409 `nothing_to_override` (`details:{itemId,state}`); an item not in the checklist is 400 `validation_error` |
 | DELETE (M) | /workspaces/:id/overrides/:itemId | removes an override → `{workspace, readiness}`; 404 when there is none |
@@ -258,7 +258,7 @@ Both arrays hold at most 5 items (`MY_WORK_LIMIT`), are computed for the signed-
   `MyWorkItem` = `{workspaceId, tenderId, bidNumber, title, stage, dueAt, endAt, readiness:{percent, blockers, analysed}}`. `readiness` comes from the same helper as the pipeline cards (`readinessFor`), so the percentage matches the card: `percent` 0–100, `blockers` = number of open blockers (mandatory checklist items missing/expired and not overridden), `analysed:false` (percent 0) while the tender has no finished analysis.
 - `awaitingDecision: DecisionItem[]` — workspaces in stage `analysing` whose **latest** analysis for the tender is `done`; oldest-waiting first (analysis `updated_at`, then workspace `created_at`, then id).
   `DecisionItem` is **flat**: `{tenderId, workspaceId, bidNumber, title, score, verdict, endAt}` (`score` 0–100 or null, `verdict` `go|review|no_go` or null). There is no nested `analysis` object. `workspaceId` is typed `string | null`; the current query always sets it.
-  The web turns a decision into `PATCH /workspaces/:id {stage:'go'}` (one tap, no dialog) or `{stage:'dropped'}` (after a confirmation dialog). The API itself does not restrict that PATCH to bid_manager+ (analyst+ per the workspace contract).
+  The web turns a decision into `PATCH /workspaces/:id {stage:'go'}` (one tap, no dialog) or `{stage:'dropped'}` (after a confirmation dialog). The API enforces it (#527): a move into `go`/`dropped` is bid_manager+, an Analyst gets 403 `forbidden`; every other move stays analyst+ per the workspace contract.
 
 ### `PATCH /org` — onboarding state (007/FR-048, FR-052)
 
