@@ -145,7 +145,7 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 - [x] T054 [P] [US3] "Leave organization" danger panel in Team section with confirm dialog; on success switch to `nextOrgId` or sign out to `/login` with toast "You left <Org>." in `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/features/settings/api.ts`, `apps/web/src/lib/auth.tsx` FR-027 (#30)
 - [x] T055 [US3] Origin check middleware: cookie-authenticated non-GET/HEAD requests with an `Origin` not equal to `config.appUrl` origin → 403 `bad_origin`; bearer requests and missing Origin pass; tests in `apps/api/src/middleware/security.ts`, `apps/api/src/app.ts`, `apps/api/test/security.test.ts` FR-028 (#31)
 - [x] T056 [P] [US3] On a mutation 403 `forbidden`, toast the server message and invalidate `ME_KEY` so role-gated UI refreshes in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-029 (#32)
-- [ ] T057 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in qa/evidence/002/US3/ — viewer/analyst/bid manager/owner walkthroughs showing hidden actions, owner role change taking effect live, member removal, last-owner error, cross-org 404 via `request` context, in `e2e/002-platform/US3-roles-tenancy.e2e.ts`, `qa/evidence/002/US3/VERDICT.md` FR-022..FR-029 (#33)
+- [x] T057 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in qa/evidence/002/US3/ — viewer/analyst/bid manager/owner walkthroughs showing hidden actions, owner role change taking effect live, member removal, last-owner error, cross-org 404 via `request` context, in `e2e/002-platform/US3-roles-tenancy.e2e.ts`, `qa/evidence/002/US3/VERDICT.md` FR-022..FR-029 (#33)
 
 **Checkpoint**: US1–US3 (the P1 set) complete
 
