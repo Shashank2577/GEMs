@@ -9,6 +9,8 @@
  *   POST /__admin/publish {count?}     publish N new bids (simulates fresh tenders)
  *   POST /__admin/corrigendum/:bidNumber {days?}   extend a bid's end date (bid number URL-encoded, or ?bidNumber=)
  *   POST /__admin/fail {mode:'down'|'html'|'off'}  simulate GeM outages
+ *   POST /__admin/document-mode {mode:'normal'|'404'|'html'|'scanned'|'oversize'}  how /showbidDocument answers
+ *                                      (404 page, HTML login page, PDF without text layer, > 25 MB stream)
  *   POST /__admin/reset                restore the recorded fixtures
  *   GET  /__admin/state                current bid numbers + counters
  *
@@ -21,10 +23,13 @@ import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { parseGemDate, toGemSolrDate } from '@tp/core/gem/normalize';
 import { parseBidPlusDoc, type BidPlusDoc } from '@tp/core/gem/parse';
-import { renderBidPdf } from './pdf';
+import { oversizePdfStream, renderBidPdf, renderScannedPdf } from './pdf';
 
 const FIXTURE_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../packages/core/test/fixtures/gem');
 const PAGE_SIZE = 10;
+
+export const DOCUMENT_MODES = ['normal', '404', 'html', 'scanned', 'oversize'] as const;
+export type DocumentMode = (typeof DOCUMENT_MODES)[number];
 
 type Doc = BidPlusDoc & { b_id: number[]; b_bid_number: string[] };
 
@@ -68,6 +73,7 @@ export function createMockGem(opts: MockGemOptions = {}) {
     pending: [] as Doc[],
     nextSyntheticId: 7429001,
     failMode: 'off' as 'off' | 'down' | 'html',
+    documentMode: 'normal' as DocumentMode,
     requests: { listing: 0, documents: 0, bootstrap: 0 },
   };
 
@@ -79,6 +85,7 @@ export function createMockGem(opts: MockGemOptions = {}) {
     state.pending = fixtures.extra.map((d) => shiftDoc(d, shift));
     state.nextSyntheticId = 7429001;
     state.failMode = 'off';
+    state.documentMode = 'normal';
     state.requests = { listing: 0, documents: 0, bootstrap: 0 };
   };
   reset();
@@ -173,7 +180,14 @@ export function createMockGem(opts: MockGemOptions = {}) {
     state.requests.documents++;
     if (state.failMode === 'down') return new Response('Service Unavailable', { status: 503 });
     const doc = findById(id);
-    if (!doc) return new Response('<html><body>Bid not found</body></html>', { status: 404, headers: { 'content-type': 'text/html' } });
+    const notFound = () => new Response('<html><body>Bid not found</body></html>', { status: 404, headers: { 'content-type': 'text/html' } });
+    if (!doc || state.documentMode === '404') return notFound();
+    const pdfHeaders = { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="GeM-Bidding-${id}.pdf"`, 'cache-control': 'no-store' };
+    if (state.documentMode === 'html') {
+      return new Response('<!DOCTYPE html><html><body><h1>Session expired</h1><p>Please login again.</p></body></html>', { headers: { 'content-type': 'text/html; charset=UTF-8' } });
+    }
+    if (state.documentMode === 'scanned') return new Response((await renderScannedPdf()) as unknown as BodyInit, { headers: pdfHeaders });
+    if (state.documentMode === 'oversize') return new Response(oversizePdfStream(), { headers: pdfHeaders });
     const t = parseBidPlusDoc(doc, { now: now() });
     if (!t) return new Response('Bad bid', { status: 500 });
     const bytes = await renderBidPdf(t);
@@ -222,6 +236,14 @@ export function createMockGem(opts: MockGemOptions = {}) {
     return c.json({ ok: true, failMode: state.failMode });
   });
 
+  app.post('/__admin/document-mode', async (c) => {
+    const body = await readJson(c);
+    const mode = body.mode ?? c.req.query('mode');
+    if (!DOCUMENT_MODES.includes(mode)) return c.json({ ok: false, error: `mode must be one of ${DOCUMENT_MODES.join(', ')}` }, 400);
+    state.documentMode = mode;
+    return c.json({ ok: true, documentMode: state.documentMode });
+  });
+
   app.post('/__admin/reset', (c) => {
     reset();
     return c.json({ ok: true, total: state.docs.length });
@@ -231,6 +253,7 @@ export function createMockGem(opts: MockGemOptions = {}) {
     total: state.docs.length,
     pending: state.pending.length,
     failMode: state.failMode,
+    documentMode: state.documentMode,
     requests: state.requests,
     bids: state.docs.map((d) => ({ bidNumber: d.b_bid_number[0], id: d.b_id[0], end: d.final_end_date_sort })),
   }));
