@@ -6,6 +6,7 @@
  * request payloads are captured with page.on('request'). Each scenario writes one named screenshot to
  * qa/evidence/007/US3/ and keeps its video there (collectRunArtifacts). Layout-sensitive scenarios carry @mobile.
  */
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { request as pwRequest, type APIRequestContext, type Page, type Request } from '@playwright/test';
@@ -19,6 +20,11 @@ const EVID_DIR = join('qa', 'evidence', '007', STORY);
 test.afterEach(async ({ page }) => { await collectRunArtifacts('007', STORY, page); });
 
 // ───────────── helpers ─────────────
+
+const E2E_DB = process.env.E2E_DATABASE_URL || 'postgres://tp:tp@localhost:5433/tenderpilot_e2e';
+/** Ends the platform-wide manual-sync cooldown (10 min since 008/US4 FR-026) by moving earlier manual runs 2 h back. */
+const ageManualRuns = () => execFileSync('psql', [E2E_DB, '-qtAX', '-c',
+  `update ingestion_runs set started_at = started_at - interval '2 hours', finished_at = finished_at - interval '2 hours' where trigger = 'manual'`]);
 
 function saveJson(name: string, data: unknown) {
   mkdirSync(EVID_DIR, { recursive: true });
@@ -40,8 +46,7 @@ test.beforeAll(async ({}, info) => {
     for (let i = 0; i < 3; i++) {
       const r = await api.post('/api/ingestion/run', { data: { pages: 5 } });
       if (r.status() !== 429) break;
-      const retryAt = Date.parse((await r.json()).error.details.retryAt);
-      await new Promise((res) => setTimeout(res, Math.max(0, retryAt - Date.now()) + 1500));
+      ageManualRuns(); // sync_cooldown: clear it instead of waiting up to 10 minutes
     }
   } finally { await api.dispose(); }
 });
@@ -586,11 +591,11 @@ test.describe('US3 guided onboarding', () => {
     await next(page, 'Create watchlist').click();
     await next(page, 'Skip for now').click();
     // the next ingestion run (manual trigger = "next run") makes the bids available to the new watchlist
-    // beforeAll returns early without syncing when tenders already exist, and the matched feed here comes from the
-    // watchlist fill-in (not from this sync). 429 is accepted because the 10-minute manual-sync cooldown (003/FR, 429 +
-    // retryAt) is shared across orgs/specs, so waiting it out would exceed the 90 s test timeout.
-    const sync = await page.request.post('/api/ingestion/run', { data: { pages: 5 } });
-    expect([200, 202, 429], await sync.text()).toContain(sync.status());
+    for (let i = 0; i < 3; i++) {
+      const r = await page.request.post('/api/ingestion/run', { data: { pages: 5 } });
+      if (r.status() !== 429) break;
+      ageManualRuns(); // sync_cooldown: clear it instead of waiting up to 10 minutes
+    }
     await main(page).getByRole('button', { name: 'Go to my feed' }).click();
     await expect(page).toHaveURL(/\/tenders\?matched=1/);
     const rows = page.locator('a[href^="/tenders/"]');

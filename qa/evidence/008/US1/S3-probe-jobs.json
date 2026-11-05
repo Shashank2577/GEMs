@@ -1,0 +1,61 @@
+[
+  {
+    "name": "changes",
+    "conclusion": "success",
+    "started": "2026-11-05T02:59:00Z",
+    "completed": "2026-11-05T02:59:08Z",
+    "steps": []
+  },
+  {
+    "name": "typecheck",
+    "conclusion": "success",
+    "started": "2026-11-05T02:59:01Z",
+    "completed": "2026-11-05T02:59:53Z",
+    "steps": []
+  },
+  {
+    "name": "unit",
+    "conclusion": "success",
+    "started": "2026-11-05T02:59:10Z",
+    "completed": "2026-11-05T02:59:35Z",
+    "steps": []
+  },
+  {
+    "name": "migrations-additive",
+    "conclusion": "success",
+    "started": "2026-11-05T02:59:10Z",
+    "completed": "2026-11-05T02:59:29Z",
+    "steps": []
+  },
+  {
+    "name": "api",
+    "conclusion": "failure",
+    "started": "2026-11-05T02:59:37Z",
+    "completed": "2026-11-05T03:00:32Z",
+    "steps": [
+      {
+        "name": "API integration tests",
+        "conclusion": "failure"
+      }
+    ]
+  },
+  {
+    "name": "e2e",
+    "conclusion": "skipped",
+    "started": "2026-11-05T03:00:32Z",
+    "completed": "2026-11-05T03:00:32Z",
+    "steps": []
+  },
+  {
+    "name": "ci-gate",
+    "conclusion": "failure",
+    "started": "2026-11-05T03:00:34Z",
+    "completed": "2026-11-05T03:00:39Z",
+    "steps": [
+      {
+        "name": "All CI jobs passed or were skipped",
+        "conclusion": "failure"
+      }
+    ]
+  }
+]

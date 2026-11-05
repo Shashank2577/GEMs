@@ -249,20 +249,20 @@ test('US2-5 [video]: dragging the blocked Preparing card (Dell desktops) to Read
   await evidence007(ap, STORY, 'US2-05-open-workspace-navigated');
 });
 
-test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=ready answers 409 conflict / not_analysed', async ({ browser }) => {
-  // A second org starts a bid on a tender it never analysed. Demo tenders are invisible to orgs that never loaded the
-  // demo (008/FR-016), so orgB loads the demo itself and picks a demo tender that has neither a workspace nor an
-  // analysis for it (plan index 30 — see PIPELINE / EXTRA_ANALYSES in packages/db/src/demo.ts).
+test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=ready answers 409 conflict / not_analysed', async ({ page, browser }) => {
+  await demoOwner(page);
+  // A second org starts a bid on a GeM tender it never analysed. Demo tenders are private to the demo org
+  // (008/US3 NFR-005), so org B ingests real (mock-gem) tenders first.
   const orgB = await pwRequest.newContext({ baseURL: test.info().project.use.baseURL });
   try {
     const ub = uniqueUser('orgb');
     expect((await orgB.post('/api/auth/signup', { data: ub })).status()).toBe(201);
-    await seedDemo(orgB);
-    const bidNo = `GEM/2026/B/${6_400_000 + 30 * 7919 + 1_337}`; // demoBidNumber(30)
-    // Bid-number prefix search (008/FR-073) finds it regardless of how old the DB is / where it sorts in the default list.
-    const feed = await (await orgB.get(`/api/tenders?q=${encodeURIComponent(bidNo)}`)).json();
-    const tenderId = (feed.items as { id: string; bidNumber: string }[]).find((t) => t.bidNumber === bidNo)?.id;
-    expect(tenderId, `demo tender ${bidNo} visible to orgB`).toBeTruthy();
+    const sync = await orgB.post('/api/ingestion/run', { data: { pages: 1 } });
+    // 429 sync_cooldown only on a retry of this test: the tenders from the first attempt are already there.
+    expect([200, 429], await sync.text()).toContain(sync.status());
+    const listed = await (await orgB.get('/api/tenders?pageSize=1')).json();
+    expect(listed.items.length, 'org B sees an ingested GeM tender').toBeGreaterThan(0);
+    const tenderId = listed.items[0].id;
     const created = await orgB.post(`/api/tenders/${tenderId}/workspace`);
     expect(created.status(), await created.text()).toBe(201);
     const ws = await created.json();
@@ -273,14 +273,11 @@ test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=rea
     expect(body.error.code).toBe('conflict');
     expect(body.error.message).toBe('Analyse the tender before marking the bid ready to submit.');
     expect(body.error.details.reason).toBe('not_analysed');
-    // Cross-org analysis scoping (orgB cannot read/override/rescore orgA's analysis) is not asserted here; it is covered by
-    // apps/api/test/isolation-contract.test.ts ('GET /tenders/:id/analysis', 'POST /analyses/:id/override|rescore').
     // Same through the UI: Move to… -> Ready to submit
     const ctx = await browser.newContext({ storageState: await orgB.storageState(), baseURL: test.info().project.use.baseURL, viewport: { width: 1440, height: 900 } });
     const p = await ctx.newPage();
     await p.goto('/pipeline');
-    // The card of the un-analysed workspace (orgB's demo workspaces are all analysed).
-    const card = col(p, 'identified').locator(`li:has(a[href="/workspaces/${ws.id}"])`);
+    const card = colCards(p, 'identified').first();
     await expect(card).toBeVisible();
     await moveViaMenu(p, card, /^Ready to submit/);
     await expect(p.getByText('Can’t move to Ready to submit yet')).toBeVisible();

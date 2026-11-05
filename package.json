@@ -7,6 +7,8 @@
     "build": "pnpm -r --filter ./packages/* --filter ./apps/* run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
+    "test:scripts": "vitest run --config scripts/vitest.config.ts",
+    "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "db:migrate": "pnpm --filter @tp/db run migrate",
     "db:seed": "pnpm --filter @tp/db run seed",
     "dev": "pnpm --filter @tp/api run dev",

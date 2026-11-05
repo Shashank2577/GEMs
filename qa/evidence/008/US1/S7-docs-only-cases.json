@@ -1,0 +1,44 @@
+[
+  {
+    "label": "specs + docs + md",
+    "paths": [
+      "specs/008-operations-scale/spec.md",
+      "docs/runbook.md",
+      "README.md"
+    ],
+    "want": "true",
+    "got": "true"
+  },
+  {
+    "label": "code change",
+    "paths": [
+      "docs/runbook.md",
+      "apps/api/src/app.ts"
+    ],
+    "want": "false",
+    "got": "false"
+  },
+  {
+    "label": "md under qa/evidence counts as code",
+    "paths": [
+      "qa/evidence/008/US1/VERDICT.md"
+    ],
+    "want": "false",
+    "got": "false"
+  },
+  {
+    "label": "code moved into docs/ (old path listed, --no-renames)",
+    "paths": [
+      "docs/x.ts",
+      "apps/api/src/x.ts"
+    ],
+    "want": "false",
+    "got": "false"
+  },
+  {
+    "label": "empty list",
+    "paths": [],
+    "want": "false",
+    "got": "false"
+  }
+]

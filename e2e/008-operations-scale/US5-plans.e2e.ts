@@ -7,6 +7,8 @@
  * Server environment this spec needs (set by the runner, not by product code):
  *   ADMIN_TOKEN=<>= 32 chars>                       (scenario 12; the spec reads the same variable)
  *   ANTHROPIC_API_KEY=qa-fake LLM_BASE_URL=http://127.0.0.1:${E2E_LLM_PORT:-4115}   (this file serves a counting fake Anthropic API)
+ * scripts/e2e-ci.sh (CI) applies them from this line (a throwaway E2E-only admin token, not a secret):
+ * @e2e-env ADMIN_TOKEN=e2e-only-admin-token-000000000000000000 ANTHROPIC_API_KEY=qa-fake LLM_BASE_URL=http://127.0.0.1:4115
  * Direct DB access (psql) is used only to create states the public API cannot produce in a test run: usage counters of a past
  * month-like volume (10 analyses, 200 packets, 10 GB of vault rows), a trial that ends in N days / ended N days ago, an org on a plan.
  *
@@ -55,7 +57,7 @@ class Transcript {
   private lines: string[] = [];
   constructor(private name: string) { this.add(`# ${name} — project ${PROJECT()} — ${new Date().toISOString()}`); }
   add(line = '') { this.lines.push(line); }
-  async http(label: string, res: Awaited<ReturnType<APIRequestContext['get']>>, reqNote: string) {
+  async http(label: string, res: { status(): number; text(): Promise<string> }, reqNote: string) { // APIResponse or a page Response
     this.add(`### ${label}`);
     this.add(`> ${reqNote}`);
     this.add(`< ${res.status()}`);
@@ -69,7 +71,7 @@ class Transcript {
 }
 
 async function errorOf(res: Awaited<ReturnType<APIRequestContext['get']>>) {
-  const j = await res.json().catch(() => ({}));
+  const j: any = await res.json().catch(() => ({}));
   return { status: res.status(), code: j?.error?.code as string | undefined, message: j?.error?.message as string | undefined, details: j?.error?.details };
 }
 
