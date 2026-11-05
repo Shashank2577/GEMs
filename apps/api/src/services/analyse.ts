@@ -16,8 +16,8 @@ import {
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
 import {
-  CURRENT_EXTRACTOR_VERSION, buildEscalationPrompt, buildLlmPrompt, chunkPages, enrichWithLlm, escalateWithLlm, escalationCandidates,
-  mergeRequirements, promptChars, unreadPagesNote,
+  CURRENT_EXTRACTOR_VERSION, MAX_CHUNK_CHARS, buildEscalationPrompt, buildLlmPrompt, chunkPages, enrichWithLlm, escalateWithLlm, escalationCandidates,
+  mergeRequirements, pageChars, partlyReadPagesNote, promptChars, unreadPagesNote,
 } from '@tp/core/analyse/llm';
 import {
   PdfPageLimitError, PdfTextError, extractPdf, isPdf, isScannedDocument, joinPages, looksScanned, splitPages,
@@ -25,7 +25,7 @@ import {
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import {
   OCR_CALL_TIMEOUT_MS, OCR_DOCUMENT_BUDGET_MS, OCR_MAX_CALLS_PER_ANALYSIS, OCR_MAX_CALLS_PER_DOCUMENT, OCR_PAGES_PER_CALL, buildOcrRequest,
-  markOcrRequirements, parseOcrPages, splitPdfForOcr, type OcrPart,
+  markOcrRequirements, openPdfForOcr, parseOcrPages, type OcrSource,
 } from '@tp/core/analyse/ocr';
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
@@ -42,7 +42,7 @@ import type { AppDeps, LlmRequest } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, conflict, forbidden, notFound, serviceUnavailable, unprocessable } from '../lib/errors';
 import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
-import { assertWithinPlan, checkAnalysisQuota, meteredCompleteJson, releaseAbandonedReservations, reserveLlmSlot } from '../lib/plan';
+import { assertWithinPlan, checkAnalysisQuota, meteredCompleteJson, releaseAbandonedReservations, reserveLlmSlot, reserveOcrSlot } from '../lib/plan';
 import { keepStaleOnCompletion, lockTenderInputs, markStale, type DbOrTx } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
@@ -80,7 +80,7 @@ export function toDocumentDto(d: DocRow, tenderBidNumber?: string | null): Tende
   return {
     id: d.id, tenderId: d.tenderId, orgId: d.orgId, kind: d.kind, fileName: d.fileName, sizeBytes: d.sizeBytes,
     pageCount: d.pageCount, totalPages: d.totalPages ?? null, sourceUrl: d.sourceUrl, hasText: !!d.text && d.text.replace(/\s+/g, '').length > 0,
-    source: d.orgId ? 'upload' : 'gem', textSource: d.textSource, bidNumberFound: bidNumberMismatch(d, tenderBidNumber),
+    needsOcr: needsOcr(d), source: d.orgId ? 'upload' : 'gem', textSource: d.textSource, bidNumberFound: bidNumberMismatch(d, tenderBidNumber),
     createdAt: iso(d.createdAt),
   };
 }
@@ -235,69 +235,89 @@ export const OCR_FAILED_MESSAGE = 'AI OCR could not read this document. Try agai
 export const needsOcr = (d: Pick<DocRow, 'text' | 'textSource'>) =>
   d.textSource !== 'ocr' && isScannedDocument(splitPages(d.text), SCANNED_EMPTY_PAGE_RATIO);
 
+/** Activity action recording that analyse's automatic OCR of a document failed: analyse does not retry it (review S2). */
+export const OCR_FAILED_ACTION = 'tender.document_ocr_failed';
+
+/** 502 `ocr_failed`, with the (logged, never shown) reason. */
+class OcrFailedError extends HttpError {
+  constructor(readonly reason: string) { super(502, 'ocr_failed', OCR_FAILED_MESSAGE); }
+}
+
 interface OcrRun {
   /** Metered OCR-tier `completeJson`. */
   completeJson: (req: LlmRequest) => Promise<unknown>;
-  /** Most calls this document may take; more parts than this → failure before any call. */
+  /** Most calls this document may take; more parts than this → failure (before any call when the page count shows it). */
   maxCalls: number;
   /** deps.clock time (ms) after which no call starts. */
   deadline: number;
   callWithTimeout: typeof withTimeout;
-  /** Called as each call starts. */
-  onCall?: () => void;
+  /** Called as each call starts, with the text characters it sends. */
+  onCall?: (chars: number) => void;
 }
 
 /**
- * Transcribe the stored PDF page by page with the OCR model: split into parts of ≤ OCR_PAGES_PER_CALL pages
- * (≤ 22 MB), one call per part, sequentially, each bounded by OCR_CALL_TIMEOUT_MS and the run's deadline. Only the
- * pages the document's text covers are kept (its `pageCount`, ≤ MAX_EXTRACT_PAGES = 150; `totalPages` is unchanged),
- * at their real page numbers. The request carries only the PDF and the fixed OCR prompt (FR-054). Any failure (missing
- * file, unreadable PDF, provider error, refusal, truncation, budget, no text at all) → 502 `ocr_failed`; the reason is
- * logged, never the document text.
+ * Transcribe the stored PDF page by page with the OCR model: parts of ≤ OCR_PAGES_PER_CALL pages (≤ 22 MB) built one at
+ * a time (review S6), one call per part, sequentially, each bounded by OCR_CALL_TIMEOUT_MS and the run's deadline. Only
+ * the pages the document's text covers are split and kept (its `pageCount`, ≤ MAX_EXTRACT_PAGES = 150; `totalPages` is
+ * unchanged), at their real page numbers. The request carries only the PDF and the fixed OCR prompt (FR-054).
+ *
+ * Any failure → 502 `ocr_failed` and nothing is stored: missing file, unreadable PDF, provider error, refusal,
+ * truncation, budget, a reply that leaves out any page of its part (review S3: a page the model explicitly returned as
+ * '' is a blank page and is fine; an absent page means the transcription is incomplete), or no text at all. The reason
+ * is logged, never the document text. `chars` counts the text sent (system + instruction; the PDF is a document block).
  */
-async function transcribeDocument(deps: AppDeps, doc: DocRow, run: OcrRun): Promise<{ pages: string[]; calls: number }> {
-  const fail = (reason: string, error?: unknown) => {
-    deps.logger.warn('ocr: failed', { tenderId: doc.tenderId, documentId: doc.id, reason, ...(error ? { error: (error as Error).message } : {}) });
-    return new HttpError(502, 'ocr_failed', OCR_FAILED_MESSAGE);
+async function transcribeDocument(deps: AppDeps, doc: DocRow, run: OcrRun): Promise<{ pages: string[]; calls: number; chars: number }> {
+  const fail = (reason: string, error?: unknown, extra: Record<string, unknown> = {}) => {
+    deps.logger.warn('ocr: failed', { tenderId: doc.tenderId, documentId: doc.id, reason, ...extra, ...(error ? { error: (error as Error).message } : {}) });
+    return new OcrFailedError(reason);
   };
   const obj = await deps.blobs.get(doc.blobKey);
   if (!obj) throw fail('file_missing');
-  let parts: OcrPart[];
+  let source: OcrSource;
   try {
-    parts = await splitPdfForOcr(new Uint8Array(await obj.arrayBuffer()), { maxPages: OCR_PAGES_PER_CALL });
+    source = await openPdfForOcr(new Uint8Array(await obj.arrayBuffer()));
   } catch (e) {
     throw fail('unreadable_pdf', e);
   }
-  const total = parts[parts.length - 1]!.lastPage;
-  const pageLimit = Math.min(doc.pageCount || total, total, MAX_EXTRACT_PAGES);
-  const wanted = parts.filter((p) => p.firstPage <= pageLimit);
-  if (wanted.length > run.maxCalls) throw fail('too_many_parts');
+  const pageLimit = Math.min(doc.pageCount || source.totalPages, source.totalPages, MAX_EXTRACT_PAGES);
+  if (Math.ceil(pageLimit / OCR_PAGES_PER_CALL) > run.maxCalls) throw fail('too_many_parts');
   const pages: string[] = Array.from({ length: pageLimit }, () => '');
   let calls = 0;
-  for (const part of wanted) {
-    const remaining = run.deadline - deps.clock.now().getTime();
-    if (remaining <= 0) throw fail('budget');
-    const req = buildOcrRequest(part);
-    const [document, instruction] = req.content;
-    const timeoutMs = Math.min(OCR_CALL_TIMEOUT_MS, remaining);
-    calls++;
-    run.onCall?.();
-    let reply: unknown;
-    try {
-      reply = await run.callWithTimeout((signal) => run.completeJson({
-        system: req.system, documents: [document], prompt: instruction.text, maxTokens: req.maxTokens, jsonSchema: req.jsonSchema, timeoutMs, signal,
-      }), timeoutMs);
-    } catch (e) {
-      throw fail('call', e);
+  let chars = 0;
+  try {
+    for await (const part of source.parts({ maxPages: OCR_PAGES_PER_CALL, pageLimit })) {
+      // A part halved for size can add calls beyond the page-count estimate above.
+      if (calls >= run.maxCalls) throw fail('too_many_parts');
+      const remaining = run.deadline - deps.clock.now().getTime();
+      if (remaining <= 0) throw fail('budget');
+      const req = buildOcrRequest(part);
+      const [document, instruction] = req.content;
+      const timeoutMs = Math.min(OCR_CALL_TIMEOUT_MS, remaining);
+      const sent = req.system.length + instruction.text.length;
+      calls++;
+      chars += sent;
+      run.onCall?.(sent);
+      let reply: unknown;
+      try {
+        reply = await run.callWithTimeout((signal) => run.completeJson({
+          system: req.system, documents: [document], prompt: instruction.text, maxTokens: req.maxTokens, jsonSchema: req.jsonSchema, timeoutMs, signal,
+        }), timeoutMs);
+      } catch (e) {
+        throw fail('call', e);
+      }
+      const parsed = parseOcrPages(reply, req.pageCount);
+      if (parsed.absent.length) throw fail('pages_missing', undefined, { pages: parsed.absent.map((p) => part.firstPage + p - 1) });
+      parsed.pages.forEach((text, i) => {
+        const page = part.firstPage + i;
+        if (page <= pageLimit) pages[page - 1] = text;
+      });
     }
-    const parsed = parseOcrPages(reply, req.pageCount);
-    parsed.pages.forEach((text, i) => {
-      const page = part.firstPage + i;
-      if (page <= pageLimit) pages[page - 1] = text;
-    });
+  } catch (e) {
+    if (e instanceof HttpError) throw e;
+    throw fail('unreadable_pdf', e); // a part that could not be built (e.g. one page over 22 MB)
   }
   if (pages.every((p) => !p)) throw fail('no_text');
-  return { pages, calls };
+  return { pages, calls, chars };
 }
 
 /**
@@ -305,24 +325,30 @@ async function transcribeDocument(deps: AppDeps, doc: DocRow, run: OcrRun): Prom
  * the document stale (`document_added`: the text they analysed changed), all in one transaction (S2). Locks like the
  * other writers of this input (S4): an org's own upload under that org's lifecycle lock (as upload/remove); a shared
  * GeM copy under the tender's exclusive input lock, and then every org's analyses are flagged (as a new GeM copy).
- * The update only applies while the row still has the text we read: a concurrent OCR that won → 409 `conflict`.
+ * The update only applies while the row still has the text (and text source) we read: a concurrent OCR that won → 409
+ * `conflict`; a row deleted meanwhile → 404.
  */
 async function storeOcrText(
-  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }, doc: DocRow, pages: string[], meta: { calls: number; trigger: 'manual' | 'analysis' },
+  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }, doc: DocRow, pages: string[],
+  meta: { calls: number; trigger: 'manual' | 'analysis'; force?: boolean },
 ): Promise<DocRow> {
   return deps.db.transaction(async (tx) => {
     if (doc.orgId) await lockAnalyses(tx, input.orgId, input.tenderId);
     else await lockTenderInputs(tx, input.tenderId, 'exclusive');
     const [updated] = await tx.update(tenderDocuments).set({ text: joinPages(pages), textSource: 'ocr', pageCount: pages.length })
       .where(and(
-        eq(tenderDocuments.id, doc.id), eq(tenderDocuments.textSource, 'pdf'),
+        eq(tenderDocuments.id, doc.id), eq(tenderDocuments.textSource, doc.textSource),
         doc.text === null ? isNull(tenderDocuments.text) : eq(tenderDocuments.text, doc.text),
       ))
       .returning();
-    if (!updated) throw conflict('This document already has text.');
+    if (!updated) {
+      const [still] = await tx.select({ id: tenderDocuments.id }).from(tenderDocuments).where(eq(tenderDocuments.id, doc.id));
+      if (!still) throw notFound('Document');
+      throw conflict('This document was changed while it was being read. Reload to see its text.');
+    }
     await logActivity(tx, {
       orgId: input.orgId, userId: input.userId, action: 'tender.document_ocr', entityType: 'tender', entityId: input.tenderId,
-      meta: { documentId: doc.id, fileName: doc.fileName, pages: pages.length, calls: meta.calls, trigger: meta.trigger },
+      meta: { documentId: doc.id, fileName: doc.fileName, pages: pages.length, calls: meta.calls, trigger: meta.trigger, ...(meta.force ? { force: true } : {}) },
     });
     await markStale(tx, doc.orgId ? { orgId: input.orgId, tenderIds: [input.tenderId] } : { tenderIds: [input.tenderId] }, 'document_added', deps.clock.now());
     return updated;
@@ -332,51 +358,93 @@ async function storeOcrText(
 /**
  * POST /tenders/:id/documents/:docId/ocr (FR-052): transcribe a scanned document on demand → the updated row.
  * 404 unknown/other-org document (tender visibility first), 409 `conflict` when it already has text, 503
- * `ocr_unavailable` without an OCR model, 402 when the org's monthly AI analyses are used up (008/FR-037), 502
- * `ocr_failed`. Calls are metered as `extract` usage without an analysis (008/FR-039).
+ * `ocr_unavailable` without an OCR model, 402 `plan_limit_reached` when the org's monthly AI slots are used up
+ * (008/FR-037), 502 `ocr_failed`.
+ *
+ * Cost control (review B1, ADR-0008 amendment): each run reserves one monthly AI slot (`reserveOcrSlot`) under its own
+ * `analysis_ref`, so manual OCR counts against `llmAnalysesPerMonth` like an AI analysis; a run whose calls reached the
+ * model keeps the slot even when it fails, so a failing document cannot be retried for free.
+ *
+ * `force` (bid_manager+, checked by the route, review S3): re-run OCR on a document whose text already came from OCR
+ * and replace that text — same guards, locks, stale marking and metering.
  */
 export async function ocrTenderDocument(
-  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; docId: string; viewer: TenderViewer },
+  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; docId: string; viewer: TenderViewer; force?: boolean },
   opts: { withTimeout?: typeof withTimeout } = {},
 ): Promise<{ doc: DocRow; tender: TenderRow }> {
   const tender = await getTender(deps, input.tenderId, input.viewer);
   const doc = await getTenderDocument(deps, input.tenderId, input.docId, input.orgId);
-  if (!needsOcr(doc)) throw conflict(doc.textSource === 'ocr' ? 'This document was already read with AI OCR.' : 'This document already has text — OCR is only for scanned PDFs.');
+  const allowed = needsOcr(doc) || (input.force && doc.textSource === 'ocr');
+  if (!allowed) {
+    throw conflict(doc.textSource === 'ocr'
+      ? 'This document was already read with AI OCR.'
+      : 'This document already has text — OCR is only for scanned PDFs.');
+  }
   const ocrLlm = deps.llmFor('ocr');
   if (!ocrLlm) throw serviceUnavailable('ocr_unavailable', OCR_UNAVAILABLE_MESSAGE);
-  await assertWithinPlan(deps, input.orgId, 'llmAnalysesPerMonth');
-  const completeJson = meteredCompleteJson({ ...deps, llm: ocrLlm }, { orgId: input.orgId, analysisId: null, kind: 'extract' });
+  const slot = await reserveOcrSlot(deps, input.orgId, ocrLlm.model);
+  const completeJson = meteredCompleteJson({ ...deps, llm: ocrLlm }, {
+    orgId: input.orgId, analysisId: null, analysisRef: slot.ref, kind: 'extract', reservationId: slot.reservationId,
+  });
   try {
     const { pages, calls } = await transcribeDocument(deps, doc, {
       completeJson, maxCalls: OCR_MAX_CALLS_PER_DOCUMENT, deadline: deps.clock.now().getTime() + OCR_DOCUMENT_BUDGET_MS,
       callWithTimeout: opts.withTimeout ?? withTimeout,
     });
-    return { doc: await storeOcrText(deps, input, doc, pages, { calls, trigger: 'manual' }), tender };
+    return { doc: await storeOcrText(deps, input, doc, pages, { calls, trigger: 'manual', force: input.force && doc.textSource === 'ocr' }), tender };
   } finally {
     await completeJson.finish();
   }
 }
 
+/** Documents of this tender whose automatic OCR failed for this org (review S2): analyse does not OCR them again. */
+async function ocrFailedDocIds(db: DbOrTx, orgId: string, tenderId: string): Promise<Set<string>> {
+  const rows = await db.select({ meta: activityLog.meta }).from(activityLog)
+    .where(and(eq(activityLog.orgId, orgId), eq(activityLog.entityType, 'tender'), eq(activityLog.entityId, tenderId), eq(activityLog.action, OCR_FAILED_ACTION)));
+  return new Set(rows.flatMap((r) => {
+    const id = (r.meta as { documentId?: unknown } | null)?.documentId;
+    return typeof id === 'string' ? [id] : [];
+  }));
+}
+
+export interface AutoOcrResult {
+  /** Documents whose OCR failed in this run. */
+  failed: string[];
+  /** Documents too long to OCR within this analysis's call cap. */
+  tooLong: string[];
+  /** Documents skipped because an earlier analysis's OCR of them failed (review S2). */
+  failedBefore: string[];
+  /** OCR calls made and text characters sent (counted in the analysis's LLM budget, review S4). */
+  calls: number;
+  chars: number;
+}
+
 /**
  * Analyse's automatic OCR (FR-052): before the run's row exists (a slow OCR cannot make the run look timed out), the
- * scanned documents are transcribed with at most OCR_MAX_CALLS_PER_ANALYSIS calls in total, whole documents only,
- * inside the analysis deadline. The calls are metered under the coming analysis's id (`analysis_ref`), so they hold
- * the same monthly AI slot as its enrichment calls. Nothing runs when OCR is off, the AI quota is used up or a run is
- * already going (that request then answers 409). A failed document stays a scan (logged; the caller notes it).
+ * scanned documents are transcribed with at most `maxCalls` calls in total (≤ OCR_MAX_CALLS_PER_ANALYSIS; they count
+ * towards the analysis's 8-call cap), whole documents only, inside the analysis deadline. The calls are metered under the
+ * coming analysis's id (`analysis_ref`), so they hold the same monthly AI slot as its enrichment calls; if the analysis
+ * row is then never inserted, analyseTender unlinks them (review S2). Nothing runs when OCR is off, the AI quota is used
+ * up or a run is already going (that request then answers 409). A document whose OCR fails stays a scan, is recorded as
+ * `tender.document_ocr_failed` and is not OCR'd by analyse again (only `POST …/ocr` retries it).
  */
 async function autoOcr(
   deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }, analysisRef: string,
-  run: { deadline: number; callWithTimeout: typeof withTimeout },
-): Promise<{ failed: string[]; tooLong: string[] }> {
-  const none = { failed: [], tooLong: [] };
+  run: { deadline: number; callWithTimeout: typeof withTimeout; maxCalls: number },
+): Promise<AutoOcrResult> {
+  const out: AutoOcrResult = { failed: [], tooLong: [], failedBefore: [], calls: 0, chars: 0 };
   const ocrLlm = deps.llmFor('ocr');
-  if (!ocrLlm) return none;
-  const docs = (await listTenderDocuments(deps, input.tenderId, input.orgId)).filter(needsOcr);
-  if (!docs.length) return none;
+  if (!ocrLlm) return out;
+  const scans = (await listTenderDocuments(deps, input.tenderId, input.orgId)).filter(needsOcr);
+  if (!scans.length) return out;
+  const failedIds = await ocrFailedDocIds(deps.db, input.orgId, input.tenderId);
+  out.failedBefore = scans.filter((d) => failedIds.has(d.id)).map((d) => d.fileName);
+  const docs = scans.filter((d) => !failedIds.has(d.id));
+  if (!docs.length) return out;
   try {
     await assertWithinPlan(deps, input.orgId, 'llmAnalysesPerMonth');
   } catch (e) {
-    if (e instanceof HttpError && e.status === 402) return none;
+    if (e instanceof HttpError && e.status === 402) return out;
     throw e;
   }
   const now = deps.clock.now();
@@ -384,31 +452,38 @@ async function autoOcr(
     eq(analyses.orgId, input.orgId), eq(analyses.tenderId, input.tenderId), eq(analyses.status, 'running'),
     gt(analyses.createdAt, new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS)),
   )).limit(1);
-  if (running) return none;
+  if (running) return out;
   const completeJson = meteredCompleteJson({ ...deps, llm: ocrLlm }, { orgId: input.orgId, analysisId: null, analysisRef, kind: 'extract' });
-  const failed: string[] = [];
-  const tooLong: string[] = [];
-  let calls = 0;
   try {
     for (const d of docs) {
-      const left = OCR_MAX_CALLS_PER_ANALYSIS - calls;
+      const left = run.maxCalls - out.calls;
       const need = Math.ceil(Math.min(d.pageCount || MAX_EXTRACT_PAGES, MAX_EXTRACT_PAGES) / OCR_PAGES_PER_CALL);
-      if (need > left) { tooLong.push(d.fileName); continue; }
-      if (deps.clock.now().getTime() >= run.deadline) { failed.push(d.fileName); continue; }
+      if (need > left) { out.tooLong.push(d.fileName); continue; }
+      if (deps.clock.now().getTime() >= run.deadline) { out.failed.push(d.fileName); continue; }
       try {
-        const r = await transcribeDocument(deps, d, { completeJson, maxCalls: left, deadline: run.deadline, callWithTimeout: run.callWithTimeout, onCall: () => { calls++; } });
+        const r = await transcribeDocument(deps, d, {
+          completeJson, maxCalls: left, deadline: run.deadline, callWithTimeout: run.callWithTimeout, onCall: (c) => { out.calls++; out.chars += c; },
+        });
         await storeOcrText(deps, input, d, r.pages, { calls: r.calls, trigger: 'analysis' });
       } catch (e) {
-        // Transcribed by a concurrent request meanwhile: it has text now.
-        if (e instanceof HttpError && e.code === 'conflict') continue;
+        // Transcribed by a concurrent request meanwhile: it has text now. Removed meanwhile: nothing to read.
+        if (e instanceof HttpError && (e.code === 'conflict' || e.status === 404)) continue;
         deps.logger.warn('analyse: automatic OCR of a scanned document failed; it is skipped', { tenderId: input.tenderId, documentId: d.id, error: (e as Error).message });
-        failed.push(d.fileName);
+        out.failed.push(d.fileName);
+        // Out of time is about this run, not the document; anything else is remembered so the next analyse does not
+        // pay for the same failing OCR again (review S2).
+        if (!(e instanceof OcrFailedError && e.reason === 'budget')) {
+          await logActivity(deps.db, {
+            orgId: input.orgId, userId: input.userId, action: OCR_FAILED_ACTION, entityType: 'tender', entityId: input.tenderId,
+            meta: { documentId: d.id, fileName: d.fileName, reason: e instanceof OcrFailedError ? e.reason : 'error' }, createdAt: deps.clock.now(),
+          });
+        }
       }
     }
   } finally {
     await completeJson.finish();
   }
-  return { failed, tooLong };
+  return out;
 }
 
 // ───────────── Fetch from GeM ─────────────
@@ -727,6 +802,19 @@ async function storeExtraction(deps: AppDeps, d: DocRow, llmRequirements: Requir
   }
 }
 
+/**
+ * Review S2: automatic OCR calls metered under an analysis id whose row was never inserted lose that `analysis_ref`, so
+ * they do not count as an AI analysis. Rows already linked to an analysis (`analysis_id` set) are never touched.
+ */
+async function unlinkOrphanOcrUsage(deps: AppDeps, orgId: string, analysisRef: string): Promise<void> {
+  try {
+    await deps.db.update(llmUsage).set({ analysisRef: null })
+      .where(and(eq(llmUsage.orgId, orgId), eq(llmUsage.analysisRef, analysisRef), isNull(llmUsage.analysisId)));
+  } catch (e) {
+    deps.logger.error('analyse: could not unlink the OCR usage of an analysis that did not start', { orgId, analysisRef, error: (e as Error).message });
+  }
+}
+
 export async function analyseTender(
   deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer },
   /**
@@ -767,14 +855,16 @@ export async function analyseTender(
     }
   }
 
-  // 008/FR-031: ≤ 8 LLM calls, ≤ 480k characters, 60 s per call, 120 s overall; the rest is rules-only.
+  // 008/FR-031: ≤ 8 LLM calls (automatic OCR included), ≤ 480k characters, 60 s per call, 120 s overall; the rest is rules-only.
   const limits = { ...DEFAULT_LLM_BUDGET, ...(opts.llmBudgetMs !== undefined ? { budgetMs: opts.llmBudgetMs } : {}), ...opts.llmBudget };
   // No LLM call starts or runs past this point, so the final write lands a fixed reserve before both the overall
   // budget and the 2-minute running timeout (FR-028): two worst-case slow calls cannot make the run look timed out.
   const llmDeadlineMs = Math.min(limits.budgetMs, ANALYSIS_RUNNING_TIMEOUT_MS) - LLM_FINISH_RESERVE_MS;
-  // FR-052: scanned documents are read by the OCR model first (counted in this analysis's budget and AI slot).
+  // FR-052: scanned documents are read by the OCR model first (counted in this analysis's call budget and AI slot).
   const analysisId = crypto.randomUUID();
-  const ocr = await autoOcr(deps, { ...input, tenderId: seen.id }, analysisId, { deadline: started + llmDeadlineMs, callWithTimeout });
+  const ocr = await autoOcr(deps, { ...input, tenderId: seen.id }, analysisId, {
+    deadline: started + llmDeadlineMs, callWithTimeout, maxCalls: Math.min(OCR_MAX_CALLS_PER_ANALYSIS, limits.maxCalls),
+  });
 
   // One running analysis per org+tender (FR-028). The advisory lock serialises concurrent requests
   // for the same org+tender until commit, so the check and the insert cannot interleave.
@@ -786,7 +876,7 @@ export async function analyseTender(
   // analyses of one org (any tender) are counted and inserted one at a time and cannot overshoot the limit.
   // Lock order is always advisory (org+tender) → org row. The AI slot is reserved in the same transaction (review S1),
   // after the analyses insert, so the reservation row is born with its `analysis_id` (review NEW-B1).
-  const { row, tender, readable, notes, now, llmAllowed, reservationId } = await deps.db.transaction(async (tx) => {
+  const begun = await deps.db.transaction(async (tx) => {
     await lockAnalyses(tx, input.orgId, seen.id);
     await lockTenderInputs(tx, seen.id, 'shared');
     const [tender] = await tx.select().from(tenders).where(eq(tenders.id, seen.id));
@@ -800,12 +890,15 @@ export async function analyseTender(
     const scanned = docs.filter(needsOcr);
     const readable = docs.filter((d) => !scanned.includes(d));
     if (!readable.length) {
+      const ocrFailed = [...ocr.failed, ...ocr.failedBefore];
       throw unprocessable('scanned_document', SCANNED_DOCUMENT_MESSAGE, {
-        documents: scanned.map((d) => d.fileName), ...(ocr.failed.length ? { ocrFailed: ocr.failed } : {}),
+        documents: scanned.map((d) => d.fileName), ...(ocrFailed.length ? { ocrFailed } : {}),
       });
     }
     const notes = scanned.map((d) => (ocr.failed.includes(d.fileName)
       ? `${d.fileName} is a scan without text and AI OCR could not read it — upload the text PDF from GeM or an OCR’d copy.`
+      : ocr.failedBefore.includes(d.fileName)
+        ? `${d.fileName} is a scan without text and AI OCR could not read it earlier — use “Read with AI (OCR)” on the document to try again, or upload the text PDF.`
       : ocr.tooLong.includes(d.fileName)
         ? `${d.fileName} is a scan without text and too long to read with AI OCR during an analysis — use “Read with AI (OCR)” on the document, or upload the text PDF.`
         : `${d.fileName} is a scan without text and was not read — upload the text PDF from GeM or an OCR’d copy.`));
@@ -828,7 +921,14 @@ export async function analyseTender(
       ? await reserveLlmSlot(deps, tx, { orgId: input.orgId, analysisId: inserted!.id, model: deps.llm.model })
       : null;
     return { row: inserted!, tender, readable, notes, now, llmAllowed, reservationId: reservation };
+  }).catch(async (e) => {
+    // Review S2: the analysis row was never inserted (409 running, 422, 402, …), so the automatic OCR calls metered under
+    // its id must not hold an AI slot for an analysis that does not exist. Their tokens stay recorded (ref unlinked); the
+    // failed-OCR marker and the per-user analyse rate limit keep this from becoming a loop of free OCR.
+    if (ocr.calls > 0) await unlinkOrphanOcrUsage(deps, input.orgId, analysisId);
+    throw e;
   });
+  const { row, tender, readable, notes, now, llmAllowed, reservationId } = begun;
   // Every write to this row from here on is guarded by `status = 'running'`: if a newer request marked
   // it timed out (and maybe replaced it), the late finisher changes nothing and logs nothing (FR-028).
   const ours = and(eq(analyses.id, row.id), eq(analyses.status, 'running'));
@@ -837,7 +937,8 @@ export async function analyseTender(
   let extractMs = 0;
   let llmMs = 0;
   let pageTotal = 0;
-  const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0, escalated: 0, cached: 0 };
+  // Review S4: automatic OCR calls count towards the analysis's call cap (≤ 8 in total) and character budget.
+  const llmUse = { calls: ocr.calls, chars: ocr.chars, ocrCalls: ocr.calls, covered: 0, skipped: 0, total: 0, escalated: 0, cached: 0 };
   // FR-051: pages the model did not read (beyond the 4 chunks, or chunks skipped / failed), added to the analysis notes.
   const docNotes: string[] = [];
   // 008/FR-039: one llm_usage row per call, with the provider's token counts; the first metered call fills the reservation.
@@ -882,10 +983,12 @@ export async function analyseTender(
       const llmItems: Requirement[] = [];
       const unread: [number, number][] = unreadFromPage ? [[unreadFromPage, pages.length]] : [];
       const lastChunkPage = chunks.length ? chunks[chunks.length - 1]!.startPage + chunks[chunks.length - 1]!.pages.length - 1 : 0;
+      const partly: [number, number][] = [];
       let readAny = false;
       let attempted = false;
       let complete = true;
-      // 008/FR-072: shareable only when every chunk's reply was cacheable (a valid, non-empty requirements array).
+      // 008/FR-072: shareable only when the first chunk's reply was cacheable (a valid, non-empty requirements array) and
+      // every later chunk's reply was a valid array — possibly empty: its pages may simply have no requirements (review S5).
       let allCacheable = true;
       for (let ci = 0; ci < chunks.length; ci++) {
         const chunk = chunks[ci]!;
@@ -909,10 +1012,15 @@ export async function analyseTender(
         llmMs += performance.now() - tl0;
         llmUse.chars += r.inputChars;
         if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
-        // A chunk cut short by this analysis' remaining character budget is not a whole read of it → never shared.
-        const whole = promptChars(buildLlmPrompt(chunk.pages, current, chunkBudget, chunk.startPage)) === promptChars(buildLlmPrompt(chunk.pages, current, undefined, chunk.startPage));
-        if (!r.cacheable || !whole) allCacheable = false;
-        if (r.used) { readAny = true; current = r.requirements; llmItems.push(...r.llmItems); } else { complete = false; unread.push([chunk.startPage, last]); }
+        // A chunk cut short — by this analysis' remaining character budget, or a single page longer than the 60,000-character
+        // chunk limit (review S5) — is not a whole read of it → never shared, and noted as partly read.
+        const whole = chunk.pages.reduce((n, p) => n + pageChars(p), 0) <= MAX_CHUNK_CHARS
+          && promptChars(buildLlmPrompt(chunk.pages, current, chunkBudget, chunk.startPage)) === promptChars(buildLlmPrompt(chunk.pages, current, undefined, chunk.startPage));
+        if (!(ci === 0 ? r.cacheable : r.valid) || !whole) allCacheable = false;
+        if (r.used) {
+          readAny = true; current = r.requirements; llmItems.push(...r.llmItems);
+          if (!whole) partly.push([chunk.startPage, last]);
+        } else { complete = false; unread.push([chunk.startPage, last]); }
       }
       // 008/FR-072: share the extraction only when the WHOLE document was read in this pass — every chunk read and
       // cacheable, none skipped / failed / truncated, no pages beyond the chunk cap. The stored items are the union of
@@ -925,6 +1033,7 @@ export async function analyseTender(
       if (readAny && unread.length) {
         for (const [from, to] of coalesceRanges(unread)) docNotes.push(unreadPagesNote(d.fileName, from, to));
       }
+      for (const [from, to] of partly) docNotes.push(partlyReadPagesNote(d.fileName, from, to));
       // FR-050: a blocking requirement the rules are unsure about (or that the model contradicts) goes to the escalation model.
       if (escCompleteJson) {
         const cands = escalationCandidates(rules, llmItems);

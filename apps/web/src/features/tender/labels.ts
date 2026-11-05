@@ -199,6 +199,7 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   'tender.document_fetched': 'fetched the bid document from GeM',
   'tender.document_fetch_failed': 'couldn’t fetch the updated bid document from GeM',
   'tender.document_ocr': 'read a scanned document with AI OCR',
+  'tender.document_ocr_failed': 'couldn’t read a scanned document with AI OCR',
   'analysis.factor_overridden': 'overrode a factor',
   'analysis.rescored': 're-scored the analysis',
   'tender.dismissed': 'dismissed this tender',
@@ -224,11 +225,15 @@ export const OCR_REQUIREMENT_TOOLTIP = 'Read by AI from a scanned page — check
 
 export type OcrActionState = 'hidden' | 'available' | 'running';
 
-/** "Read with AI (OCR)" row action: only for documents without text, when OCR is configured and the user is analyst+ (FR-052/FR-053). */
+/**
+ * "Read with AI (OCR)" row action: only for documents the API says need OCR (`needsOcr`: ≥ 80% of pages without text, not
+ * yet transcribed — a scan with a few text pages still qualifies), when OCR is configured and the user is analyst+
+ * (FR-052/FR-053).
+ */
 export function ocrActionState(
-  doc: Pick<TenderDocumentDto, 'hasText' | 'textSource'>, opts: { ocrAvailable: boolean; canRun: boolean; running: boolean },
+  doc: Pick<TenderDocumentDto, 'needsOcr'>, opts: { ocrAvailable: boolean; canRun: boolean; running: boolean },
 ): OcrActionState {
-  if (doc.hasText || doc.textSource === 'ocr' || !opts.ocrAvailable || !opts.canRun) return 'hidden';
+  if (!doc.needsOcr || !opts.ocrAvailable || !opts.canRun) return 'hidden';
   return opts.running ? 'running' : 'available';
 }
 
@@ -241,5 +246,8 @@ export function unreadableDocumentNotice(fileName: string, offerOcr: boolean): s
     : `We couldn't read text from ${fileName}. Upload a text PDF or ask your admin to enable AI OCR.`;
 }
 
-/** Documents that still have no text and so need the notice. */
-export const unreadableDocuments = <T extends Pick<TenderDocumentDto, 'hasText'>>(docs: readonly T[] | undefined): T[] => (docs ?? []).filter((d) => !d.hasText);
+/** Documents analysis cannot read yet (`needsOcr`), and so need the notice. */
+export const unreadableDocuments = <T extends Pick<TenderDocumentDto, 'needsOcr'>>(docs: readonly T[] | undefined): T[] => (docs ?? []).filter((d) => d.needsOcr);
+
+/** Tooltip on a rule-read requirement the AI review disagreed with (004/FR-050, review S9). */
+export const NEEDS_REVIEW_LABEL = 'Check this';

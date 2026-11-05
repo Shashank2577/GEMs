@@ -30,7 +30,7 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
     if (!file) return;
     upload.mutate({ file, kind }, {
       onSuccess: (d) => {
-        const pagesRead = `${d.pageCount ?? 0} pages read${d.hasText ? '' : ' — no text found; it may be a scan'}`;
+        const pagesRead = `${d.pageCount ?? 0} pages read${d.needsOcr ? ' — no text found; it may be a scan' : ''}`;
         const action = hasAnalysis ? { label: 'Re-analyse', onClick: onReanalyse } : undefined;
         toast.success(`${d.fileName} uploaded`, { description: pagesRead, action });
         // FR-010: the document is stored either way; warn separately that it may belong to another bid.
@@ -85,14 +85,16 @@ export function DocumentsTab({ tenderId, hasGemLink, hasAnalysis, onReanalyse }:
           ) : (
             <>
             {unreadable.length > 0 && (
-              <ul role="status" aria-label="Documents without readable text" data-testid="unreadable-notice" className="mb-3 grid gap-1.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
-                {unreadable.map((d) => (
-                  <li key={d.id} className="flex items-start gap-2 break-words">
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
-                    <span>{unreadableDocumentNotice(d.fileName, offerOcr)}</span>
-                  </li>
-                ))}
-              </ul>
+              <div role="status" aria-label="Documents without readable text" data-testid="unreadable-notice" className="mb-3 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
+                <ul className="grid gap-1.5">
+                  {unreadable.map((d) => (
+                    <li key={d.id} className="flex items-start gap-2 break-words">
+                      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
+                      <span>{unreadableDocumentNotice(d.fileName, offerOcr)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
             <ul className="grid gap-2">
               {items.map((d) => (
@@ -151,7 +153,7 @@ function DocRow({ doc, tenderId, bidNumber, onRemove, ocrState, ocrBusy, onOcr }
             )}
             <Tooltip content={formatDateIST(doc.createdAt, { time: true })}><span>· {relativeTime(doc.createdAt)}</span></Tooltip>
             {isOcrDocument(doc) && <Badge size="sm" tone="info" data-testid="ocr-badge"><Sparkles aria-hidden /> Text via OCR</Badge>}
-            {!doc.hasText && <Badge size="sm" tone="warning">No text — scanned?</Badge>}
+            {doc.needsOcr && <Badge size="sm" tone="warning">No text — scanned?</Badge>}
             {doc.bidNumberFound && (
               <Tooltip content={`Page 1 shows ${doc.bidNumberFound}${bidNumber ? `, but this tender is ${bidNumber}` : ''}. Check that this is the right PDF.`}>
                 <span tabIndex={0} className="rounded focus-ring"><Badge size="sm" tone="warning">Different bid?</Badge></span>
@@ -166,7 +168,9 @@ function DocRow({ doc, tenderId, bidNumber, onRemove, ocrState, ocrBusy, onOcr }
             {ocrState === 'running' ? <Loader2 className="animate-spin" aria-hidden /> : <ScanText aria-hidden />} {ocrState === 'running' ? 'Reading…' : 'Read with AI (OCR)'}
           </Button>
         )}
-        {ocrState === 'running' && <span role="status" className="sr-only">Reading {doc.fileName} with AI. This can take a minute.</span>}
+        {/* Always rendered (empty when idle) so screen readers announce the text when it changes (a live region added
+            together with its text is often not read). */}
+        <span role="status" className="sr-only">{ocrState === 'running' ? `Reading ${doc.fileName} with AI. This can take a minute.` : ''}</span>
         <Button asChild size="sm" variant="secondary"><a href={apiUrl(base, { inline: 1 })} target="_blank" rel="noreferrer"><Eye /> View</a></Button>
         <Button asChild size="sm" variant="ghost"><a href={apiUrl(base)} download={doc.fileName} aria-label={`Download ${doc.fileName}`}><Download /> <span className="sm:sr-only">Download</span></a></Button>
         {onRemove && (

@@ -130,13 +130,34 @@ export async function checkAnalysisQuota(deps: Pick<AppDeps, 'clock'>, tx: DbOrT
  * (FK `ON DELETE SET NULL`) cannot make the fill fail (review NEW-B1). Returns the reservation id.
  */
 export async function reserveLlmSlot(
-  deps: Pick<AppDeps, 'clock'>, tx: DbOrTx, r: { orgId: string; analysisId: string; model: string },
+  deps: Pick<AppDeps, 'clock'>, tx: DbOrTx, r: { orgId: string; analysisId: string | null; analysisRef?: string; model: string },
 ): Promise<string> {
   const [row] = await tx.insert(llmUsage).values({
-    orgId: r.orgId, analysisId: r.analysisId, analysisRef: r.analysisId, kind: 'extract', model: r.model, inputTokens: 0, outputTokens: 0,
+    orgId: r.orgId, analysisId: r.analysisId, analysisRef: r.analysisRef ?? r.analysisId, kind: 'extract', model: r.model, inputTokens: 0, outputTokens: 0,
     reserved: true, createdAt: deps.clock.now(),
   }).returning({ id: llmUsage.id });
   return row!.id;
+}
+
+/**
+ * On-demand OCR (004/FR-052) takes one monthly AI slot per run, like an AI analysis (008/FR-037, ADR-0008 amendment
+ * 2026-11-05): under the org row lock, throw 402 `plan_limit_reached` (`limit: 'llmAnalysesPerMonth'`) when the slots
+ * are used up, else reserve one under a fresh `analysis_ref` (no `analysis_id`: there is no analysis). The OCR run's
+ * first metered call fills the reservation and its other calls are metered under the same ref, so the run counts once;
+ * a run whose calls never reached the model gives the slot back (`meteredCompleteJson.finish`). Every attempt that
+ * reached the model keeps its slot, failed or not, so retries of a failing OCR are bounded by the quota as well as the
+ * `ocr.org` rate limit. Returns `{ ref, reservationId }`.
+ */
+export async function reserveOcrSlot(
+  deps: Pick<AppDeps, 'db' | 'clock'>, orgId: string, model: string,
+): Promise<{ ref: string; reservationId: string }> {
+  const ref = crypto.randomUUID();
+  const reservationId = await deps.db.transaction(async (tx) => {
+    const { plan } = await loadPlan(tx, orgId, { forUpdate: true });
+    if (plan !== 'enterprise') await assertWithinPlan(deps, orgId, 'llmAnalysesPerMonth', 1, { db: tx, plan });
+    return reserveLlmSlot(deps, tx, { orgId, analysisId: null, analysisRef: ref, model });
+  });
+  return { ref, reservationId };
 }
 
 /**
@@ -293,6 +314,13 @@ export function meteredCompleteJson(
       if (r || ok || inFlightAbort) {
         // Synchronously, before any await: a concurrent `finish()` must already see this call as metered.
         metered = true;
+        if (!r) {
+          // Aborted in flight (our timeout / the run's budget) before the provider reported usage: the row records 0
+          // because the column cannot be null, but the real count is UNKNOWN and may be billed (review S1). Say so.
+          deps.logger.warn('llm usage: call aborted before the provider reported usage; tokens unknown (recorded as 0)', {
+            orgId: ctx.orgId, analysisRef: ctx.analysisRef ?? ctx.analysisId, model: llm.model, tokensUnknown: true,
+          });
+        }
         const fill = reservationId;
         reservationId = null;
         await recordLlmUsage(deps, {

@@ -84,6 +84,12 @@ export interface TenderDocumentDto {
   totalPages: number | null;
   sourceUrl: string | null;
   hasText: boolean;
+  /**
+   * The document cannot be analysed as it is: its text layer is empty on at least 80% of pages (008/FR-030,
+   * `SCANNED_EMPTY_PAGE_RATIO`) and OCR has not transcribed it yet. The UI offers "Read with AI (OCR)" / the unreadable
+   * notice on this flag, not on `hasText` (a scan with a few text pages has text but still needs OCR).
+   */
+  needsOcr: boolean;
   source: 'gem' | 'upload';
   /** Where the stored text came from: the PDF text layer or OCR (FR-052). */
   textSource: 'pdf' | 'ocr';

@@ -152,6 +152,37 @@ describe('chunked enrichment × shared extraction cache (FR-051 × 008/FR-072)',
     expect(seen).toHaveLength(8);
   });
 
+  it('review S5: a later chunk whose valid reply has no requirements does not block sharing', async () => {
+    const t = await gemTenderWithText(longPages(4), 'gem-quiet.pdf'); // 2 chunks; the 2nd has nothing to report
+    const seen: Req[] = [];
+    await runAs(roles, t.id, fake('s', (r, i) => (i === 0 ? certPerCall(r, i) : { requirements: [] }), seen));
+    expect(seen).toHaveLength(2);
+    const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+    expect(doc!.extractedMethod).toBe('LLM');
+    expect((doc!.requirements ?? []).map((r) => r.value)).toEqual(['CERT-0']);
+  });
+
+  it('review S5: a malformed reply on a later chunk, or an empty first chunk, still blocks sharing', async () => {
+    const garbled = await gemTenderWithText(longPages(4), 'gem-garbled.pdf');
+    await runAs(roles, garbled.id, fake('s', (r, i) => (i === 0 ? certPerCall(r, i) : { nope: true })));
+    const emptyFirst = await gemTenderWithText(longPages(4), 'gem-empty-first.pdf');
+    await runAs(roles, emptyFirst.id, fake('s', (r, i) => (i === 0 ? { requirements: [] } : certPerCall(r, i))));
+    for (const t of [garbled, emptyFirst]) {
+      const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+      expect(doc).toMatchObject({ requirements: null, extractorVersion: null, extractedMethod: null });
+    }
+  });
+
+  it('review S5: a single page longer than the chunk limit is not a whole read — not stored, noted as partly read', async () => {
+    const t = await gemTenderWithText(['Huge page ' + 'terms and conditions of the bid '.repeat(2_300)], 'gem-one-page.pdf'); // ~73k chars
+    const seen: Req[] = [];
+    const a = await runAs(roles, t.id, fake('s', certPerCall, seen));
+    expect(seen).toHaveLength(1);
+    expect(a.analysis.notes).toEqual(['Page 1 of gem-one-page.pdf was only partly read by AI']);
+    const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+    expect(doc).toMatchObject({ requirements: null, extractedMethod: null });
+  });
+
   it('a failed chunk or an OCR-derived document is NOT stored', async () => {
     const failed = await gemTenderWithText(longPages(4), 'gem-fail.pdf');
     await runAs(roles, failed.id, fake('s', (r, i) => { if (i === 1) throw new Error('overloaded'); return certPerCall(r, i); }));
@@ -177,7 +208,7 @@ describe('escalation (T088, FR-050, FR-048)', () => {
   const conflicting = { requirements: [{ key: 'emd', label: 'EMD amount', value: String(EMD + 1), numeric: EMD + 1, mandatory: true, page: 1, quote: 'EMD other', confidence: 0.8 }] };
   const adjudicated = { requirements: [{ key: 'emd', label: 'EMD amount', value: String(EMD + 5), numeric: EMD + 5, mandatory: true, page: 1, quote: `EMD Amount ${EMD + 5}`, confidence: 0.85 }] };
 
-  it('rule/LLM conflict on a blocking key + an escalation model → the escalation answer is merged as an LLM item with its quote', async () => {
+  it('rule/LLM conflict on a blocking key + an escalation model whose quote is not on the page → the confident rule item stays, marked needsReview (review S9)', async () => {
     const t = await tenderWithText(await sampleText(), 'bid.pdf');
     const esc: Req[] = [];
     const { analysis } = await run(t.id, fake('sonnet', () => conflicting), fake('fable', () => adjudicated, esc));
@@ -185,8 +216,8 @@ describe('escalation (T088, FR-050, FR-048)', () => {
     expect(esc[0]!.prompt).toContain('emd');
     expect(esc[0]!.prompt).toContain(String(EMD + 1));
     const emd = analysis.requirements.find((r) => r.key === 'emd')!;
-    expect(emd).toMatchObject({ method: 'LLM', numeric: EMD + 5, source: { quote: `EMD Amount ${EMD + 5}` } });
-    expect(emd.confidence).toBeLessThanOrEqual(0.9);
+    expect(emd).toMatchObject({ method: 'RULE', numeric: EMD });
+    expect(emd.needsReview).toContain(`EMD Amount ${EMD + 5}`);
     // Metered under the same analysis with the escalation model's tokens; still one AI analysis.
     const usage = await ctx.db.select().from(llmUsage).where(eq(llmUsage.analysisRef, analysis.id));
     expect(usage.map((u) => u.model).sort()).toEqual(['fable', 'sonnet']);

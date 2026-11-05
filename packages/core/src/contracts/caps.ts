@@ -16,8 +16,8 @@ export const MAX_TENDER_DOC_PAGES = 300;
 export const SCANNED_EMPTY_PAGE_RATIO = 0.8;
 
 /**
- * At most this many LLM calls per analysis (enrichment chunks and escalation); the rest is read by rules only
- * (008/FR-031, raised from 2 by 004/FR-051 for chunked reading).
+ * At most this many LLM calls per analysis (automatic OCR, enrichment chunks and escalation); the rest is read by rules
+ * only (008/FR-031, raised from 2 by 004/FR-051 for chunked reading — ~5× the worst-case cost, see ADR-0008 amendment).
  */
 export const MAX_LLM_CALLS_PER_ANALYSIS = 8;
 

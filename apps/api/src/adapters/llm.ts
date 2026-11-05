@@ -40,7 +40,7 @@ export function parseJsonLoose<T = unknown>(text: string): T {
 /**
  * Highest `max_tokens` sent on a non-streaming request. Long generations must be streamed (the official SDKs refuse
  * non-streaming requests whose `max_tokens` implies more than ~10 minutes, about 21k tokens, and idle connections get
- * dropped); this adapter does not stream, so callers that need more output split the work (OCR: 10 pages per call,
+ * dropped); this adapter does not stream, so callers that need more output split the work (OCR: 5 pages per call,
  * `OCR_PAGES_PER_CALL`). A reply that needs more than this ends with `max_tokens` → `LlmError`.
  */
 export const MAX_NON_STREAMING_TOKENS = 16_000;

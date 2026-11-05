@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import {
   OCR_CALL_TIMEOUT_MS, OCR_DOCUMENT_BUDGET_MS, OCR_JSON_SCHEMA, OCR_MAX_BYTES_PER_CALL, OCR_MAX_CALLS_PER_ANALYSIS, OCR_MAX_CALLS_PER_DOCUMENT, OCR_MAX_CONFIDENCE,
-  OCR_MAX_PAGES_PER_CALL, OCR_PAGES_PER_CALL, OcrSplitError, buildOcrRequest, markOcrRequirements, parseOcrPages, splitPdfForOcr, toBase64,
+  OCR_MAX_OUTPUT_TOKENS, OCR_MAX_PAGES_PER_CALL, OCR_PAGES_PER_CALL, OcrSplitError, buildOcrRequest, markOcrRequirements, openPdfForOcr, parseOcrPages,
+  splitPdfForOcr, toBase64,
 } from '../../src/analyse/ocr';
 
 async function pdf(pages: number): Promise<Uint8Array> {
@@ -45,6 +46,34 @@ describe('splitPdfForOcr (T090, FR-052)', () => {
     await expect(splitPdfForOcr(bytes, { maxBytes: 10 })).rejects.toBeInstanceOf(OcrSplitError);
   });
 
+  it('builds parts lazily, one per request, and only up to the page limit (review S6)', async () => {
+    const src = await openPdfForOcr(await pdf(9));
+    expect(src.totalPages).toBe(9);
+    const it = src.parts({ maxPages: 2, pageLimit: 5 });
+    const first = await it.next();
+    expect(first.value).toMatchObject({ firstPage: 1, lastPage: 2 });
+    const rest: [number, number][] = [];
+    for await (const p of it) rest.push([p.firstPage, p.lastPage]);
+    // Pages 6–9 are never copied into a part.
+    expect(rest).toEqual([[3, 4], [5, 5]]);
+    // A page limit below the page count never returns the original bytes, even when the PDF would fit in one part.
+    const cut = await splitPdfForOcr(await pdf(4), { pageLimit: 3 });
+    expect(cut.map((p) => [p.firstPage, p.lastPage])).toEqual([[1, 3]]);
+    expect(await pageCount(cut[0]!.bytes)).toBe(3);
+  });
+
+  it('a consumer that stops early never builds the later parts', async () => {
+    const src = await openPdfForOcr(await pdf(6));
+    const create = vi.spyOn(PDFDocument, 'create');
+    try {
+      let seen = 0;
+      for await (const _p of src.parts({ maxPages: 1 })) { seen++; if (seen === 2) break; }
+      expect(create).toHaveBeenCalledTimes(2);
+    } finally {
+      create.mockRestore();
+    }
+  });
+
   it('rejects bytes that are not a PDF', async () => {
     await expect(splitPdfForOcr(new TextEncoder().encode('not a pdf'))).rejects.toBeInstanceOf(OcrSplitError);
   });
@@ -76,12 +105,18 @@ describe('parseOcrPages', () => {
     const r = parseOcrPages({ pages: [{ page: 2, text: ' Bid\r\nNo. 1 ' }, { page: 1, text: 'first' }, { page: 4, text: '' }, { page: 9, text: 'out of range' }] }, 4);
     expect(r.pages).toEqual(['first', 'Bid\nNo. 1', '', '']);
     expect(r.missing).toEqual([3, 4]);
+    // Page 4 came back explicitly blank; page 3 was not returned at all (review S3).
+    expect(r.absent).toEqual([3]);
+  });
+
+  it('a null text counts as absent, an explicit empty string as a blank page', () => {
+    expect(parseOcrPages({ pages: [{ page: 1, text: null }, { page: 2, text: '   ' }] }, 2)).toMatchObject({ missing: [1, 2], absent: [1] });
   });
 
   it('keeps the longer text of a repeated page; accepts a bare array; unusable replies give all-empty pages', () => {
     expect(parseOcrPages({ pages: [{ page: 1, text: 'a' }, { page: 1, text: 'abc' }] }, 1).pages).toEqual(['abc']);
     expect(parseOcrPages([{ page: 1, text: 'x' }], 1).pages).toEqual(['x']);
-    expect(parseOcrPages('garbage', 2)).toEqual({ pages: ['', ''], missing: [1, 2] });
+    expect(parseOcrPages('garbage', 2)).toEqual({ pages: ['', ''], missing: [1, 2], absent: [1, 2] });
     expect(parseOcrPages({ pages: [{ page: 'one', text: 1 }] }, 1).missing).toEqual([1]);
   });
 });
@@ -89,10 +124,13 @@ describe('parseOcrPages', () => {
 describe('API OCR limits and provenance (T091, FR-052)', () => {
   it('pins the per-call, per-document and per-analysis limits', () => {
     expect([OCR_PAGES_PER_CALL, OCR_MAX_CALLS_PER_DOCUMENT, OCR_CALL_TIMEOUT_MS, OCR_DOCUMENT_BUDGET_MS, OCR_MAX_CALLS_PER_ANALYSIS])
-      .toEqual([10, 15, 120_000, 600_000, 2]);
-    // 15 calls of 10 pages cover the 150-page text cap; one call's output budget stays under the non-streaming cap (16k).
+      .toEqual([5, 30, 90_000, 600_000, 4]);
+    // 30 calls of 5 pages cover the 150-page text cap; one call's output budget stays well under the non-streaming cap (16k).
     expect(OCR_PAGES_PER_CALL * OCR_MAX_CALLS_PER_DOCUMENT).toBe(150);
-    expect(buildOcrRequest({ bytes: new Uint8Array([1]), firstPage: 1, lastPage: OCR_PAGES_PER_CALL }).maxTokens).toBeLessThanOrEqual(16_000);
+    expect(buildOcrRequest({ bytes: new Uint8Array([1]), firstPage: 1, lastPage: OCR_PAGES_PER_CALL }).maxTokens).toBe(7_500);
+    // Even a 100-page part (the FR-052 ceiling) never asks for more than the cap.
+    expect(OCR_MAX_OUTPUT_TOKENS).toBe(16_000);
+    expect(buildOcrRequest({ bytes: new Uint8Array([1]), firstPage: 1, lastPage: 100 }).maxTokens).toBe(16_000);
   });
 
   it('markOcrRequirements sets source.ocr and caps confidence at 0.8', () => {

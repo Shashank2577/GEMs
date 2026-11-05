@@ -22,7 +22,9 @@ export const CURRENT_EXTRACTOR_VERSION = 'llm-extract-2026-11-v2';
 
 /** The LLM's confidence is capped so a clean RULE match (0.95) is never displaced. */
 export const LLM_MAX_CONFIDENCE = 0.9;
-const MAX_CHARS = 60_000;
+/** Characters of document text in one enrichment prompt / one page chunk (FR-047, FR-051). */
+export const MAX_CHUNK_CHARS = 60_000;
+const MAX_CHARS = MAX_CHUNK_CHARS;
 
 export const LLM_REQUIREMENT_KEYS = [
   'turnover_min', 'oem_turnover', 'experience_years', 'similar_work', 'past_performance', 'emd', 'epbg',
@@ -193,7 +195,7 @@ export interface PageChunk {
 }
 
 /** Characters of a page as `buildLlmPrompt` includes them. */
-const pageChars = (p: string) => p.replace(/[ \t]+/g, ' ').trim().length;
+export const pageChars = (p: string) => p.replace(/[ \t]+/g, ' ').trim().length;
 
 /**
  * Split a document into page-aligned chunks of ≤ `maxChars` characters of page text (a single page longer than that gets
@@ -226,6 +228,13 @@ export function unreadPagesNote(fileName: string, from: number, to: number): str
     : `Pages ${from}–${to} of ${fileName} were not read by AI`;
 }
 
+/** A chunk whose text was cut to fit (a single page over 60,000 characters, or the analysis's character budget). */
+export function partlyReadPagesNote(fileName: string, from: number, to: number): string {
+  return from === to
+    ? `Page ${from} of ${fileName} was only partly read by AI`
+    : `Pages ${from}–${to} of ${fileName} were only partly read by AI`;
+}
+
 export interface LlmExtractResult {
   requirements: Requirement[];
   used: boolean;
@@ -244,6 +253,11 @@ export interface LlmExtractResult {
    * reply is used for this analysis (rules only) but must never be cached and served to every org (008/FR-072).
    */
   cacheable?: boolean;
+  /**
+   * The reply was a well-formed requirements array (possibly empty, review S5). A later chunk of a document that simply
+   * has no requirements on its pages is valid and does not stop the document's extraction from being shared.
+   */
+  valid?: boolean;
 }
 
 /** Run the LLM extractor and merge; on any failure, fall back to the rule results. */
@@ -260,8 +274,9 @@ export async function enrichWithLlm(
   try {
     const reply = await completeJson(prompt);
     const llm = parseLlmRequirements(reply, src);
-    const cacheable = replyArray(reply) !== null && llm.length > 0;
-    return { requirements: mergeRequirements(rules, llm), used: true, inputChars, llmItems: llm, llm, cacheable };
+    const valid = replyArray(reply) !== null;
+    const cacheable = valid && llm.length > 0;
+    return { requirements: mergeRequirements(rules, llm), used: true, inputChars, llmItems: llm, llm, cacheable, valid };
   } catch (e) {
     return { requirements: rules, used: false, error: (e as Error).message, inputChars, llmItems: [] };
   }
@@ -330,20 +345,52 @@ ${parts.join('\n\n')}`;
   return { system: ESCALATION_SYSTEM, prompt, maxTokens: 2048, jsonSchema: LLM_REQUIREMENTS_JSON_SCHEMA };
 }
 
+const squash = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** The quote occurs (case- and whitespace-insensitively) on the page it cites. */
+export function quoteOnPage(pages: string[], r: Pick<Requirement, 'source'>): boolean {
+  const { page, quote } = r.source;
+  if (!page || !quote || page < 1 || page > pages.length) return false;
+  const q = squash(quote);
+  return q.length > 0 && squash(pages[page - 1]!).includes(q);
+}
+
+const showValue = (r: Requirement) => (typeof r.value === 'string' ? r.value : JSON.stringify(r.value ?? null));
+
 /**
- * Merge adjudicated items into `current`: for a candidate key, an item WITH a quote replaces the existing single-valued
- * requirement (never a MANUAL one) when it contradicts it or is more confident. The result stays an LLM item, capped
- * at 0.9, and is scored by the deterministic engine like any other (FR-048).
+ * Merge adjudicated items into `current`: for a candidate key, an item WITH a quote may replace the existing
+ * single-valued requirement (never a MANUAL one) when it contradicts it or is more confident. The result stays an LLM
+ * item, capped at 0.9, and is scored by the deterministic engine like any other (FR-048).
+ *
+ * A RULE item is never overridden silently (review S9): the adjudicated item replaces it only when its quote is found
+ * on the page it cites (`pages`) AND its confidence is at least the rule's. Otherwise a conflicting answer leaves the
+ * rule item in place, marked `needsReview` with what the model read, for a human to check. As the LLM is capped at
+ * 0.9, a clean rule match (0.95) is always kept.
  */
-export function applyEscalation(current: Requirement[], adjudicated: Requirement[], candidates: ReturnType<typeof escalationCandidates>): Requirement[] {
+export function applyEscalation(
+  current: Requirement[], adjudicated: Requirement[], candidates: ReturnType<typeof escalationCandidates>, pages: string[] = [],
+): Requirement[] {
   const out = [...current];
   for (const c of candidates) {
     const a = adjudicated.find((r) => r.key === c.key && r.source.quote);
     if (!a) continue;
     const i = out.findIndex((r) => r.key === c.key);
     if (i < 0) { out.push(a); continue; }
-    if (out[i]!.method === 'MANUAL') continue;
-    if (!sameValue(out[i]!, a) || a.confidence > out[i]!.confidence) out[i] = a;
+    const existing = out[i]!;
+    if (existing.method === 'MANUAL') continue;
+    const differs = !sameValue(existing, a);
+    if (!differs && a.confidence <= existing.confidence) continue;
+    if (existing.method === 'RULE' && !(quoteOnPage(pages, a) && a.confidence >= existing.confidence)) {
+      if (differs) {
+        out[i] = {
+          ...existing,
+          needsReview: `AI review read ${showValue(a)}${a.source.page ? ` on page ${a.source.page}` : ''} (“${a.source.quote}”), `
+            + 'which differs from this value — check it against the document.',
+        };
+      }
+      continue;
+    }
+    out[i] = a;
   }
   return out;
 }
@@ -366,7 +413,7 @@ export async function escalateWithLlm(
   const keys = candidates.map((c) => c.key);
   try {
     const adjudicated = parseLlmRequirements(await completeJson(prompt), src).filter((r) => keys.includes(r.key));
-    return { requirements: applyEscalation(current, adjudicated, candidates), used: true, keys, inputChars };
+    return { requirements: applyEscalation(current, adjudicated, candidates, pages), used: true, keys, inputChars };
   } catch (e) {
     return { requirements: current, used: false, keys, inputChars, error: (e as Error).message };
   }

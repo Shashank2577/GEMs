@@ -4,7 +4,7 @@ import type { AnalysisDto, Requirement, TenderDocumentDto } from '@tp/core/contr
 import { Badge, Card, EmptyState, Input, ResponsiveTable, Tooltip, type Column } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { PageChip } from './AnalysisPanel';
-import { OCR_REQUIREMENT_TOOLTIP, REQ_GROUPS, documentCheckPrefix, formatRequirementValue, mismatchedDocuments } from './labels';
+import { NEEDS_REVIEW_LABEL, OCR_REQUIREMENT_TOOLTIP, REQ_GROUPS, documentCheckPrefix, formatRequirementValue, mismatchedDocuments } from './labels';
 
 function MethodBadge({ m }: { m: Requirement['method'] }) {
   if (m === 'LLM') return <Badge tone="accent" size="sm"><Bot aria-hidden /> AI</Badge>;
@@ -77,6 +77,11 @@ export function RequirementsTab({ analysis, tenderId, documents, bidNumber }: {
             {r.source.ocr && (
               <Tooltip content={OCR_REQUIREMENT_TOOLTIP}>
                 <span tabIndex={0} className="rounded focus-ring" data-testid="ocr-requirement"><Badge size="sm" tone="info"><ScanText aria-hidden /> Read by AI (OCR)</Badge><span className="sr-only">. {OCR_REQUIREMENT_TOOLTIP}</span></span>
+              </Tooltip>
+            )}
+            {r.needsReview && (
+              <Tooltip content={r.needsReview}>
+                <span tabIndex={0} className="rounded focus-ring" data-testid="requirement-needs-review"><Badge size="sm" tone="warning"><TriangleAlert aria-hidden /> {NEEDS_REVIEW_LABEL}</Badge><span className="sr-only">. {r.needsReview}</span></span>
               </Tooltip>
             )}
             {r.mandatory && <Tooltip content="Mandatory for eligibility"><span className="size-1.5 rounded-full bg-danger" role="img" aria-label="mandatory" /></Tooltip>}
