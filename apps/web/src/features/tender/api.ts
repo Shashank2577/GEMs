@@ -118,8 +118,15 @@ export function useOverride(tenderId: string) {
       api.post<AnalysisDto>(`/analyses/${analysisId}/override`, body),
     onSuccess: (a) => {
       qc.setQueryData(tenderKeys.analysis(tenderId), a);
+      qc.invalidateQueries({ queryKey: tenderKeys.analysis(tenderId) });
       qc.invalidateQueries({ queryKey: tenderKeys.activity(tenderId) });
       qc.invalidateQueries({ queryKey: tenderKeys.detail(tenderId) });
+    },
+    // The analysis was replaced by a newer one: refetch so the retry targets the new id.
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409 && err.code === 'analysis_replaced') {
+        qc.invalidateQueries({ queryKey: tenderKeys.analysis(tenderId) });
+      }
     },
   });
 }

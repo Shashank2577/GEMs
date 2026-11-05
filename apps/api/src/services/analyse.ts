@@ -247,7 +247,6 @@ export async function latestAnalysis(deps: AppDeps, tenderId: string, orgId: str
   return a ?? null;
 }
 
-/** Latest analysis with status `done` (FR-029): the result to show and to carry overrides from. */
 type Tx = Parameters<Parameters<AppDeps['db']['transaction']>[0]>[0];
 
 /** Latest analysis with status `done` (FR-029): the result to show and to carry overrides from. */
@@ -466,7 +465,7 @@ export async function overrideFactor(
     const [newer] = await tx.select({ id: analyses.id }).from(analyses).where(and(
       eq(analyses.orgId, input.orgId), eq(analyses.tenderId, a.tenderId), eq(analyses.status, 'done'), gt(analyses.createdAt, a.createdAt),
     )).limit(1);
-    if (newer) throw new HttpError(409, 'conflict', 'A newer analysis has replaced this one. Reload and apply the override again.');
+    if (newer) throw new HttpError(409, 'analysis_replaced', 'A newer analysis has replaced this one. Reload and apply the override again.');
     const from = effectiveStatus(factor);
     const at = deps.clock.now().toISOString();
     const factors: ScoreFactor[] = a.factors.map((f) => {

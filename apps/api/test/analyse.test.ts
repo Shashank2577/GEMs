@@ -242,6 +242,7 @@ describe('override (FR-016)', () => {
     const audit = await ctx.db.select().from(activityLog).where(eq(activityLog.action, 'analysis.factor_overridden'));
     expect(audit[0].meta).toMatchObject({ factorKey: 'experience', from: 'fail', to: 'pass' });
 
+    ctx.clock.advance(1000); // the fixed clock would give both rows the same created_at
     const again = await request(ctx.app, 'POST', `/tenders/${tenderId}/analyse`, { cookie: roles.analyst.cookie });
     expect(again.body.id).not.toBe(analysisId);
     expect(again.body.factors.find((x: any) => x.key === 'experience').overridden.status).toBe('pass');
@@ -615,12 +616,19 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     expect(got.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'JV partner brings 6 years' });
     expect(got.body.lastAttempt).toEqual({ status: 'failed', error: 'database unavailable', at: ctx.clock.now().toISOString() });
 
+    // SF1: an override while a newer attempt failed returns the same shape as GET (lastAttempt + documents kept).
+    const ov2 = await request(ctx.app, 'POST', `/analyses/${first.body.id}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'emd', status: 'fail', reason: 'Bank guarantee withdrawn' } });
+    expect(ov2.status).toBe(200);
+    expect(ov2.body.lastAttempt).toEqual(got.body.lastAttempt);
+    expect(ov2.body.documents).toEqual(got.body.documents);
+    expect(ov2.body.factors.find((f: any) => f.key === 'emd').overridden).toMatchObject({ status: 'fail' });
+
     // S2: the feed card and tender detail keep the last done score after the failed re-analysis.
     const feed = await request(ctx.app, 'GET', `/tenders/${t.id}`, { cookie: roles.viewer.cookie });
-    expect(feed.body.analysis).toMatchObject({ id: first.body.id, score: ov.body.score, verdict: 'go' });
+    expect(feed.body.analysis).toMatchObject({ id: first.body.id, score: ov2.body.score, verdict: 'go' });
     expect(feed.body.analysisDetail).toMatchObject({ id: first.body.id, status: 'done' });
     const sorted = await request(ctx.app, 'GET', '/tenders?sort=-score&limit=50', { cookie: roles.viewer.cookie });
-    expect(sorted.body.items.find((i: any) => i.id === t.id)?.analysis).toMatchObject({ id: first.body.id, score: ov.body.score });
+    expect(sorted.body.items.find((i: any) => i.id === t.id)?.analysis).toMatchObject({ id: first.body.id, score: ov2.body.score });
 
     // Re-analysing after the failure carries the override from the last DONE analysis, not the failed row.
     ctx.clock.advance(1000);
@@ -713,7 +721,7 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     // Overriding the replaced analysis now is refused instead of being silently lost.
     const stale = await request(ctx.app, 'POST', `/analyses/${first.body.id}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'emd', status: 'fail', reason: 'Too late' } });
     expect(stale.status).toBe(409);
-    expect(stale.body.error.code).toBe('conflict');
+    expect(stale.body.error.code).toBe('analysis_replaced');
   });
 
   it('S3: a first-ever analysis that timed out is reported as failed, not in progress', async () => {

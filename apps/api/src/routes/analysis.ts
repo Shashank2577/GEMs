@@ -12,7 +12,7 @@
  *   GET  /scoring-weights                             {weights, defaults, custom}    viewer+
  *   PUT  /scoring-weights                             partial weights ({} = reset)   bid_manager+
  */
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { idParamSchema, uuidSchema } from '@tp/core/contracts/common';
 import { overrideFactorInputSchema, scoringWeightsSchema, tenderDocKindSchema } from '@tp/core/contracts/analyse';
@@ -102,9 +102,8 @@ analysisRoutes.post('/tenders/:id/analyse', requireRole('analyst'), rateLimit('a
   return c.json(toAnalysisDto(analysis, documents), 201);
 });
 
-analysisRoutes.get('/tenders/:id/analysis', requireAuth, async (c) => {
-  const tenderId = tenderIdOf(c.req.param('id'));
-  await getTender(c.var.deps, tenderId, c.var.org);
+/** The GET-shaped analysis view (shown result + documents + lastAttempt) for a tender. */
+async function analysisView(c: Context<AppEnv>, tenderId: string) {
   const [latest, done] = await Promise.all([
     latestAnalysis(c.var.deps, tenderId, orgId(c)), latestDoneAnalysis(c.var.deps, tenderId, orgId(c)),
   ]);
@@ -114,14 +113,21 @@ analysisRoutes.get('/tenders/:id/analysis', requireAuth, async (c) => {
   const docs = await listTenderDocuments(c.var.deps, tenderId, orgId(c));
   const lastAttempt = lastAttemptOf(latest, shown, c.var.deps.clock.now());
   // A first-ever run that timed out is reported as failed, not "in progress" forever.
-  return c.json({ ...shownAnalysisDto(shown, lastAttempt, docs), ...(lastAttempt ? { lastAttempt } : {}) });
+  return { ...shownAnalysisDto(shown, lastAttempt, docs), ...(lastAttempt ? { lastAttempt } : {}) };
+}
+
+analysisRoutes.get('/tenders/:id/analysis', requireAuth, async (c) => {
+  const tenderId = tenderIdOf(c.req.param('id'));
+  await getTender(c.var.deps, tenderId, c.var.org);
+  return c.json(await analysisView(c, tenderId));
 });
 
 analysisRoutes.post('/analyses/:id/override', requireRole('bid_manager'), async (c) => {
   const { id } = parseWith(idParamSchema, { id: c.req.param('id') }, 'path');
   const body = await parseJson(c, overrideFactorInputSchema);
   const a = await overrideFactor(c.var.deps, { orgId: orgId(c), userId: userId(c), userName: c.var.user.name, analysisId: id, ...body });
-  return c.json(toAnalysisDto(a));
+  // Same shape as GET so the client cache keeps lastAttempt and documents.
+  return c.json(await analysisView(c, a.tenderId));
 });
 
 analysisRoutes.get('/scoring-weights', requireAuth, (c) => c.json(weightsResponse(c.var.org.scoringWeights)));
