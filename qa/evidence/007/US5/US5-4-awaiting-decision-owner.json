@@ -1,0 +1,27 @@
+{
+  "awaitingDecision": [
+    {
+      "workspaceId": "7c0e491a-5f24-472e-9405-b208e2844ad9",
+      "tenderId": "b5c0263c-9e04-45d8-b7ff-0bfa4cd76733",
+      "bidNumber": "GEM/2026/B/6488446",
+      "title": "Multifunction Machine MFM (Q2) – A3 mono laser, 35 ppm, duplex",
+      "score": 100,
+      "verdict": "go",
+      "endAt": "2026-11-08T04:30:00.000Z"
+    },
+    {
+      "workspaceId": "456fd102-c296-43ed-abc4-947cf61b704f",
+      "tenderId": "53425112-2ea0-4849-b56c-26cd1363285d",
+      "bidNumber": "GEM/2026/B/6535960",
+      "title": "Rack Server – 2 x Intel Xeon Silver, 256 GB RAM, 8 x 1.92 TB SSD",
+      "score": 80,
+      "verdict": "no_go",
+      "endAt": "2026-11-13T06:30:00.000Z"
+    }
+  ],
+  "dbExpectedOrder": [
+    "7c0e491a-5f24-472e-9405-b208e2844ad9",
+    "456fd102-c296-43ed-abc4-947cf61b704f"
+  ],
+  "analysingWorkspacesInOrg": 2
+}

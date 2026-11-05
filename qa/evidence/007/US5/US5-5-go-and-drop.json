@@ -1,0 +1,16 @@
+{
+  "goPatch": {
+    "target": "3e868701-3dbd-4121-8b88-30f0337da90a",
+    "status": 200,
+    "requests": 1
+  },
+  "funnel": {
+    "goBefore": 2,
+    "analysingBefore": 2
+  },
+  "dropped": "3de1ca33-2ce9-47e3-9d4a-214e82f74a53",
+  "finalStages": {
+    "go": "go",
+    "drop": "dropped"
+  }
+}

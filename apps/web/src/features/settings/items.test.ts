@@ -39,10 +39,12 @@ describe('SETTINGS_ITEMS', () => {
 describe('visibleSettingsItems', () => {
   const asRole = (r: Role) => (min: Role) => roleCan(r, min);
 
-  it('hides pages whose route is not shipped yet (Activity log until T085)', () => {
+  it('shows Activity log (shipped in T085) and hides any page flagged ready:false', () => {
     const labels = visibleSettingsItems(asRole('owner')).map((i) => i.label);
-    expect(labels).not.toContain('Activity log');
-    expect(labels).toHaveLength(SETTINGS_ITEMS.filter((i) => i.ready !== false).length);
+    expect(labels).toContain('Activity log');
+    expect(labels).toHaveLength(SETTINGS_ITEMS.length);
+    const hidden: SettingsItem[] = [{ ...byLabel('Activity log'), ready: false }];
+    expect(visibleSettingsItems(asRole('owner'), hidden)).toEqual([]);
   });
 
   it('shows a ready Activity log to every role, and filters by `min`', () => {
