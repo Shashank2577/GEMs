@@ -1,7 +1,7 @@
 /** Bid workspace API (T063, T067; FR-023, FR-028, US4 acceptance 1–2, US6 activity). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { activityLog, analyses, notifications, type ChecklistItem } from '@tp/db';
+import { activityLog, analyses, bidWorkspaces, notifications, type ChecklistItem } from '@tp/db';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
@@ -402,5 +402,77 @@ describe('mapping & readiness edge cases (T028; 006/FR-013, FR-016, FR-017, FR-0
     expect(r.body.error.code).toBe('validation_error');
     expect(r.body.error.details.fields.nope).toBe('Not an item of this bid’s checklist');
     expect((await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.viewer.cookie, json: { pan: 'auto' } })).status).toBe(403);
+  });
+});
+
+describe('overrides only for missing/expired items (006/FR-027)', () => {
+  it('409 nothing_to_override for ready and generated items; missing still works', async () => {
+    for (const itemId of ['gst', 'non_blacklisting']) {
+      const r = await request(ctx.app, 'POST', `/workspaces/${wsId}/overrides`, { cookie: s.org.bidManager.cookie, json: { itemId, reason: 'Not actually needed' } });
+      expect(r.status).toBe(409);
+      expect(r.body.error).toMatchObject({ code: 'nothing_to_override', message: 'Only a missing or expired item can be overridden.' });
+    }
+    const [w] = await ctx.db.select().from(bidWorkspaces).where(eq(bidWorkspaces.id, wsId));
+    expect(w.overrides ?? []).toEqual([]);
+    // Re-overriding an already overridden item (to update the reason) is still allowed.
+    const ok = await request(ctx.app, 'POST', `/workspaces/${wsId}/overrides`, { cookie: s.org.bidManager.cookie, json: { itemId: 'oem_authorization', reason: 'First reason given' } });
+    expect(ok.status).toBe(201);
+    const again = await request(ctx.app, 'POST', `/workspaces/${wsId}/overrides`, { cookie: s.org.bidManager.cookie, json: { itemId: 'oem_authorization', reason: 'Updated reason given' } });
+    expect(again.status).toBe(201);
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/overrides/oem_authorization`, { cookie: s.org.bidManager.cookie })).status).toBe(200);
+  });
+});
+
+describe('comment mentions and deletion (006/FR-032, FR-033)', () => {
+  const mentionNotes = (userId: string) => ctx.db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.kind, 'mention')));
+
+  it('notifies a mentioned member who is neither owner nor assignee, once, and not the author', async () => {
+    const viewerId = s.org.viewer.me.user.id;
+    const before = (await mentionNotes(viewerId)).length;
+    const c = await request(ctx.app, 'POST', `/workspaces/${wsId}/comments`, { cookie: s.org.analyst.cookie, json: { body: 'Please review the MAF @Test viewer and @test VIEWER, also @Test analyst (me)' } });
+    expect(c.status).toBe(201);
+    const after = await mentionNotes(viewerId);
+    expect(after).toHaveLength(before + 1);
+    expect(after.at(-1)).toMatchObject({ title: 'Test analyst mentioned you on GEM/2026/B/700001', link: `/workspaces/${wsId}` });
+    // The author mentioning themselves gets nothing from this comment.
+    expect((await mentionNotes(s.org.analyst.me.user.id)).filter((n) => n.dedupeKey === `comment:${c.body.id}`)).toHaveLength(0);
+  });
+
+  it('an owner/assignee who is also mentioned gets a single notification', async () => {
+    const mgr = s.org.bidManager.me.user.id;
+    const before = (await mentionNotes(mgr)).length;
+    const c = await request(ctx.app, 'POST', `/workspaces/${wsId}/comments`, { cookie: s.org.analyst.cookie, json: { body: 'Ping @Test bid manager' } });
+    const mine = (await mentionNotes(mgr)).filter((n) => n.dedupeKey === `comment:${c.body.id}`);
+    expect(mine).toHaveLength(1);
+    expect(mine[0].title).toMatch(/mentioned you/);
+    expect(await mentionNotes(mgr)).toHaveLength(before + 1);
+  });
+
+  it('an ambiguous first name ("@Test") notifies nobody extra', async () => {
+    const viewerId = s.org.viewer.me.user.id;
+    const before = (await mentionNotes(viewerId)).length;
+    await request(ctx.app, 'POST', `/workspaces/${wsId}/comments`, { cookie: s.org.analyst.cookie, json: { body: '@Test who owns this?' } });
+    expect(await mentionNotes(viewerId)).toHaveLength(before);
+  });
+
+  it('author or Bid Manager+ can delete (204, logged); others 403; other org 404', async () => {
+    const mk = async (cookie: string) => (await request(ctx.app, 'POST', `/workspaces/${wsId}/comments`, { cookie, json: { body: 'to be deleted' } })).body.id as string;
+    const mine = await mk(s.org.analyst.cookie);
+    const managers = await mk(s.org.bidManager.cookie);
+
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/comments/${managers}`, { cookie: s.org.analyst.cookie })).status).toBe(403);
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/comments/${mine}`, { cookie: s.org.viewer.cookie })).status).toBe(403);
+    const other = await signup(ctx.app);
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/comments/${mine}`, { cookie: other.cookie })).status).toBe(404);
+
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/comments/${mine}`, { cookie: s.org.analyst.cookie })).status).toBe(204);
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/comments/${managers}`, { cookie: s.org.bidManager.cookie })).status).toBe(204);
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/comments/${mine}`, { cookie: s.org.analyst.cookie })).status).toBe(404);
+    expect((await request(ctx.app, 'DELETE', `/workspaces/${wsId}/comments/not-a-uuid`, { cookie: s.org.analyst.cookie })).status).toBe(404);
+
+    const list = await request(ctx.app, 'GET', `/workspaces/${wsId}/comments`, { cookie: s.org.viewer.cookie });
+    expect(list.body.items.map((x: any) => x.id)).not.toContain(mine);
+    const acts = await ctx.db.select().from(activityLog).where(and(eq(activityLog.action, 'workspace.comment_deleted'), eq(activityLog.entityId, wsId)));
+    expect(acts.map((a) => (a.meta as any).commentId).sort()).toEqual([mine, managers].sort());
   });
 });

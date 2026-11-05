@@ -78,6 +78,7 @@ export function describeActivity(a: ActivityItem): string {
     case 'workspace.item_overridden': return `overrode “${m.label ?? m.itemId}”: ${m.reason ?? ''}`;
     case 'workspace.override_removed': return 'removed an override';
     case 'workspace.commented': return 'commented';
+    case 'workspace.comment_deleted': return 'deleted a comment';
     case 'workspace.packet_built': return `built the packet (${m.pageCount ?? '?'} pages)`;
     case 'workspace.packet_failed': return 'tried to build the packet (failed)';
     case 'workspace.assist_values_saved': return 'updated the submission values';
