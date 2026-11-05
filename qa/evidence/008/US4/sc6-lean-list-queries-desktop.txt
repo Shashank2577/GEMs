@@ -1,4 +1,4 @@
-# sc6-lean-list-queries — project desktop — 2026-11-05T06:30:12.531Z
+# sc6-lean-list-queries — project desktop — 2026-11-05T07:23:13.131Z
 GET /api/tenders item: 36 keys → id, source, bidNumber, gemBidId, bidType, title, items, category, quantity, ministry, department, organisation, buyerOffice, state, city, startAt, endAt, openingAt, emdAmount, estimatedValue, epbgPercent, hsnCodes, status, documentUrl, sourceUrl, fetchedAt, createdAt, updatedAt, isDemo, matches, analysis, workspace, seen, isNew, dismissed, hasCorrigendum
-GET /api/dashboard keys: generatedAt, tiles, stats, closingSoon, pipeline, pipelineValue, verdicts, matchesByDay, recentMatches, expiringDocuments, activity, setup, setupComplete, demo
+GET /api/dashboard keys: generatedAt, tiles, stats, closingSoon, pipeline, pipelineValue, verdicts, matchesByDay, recentMatches, expiringDocuments, activity, setup, setupComplete, demo, myWork, awaitingDecision
 SQL-level check (query shape, `tenders.raw` / `tender_documents.text` never selected): apps/api/test/perf-indexes.test.ts "list queries read tenderListColumns only" — see VERDICT.md for its run.

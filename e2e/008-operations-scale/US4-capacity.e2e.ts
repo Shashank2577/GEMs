@@ -132,6 +132,7 @@ const mockGemRequests = async (r: APIRequestContext) => ((await (await r.get(`${
 interface LlmCall { at: number; chars: number }
 const llmCalls: LlmCall[] = [];
 let llmServer: Server | undefined;
+let llmDelayMs = 0; // round-2 addendum: a slow fake LLM (sc7b)
 async function startFakeLlm() {
   if (llmServer) return;
   llmServer = createServer((req, res) => {
@@ -145,7 +146,7 @@ async function startFakeLlm() {
       } catch { /* not json */ }
       llmCalls.push({ at: Date.now(), chars });
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ id: 'msg_qa', type: 'message', role: 'assistant', model: 'qa-fake', stop_reason: 'end_turn', content: [{ type: 'text', text: '{"requirements":[]}' }], usage: { input_tokens: 1, output_tokens: 1 } }));
+      setTimeout(() => res.end(JSON.stringify({ id: 'msg_qa', type: 'message', role: 'assistant', model: 'qa-fake', stop_reason: 'end_turn', content: [{ type: 'text', text: '{"requirements":[]}' }], usage: { input_tokens: 1, output_tokens: 1 } })), llmDelayMs);
     });
   });
   await new Promise<void>((ok, bad) => { llmServer!.once('error', bad); llmServer!.listen(LLM_PORT, '127.0.0.1', () => ok()); });
@@ -502,3 +503,66 @@ for (const phone of [false, true]) {
     t.save();
   });
 }
+
+// ═════════════ round-2 addendum (PR #515 head after the 1c81196 review fixes) ═════════════
+
+test('sc7b slow LLM (55 s per call): the analysis still finishes `done` inside 120 s, is never reported timed out, overflow documents are rules-only with the budget warning', async ({ page }) => {
+  test.skip(PROJECT() === 'mobile', 'desktop only');
+  test.setTimeout(170_000);
+  await startFakeLlm();
+  const t = new Transcript('sc7b-slow-llm-deadline');
+  await signedUp(page, 'sc7b');
+  const tender = insertTender();
+  const { readFileSync } = await import('node:fs');
+  for (const [name, kind] of [['go-it-services.pdf', 'bid'], ['review-hardware-oem.pdf', 'atc'], ['emd-exempt-mse.pdf', 'corrigendum'], ['nogo-experience.pdf', 'boq'], ['synthetic-tender.pdf', 'other']] as const) {
+    expect((await uploadApi(page.request, tender.id, pdfFile(name, readFileSync(join(BIDS, name))), kind)).status()).toBe(201);
+  }
+  llmCalls.length = 0;
+  llmDelayMs = 55_000;
+  try {
+    const started = Date.now();
+    const res = await page.request.post(`/api/tenders/${tender.id}/analyse`, { timeout: 150_000 });
+    const wall = Date.now() - started;
+    await t.http('Analyse with a fake LLM that answers after 55 s', res, 'POST /api/tenders/:id/analyse', wall);
+    expect(res.status()).toBeLessThan(300);
+    t.add(`wall clock: ${wall} ms; LLM calls started: ${llmCalls.length} at +${llmCalls.map((c) => Math.round((c.at - started) / 1000)).join(' s, +')} s`);
+    expect(wall).toBeLessThan(120_000);
+    expect(llmCalls.length).toBeLessThanOrEqual(2);
+    const a = await (await page.request.get(`/api/tenders/${tender.id}/analysis`)).json();
+    t.add(`GET analysis → status=${a.status} method=${a.method} error=${a.error} lastAttempt=${JSON.stringify(a.lastAttempt ?? null)} warnings=${JSON.stringify(a.warnings)}`);
+    expect(a.status).toBe('done');
+    expect(a.error).toBeNull();
+    expect(a.lastAttempt, 'never reported as running/failed/timed out').toBeUndefined();
+    expect(a.warnings.map((w: { code: string }) => w.code)).toContain('llm_budget_exhausted');
+    expect(psql(`select status from analyses where tender_id='${tender.id}' order by created_at desc limit 1`)).toBe('done');
+    await page.goto(`/tenders/${tender.id}`);
+    await expect(page.getByTestId('analysis-warnings')).toContainText('rules only');
+    await expect(page.getByText(/timed out/i)).toHaveCount(0);
+    await shot(page, 'sc7b-slow-llm-done');
+  } finally { llmDelayMs = 0; }
+  t.save();
+});
+
+test('sc8b a 200-page document is accepted and truncated: 201 with a pages_truncated warning on the upload, first 150 pages stored/read', async ({ page }) => {
+  test.skip(PROJECT() === 'mobile', 'desktop only');
+  const t = new Transcript('sc8b-200-pages-truncated');
+  await signedUp(page, 'sc8b');
+  const tender = insertTender();
+  const up = await uploadApi(page.request, tender.id, pdfFile('200-pages.pdf', await textPdf(200, 'Long')));
+  await t.http('200-page upload', up, 'POST /api/tenders/:id/documents');
+  expect(up.status()).toBe(201);
+  expect(await up.json()).toMatchObject({ pageCount: 150, totalPages: 200, warnings: expect.arrayContaining([{ code: 'pages_truncated', analysed: 150, total: 200 }]) });
+  expect(docCount(tender.id)).toBe(1);
+  const res = await page.request.post(`/api/tenders/${tender.id}/analyse`);
+  await t.http('Analyse', res, 'POST /api/tenders/:id/analyse');
+  expect(res.status()).toBeLessThan(300);
+  const a = await (await page.request.get(`/api/tenders/${tender.id}/analysis`)).json();
+  t.add(`GET analysis → status=${a.status} warnings=${JSON.stringify(a.warnings)} documents=${JSON.stringify(a.documents)}`);
+  expect(a.status).toBe('done');
+  expect(a.documents).toMatchObject([{ pageCount: 150, totalPages: 200 }]);
+  await page.goto(`/tenders/${tender.id}?tab=documents`);
+  await page.locator('input[type="file"]').setInputFiles(pdfFile('200-pages-again.pdf', await textPdf(200, 'Long')));
+  await expect(toastWith(page, /150/)).toBeVisible();
+  await shot(page, 'sc8b-200-pages-truncated-warning');
+  t.save();
+});

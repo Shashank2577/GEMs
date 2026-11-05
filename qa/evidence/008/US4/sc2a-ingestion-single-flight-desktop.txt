@@ -1,9 +1,9 @@
-# sc2a-ingestion-single-flight — project desktop — 2026-11-05T06:30:06.467Z
+# sc2a-ingestion-single-flight — project desktop — 2026-11-05T07:23:06.039Z
 running rows after cron tick start: 1
 ### manual Sync now while a cron run is in progress
 > POST /api/ingestion/run {}
 < 409
-{"error":{"code":"ingestion_running","message":"A GeM sync is already running — results will appear shortly.","details":{"run":{"id":"aeeb6fcf-e2d3-4bff-b234-751c890a1330","trigger":"cron","status":"running","pagesFetched":0,"tendersSeen":0,"tendersCreated":0,"tendersUpdated":0,"matchesCreated":0,"error":null,"startedAt":"2026-11-05T06:30:06.671Z","finishedAt":null,"durationMs":null}}}}
+{"error":{"code":"ingestion_running","message":"A GeM sync is already running — results will appear shortly.","details":{"run":{"id":"80be0633-5f26-42f9-ae83-3c359edf5532","trigger":"cron","status":"running","pagesFetched":0,"tendersSeen":0,"tendersCreated":0,"tendersUpdated":0,"matchesCreated":0,"error":null,"startedAt":"2026-11-05T07:23:06.270Z","finishedAt":null,"durationMs":null}}}}
 
 second insert of a status='running' row → ERROR:  duplicate key value violates unique constraint "ingestion_runs_one_running_uq"
 running rows afterwards: 1
