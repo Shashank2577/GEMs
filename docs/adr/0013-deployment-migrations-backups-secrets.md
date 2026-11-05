@@ -30,9 +30,10 @@ per PR. Secrets: `wrangler secret put`, `.dev.vars`/`.env` git-ignored, no scann
    a migration is still generated with `drizzle-kit generate` (so the snapshot/journal stay drizzle's), then
    hand-edited: first line `-- tp:non-transactional` (`migrate.ts` runs the file statement by statement outside a
    transaction, drops an INVALID leftover of a failed build first and refuses to record an index that is still
-   INVALID), `CONCURRENTLY`, `IF [NOT] EXISTS` on every statement. Hand-edited so far: `0012_gem_lease_single_run`
-   (seed row, duplicate reap and `IF NOT EXISTS` added to the generated DDL), `0013_capacity_indexes`,
-   `0014_open_closing_idx`. Dropping a superseded index (0014) is allowed in the same release: the old Worker's
+   INVALID), `CONCURRENTLY`, `IF [NOT] EXISTS` on every statement. Hand-edited so far: `0014_gem_lease_single_run`
+   (seed row, duplicate reap and `IF NOT EXISTS` added to the generated DDL), `0015_capacity_indexes`,
+   `0016_open_closing_idx` (drops the index it supersedes) and `0017_open_state_created_idx`. Dropping a superseded
+   index (0016) is allowed in the same release: the old Worker's
    queries stay correct, only their plan changes for the minute between migrate and deploy.
 2. **Staging (SHOULD)** — a Neon branch `staging` + a second Worker environment (`[env.staging]` in `wrangler.toml`,
    `name = "tenderpilot-staging"`, its own R2 bucket and secrets) deployed from `main` first; production deploy is a

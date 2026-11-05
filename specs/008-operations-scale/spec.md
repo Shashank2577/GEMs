@@ -274,8 +274,11 @@ partial indexes; 20 concurrent `fetch-documents` calls against mock-gem show ≥
    wall-clock, and if the budget is exhausted the remaining documents are rules-only and the result shows the warning
    "AI review covered 2 of 5 documents; the rest were checked by rules only." *(gap)*.
 8. **Given** a tender document with 301 pages, **When** it is uploaded or fetched, **Then** the API returns 422
-   `document_too_long` "This document has 301 pages. TenderPilot reads up to 300 pages — upload the bid document and
-   ATC separately." and no `tender_documents` row is written *(gap)*.
+   `document_too_long` "This document has 301 pages. TenderPilot accepts documents of up to 300 pages and reads the
+   first 150 — upload the bid document and ATC separately." before any text is read, and no blob and no
+   `tender_documents` row is written; a document of 151–300 pages is accepted, its first 150 pages are read and the
+   upload answers with a `pages_truncated` warning (004 NFR-005, `MAX_EXTRACT_PAGES = 150`) *(gap; message amended
+   2026-11-05, PR #515 review)*.
 9. **Given** a PDF whose text layer is empty on ≥ 80 % of pages (scanned), **When** it is analysed, **Then** the API
    returns 422 `scanned_document` "This PDF is a scan without text. Upload the text PDF from GeM or an OCR'd copy."
    *(gap; `looksScanned` exists but only annotates activity meta)*.
@@ -608,13 +611,19 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   no-silent-cap rule prevails; amended 2026-11-05, PR #515 review).
 - **FR-029** *(gap)*: `notifications` MUST have `notifications_pending_idx (created_at) WHERE status = 'pending' AND
   channel IN ('email','whatsapp')`.
-- **FR-030** *(gap)*: Tender documents MUST be capped at `MAX_TENDER_DOC_PAGES = 300` (422 `document_too_long`).
+- **FR-030** *(gap)*: Tender documents MUST be capped at `MAX_TENDER_DOC_PAGES = 300`: a longer document is refused
+  with 422 `document_too_long` before any text is read (no blob, no row). Documents of 151–300 pages are accepted and
+  truncated to the first `MAX_EXTRACT_PAGES = 150` pages with a `pages_truncated` warning (004 NFR-005; amended
+  2026-11-05, PR #515 review).
   Scanned documents (`looksScanned()` true) MUST NOT be analysed: in a mixed set they are skipped with a note, and when
   every document of the analysis is a scan the API returns 422 `scanned_document`.
 - **FR-031** *(gap)*: An analysis MUST make at most `MAX_LLM_CALLS_PER_ANALYSIS = 2` LLM calls, send at most
   `MAX_LLM_INPUT_CHARS = 90_000` characters in total, set a 60 s per-call timeout and a 120 s overall budget; when a
   budget is exhausted the remaining documents use rules only and the analysis carries a warning
   `llm_budget_exhausted` rendered as "AI review covered X of Y documents; the rest were checked by rules only."
+  No LLM call starts or runs past `min(120 s budget, 2-minute running timeout) − 30 s` (`LLM_FINISH_RESERVE_MS`),
+  measured from the request on the same clock as the analysis row's `created_at`, so scoring and the final write land
+  inside 120 s and before the run could be reported "timed out" (amended 2026-11-05, PR #515 review).
 - **FR-032** *(gap)*: Packet builds MUST pre-flight the total input size and item count before writing any row or
   blob: > 40 items → 413 `packet_too_large`, and the request schema `packetBuildSchema.items.max` MUST be 40. The size
   check is 006 FR-056's (Σ stored sizes + 50 KB per annexure, configurable `PACKET_MAX_INPUT_BYTES`, 006's message);

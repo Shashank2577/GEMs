@@ -124,7 +124,7 @@ const safeName = (name: string) => {
 
 /** 008/FR-030 messages (spec 008 US4 scenarios 8–9). */
 export const documentTooLongMessage = (pages: number) =>
-  `This document has ${pages} pages. TenderPilot reads up to ${MAX_TENDER_DOC_PAGES} pages — upload the bid document and ATC separately.`;
+  `This document has ${pages} pages. TenderPilot accepts documents of up to ${MAX_TENDER_DOC_PAGES} pages and reads the first ${MAX_EXTRACT_PAGES} — upload the bid document and ATC separately.`;
 export const SCANNED_DOCUMENT_MESSAGE = 'This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.';
 
 /**
@@ -333,6 +333,8 @@ export interface LlmBudgetLimits { maxCalls: number; maxChars: number; callTimeo
 export const DEFAULT_LLM_BUDGET: LlmBudgetLimits = {
   maxCalls: MAX_LLM_CALLS_PER_ANALYSIS, maxChars: MAX_LLM_INPUT_CHARS, callTimeoutMs: LLM_CALL_TIMEOUT_MS, budgetMs: ANALYSIS_BUDGET_MS,
 };
+/** Time kept free after the last LLM call for scoring and the final write (FR-028, FR-031). */
+export const LLM_FINISH_RESERVE_MS = 30_000;
 /** A document gets an LLM call only when at least this much of its text still fits the character budget. */
 const MIN_LLM_DOC_CHARS = 2_000;
 /** Reserve per page for the "=== Page N ===" header around the page text. */
@@ -357,11 +359,17 @@ export function withTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms: nu
 
 export async function analyseTender(
   deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer },
-  /** `llmBudgetMs` is shorthand for `llmBudget.budgetMs`. */
-  opts: { llmBudget?: Partial<LlmBudgetLimits>; llmBudgetMs?: number } = {},
+  /**
+   * `llmBudgetMs` is shorthand for `llmBudget.budgetMs`. `withTimeout` is a test seam: a fake can advance the
+   * clock by the time it is given instead of waiting it out.
+   */
+  opts: { llmBudget?: Partial<LlmBudgetLimits>; llmBudgetMs?: number; withTimeout?: typeof withTimeout } = {},
 ): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
   // 008/FR-031's 120 s overall budget is wall-clock from the request, so a slow GeM auto-fetch counts too (review N4).
-  const started = Date.now();
+  // Measured on deps.clock, the same clock as the row's createdAt that the running timeout is judged by.
+  const elapsedSince = (t: number) => deps.clock.now().getTime() - t;
+  const started = deps.clock.now().getTime();
+  const callWithTimeout = opts.withTimeout ?? withTimeout;
   const tender = await getTender(deps, input.tenderId, input.viewer);
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
@@ -412,6 +420,9 @@ export async function analyseTender(
     let usedLlm = false;
     // 008/FR-031: ≤ 2 LLM calls, ≤ 90k characters, 60 s per call, 120 s overall; the rest is rules-only.
     const limits = { ...DEFAULT_LLM_BUDGET, ...(opts.llmBudgetMs !== undefined ? { budgetMs: opts.llmBudgetMs } : {}), ...opts.llmBudget };
+    // No LLM call starts or runs past this point, so the final write lands a fixed reserve before both the overall
+    // budget and the 2-minute running timeout (FR-028): two worst-case slow calls cannot make the run look timed out.
+    const llmDeadlineMs = Math.min(limits.budgetMs, ANALYSIS_RUNNING_TIMEOUT_MS) - LLM_FINISH_RESERVE_MS;
     const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
     for (const d of ordered) {
       const tx0 = performance.now();
@@ -424,20 +435,20 @@ export async function analyseTender(
       extractMs += performance.now() - tx0;
       if (!deps.llm) { perDoc.push(rules); continue; }
       const llm = deps.llm;
-      const elapsed = Date.now() - started;
+      const elapsed = elapsedSince(started);
       const remaining = limits.maxChars - llmUse.chars;
       const docBudget = remaining - promptChars(buildLlmPrompt([], rules)) - PAGE_HEADER_CHARS * pages.length;
       const fits = docBudget >= Math.min(MIN_LLM_DOC_CHARS, pages.join('').length)
         && promptChars(buildLlmPrompt(pages, rules, docBudget)) <= remaining;
-      if (llmUse.calls >= limits.maxCalls || elapsed >= limits.budgetMs || !fits) {
+      if (llmUse.calls >= limits.maxCalls || elapsed >= llmDeadlineMs || !fits) {
         llmUse.skipped++;
         perDoc.push(rules);
         continue;
       }
       llmUse.calls++;
-      const timeoutMs = Math.min(limits.callTimeoutMs, limits.budgetMs - elapsed);
+      const timeoutMs = Math.min(limits.callTimeoutMs, llmDeadlineMs - elapsed);
       const tl0 = performance.now();
-      const r = await enrichWithLlm(pages, rules, (req) => withTimeout((signal) => llm.completeJson({ ...req, signal }), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
+      const r = await enrichWithLlm(pages, rules, (req) => callWithTimeout((signal) => llm.completeJson({ ...req, signal }), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
       llmMs += performance.now() - tl0;
       llmUse.chars += r.inputChars;
       if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
@@ -449,7 +460,7 @@ export async function analyseTender(
     const warnings: AnalysisWarning[] = deps.llm && llmUse.covered < llmUse.total
       ? [{ code: 'llm_budget_exhausted', covered: llmUse.covered, total: llmUse.total }]
       : [];
-    if (deps.llm) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: Date.now() - started });
+    if (deps.llm) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: elapsedSince(started) });
     const ts0 = performance.now();
     const requirements = combineRequirements(perDoc, requirementsFromListing(tender));
     const company = await loadCompany(deps, input.orgId);

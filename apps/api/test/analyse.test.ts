@@ -456,7 +456,7 @@ async function longPdf(pages: number): Promise<Uint8Array> {
 }
 
 describe('document caps (008/FR-030, US4 scenarios 8–9)', () => {
-  const tooLong = 'This document has 301 pages. TenderPilot reads up to 300 pages — upload the bid document and ATC separately.';
+  const tooLong = 'This document has 301 pages. TenderPilot accepts documents of up to 300 pages and reads the first 150 — upload the bid document and ATC separately.';
 
   it('a 301-page upload → 422 document_too_long; no tender_documents row is written', async () => {
     const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9300001', contentHash: 'cap-upload' });
@@ -559,6 +559,37 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
     const over = await analyseTender({ ...ctx.deps, llm: hang }, input, { llmBudget: { budgetMs: 0 } });
     expect(calls.length).toBe(0);
     expect(over.analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 0, total: 5 }]);
+  });
+
+  it('worst case: two calls that each take all the time they are given still write done well before the run is 2 minutes old (review S1, scenario 7)', async () => {
+    const { analyseTender, lastAttemptOf, ANALYSIS_RUNNING_TIMEOUT_MS } = await import('../src/services/analyse');
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} };
+    calls.length = 0;
+    const given: number[] = [];
+    // A slow provider on the fake clock: every call uses its whole time limit, then answers.
+    const slowest = <T>(call: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> => {
+      given.push(ms);
+      ctx.clock.advance(ms);
+      return call(new AbortController().signal);
+    };
+    const { analysis } = await analyseTender({ ...ctx.deps, llm: countingLlm() }, input, { withTimeout: slowest });
+    // 60 s for the first call; the second only gets what is left before 120 s − 30 s reserve.
+    expect(given).toEqual([60_000, 30_000]);
+    expect(analysis).toMatchObject({ status: 'done', method: 'rules+llm', warnings: [{ code: 'llm_budget_exhausted', covered: 2, total: 5 }] });
+    const age = analysis.updatedAt.getTime() - analysis.createdAt.getTime();
+    expect(age).toBeLessThan(ANALYSIS_RUNNING_TIMEOUT_MS);
+    expect(age).toBeLessThanOrEqual(90_000);
+    // A GET at the moment it finished does not report it as timed out.
+    expect(lastAttemptOf(analysis, analysis, ctx.clock.now())).toBeUndefined();
+    // Past the deadline no further call starts: a third document would be rules-only.
+    calls.length = 0;
+    given.length = 0;
+    const capped = await analyseTender({ ...ctx.deps, llm: countingLlm() }, input, {
+      withTimeout: <T>(call: (signal: AbortSignal) => Promise<T>, ms: number) => { given.push(ms); ctx.clock.advance(ms); return call(new AbortController().signal); },
+      llmBudget: { maxCalls: 5 },
+    });
+    expect(given).toEqual([60_000, 30_000]);
+    expect(capped.analysis.updatedAt.getTime() - capped.analysis.createdAt.getTime()).toBeLessThanOrEqual(90_000);
   });
 
   it('a timed-out call aborts the provider request (AbortSignal through completeJson to fetch; review S3)', async () => {
@@ -857,8 +888,17 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
       complete: () => new Promise(() => {}),
       completeJson: () => new Promise(() => {}),
     };
-    const r = await analyseTender({ ...ctx.deps, llm: hung }, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: t.id, viewer: {} }, { llmBudgetMs: 50 });
-    expect(r.analysis).toMatchObject({ status: 'done', method: 'rules' });
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: t.id, viewer: {} };
+    // Budget path: a budget already spent (below the finish reserve) starts no call at all.
+    const r = await analyseTender({ ...ctx.deps, llm: hung }, input, { llmBudgetMs: 50 });
+    expect(r.analysis).toMatchObject({ status: 'done', method: 'rules', warnings: [{ code: 'llm_budget_exhausted', covered: 0, total: 1 }] });
+    // Abort path: the call starts, hangs, is aborted at its time limit, and the run falls back to rules.
+    ctx.clock.advance(1000);
+    let started = 0;
+    const counted: LlmClient = { ...hung, completeJson: () => { started++; return new Promise(() => {}); } };
+    const aborted = await analyseTender({ ...ctx.deps, llm: counted }, input, { llmBudget: { callTimeoutMs: 50 } });
+    expect(started).toBe(1);
+    expect(aborted.analysis).toMatchObject({ status: 'done', method: 'rules', warnings: [{ code: 'llm_budget_exhausted', covered: 0, total: 1 }] });
   });
 
   it('B2: an override saved while a re-analysis is running is carried into the new result', async () => {

@@ -6,7 +6,10 @@
 
 const MB = 1024 * 1024;
 
-/** A tender document longer than this is rejected with 422 `document_too_long` (FR-030). */
+/**
+ * A tender document longer than this is rejected with 422 `document_too_long` before any text is read (FR-030).
+ * Up to this many pages it is accepted, and only the first `MAX_EXTRACT_PAGES` (150) are read (`pages_truncated`).
+ */
 export const MAX_TENDER_DOC_PAGES = 300;
 
 /** Share of pages with an empty text layer at which a PDF counts as a scan (FR-030, US4 scenario 9). */

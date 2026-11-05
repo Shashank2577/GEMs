@@ -351,7 +351,7 @@ test('sc8 a 301-page PDF is refused with 422 document_too_long (UI toast + API),
   const t = new Transcript('sc8-document-too-long');
   await signedUp(page, 'sc8');
   const tender = insertTender();
-  const MSG = 'This document has 301 pages. TenderPilot reads up to 300 pages — upload the bid document and ATC separately.';
+  const MSG = 'This document has 301 pages. TenderPilot accepts documents of up to 300 pages and reads the first 150 — upload the bid document and ATC separately.';
 
   // Boundary first: exactly 300 pages is accepted.
   const ok = await uploadApi(page.request, tender.id, pdfFile('exactly-300-pages.pdf', await textPdf(300, 'Boundary')));
