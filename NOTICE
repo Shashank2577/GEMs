@@ -72,3 +72,5 @@ copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for 
 Test fixtures packages/core/test/fixtures/bids/real-*.pdf embed subsets of GNU FreeSans
 (https://www.gnu.org/software/freefont/), GPLv3 with the font exception, which permits embedding the
 font in documents without the documents becoming subject to the GPL.
+
+Inter typeface (apps/web/public/fonts/inter-*.woff2): Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter), SIL Open Font License 1.1 (https://openfontlicense.org). Self-hosted subset of the Google Fonts build.

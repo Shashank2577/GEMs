@@ -1,0 +1,41 @@
+{
+  "expected": [
+    "nav",
+    "hero",
+    "built-for",
+    "how",
+    "control",
+    "metrics",
+    "teams",
+    "pricing",
+    "faq",
+    "final-cta",
+    "footer"
+  ],
+  "observed": [
+    "nav",
+    "hero",
+    "built-for",
+    "how",
+    "control",
+    "metrics",
+    "teams",
+    "pricing",
+    "faq",
+    "final-cta",
+    "footer"
+  ],
+  "tops": {
+    "nav": 0,
+    "hero": 200.375,
+    "built-for": 797.25,
+    "how": 919.25,
+    "control": 1749.25,
+    "metrics": 2335.25,
+    "teams": 2516.25,
+    "pricing": 3294.25,
+    "faq": 4169.25,
+    "final-cta": 4910.25,
+    "footer": 5205.25
+  }
+}

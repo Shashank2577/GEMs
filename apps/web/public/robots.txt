@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /tenders
+Disallow: /pipeline
+Disallow: /vault
+Disallow: /profile
+Disallow: /settings
+Disallow: /onboarding
+Disallow: /workspaces
+Disallow: /api/
+
+Sitemap: https://tenderpilot.in/sitemap.xml

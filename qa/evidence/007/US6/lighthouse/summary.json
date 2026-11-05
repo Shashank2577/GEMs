@@ -1,0 +1,122 @@
+{
+  "url": "http://localhost:8788/",
+  "formFactor": "mobile",
+  "lighthouseVersion": "13.6.0",
+  "runs": 3,
+  "generatedAt": "2026-11-05T07:15:41.023Z",
+  "pass": true,
+  "checks": {
+    "performance": {
+      "median": 93,
+      "min": 85,
+      "pass": true
+    },
+    "accessibility": {
+      "median": 100,
+      "min": 95,
+      "pass": true
+    },
+    "best-practices": {
+      "median": 96,
+      "min": 90,
+      "pass": true
+    },
+    "seo": {
+      "median": 100,
+      "min": 90,
+      "pass": true
+    }
+  },
+  "metricChecks": {
+    "lcpMs": {
+      "median": 905,
+      "max": 2500,
+      "pass": true
+    },
+    "cls": {
+      "median": 0,
+      "max": 0.1,
+      "pass": true
+    }
+  },
+  "perRun": [
+    {
+      "run": 1,
+      "scores": {
+        "performance": 93,
+        "accessibility": 100,
+        "best-practices": 96,
+        "seo": 100
+      },
+      "metrics": {
+        "lcpMs": 903,
+        "tbtMs": 308,
+        "cls": 0,
+        "fcpMs": 903
+      },
+      "failedAudits": [
+        "total-blocking-time: 0.78",
+        "max-potential-fid: 0.47",
+        "errors-in-console: 0",
+        "mainthread-work-breakdown: 0",
+        "unused-css-rules: 0",
+        "unused-javascript: 0.5",
+        "forced-reflow-insight: 0",
+        "network-dependency-tree-insight: 0",
+        "render-blocking-insight: 0"
+      ]
+    },
+    {
+      "run": 2,
+      "scores": {
+        "performance": 95,
+        "accessibility": 100,
+        "best-practices": 96,
+        "seo": 100
+      },
+      "metrics": {
+        "lcpMs": 905,
+        "tbtMs": 259,
+        "cls": 0,
+        "fcpMs": 905
+      },
+      "failedAudits": [
+        "total-blocking-time: 0.83",
+        "max-potential-fid: 0.78",
+        "errors-in-console: 0",
+        "unused-css-rules: 0",
+        "unused-javascript: 0.5",
+        "forced-reflow-insight: 0",
+        "network-dependency-tree-insight: 0",
+        "render-blocking-insight: 0"
+      ]
+    },
+    {
+      "run": 3,
+      "scores": {
+        "performance": 91,
+        "accessibility": 100,
+        "best-practices": 96,
+        "seo": 100
+      },
+      "metrics": {
+        "lcpMs": 912,
+        "tbtMs": 366,
+        "cls": 0,
+        "fcpMs": 912
+      },
+      "failedAudits": [
+        "total-blocking-time: 0.71",
+        "max-potential-fid: 0.68",
+        "errors-in-console: 0",
+        "mainthread-work-breakdown: 0",
+        "unused-css-rules: 0",
+        "unused-javascript: 0.5",
+        "forced-reflow-insight: 0",
+        "network-dependency-tree-insight: 0",
+        "render-blocking-insight: 0"
+      ]
+    }
+  ],
+  "htmlReport": "report.html (the median-performance run)"
+}
