@@ -67,6 +67,34 @@ describe('scoreTender on the sample bids', () => {
     expect(r.summary).toContain('Blocked by years of experience');
   });
 
+  describe('experience basis hint (T096, FR-022)', () => {
+    const exp = (profile: Partial<typeof baseProfile>, pcs = basePastContracts, need = 6) =>
+      f(scoreTender({ requirements: [R('experience_years', `${need} years`, need)], profile: { ...baseProfile, ...profile }, pastContracts: pcs, vaultDocs: baseVault, now: NOW }).factors, 'experience');
+
+    it('fail on contract years while the incorporation date would meet the bid → suggests older contracts', () => {
+      const e = exp({ incorporationDate: '2015-04-01' });
+      expect(e.status).toBe('fail');
+      expect(e.detail).toBe('You have 4.4 years of experience; the bid needs 6 years. (incorporated 11.6 years ago — add older contracts as proof)');
+    });
+
+    it('no hint when the incorporation date would not meet the bid either (nogo-experience sentence unchanged)', () => {
+      const e = exp({}, basePastContracts, 5);
+      expect(e.detail).toBe('You have 4.4 years of experience; the bid needs 5 years.');
+    });
+
+    it('no hint on a pass, so the verified pass sentences are unchanged', () => {
+      const e = exp({ incorporationDate: '2015-04-01' }, basePastContracts, 3);
+      expect(e.status).toBe('pass');
+      expect(e.detail).toBe('You have 4.4 years of experience; the bid needs 3 years.');
+    });
+
+    it('no hint when the basis is the incorporation date or the contracts are older than it', () => {
+      expect(exp({}, [], 6).detail).toContain('based on your incorporation date');
+      expect(exp({}, [], 6).detail).not.toContain('incorporated');
+      expect(exp({ incorporationDate: '2024-01-01' }, basePastContracts, 6).detail).not.toContain('incorporated');
+    });
+  });
+
   it('review-hardware-oem with an incomplete profile → Review with unknowns lowering confidence (US2 #5)', () => {
     const r = scoreTender({ requirements: reqsByKey.get('review-hardware-oem')!, profile: sparseProfile, pastContracts: [], vaultDocs: [{ type: 'udyam' }], now: NOW });
     expect(f(r.factors, 'turnover').status).toBe('unknown');

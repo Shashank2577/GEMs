@@ -120,6 +120,13 @@ export function experienceYears(pcs: ScorePastContract[], profile: ScoreProfile 
   return null;
 }
 
+/** Years since the incorporation date, or null when it is unset/invalid. */
+export function incorporationYears(profile: ScoreProfile | null, now: Date): number | null {
+  const inc = toDate(profile?.incorporationDate ?? null);
+  if (!inc || Number.isNaN(inc.getTime())) return null;
+  return Math.max(0, (now.getTime() - inc.getTime()) / (365.25 * DAY));
+}
+
 /** Words too generic to prove an authorisation covers a product. */
 const OEM_STOPWORDS = new Set([
   'the', 'and', 'for', 'with', 'from', 'supply', 'supplies', 'purchase', 'procurement', 'installation', 'commissioning', 'maintenance',
@@ -198,7 +205,13 @@ export function scoreTender(input: ScoreInput): ScoreResult {
       if (exp && exp.years + 1e-9 >= req) push('experience', 'pass', `You have ${years(exp.years)} of experience${basis}; the bid needs ${years(req)}.`, { blocking: true, requirementKey: 'experience_years' });
       else if (ex) push('experience', 'exempt', `Exempt (${ex.label}): the bid waives the ${years(req)} experience criterion for ${ex.label === 'MSE' ? 'MSEs' : 'Startups'}.`, { blocking: true, requirementKey: 'experience_years' });
       else if (!exp) push('experience', 'unknown', `Bid needs ${years(req)} of experience; add past contracts or your incorporation date to your profile.`, { blocking: true, requirementKey: 'experience_years' });
-      else push('experience', 'fail', `You have ${years(exp.years)} of experience${basis}; the bid needs ${years(req)}.${exemptionHint()}`, { blocking: true, requirementKey: 'experience_years' });
+      else {
+        // T096: the contracts on file give fewer years than the company has existed, and the older years would
+        // meet the bid. Only on a fail, so the verified pass sentences stay unchanged.
+        const inc = exp.basis === 'contracts' ? incorporationYears(profile, now) : null;
+        const incHint = inc != null && inc > exp.years && inc + 1e-9 >= req ? ` (incorporated ${years(inc)} ago — add older contracts as proof)` : '';
+        push('experience', 'fail', `You have ${years(exp.years)} of experience${basis}; the bid needs ${years(req)}.${incHint}${exemptionHint()}`, { blocking: true, requirementKey: 'experience_years' });
+      }
     }
   }
 
