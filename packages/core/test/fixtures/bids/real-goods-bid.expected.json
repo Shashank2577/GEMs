@@ -1,0 +1,199 @@
+{
+  "file": "real-goods-bid.pdf",
+  "bidNumber": "GEM/2026/B/6211873",
+  "description": "Goods bid, OEM criteria, older \"Exemption\" labels, past performance in the documents list",
+  "layout": "cell",
+  "fields": [
+    {
+      "key": "bid_published_at",
+      "value": "2026-10-24T00:00:00+05:30",
+      "page": 1
+    },
+    {
+      "key": "bid_end",
+      "value": "2026-11-14T13:00:00+05:30",
+      "page": 1
+    },
+    {
+      "key": "bid_opening",
+      "value": "2026-11-14T13:30:00+05:30",
+      "page": 1
+    },
+    {
+      "key": "offer_validity",
+      "value": "90 days",
+      "numeric": 90,
+      "page": 1
+    },
+    {
+      "key": "ministry",
+      "value": "Ministry of Home Affairs",
+      "page": 1
+    },
+    {
+      "key": "department",
+      "value": "Central Armed Police Forces",
+      "page": 1
+    },
+    {
+      "key": "organisation",
+      "value": "Central Reserve Police Force",
+      "page": 1
+    },
+    {
+      "key": "office",
+      "value": "Group Centre Yelahanka",
+      "page": 1
+    },
+    {
+      "key": "total_quantity",
+      "value": 40,
+      "numeric": 40,
+      "page": 1
+    },
+    {
+      "key": "item_category",
+      "value": "Multifunction Machine MFM (Q2)",
+      "page": 1
+    },
+    {
+      "key": "estimated_value",
+      "value": "18,40,000",
+      "numeric": 1840000,
+      "page": 1
+    },
+    {
+      "key": "turnover_min",
+      "value": "60 Lakh (s)",
+      "numeric": 6000000,
+      "page": 1
+    },
+    {
+      "key": "oem_turnover",
+      "value": "5 Crore (s)",
+      "numeric": 50000000,
+      "page": 1
+    },
+    {
+      "key": "experience_years",
+      "value": "3 years",
+      "numeric": 3,
+      "page": 1
+    },
+    {
+      "key": "past_performance",
+      "value": "30%",
+      "numeric": 30,
+      "page": 1
+    },
+    {
+      "key": "mse_exemption",
+      "value": true,
+      "page": 1
+    },
+    {
+      "key": "startup_exemption",
+      "value": true,
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "Experience Criteria",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "Past Performance",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "Bidder Turnover",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "Certificate (Requested in ATC)",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "OEM Authorization Certificate",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "OEM Annual Turnover",
+      "page": 1
+    },
+    {
+      "key": "oem_auth",
+      "value": true,
+      "page": 1
+    },
+    {
+      "key": "bid_to_ra",
+      "value": false,
+      "page": 1
+    },
+    {
+      "key": "bid_type",
+      "value": "Two Packet Bid",
+      "page": 1
+    },
+    {
+      "key": "evaluation_method",
+      "value": "Total value wise evaluation",
+      "page": 1
+    },
+    {
+      "key": "emd",
+      "value": "36800",
+      "numeric": 36800,
+      "page": 1
+    },
+    {
+      "key": "epbg",
+      "value": "3%",
+      "numeric": 3,
+      "page": 2
+    },
+    {
+      "key": "epbg_duration",
+      "value": "14 months",
+      "numeric": 14,
+      "page": 2
+    },
+    {
+      "key": "mii",
+      "value": true,
+      "page": 2
+    },
+    {
+      "key": "mse_purchase_preference",
+      "value": true,
+      "page": 2
+    },
+    {
+      "key": "delivery_days",
+      "value": "45 days",
+      "numeric": 45,
+      "page": 3
+    },
+    {
+      "key": "consignee_state",
+      "value": "Karnataka",
+      "page": 3
+    },
+    {
+      "key": "certificate",
+      "value": "BIS",
+      "page": 4
+    },
+    {
+      "key": "undertaking",
+      "value": "non_blacklisting",
+      "page": 4
+    }
+  ]
+}

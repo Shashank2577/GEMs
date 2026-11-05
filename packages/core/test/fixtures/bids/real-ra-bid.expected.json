@@ -1,0 +1,181 @@
+{
+  "file": "real-ra-bid.pdf",
+  "bidNumber": "GEM/2026/B/6247781",
+  "description": "Goods bid with reverse auction (RA qualification rule), interleaved wrapped labels, no ePBG, two consignees",
+  "layout": "interleaved",
+  "fields": [
+    {
+      "key": "bid_published_at",
+      "value": "2026-10-28T00:00:00+05:30",
+      "page": 1
+    },
+    {
+      "key": "bid_end",
+      "value": "2026-11-18T11:00:00+05:30",
+      "page": 1
+    },
+    {
+      "key": "bid_opening",
+      "value": "2026-11-18T11:30:00+05:30",
+      "page": 1
+    },
+    {
+      "key": "offer_validity",
+      "value": "60 days",
+      "numeric": 60,
+      "page": 1
+    },
+    {
+      "key": "ministry",
+      "value": "Uttar Pradesh",
+      "page": 1
+    },
+    {
+      "key": "department",
+      "value": "Uttar Pradesh Basic Education Department",
+      "page": 1
+    },
+    {
+      "key": "organisation",
+      "value": "Samagra Shiksha Uttar Pradesh",
+      "page": 1
+    },
+    {
+      "key": "office",
+      "value": "State Project Office Lucknow",
+      "page": 1
+    },
+    {
+      "key": "total_quantity",
+      "value": 60,
+      "numeric": 60,
+      "page": 1
+    },
+    {
+      "key": "item_category",
+      "value": "Desktop Computers (Q2)",
+      "page": 1
+    },
+    {
+      "key": "estimated_value",
+      "value": "39,00,000",
+      "numeric": 3900000,
+      "page": 1
+    },
+    {
+      "key": "turnover_min",
+      "value": "1.2 Crore (s)",
+      "numeric": 12000000,
+      "page": 1
+    },
+    {
+      "key": "oem_turnover",
+      "value": "250 Crore (s)",
+      "numeric": 2500000000,
+      "page": 1
+    },
+    {
+      "key": "experience_years",
+      "value": "2 years",
+      "numeric": 2,
+      "page": 1
+    },
+    {
+      "key": "mse_exemption",
+      "value": false,
+      "page": 1
+    },
+    {
+      "key": "startup_exemption",
+      "value": false,
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "Experience Criteria",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "Bidder Turnover",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "OEM Authorization Certificate",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "OEM Annual Turnover",
+      "page": 1
+    },
+    {
+      "key": "document",
+      "value": "Compliance of BoQ specification and supporting document",
+      "page": 1
+    },
+    {
+      "key": "oem_auth",
+      "value": true,
+      "page": 1
+    },
+    {
+      "key": "bid_to_ra",
+      "value": true,
+      "page": 1
+    },
+    {
+      "key": "bid_type",
+      "value": "Two Packet Bid",
+      "page": 1
+    },
+    {
+      "key": "evaluation_method",
+      "value": "Total value wise evaluation",
+      "page": 1
+    },
+    {
+      "key": "emd",
+      "value": "78,000",
+      "numeric": 78000,
+      "page": 1
+    },
+    {
+      "key": "mii",
+      "value": true,
+      "page": 2
+    },
+    {
+      "key": "mse_purchase_preference",
+      "value": true,
+      "page": 2
+    },
+    {
+      "key": "delivery_days",
+      "value": "30 days",
+      "numeric": 30,
+      "page": 3
+    },
+    {
+      "key": "consignee_state",
+      "value": "Uttar Pradesh",
+      "page": 3
+    },
+    {
+      "key": "certificate",
+      "value": "ISO 9001",
+      "page": 4
+    },
+    {
+      "key": "certificate",
+      "value": "ISO 14001",
+      "page": 4
+    },
+    {
+      "key": "undertaking",
+      "value": "non_blacklisting",
+      "page": 4
+    }
+  ]
+}
