@@ -1,7 +1,7 @@
 /** Build AppDeps from environment variables + runtime-specific db/blob store. */
 import type { Db } from '@tp/db';
 import type { AppDeps, BlobStore, Clock, GemLease, Logger } from '../deps';
-import { loadConfig, loadGemConfig, type RuntimeEnv } from '../env';
+import { loadConfig, loadGemConfig, type AppConfig, type RuntimeEnv } from '../env';
 import { createPgRateLimiter } from '../lib/rate-limiter';
 import { systemClock } from './clock';
 import { noopErrorReporter } from './errors';
@@ -21,6 +21,7 @@ export interface CreateDepsInput {
 
 export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetch: f }: CreateDepsInput): AppDeps {
   const config = loadConfig(env);
+  warnMissingUnsubscribeSecret(env, config, logger);
   const doFetch: typeof fetch = f ?? ((input, init) => fetch(input, init));
   return {
     db,
@@ -43,6 +44,17 @@ export function createDeps({ env, db, blobs, clock, logger = consoleLogger, fetc
     errors: noopErrorReporter,
     gemLease: noopGemLease,
   };
+}
+
+let warnedUnsubscribeSecret = false;
+/**
+ * 003/FR-048: production with real email but no UNSUBSCRIBE_SECRET sends alert emails without List-Unsubscribe
+ * headers. Logged once per process / isolate (createDeps runs per request on the Worker).
+ */
+function warnMissingUnsubscribeSecret(env: RuntimeEnv, config: AppConfig, logger: Logger) {
+  if (warnedUnsubscribeSecret || config.environment !== 'production' || !env.RESEND_API_KEY || config.unsubscribeSecret) return;
+  warnedUnsubscribeSecret = true;
+  logger.warn('UNSUBSCRIBE_SECRET is not set: alert emails go out without one-click unsubscribe headers (003/FR-048)');
 }
 
 /** GeM lease that never waits (the per-instance GemClient throttle still applies). US4 replaces it with `lib/gem-lease.ts`. */

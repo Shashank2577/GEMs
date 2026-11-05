@@ -14,7 +14,7 @@ import { slugify } from '../src/lib/slug';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import type { BlobStore } from '../src/deps';
 import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
-import { loadConfig } from '../src/env';
+import { loadConfig, TEST_UNSUBSCRIBE_SECRET } from '../src/env';
 import {
   HttpError, payloadTooLarge, paymentRequired, rateLimitMessage, serviceUnavailable, tooManyRequests, unprocessable,
 } from '../src/lib/errors';
@@ -192,6 +192,31 @@ describe('ops config and deps (008/T013)', () => {
     expect(typeof deps.rateLimiter.reset).toBe('function');
     expect(() => deps.errors.capture(new Error('boom'), { rid: 'r1' })).not.toThrow();
     await expect(deps.gemLease.acquire(25_000)).resolves.toBeUndefined();
+  });
+});
+
+describe('unsubscribe secret (003/FR-048)', () => {
+  it('fixed key only in test, a random per-process key in development, none in production unless configured', () => {
+    expect(loadConfig({ NODE_ENV: 'test' }).unsubscribeSecret).toBe(TEST_UNSUBSCRIBE_SECRET);
+    const dev = loadConfig({}).unsubscribeSecret;
+    expect(dev).toMatch(/^dev-[0-9a-f-]{36}-[0-9a-f-]{36}$/);
+    expect(dev).not.toBe(TEST_UNSUBSCRIBE_SECRET);
+    expect(loadConfig({ NODE_ENV: 'development' }).unsubscribeSecret).toBe(dev); // stable within the process
+    expect(loadConfig({ NODE_ENV: 'production' }).unsubscribeSecret).toBeNull();
+    expect(loadConfig({ NODE_ENV: 'production', UNSUBSCRIBE_SECRET: 's3cret' }).unsubscribeSecret).toBe('s3cret');
+  });
+
+  it('warns once when production sends real email without UNSUBSCRIBE_SECRET', () => {
+    const warnings: string[] = [];
+    const logger = { ...silentLogger, warn: (msg: string) => { warnings.push(msg); } };
+    const make = (env: Record<string, string>) => createDeps({ env, db: {} as never, blobs: createMemoryBlobStore(), logger });
+    make({ NODE_ENV: 'production' }); // no email configured: nothing to warn about
+    make({ NODE_ENV: 'production', RESEND_API_KEY: 'r', UNSUBSCRIBE_SECRET: 's' });
+    make({ NODE_ENV: 'development', RESEND_API_KEY: 'r' });
+    expect(warnings).toEqual([]);
+    make({ NODE_ENV: 'production', RESEND_API_KEY: 'r' });
+    make({ NODE_ENV: 'production', RESEND_API_KEY: 'r' }); // once per process (createDeps runs per request on the Worker)
+    expect(warnings).toEqual([expect.stringMatching(/^UNSUBSCRIBE_SECRET is not set/)]);
   });
 });
 

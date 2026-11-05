@@ -1,5 +1,5 @@
 {
-  "id": "53787e77-421d-4a63-94fc-7bb4250a2cbe",
+  "id": "1cef7b8e-1a44-4c95-b793-02b94f837cd0",
   "prevId": "ae21616d-fcc7-45e6-9776-2abf72a71dc1",
   "version": "7",
   "dialect": "postgresql",
@@ -1626,6 +1626,28 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notifications_pending_idx": {
+          "name": "notifications_pending_idx",
+          "columns": [
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"notifications\".\"status\" = 'pending' and \"notifications\".\"channel\" in ('email', 'whatsapp')",
           "concurrently": false,
           "method": "btree",
           "with": {}

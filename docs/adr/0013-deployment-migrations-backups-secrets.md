@@ -36,7 +36,8 @@ per PR. Secrets: `wrangler secret put`, `.dev.vars`/`.env` git-ignored, no scann
    `workers.dev` route disabled in production.
 5. **Secrets (SHOULD)** — runbook section listing each secret, where it lives, who can rotate it and how
    (`DATABASE_URL`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `SENTRY_DSN`,
-   `ADMIN_TOKEN`). Enable GitHub secret scanning + push protection on the repo. Remove `SESSION_SECRET` from
+   `ADMIN_TOKEN`, `UNSUBSCRIBE_SECRET` — HMAC key for 003/FR-048 one-click unsubscribe links; rotating it invalidates
+   links in emails already sent). Enable GitHub secret scanning + push protection on the repo. Remove `SESSION_SECRET` from
    `specs/001-gem-tender-copilot/plan.md`.
 
 ## Consequences

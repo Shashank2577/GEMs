@@ -1,7 +1,8 @@
 /**
  * One-click email unsubscribe (003/FR-048, RFC 8058). The token is `<b64url payload>.<b64url HMAC-SHA256>` over
  * `userId:orgId:email_matches`, keyed by `UNSUBSCRIBE_SECRET`. It does not expire (old emails must keep working) and
- * can only switch OFF email match alerts for that user in that org, so replaying it is harmless.
+ * can only switch OFF email (alerts, digests and reminders) for that user in that org, and only after a POST (GET shows a
+ * confirmation page), so replaying it is harmless. The scope string is kept as `email_matches` so issued links keep working.
  */
 import type { AppConfig, EmailMessage } from '../deps';
 import { b64url, fromB64url, timingSafeEqual } from './crypto';

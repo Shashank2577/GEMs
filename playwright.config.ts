@@ -43,6 +43,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
+      // E2E_TEST_HOOKS=1 mounts GET /api/__test/mail; with reuseExistingServer a locally running API started without it is reused and that route 404s.
       command: 'E2E_TEST_HOOKS=1 e2e/support/start-api.sh',
       url: `http://localhost:${E2E_PORT}/api/health`,
       reuseExistingServer: !process.env.CI,

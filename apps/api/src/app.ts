@@ -79,8 +79,9 @@ export function createApp(deps: AppDeps, opts: { testHooks?: boolean } = {}) {
     return c.json({ ok: db, db, version: deps.config.version }, db ? 200 : 503);
   });
 
-  // 003/NFR-008: E2E-only mail capture. Opt-in via E2E_TEST_HOOKS=1 on the Node server (never wired in worker.ts).
-  if (opts.testHooks && 'sent' in deps.mailer && Array.isArray(deps.mailer.sent)) {
+  // 003/NFR-008: E2E-only mail capture. Opt-in via E2E_TEST_HOOKS=1 on the Node server (never wired in worker.ts),
+  // never in production, and only with the in-memory log mailer.
+  if (opts.testHooks && deps.config.environment !== 'production' && 'sent' in deps.mailer && Array.isArray(deps.mailer.sent)) {
     const mailer = deps.mailer as { sent: unknown[] };
     api.get('/__test/mail', (c) => c.json({ sent: mailer.sent }));
   }

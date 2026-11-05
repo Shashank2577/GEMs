@@ -205,7 +205,9 @@ export interface IngestionRunsResponse {
 
 // ───────────── Notifications ─────────────
 
+/** Notification kinds; must equal the `notifications.kind` union in @tp/db (type-checked in apps/api routes/notifications.ts). */
 export const NOTIFICATION_KINDS = ['tender_match', 'expiry', 'deadline', 'assignment', 'mention', 'digest', 'system'] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export const notificationsQuerySchema = z.object({
   unread: flag,
@@ -216,7 +218,7 @@ export const notificationsQuerySchema = z.object({
 
 export interface NotificationDto {
   id: string;
-  kind: 'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system';
+  kind: NotificationKind;
   title: string;
   body: string;
   link: string | null;

@@ -1,4 +1,4 @@
-/** 003/NFR-008 — GET /api/__test/mail exists only when the app is built with the E2E test hooks (E2E_TEST_HOOKS=1). */
+/** 003/NFR-008 — GET /api/__test/mail exists only when the app is built with the E2E test hooks (E2E_TEST_HOOKS=1), outside production. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { createTestContext, TEST_APP_URL, type TestContext } from './helpers';
@@ -19,6 +19,11 @@ describe('E2E mail capture hook', () => {
     const r = await app.request(`${TEST_APP_URL}/api/__test/mail`);
     expect(r.status).toBe(200);
     expect((await r.json()).sent).toEqual([expect.objectContaining({ to: 'a@example.com', subject: 'Hello', headers: { 'List-Unsubscribe': '<x>' } })]);
+  });
+
+  it('is never mounted in production, even when enabled', async () => {
+    const app = createApp({ ...ctx.deps, config: { ...ctx.deps.config, environment: 'production' } }, { testHooks: true });
+    expect((await app.request(`${TEST_APP_URL}/api/__test/mail`)).status).toBe(404);
   });
 
   it('does nothing for a real (non-log) mailer even when enabled', async () => {

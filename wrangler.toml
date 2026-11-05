@@ -2,7 +2,9 @@
 # pipeline, and stores files in R2. Database: Neon Postgres (DATABASE_URL secret).
 #
 # Secrets (wrangler secret put <NAME>): DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY,
-#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID. Optional ones may be omitted (features degrade to no-ops).
+#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, UNSUBSCRIBE_SECRET (HMAC key for one-click unsubscribe links; required
+#   with RESEND_API_KEY, else alert emails carry no List-Unsubscribe header). Optional ones may be omitted
+#   (features degrade to no-ops).
 # Deploy: pnpm deploy   (builds apps/web, then `wrangler deploy`)
 name = "tenderpilot"
 main = "apps/api/src/worker.ts"

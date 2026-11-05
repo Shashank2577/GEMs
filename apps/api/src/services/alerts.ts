@@ -3,13 +3,16 @@
  *  - instant users: each pending email / WhatsApp row is sent on its own;
  *  - daily users: pending rows are held and sent as one digest per org per IST day, from 08:00 IST;
  *  - every row ends `sent`, `skipped` (channel not configured / no phone) or `failed` (+ error);
- *  - transient provider failures (network / 408 / 429 / 5xx) stay `pending` and are retried at +5 min then +30 min;
- *    the 3rd failed attempt (or any permanent 4xx) marks the row `failed` (FR-047, T051);
+ *  - held daily rows are released until the next 08:00 IST, so they never crowd instant rows out of a batch;
+ *  - transient provider failures (network / timeout / 408 / 429 / 5xx) stay `pending` and are retried at +5 min then
+ *    +25 min (inside the 30-min cron); the 3rd failed attempt (or any permanent 4xx) marks the row `failed` (FR-047, T051);
  *  - rows are claimed atomically (FOR UPDATE SKIP LOCKED + a lease on next_attempt_at), so concurrent runs never send
- *    the same row twice and re-running is idempotent.
+ *    the same row twice and re-running is idempotent; a daily digest is reserved as a `pending` row under the same
+ *    lease and promoted to `sent` only after the provider accepted it;
+ *  - rows for a channel the user switched off (e.g. one-click unsubscribe) are `skipped`.
  * Email via deps.mailer (Resend), WhatsApp via deps.whatsapp (Meta Cloud API, pre-approved template).
  */
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, lte, sql } from 'drizzle-orm';
 import { notificationPrefs, notifications, organizations, tenders, users } from '@tp/db';
 import { isTransientSendError } from '../adapters/provider-error';
 import type { AppDeps } from '../deps';
@@ -105,17 +108,33 @@ function textVersion(rows: { n: NotificationRow }[], appUrl: string): string {
 
 // ───────────── dispatcher ─────────────
 
-/** FR-047: a row is tried at most this many times before it is marked `failed`. */
+/** FR-047: a row is tried at most this many times before it is marked `failed` (SC-006: terminal within 3 attempts). */
 export const MAX_SEND_ATTEMPTS = 3;
-/** Back-off before retry n+1 after a transient failure on attempt n (1-based): +5 min, then +30 min. */
-export const RETRY_BACKOFF_MS = [5 * 60_000, 30 * 60_000] as const;
+/**
+ * Back-off before retry n+1 after a transient failure on attempt n (1-based): +5 min, then +25 min. Both are shorter than
+ * the 30-minute cron, so each retry is already due at the next scheduled dispatch even if that run starts a few minutes
+ * early — a row is terminal within 3 cron cycles.
+ */
+export const RETRY_BACKOFF_MS = [5 * 60_000, 25 * 60_000] as const;
 /**
  * How long a dispatcher owns the rows it claimed. A claim moves `next_attempt_at` to `now + lease`, so concurrent
  * dispatchers skip those rows; if a dispatcher dies mid-run the rows become due again when the lease runs out.
+ * A daily-digest reservation (a `pending` digest row) carries the same lease and is deleted once it has expired.
  */
 export const CLAIM_LEASE_MS = 15 * 60_000;
+/** Rows claimed per dispatch (FR-047; ADR-0006 pending partial index `notifications_pending_idx`). */
+export const DISPATCH_BATCH = 500;
 
-type Claimed = { n: NotificationRow; email: string; phone: string | null; name: string; frequency: 'instant' | 'daily' | null; orgName: string };
+/** The first DIGEST_HOUR_IST (08:00 IST) strictly after `now`: today's if it is still ahead, else tomorrow's. */
+export function nextDigestAt(now: Date): Date {
+  const todayAt = Date.parse(`${istDay(now)}T00:00:00.000Z`) - IST_MS + DIGEST_HOUR_IST * 3_600_000;
+  return new Date(now.getTime() < todayAt ? todayAt : todayAt + 86_400_000);
+}
+
+type Claimed = {
+  n: NotificationRow; email: string; phone: string | null; name: string; frequency: 'instant' | 'daily' | null; orgName: string;
+  emailOn: boolean | null; whatsappOn: boolean | null;
+};
 
 export async function dispatchNotifications(deps: AppDeps, opts: { limit?: number } = {}): Promise<DispatchReport> {
   const { db, clock, logger, mailer, whatsapp, config } = deps;
@@ -123,31 +142,39 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   const report: DispatchReport = { sent: 0, skipped: 0, failed: 0, retried: 0, held: 0, digests: 0 };
   const lease = new Date(now.getTime() + CLAIM_LEASE_MS);
 
+  // A digest reservation whose lease ran out belongs to a dispatcher that died between reserving and settling it:
+  // drop it so today's digest can be sent (its rows' leases have expired too, so they are claimed again below).
+  await db.delete(notifications).where(and(
+    eq(notifications.kind, 'digest'), eq(notifications.status, 'pending'), lte(notifications.nextAttemptAt, now),
+  ));
+
   // Claim due rows atomically: rows locked by a concurrent dispatcher are skipped, and once claimed their
-  // next_attempt_at is in the future, so no other run picks them up. `prev` lets held rows be released unchanged.
+  // next_attempt_at is in the future (the lease), so no other run picks them up. Digest rows are never claimed.
   const claimRes = await db.execute(sql`
     with due as (
-      select id, next_attempt_at as prev from notifications
-      where status = 'pending' and channel in ('email', 'whatsapp')
+      select id from notifications
+      where status = 'pending' and channel in ('email', 'whatsapp') and kind <> 'digest'
         and (next_attempt_at is null or next_attempt_at <= ${now})
       order by created_at
-      limit ${opts.limit ?? 500}
+      limit ${opts.limit ?? DISPATCH_BATCH}
       for update skip locked
     )
     update notifications n set next_attempt_at = ${lease}
     from due where n.id = due.id
-    returning n.id as id, due.prev as prev`);
-  const claimedRows = (claimRes as unknown as { rows: { id: string; prev: Date | string | null }[] }).rows;
-  if (!claimedRows.length) return report;
-  const prevById = new Map(claimedRows.map((r) => [r.id, r.prev == null ? null : new Date(r.prev)]));
+    returning n.id as id`);
+  const claimedIds = (claimRes as unknown as { rows: { id: string }[] }).rows.map((r) => r.id);
+  if (!claimedIds.length) return report;
 
   const pending: Claimed[] = await db
-    .select({ n: notifications, email: users.email, phone: users.phone, name: users.name, frequency: notificationPrefs.frequency, orgName: organizations.name })
+    .select({
+      n: notifications, email: users.email, phone: users.phone, name: users.name, frequency: notificationPrefs.frequency, orgName: organizations.name,
+      emailOn: notificationPrefs.email, whatsappOn: notificationPrefs.whatsapp,
+    })
     .from(notifications)
     .innerJoin(users, eq(users.id, notifications.userId))
     .innerJoin(organizations, eq(organizations.id, notifications.orgId))
     .leftJoin(notificationPrefs, and(eq(notificationPrefs.orgId, notifications.orgId), eq(notificationPrefs.userId, notifications.userId)))
-    .where(inArray(notifications.id, [...prevById.keys()]))
+    .where(inArray(notifications.id, claimedIds))
     .orderBy(notifications.createdAt);
 
   const tenderIds = [...new Set(pending.map((p) => tenderIdFromLink(p.n.link)).filter((x): x is string => !!x))];
@@ -158,20 +185,13 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   // never overwrites a newer outcome — re-running the dispatcher is idempotent.
   const owned = (ids: string[]) => and(inArray(notifications.id, ids), eq(notifications.status, 'pending'), eq(notifications.nextAttemptAt, lease));
 
-  /** Not sent this run (digest not due / already sent today): hand the rows back with their previous schedule. */
-  const release = async (ids: string[]) => {
-    const byPrev = new Map<string, string[]>();
-    for (const id of ids) {
-      const key = prevById.get(id)?.toISOString() ?? '';
-      byPrev.set(key, [...(byPrev.get(key) ?? []), id]);
-    }
-    for (const [prev, group] of byPrev) {
-      await db.update(notifications).set({ nextAttemptAt: prev ? new Date(prev) : null }).where(owned(group));
-    }
+  /** Not sent this run (digest not due / already sent today): hand the rows back, due again at `at`. */
+  const release = async (ids: string[], at: Date) => {
+    await db.update(notifications).set({ nextAttemptAt: at }).where(owned(ids));
     report.held += ids.length;
   };
 
-  /** Provider accepted (sent) or the channel is not configured (skipped): terminal. */
+  /** Provider accepted (sent) or the channel is not configured / switched off (skipped): terminal. */
   const settle = async (ids: string[], status: 'sent' | 'skipped', error: string | null = null) => {
     const done = await db.update(notifications)
       .set({
@@ -200,28 +220,48 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
     for (const r of done) r.status === 'pending' ? report.retried++ : report.failed++;
   };
 
+  /**
+   * Bookkeeping after the provider call. A database error here must not be mistaken for a send failure (that would
+   * re-send an email that already went out, or free a digest slot that was used): log it and leave the rows leased —
+   * they become due again when the lease expires (at-least-once delivery).
+   */
+  const record = async (what: string, ids: string[], fn: () => Promise<unknown>) => {
+    try { await fn(); } catch (e) { logger.error(`notification bookkeeping failed: ${what}`, { ids, error: errMsg(e) }); }
+  };
+
+  // The user may have switched the channel off (or unsubscribed) after the row was queued: never send it.
+  const switchedOff = (p: Claimed) =>
+    p.n.channel === 'email' ? p.emailOn === false : p.n.channel === 'whatsapp' ? p.whatsappOn === false : false;
+
   // Group: instant → one message per row; daily → one digest per (user, org, channel).
   const digestGroups = new Map<string, Claimed[]>();
   const digestDue = istHour(now) >= DIGEST_HOUR_IST;
   const toHold: string[] = [];
   for (const p of pending) {
-    const daily = p.frequency === 'daily' && p.n.kind === 'tender_match';
-    if (!daily) {
-      try {
-        const r = await sendOne(deps, p, tenderById, now);
-        await settle([p.n.id], r.skipped ? 'skipped' : 'sent', r.skipped ? r.reason ?? 'Channel not configured' : null);
-      } catch (e) {
-        logger.warn('notification send failed', { id: p.n.id, channel: p.n.channel, attempt: p.n.attempts + 1, transient: isTransientSendError(e), error: errMsg(e) });
-        await fail([p.n.id], e);
-      }
+    if (switchedOff(p)) {
+      await record('switched off', [p.n.id], () => settle([p.n.id], 'skipped', p.n.channel === 'email' ? 'Email alerts are turned off' : 'WhatsApp alerts are turned off'));
       continue;
     }
-    // A digest is sent once per IST day after DIGEST_HOUR_IST; rows created today before it wait.
+    const daily = p.frequency === 'daily' && p.n.kind === 'tender_match';
+    if (!daily) {
+      let r: Awaited<ReturnType<typeof sendOne>>;
+      try {
+        r = await sendOne(deps, p, tenderById, now);
+      } catch (e) {
+        logger.warn('notification send failed', { id: p.n.id, channel: p.n.channel, attempt: p.n.attempts + 1, transient: isTransientSendError(e), error: errMsg(e) });
+        await record('send failure', [p.n.id], () => fail([p.n.id], e));
+        continue;
+      }
+      await record('send outcome', [p.n.id], () => settle([p.n.id], r.skipped ? 'skipped' : 'sent', r.skipped ? r.reason ?? 'Channel not configured' : null));
+      continue;
+    }
+    // A digest is sent once per IST day after DIGEST_HOUR_IST; rows created today before it wait until then.
     if (!digestDue) { toHold.push(p.n.id); continue; }
     const key = `${p.n.userId}|${p.n.orgId}|${p.n.channel}`;
     digestGroups.set(key, [...(digestGroups.get(key) ?? []), p]);
   }
-  if (toHold.length) await release(toHold);
+  // Held rows are not due again before the digest hour, so they never crowd instant rows out of the batch.
+  if (toHold.length) await release(toHold, nextDigestAt(now));
 
   for (const [key, group] of digestGroups) {
     const [userId, orgId, channel] = key.split('|') as [string, string, 'email' | 'whatsapp'];
@@ -230,16 +270,22 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
     const first = group[0];
     const count = group.length;
     const title = `${count} new GeM tender${count === 1 ? '' : 's'} matched today`;
-    // Reserve today's digest first (unique user/channel/dedupe key): if it already exists — sent earlier today or
-    // by a concurrent dispatcher — hold the rest for tomorrow. Never two digests a day.
+    // Reserve today's digest (unique user/channel/dedupe key) as a `pending` row under our lease, promoted once the
+    // provider accepted it. If the slot is taken: already settled today → hold the rows for tomorrow's digest;
+    // in flight in another dispatcher → look again when its lease ends. Never two digests a day.
     const [digest] = await db.insert(notifications).values({
       orgId, userId, channel, kind: 'digest', title, body: `${count} matched tenders`,
-      link: '/tenders?matched=1', dedupeKey, status: 'sent', sentAt: now, createdAt: now,
+      link: '/tenders?matched=1', dedupeKey, status: 'pending', nextAttemptAt: lease, createdAt: now,
     }).onConflictDoNothing().returning({ id: notifications.id });
-    if (!digest) { await release(ids); continue; }
+    if (!digest) {
+      const [existing] = await db.select({ status: notifications.status, nextAttemptAt: notifications.nextAttemptAt }).from(notifications)
+        .where(and(eq(notifications.userId, userId), eq(notifications.channel, channel), eq(notifications.dedupeKey, dedupeKey)));
+      await release(ids, existing?.status === 'pending' && existing.nextAttemptAt ? existing.nextAttemptAt : nextDigestAt(now));
+      continue;
+    }
+    let skipped = false;
+    let reason: string | null = null;
     try {
-      let skipped = false;
-      let reason: string | null = null;
       if (channel === 'email') {
         const rows = group.map((g) => ({ n: g.n, tender: tenderById.get(tenderIdFromLink(g.n.link) ?? '') }));
         const r = await mailer.send({
@@ -251,27 +297,32 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
         });
         skipped = !!r.skipped;
         if (skipped) reason = 'Email is not configured (RESEND_API_KEY)';
+      } else if (!first.phone) {
+        skipped = true;
+        reason = 'No mobile number on the account';
       } else {
-        if (!first.phone) { skipped = true; reason = 'No mobile number on the account'; } else {
-          const r = await whatsapp.send({
-            to: first.phone,
-            template: { name: `${WHATSAPP_TEMPLATE}_digest`, language: 'en', params: [String(count), first.orgName, `${config.appUrl}/tenders?matched=1`] },
-            text: `${title} for ${first.orgName}. Review: ${config.appUrl}/tenders?matched=1`,
-          });
-          skipped = !!r.skipped;
-          if (skipped) reason = 'WhatsApp is not configured (WHATSAPP_TOKEN)';
-        }
+        const r = await whatsapp.send({
+          to: first.phone,
+          template: { name: `${WHATSAPP_TEMPLATE}_digest`, language: 'en', params: [String(count), first.orgName, `${config.appUrl}/tenders?matched=1`] },
+          text: `${title} for ${first.orgName}. Review: ${config.appUrl}/tenders?matched=1`,
+        });
+        skipped = !!r.skipped;
+        if (skipped) reason = 'WhatsApp is not configured (WHATSAPP_TOKEN)';
       }
-      if (skipped) await db.update(notifications).set({ status: 'skipped', error: reason, sentAt: null }).where(eq(notifications.id, digest.id));
-      else await db.update(notifications).set({ attempts: 1 }).where(eq(notifications.id, digest.id));
+    } catch (e) {
+      // Only a provider error lands here: free today's digest slot so a retry (or the next dispatch) can send it.
+      logger.warn('digest send failed', { userId, channel, transient: isTransientSendError(e), error: errMsg(e) });
+      await record('digest slot release', [digest.id], () => db.delete(notifications).where(eq(notifications.id, digest.id)));
+      await record('digest send failure', ids, () => fail(ids, e));
+      continue;
+    }
+    await record('digest outcome', [digest.id, ...ids], async () => {
+      await db.update(notifications)
+        .set({ status: skipped ? 'skipped' : 'sent', error: reason, sentAt: skipped ? null : now, attempts: skipped ? 0 : 1, nextAttemptAt: null })
+        .where(eq(notifications.id, digest.id));
       report.digests++;
       await settle(ids, skipped ? 'skipped' : 'sent', reason);
-    } catch (e) {
-      logger.warn('digest send failed', { userId, channel, transient: isTransientSendError(e), error: errMsg(e) });
-      // Free today's digest slot so a retry (or the next dispatch) can send it.
-      await db.delete(notifications).where(eq(notifications.id, digest.id));
-      await fail(ids, e);
-    }
+    });
   }
   logger.info('notifications dispatched', { ...report });
   return report;

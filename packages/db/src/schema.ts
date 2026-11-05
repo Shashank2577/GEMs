@@ -2,6 +2,7 @@
  * TenderPilot database schema — single source of truth (see specs/001-gem-tender-copilot/data-model.md).
  * Every org-owned table carries org_id (Constitution IV).
  */
+import { sql } from 'drizzle-orm';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -530,6 +531,9 @@ export const notifications = pgTable('notifications', {
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
+  // Dispatcher claim scan (FR-047; ADR-0006): only the pending email/WhatsApp outbox, by due time then age.
+  pendingIdx: index('notifications_pending_idx').on(t.nextAttemptAt, t.createdAt)
+    .where(sql`${t.status} = 'pending' and ${t.channel} in ('email', 'whatsapp')`),
 }));
 
 export const activityLog = pgTable('activity_log', {

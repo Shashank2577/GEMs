@@ -1,2 +1,3 @@
 ALTER TABLE "notifications" ADD COLUMN "attempts" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
-ALTER TABLE "notifications" ADD COLUMN "next_attempt_at" timestamp with time zone;
+ALTER TABLE "notifications" ADD COLUMN "next_attempt_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "notifications_pending_idx" ON "notifications" USING btree ("next_attempt_at","created_at") WHERE "notifications"."status" = 'pending' and "notifications"."channel" in ('email', 'whatsapp');
