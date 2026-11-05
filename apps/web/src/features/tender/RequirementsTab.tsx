@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Bot, Cpu, ListChecks, PenLine, Search } from 'lucide-react';
-import type { AnalysisDto, Requirement } from '@tp/core/contracts/analyse';
+import { Bot, Cpu, ListChecks, PenLine, Search, TriangleAlert } from 'lucide-react';
+import type { AnalysisDto, Requirement, TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { Badge, Card, EmptyState, Input, ResponsiveTable, Tooltip, type Column } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { PageChip } from './AnalysisPanel';
-import { REQ_GROUPS, formatRequirementValue } from './labels';
+import { REQ_GROUPS, documentCheckPrefix, formatRequirementValue, mismatchedDocuments } from './labels';
 
 function MethodBadge({ m }: { m: Requirement['method'] }) {
   if (m === 'LLM') return <Badge tone="accent" size="sm"><Bot aria-hidden /> AI</Badge>;
@@ -23,8 +23,33 @@ function ConfidenceBar({ v }: { v: number }) {
   );
 }
 
+function DocumentCheckCallout({ docs, bidNumber, summary }: { docs: TenderDocumentDto[]; bidNumber?: string; summary: string | null }) {
+  const prefix = documentCheckPrefix(summary);
+  if (!docs.length && !prefix) return null;
+  return (
+    <div role="alert" className="flex gap-3 rounded-xl border border-warning/30 bg-warning-soft/60 p-4 text-sm">
+      <TriangleAlert className="mt-0.5 size-5 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
+      <div className="min-w-0">
+        <div className="font-semibold">Check documents</div>
+        {docs.length ? (
+          <ul className="mt-0.5 text-muted-foreground">
+            {docs.map((d) => (
+              <li key={d.id} className="break-words">
+                <span className="font-medium text-foreground">{d.fileName}</span> is for {d.bidNumberFound}{bidNumber ? `, not ${bidNumber}` : ''}.
+              </li>
+            ))}
+          </ul>
+        ) : <p className="mt-0.5 break-words text-muted-foreground">{prefix!.replace(/^Check documents: /, '')}</p>}
+        <p className="mt-1 text-muted-foreground">Requirements below may come from the wrong bid. Remove the document or upload the right PDF, then re-analyse.</p>
+      </div>
+    </div>
+  );
+}
+
 /** Every extracted requirement with value, provenance, method and confidence (FR-012). */
-export function RequirementsTab({ analysis, tenderId }: { analysis: AnalysisDto | null; tenderId: string }) {
+export function RequirementsTab({ analysis, tenderId, documents, bidNumber }: {
+  analysis: AnalysisDto | null; tenderId: string; documents?: TenderDocumentDto[]; bidNumber?: string;
+}) {
   const [q, setQ] = useState('');
   const groups = useMemo(() => {
     if (!analysis) return [];
@@ -63,6 +88,7 @@ export function RequirementsTab({ analysis, tenderId }: { analysis: AnalysisDto 
 
   return (
     <div className="grid gap-6">
+      <DocumentCheckCallout docs={mismatchedDocuments(analysis, documents)} bidNumber={bidNumber} summary={analysis.summary} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           {analysis.requirements.length} requirements extracted · {analysis.requirements.filter((r) => r.method === 'RULE').length} by rules

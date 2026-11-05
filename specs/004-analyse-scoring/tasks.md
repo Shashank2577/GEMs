@@ -93,7 +93,7 @@ description: "Task list for 004 Analyse — bid documents, eligibility extractio
 
 **Goal**: Rules extract every standard GeM requirement with document/page/quote provenance, combine documents (corrigendum wins), fall back to listing, and show it in the Requirements tab.
 
-**Independent Test**: Analyse `go-it-services.pdf` without an LLM key → 30 requirements with the values/pages in spec US2 #1, page chips open the right page.
+**Independent Test**: Analyse `go-it-services.pdf` without an LLM key → 32 requirements (30 + `bid_published_at`, `consignee_state` from FR-019) with the values/pages in spec US2 #1, page chips open the right page.
 
 ### Built
 
@@ -106,13 +106,13 @@ description: "Task list for 004 Analyse — bid documents, eligibility extractio
 
 ### Remaining
 
-- [ ] T032 [P] [US2] Port erenmyeager15 "MSE Relaxation…/Startup Relaxation for Years Of Experience (and Turnover)" labels and "Yes | Complete"/"No | Complete" value parsing; tests on text snippets in `packages/core/src/analyse/rules.ts`, `packages/core/test/analyse/rules.test.ts` FR-018 (#198)
-- [ ] T033 [P] [US2] Labels `contract_period` ("Contract Period N Year(s)/Month(s)/Day(s)" → months) and `bid_published_at` ("Dated: dd-mm-yyyy"), experience label variant "…for same/similar service"; tests in `packages/core/src/analyse/rules.ts`, `packages/core/test/analyse/rules.test.ts` FR-019 (#200)
-- [ ] T034 [US2] `consignee_state` from the consignee/reporting-officer block using an Indian state list (ported from erenmyeager15 `INDIAN_STATES`/`inferIndianState`, scoped to the consignee section); delivery factor uses it when `tender.state` is null; tests in `packages/core/src/analyse/rules.ts`, `packages/core/src/analyse/score.ts`, `packages/core/test/analyse/rules.test.ts`, `packages/core/test/analyse/score.test.ts` FR-019 FR-022 (#202)
-- [ ] T035 [US2] Real-layout extraction corpus: add ≥ 3 anonymised bilingual GeM bid PDFs (goods, service with contract period, RA) with expected-value JSON and a corpus test asserting ≥ 95 % field accuracy (value + page) and Mujahid-Alam's page-1 field list as a coverage checklist in `packages/core/test/fixtures/bids/real-*.pdf`, `packages/core/test/fixtures/bids/real-*.expected.json`, `packages/core/test/analyse/corpus.test.ts` SC-001 (#204)
-- [ ] T036 [US2] Analysis summary prefix "Check documents: <file> is for <bid no>." and Requirements-tab warning callout when any analysed document's detected bid number mismatches; API test in `apps/api/src/services/analyse.ts`, `apps/web/src/features/tender/RequirementsTab.tsx`, `apps/api/test/analyse.test.ts` FR-010 (#206)
-- [ ] T037 [P] [US2] Group/label/format entries for new keys (`contract_period`, `bid_published_at`, `consignee_state`) in `apps/web/src/features/tender/labels.ts` FR-020 (#208)
-- [ ] T038 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in qa/evidence/004/US2/ — rules-only analysis of `go-it-services.pdf` (assert 30 requirements and key values/pages via API + UI), header counts, groups, page chip opens `#page=4`, filter + "Nothing matches", corrigendum upload supersedes end date, listing fallback row, 422 `no_documents` toast with Upload PDF action, auto-fetch from GeM; desktop + `@mobile` card layout in `e2e/004-analyse/US2-extraction.e2e.ts`, `qa/evidence/004/US2/VERDICT.md` FR-011..FR-020 (#210)
+- [x] T032 [P] [US2] Port erenmyeager15 "MSE Relaxation…/Startup Relaxation for Years Of Experience (and Turnover)" labels and "Yes | Complete"/"No | Complete" value parsing; tests on text snippets in `packages/core/src/analyse/rules.ts`, `packages/core/test/analyse/rules.test.ts` FR-018 (#198)
+- [x] T033 [P] [US2] Labels `contract_period` ("Contract Period N Year(s)/Month(s)/Day(s)" → months) and `bid_published_at` ("Dated: dd-mm-yyyy"), experience label variant "…for same/similar service"; tests in `packages/core/src/analyse/rules.ts`, `packages/core/test/analyse/rules.test.ts` FR-019 (#200)
+- [x] T034 [US2] `consignee_state` from the consignee/reporting-officer block using an Indian state list (ported from erenmyeager15 `INDIAN_STATES`/`inferIndianState`, scoped to the consignee section); delivery factor uses it when `tender.state` is null; tests in `packages/core/src/analyse/rules.ts`, `packages/core/src/analyse/score.ts`, `packages/core/test/analyse/rules.test.ts`, `packages/core/test/analyse/score.test.ts` FR-019 FR-022 (#202)
+- [x] T035 [US2] Real-layout extraction corpus: add ≥ 3 anonymised bilingual GeM bid PDFs (goods, service with contract period, RA) with expected-value JSON and a corpus test asserting ≥ 95 % field accuracy (value + page) and Mujahid-Alam's page-1 field list as a coverage checklist in `packages/core/test/fixtures/bids/real-*.pdf`, `packages/core/test/fixtures/bids/real-*.expected.json`, `packages/core/test/analyse/corpus.test.ts` SC-001 (#204)
+- [x] T036 [US2] Analysis summary prefix "Check documents: <file> is for <bid no>." and Requirements-tab warning callout when any analysed document's detected bid number mismatches; API test in `apps/api/src/services/analyse.ts`, `apps/web/src/features/tender/RequirementsTab.tsx`, `apps/api/test/analyse.test.ts` FR-010 (#206)
+- [x] T037 [P] [US2] Group/label/format entries for new keys (`contract_period`, `bid_published_at`, `consignee_state`) in `apps/web/src/features/tender/labels.ts` FR-020 (#208)
+- [ ] T038 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in qa/evidence/004/US2/ — rules-only analysis of `go-it-services.pdf` (assert 32 requirements and key values/pages via API + UI), header counts, groups, page chip opens `#page=4`, filter + "Nothing matches", corrigendum upload supersedes end date, listing fallback row, 422 `no_documents` toast with Upload PDF action, auto-fetch from GeM; desktop + `@mobile` card layout in `e2e/004-analyse/US2-extraction.e2e.ts`, `qa/evidence/004/US2/VERDICT.md` FR-011..FR-020 (#210)
 
 **Checkpoint**: Extraction is verifiable on its own (Requirements tab).
 
@@ -249,6 +249,8 @@ description: "Task list for 004 Analyse — bid documents, eligibility extractio
 ## Phase 10: Polish & Cross-Cutting Concerns
 
 **Purpose**: Improvements that affect multiple user stories
+
+- [ ] T035a [US2] Follow-up to T035: replace/augment the corpus with real anonymised GeM PDFs (SC-001) — synthesised corpus only so far
 
 - [ ] T095 [P] Update `specs/001-gem-tender-copilot/contracts/api.md § Analyse` with the new endpoints (`DELETE …/documents/:docId`, `…/ocr`, `/analyses/:id/rescore`, `/analysis/capabilities`), new fields (`staleReason`, `staleAt`, `notes`, `lastAttempt`, `textSource`, `bidNumberFound`, `warnings`) and error codes (`analysis_running`, `ocr_unavailable`, `ocr_failed`) FR-009 FR-028 FR-037 FR-043 FR-052 FR-053 (#273)
 - [ ] T096 [P] Experience basis hint: when contracts give fewer years than the incorporation date, append "(incorporated N years ago — add older contracts as proof)" to the experience detail; tests in `packages/core/src/analyse/score.ts`, `packages/core/test/analyse/score.test.ts` FR-022 (#275)
