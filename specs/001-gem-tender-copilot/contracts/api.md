@@ -17,14 +17,14 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | Method | Path | Body / Query | Returns |
 |---|---|---|---|
 | POST | /auth/signup | `{name,email,password(≥8),orgName}` | `Me` (sets cookie), 201 |
-| POST | /auth/login | `{email,password}` | `Me`; 400 `invalid_credentials`; 429 `rate_limited` (FR-010) |
+| POST | /auth/login | `{email,password}` | `Me`; 401 `invalid_credentials`; 429 `rate_limited` (FR-010) |
 | POST | /auth/logout | – | `{ok:true}` |
 | GET | /auth/me | – | `Me = {user:{id,name,email,phone}, org:{id,name,slug,plan,onboardingState}, role, orgs:[{id,name,role}]}` (401 if none) |
 | POST (S) | /auth/switch-org | `{orgId}` | `Me`; 404 `not_found` for an org the user is not in |
 | POST | /auth/forgot-password | `{email}` | `{ok:true}` always (no account enumeration); 429 `rate_limited` per email (3/h) and per IP (20/h) (FR-011) |
 | POST | /auth/reset-password | `{token,password(≥8)}` | `{ok:true}`, signs out every session of the user; 400 `reset_invalid` (unknown, used or expired link, 1 h); 429 `rate_limited` (FR-011) |
 | GET | /auth/invite/:token | – (no auth) | `InvitePreview = {orgName,email,role,invitedBy,expiresAt,existingUser}`; 404 `invite_invalid` (FR-019) |
-| POST | /auth/accept-invite | `{token,name?,password?}` (signed in: neither; existing account: `password`; new account: `name`+`password`) | `Me`; 404 `invite_invalid`; 403 `invite_email_mismatch` when the signed-in user's email is not the invited one (FR-018); 429 `rate_limited` |
+| POST | /auth/accept-invite | `{token,name?,password?}` (signed in: neither; existing account: `password`; new account: `name`+`password`) | `Me`; 404 `invite_invalid`; 401 `invalid_credentials` (wrong password for an existing account); 403 `invite_email_mismatch` when the signed-in user's email is not the invited one (FR-018); 429 `rate_limited` |
 | PATCH | /me | `{name?,phone?}` | `Me` |
 | POST (S) | /me/password | `{currentPassword,newPassword}` | `{ok:true}`, other sessions are signed out; 400 `invalid_credentials`; 429 `rate_limited` |
 | GET | /me/sessions | – | `{items:[{id,current,userAgent,device,createdAt,lastSeenAt}], total}` (S) |
@@ -41,7 +41,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member; 409 `last_owner` when it would leave no owner (FR-021) |
 | DELETE (S) | /org/members/me | – | `{ok:true,nextOrgId}`: leave the active org (FR-027); 409 `last_owner` |
 | PATCH (M) | /org | `{name?, onboardingState?, scoringWeights?}` | org |
-| GET | /activity | `entityType?, entityId?, userId?` | `{items:[{id,user:{id,name},action,entityType,entityId,meta,createdAt}], total}` |
+| GET | /activity | `entityType?, entityId?, userId?, page?, pageSize?` | `{items:[{id,user:{id,name}\|null,action,entityType,entityId,meta,createdAt}], total}`; `user` is null when the actor no longer exists; newest first, paginated by `page`/`pageSize` |
 | GET | /health | – | `{ok, db, version}` (no auth) |
 
 ### Platform error codes
@@ -52,7 +52,7 @@ and `conflict` (409):
 | Code | Status | When |
 |---|---|---|
 | `rate_limited` | 429 | Too many credential attempts (login, accept-invite, change password: 10 failures per email and 30 per IP per 15 min), password-reset requests (3 per email, 20 per IP per hour), or a second test alert within a minute. Sends `Retry-After` (seconds); `details.retryAfter` repeats it. The per-IP limits apply only when the client IP is known (`TRUST_PROXY`). |
-| `invalid_credentials` | 400 | Wrong email/password, or wrong current password (field error). Login returns 401. |
+| `invalid_credentials` | 401 / 400 | 401 for a wrong email/password at login and a wrong password on accept-invite (existing account); 400 for a wrong current password on `/me/password` (field error). |
 | `invite_invalid` | 404 | Invitation link unknown, already used or expired. |
 | `invite_email_mismatch` | 403 | A signed-in user accepts an invitation addressed to another email. |
 | `reset_invalid` | 400 | Password-reset link unknown, already used or expired. Counted against the IP's `login_ip` budget. |

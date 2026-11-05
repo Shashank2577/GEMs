@@ -9,6 +9,9 @@
  *   ...
  *   await org.dispose();
  *
+ * Must be called from a test or hook (it reads the project's `baseURL` via `test.info()`, which throws elsewhere), or
+ * pass `opts.baseURL` explicitly to use it outside one.
+ *
  * `request` is Playwright's `APIRequest` factory (the `playwright.request` fixture, or `request` imported from
  * `@playwright/test`, the default); its contexts are created here with the project's `baseURL`, so the cookies of each user stay
  * separate and the caller's own context is never touched.

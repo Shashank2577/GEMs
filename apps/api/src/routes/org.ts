@@ -214,8 +214,8 @@ orgRoutes.delete('/org/members/me', requireSession, async (c) => {
       .where(eq(memberships.userId, uid)).orderBy(asc(memberships.createdAt)).limit(1);
     const nextId = next?.orgId ?? null;
     // Sign-in resumes in the org the user is moved to, never the one they left (002/FR-021).
-    // users before sessions: the same row order as sign-in / switch-org (session insert/update, then users), so two
-    // requests of this user cannot deadlock on the pair.
+    // Lock order users -> sessions, the same as the reset-password transaction (auth.ts). Sign-in / switch-org touch
+    // sessions then users, but they are not transactions, so they cannot deadlock with this code.
     await tx.update(users).set({ lastOrgId: nextId }).where(eq(users.id, uid));
     await tx.update(sessions).set({ activeOrgId: nextId }).where(eq(sessions.id, c.var.sessionId!));
     return nextId;

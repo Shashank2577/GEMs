@@ -224,6 +224,7 @@ Reset-password looks up a valid token before hashing and counts invalid tokens a
 vouch for the new link; the original inviter stays visible in the activity log). It deliberately **also revives an expired,
 unaccepted invitation**: expired rows are kept until replaced or revoked, so "Resend" is how an admin renews one. Accepted
 invitations and other orgs' invitations are 404. The pending list (`GET /org/members`) shows only unexpired rows.
+**Security headers** (decision, FR-050): `X-Frame-Options: DENY` everywhere except `SAMEORIGIN` on `content-disposition: inline` file responses (in-app previews, `middleware/security.ts`); the SPA CSP keeps `style-src 'unsafe-inline'` (Radix/sonner inline styles) and adds `frame-src`/`object-src`/`worker-src 'self' blob:` for PDF previews.
 **Client IP** (decision): read only from a trusted proxy, selected by `TRUST_PROXY`: `cloudflare` (the Worker default) →
 `cf-connecting-ip`; `xff`/`1` → first `x-forwarded-for` hop (Node behind a reverse proxy); unset (Node default) → `null`.
 A `null` IP means per-IP limits are **skipped** (per-email limits still apply), so un-proxied clients do not share one
