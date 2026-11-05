@@ -243,7 +243,7 @@ test.describe('US5 corrigendum', () => {
     await page.goto(`/tenders?q=${ENC(BID)}`);
     const card = cards(page).filter({ hasText: BID });
     await expect(card).toHaveCount(1);
-    await expect(card.getByRole('link', { name: /^Score \d+/ })).toBeVisible();
+    await expect(card.getByRole('link', { name: /Eligibility score \d+ of 100/ })).toBeVisible();
     const recheck = card.getByText('Re-check', { exact: true });
     const corr = card.getByText('Corrigendum', { exact: true });
     await expect(recheck).toBeVisible();
