@@ -1,0 +1,242 @@
+{
+  "url": "http://localhost:8788/tenders",
+  "timestamp": "2026-11-05T07:52:12.180Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">QT</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">QT</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"cursor-help text-muted-foreground\" data-state=\"closed\">ⓘ</span>",
+          "target": [
+            ".cursor-help"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.8pt (14.4px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(13) > .ring-primary\\/10.ring-1.border-primary\\/30 > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .-rotate-90[width=\"48\"][height=\"48\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 14.4px;\">98</span>",
+          "target": [
+            "li:nth-child(13) > .ring-primary\\/10.ring-1.border-primary\\/30 > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.tabular.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.8pt (14.4px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(16) > article > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .-rotate-90[width=\"48\"][height=\"48\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 14.4px;\">100</span>",
+          "target": [
+            "li:nth-child(16) > article > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.tabular.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.8pt (14.4px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(17) > .ring-primary\\/10.ring-1.border-primary\\/30 > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .-rotate-90[width=\"48\"][height=\"48\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 14.4px;\">86</span>",
+          "target": [
+            "li:nth-child(17) > .ring-primary\\/10.ring-1.border-primary\\/30 > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.tabular.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.8pt (14.4px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(19) > article > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .-rotate-90[width=\"48\"][height=\"48\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 14.4px;\">80</span>",
+          "target": [
+            "li:nth-child(19) > article > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.tabular.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.8pt (14.4px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(24) > article > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .-rotate-90[width=\"48\"][height=\"48\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 14.4px;\">82</span>",
+          "target": [
+            "li:nth-child(24) > article > .items-start.gap-4.flex > .items-end.flex-col.z-10 > .p-0\\.5.flex-col.rounded-lg > .justify-center.shrink-0[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.tabular.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        }
+      ]
+    }
+  ],
+  "passes": 32
+}

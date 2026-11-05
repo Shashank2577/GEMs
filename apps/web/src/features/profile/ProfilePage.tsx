@@ -85,7 +85,7 @@ function SectionCard({ id, title, description, icon: Icon, children, aside }: { 
 function Explain({ children, label }: { children: ReactNode; label: string }) {
   return (
     <Tooltip content={<span className="block max-w-xs text-xs leading-relaxed">{children}</span>}>
-      <button type="button" className="inline-flex rounded text-muted-foreground hover:text-foreground focus-ring" aria-label={`What is ${label}?`}><HelpCircle className="size-3.5" /></button>
+      <button type="button" className="-m-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-ring" aria-label={`What is ${label}?`}><HelpCircle className="size-3.5" /></button>
     </Tooltip>
   );
 }
@@ -286,7 +286,7 @@ export default function ProfilePage() {
             {/* Name from content — the ring's img name "Profile N% complete" — not an aria-label that omits the visible "N%" (axe label-content-name-mismatch). */}
             <span className="scale-[0.42] -m-[22px]"><Ring value={percent} /></span><span aria-hidden>{percent}%</span>
           </button>
-          <nav aria-label="Profile sections" className="-mr-4 flex gap-1.5 overflow-x-auto pr-4 scrollbar-thin">
+          <nav aria-label="Profile sections" className="-mr-4 flex min-w-0 gap-1.5 overflow-x-auto pr-4 scrollbar-thin">
             {SECTIONS.map((s) => (
               <button key={s.id} type="button" onClick={() => jump(s.id)} aria-current={active === s.id ? 'true' : undefined}
                 className={cn('h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring', active === s.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground')}>
@@ -297,7 +297,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] xl:grid-cols-[13rem_minmax(0,1fr)_19rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] xl:grid-cols-[13rem_minmax(0,1fr)_19rem]">
         {/* Desktop section nav */}
         <nav aria-label="Profile sections" className="hidden lg:block">
           <ul className="sticky top-20 grid gap-0.5">
@@ -404,7 +404,7 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <h3 className="flex items-center gap-1.5 text-sm font-semibold"><Flag className="size-4 text-accent" aria-hidden />Make in India (MII) class
                   <Explain label="Make in India class">Under the Public Procurement (Preference to Make in India) Order 2017, Class-I local suppliers (≥ 50% local content) get purchase preference; Class-II (≥ 20%) can participate; Non-local suppliers (&lt; 20%) are barred from many bids under ₹200 crore.</Explain>
                 </h3>
@@ -452,8 +452,8 @@ export default function ProfilePage() {
               <Field label="States you can deliver or serve in" error={errors.operatingStates}
                 labelAside={!readOnly ? (
                   <span className="flex gap-2 text-xs">
-                    <button type="button" className="font-medium text-primary hover:underline" onClick={() => set('operatingStates', [...INDIAN_STATES])}>All India</button>
-                    {draft.operatingStates.length > 0 && <button type="button" className="text-muted-foreground hover:underline" onClick={() => set('operatingStates', [])}>Clear</button>}
+                    <button type="button" className="inline-flex min-h-6 items-center font-medium text-primary hover:underline" onClick={() => set('operatingStates', [...INDIAN_STATES])}>All India</button>
+                    {draft.operatingStates.length > 0 && <button type="button" className="inline-flex min-h-6 items-center text-muted-foreground hover:underline" onClick={() => set('operatingStates', [])}>Clear</button>}
                   </span>
                 ) : undefined}>
                 <div id="f-operatingStates">

@@ -1,0 +1,336 @@
+{
+  "url": "http://localhost:8788/profile",
+  "timestamp": "2026-11-05T07:52:27.013Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-7.1.1"
+      ],
+      "description": "Ensure ARIA attributes are not prohibited for an element's role",
+      "help": "Elements must only use permitted ARIA attributes",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-prohibited-attr?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
+                "nodeName": "div",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on \"div\" elements with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<div class=\"group flex h-full min-w-0 flex-1 flex-col items-center justify-end\" tabindex=\"0\" aria-label=\"FY 2022-23: ₹1,82,30,000\" data-state=\"closed\">",
+          "target": [
+            "div[aria-label=\"FY 2022-23: ₹1,82,30,000\"]"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on \"div\" elements with no valid role attribute."
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
+                "nodeName": "div",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on \"div\" elements with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<div class=\"group flex h-full min-w-0 flex-1 flex-col items-center justify-end\" tabindex=\"0\" aria-label=\"FY 2023-24: ₹2,46,10,000\" data-state=\"closed\">",
+          "target": [
+            "div[aria-label=\"FY 2023-24: ₹2,46,10,000\"]"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on \"div\" elements with no valid role attribute."
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
+                "nodeName": "div",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on \"div\" elements with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<div class=\"group flex h-full min-w-0 flex-1 flex-col items-center justify-end\" tabindex=\"0\" aria-label=\"FY 2024-25: ₹3,18,40,000\" data-state=\"closed\">",
+          "target": [
+            "div[aria-label=\"FY 2024-25: ₹3,18,40,000\"]"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on \"div\" elements with no valid role attribute."
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">QT</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">QT</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".grid-cols-1.gap-1\\.5.grid:nth-child(7) > .relative > .relative.flex.items-center > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > .col-span-2.md\\:col-span-1:nth-child(2) > .relative > .relative.flex.items-center > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > .col-span-2.md\\:col-span-1:nth-child(3) > .relative > .relative.flex.items-center > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(2) > .col-span-2.md\\:col-span-1:nth-child(2) > .relative > .relative.flex.items-center > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(2) > .col-span-2.md\\:col-span-1:nth-child(3) > .relative > .relative.flex.items-center > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(3) > .col-span-2.md\\:col-span-1:nth-child(2) > .relative > .relative.flex.items-center > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(3) > .col-span-2.md\\:col-span-1:nth-child(3) > .relative > .relative.flex.items-center > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "13.5pt (18px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"76\" height=\"76\" class=\"-rotate-90\">",
+                  "target": [
+                    ".text-card-foreground.p-4.rounded-xl > .gap-4.flex.items-center > .relative[role=\"img\"][aria-label=\"Profile 96% complete\"] > .-rotate-90[width=\"76\"][height=\"76\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"absolute inset-0 flex items-center justify-center text-lg font-semibold tabular tracking-tight\">96<span class=\"text-xs text-muted-foreground\">%</span></span>",
+          "target": [
+            ".text-card-foreground.p-4.rounded-xl > .gap-4.flex.items-center > .relative[role=\"img\"][aria-label=\"Profile 96% complete\"] > .text-lg.inset-0.tracking-tight"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        }
+      ]
+    }
+  ],
+  "passes": 32
+}

@@ -196,7 +196,11 @@ export function handleForbidden(err: unknown): boolean {
 export const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({ onError: (err, query) => { handleSessionEnd(err, query.meta); } }),
   mutationCache: new MutationCache({
-    onError: (err, _vars, _ctx, mutation) => { if (!handleSessionEnd(err, mutation.meta)) handleForbidden(err); },
+    onError: (err, _vars, _ctx, mutation) => {
+      if (handleSessionEnd(err, mutation.meta) || handleForbidden(err)) return;
+      // Offline / unreachable (007/FR-096): mutations are not paused (networkMode 'always'), so they fail at once; say so once.
+      if (err instanceof ApiError && err.status === 0) toast.error(err.message, { id: errorToastId(err.message) });
+    },
   }),
   defaultOptions: {
     queries: {
@@ -207,6 +211,9 @@ export const queryClient: QueryClient = new QueryClient({
         return count < 2;
       },
     },
-    mutations: { retry: false },
+    // networkMode 'always': a mutation fires immediately and fails fast when offline instead of sitting paused (and
+    // spinning) until the connection returns (007/FR-096). Queries keep the default 'online' mode: they pause and
+    // the last loaded data stays on screen under the offline banner.
+    mutations: { retry: false, networkMode: 'always' },
   },
 });

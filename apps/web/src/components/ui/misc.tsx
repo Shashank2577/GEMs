@@ -133,7 +133,7 @@ export function Stepper({ steps, current, className, onStepClick }: { steps: { l
               disabled={!clickable}
               onClick={() => clickable && onStepClick?.(i)}
               aria-current={active ? 'step' : undefined}
-              className="flex min-w-0 items-center gap-2 text-left disabled:cursor-default focus-ring rounded"
+              className="flex min-h-6 min-w-6 items-center gap-2 text-left disabled:cursor-default focus-ring rounded"
             >
               <span className={cn('flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold',
                 done ? 'bg-primary text-primary-foreground' : active ? 'border-2 border-primary text-primary' : 'border text-muted-foreground')}>
