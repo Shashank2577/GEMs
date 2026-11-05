@@ -1,29 +1,29 @@
-gem-fetch.sh  base=http://localhost:8791  mock-gem=http://127.0.0.1:4014  orgs/tenders=20  min gap=980 ms  (2026-11-05T05:00:33Z)
+gem-fetch.sh  base=http://localhost:8791  mock-gem=http://127.0.0.1:4014  orgs/tenders=20  min gap=980 ms  (2026-11-05T05:12:15Z)
 ingestion: HTTP 200
 calls (org: HTTP status, seconds):
-  org1   201 1.130975
-  org2   201 0.693388
-  org3   201 6.107728
-  org4   201 2.125050
-  org5   201 4.109697
-  org6   201 8.108313
-  org7   201 5.104430
-  org8   201 3.118052
-  org9   201 7.105041
-  org10  201 11.096842
-  org11  201 10.081660
-  org12  201 9.108169
-  org13  201 13.078871
-  org14  201 14.083131
-  org15  201 12.083472
-  org16  201 19.086220
-  org17  201 18.072886
-  org18  201 15.077839
-  org19  201 17.062510
-  org20  201 16.069965
+  org1   201 0.709719
+  org2   201 2.098391
+  org3   201 3.105096
+  org4   201 1.133094
+  org5   201 6.081617
+  org6   201 5.084377
+  org7   201 7.081666
+  org8   201 9.074286
+  org9   201 13.066523
+  org10  201 4.086787
+  org11  201 10.068701
+  org12  201 8.081092
+  org13  201 11.071985
+  org14  201 18.042877
+  org15  201 12.056401
+  org16  201 17.050676
+  org17  201 16.050214
+  org18  201 15.054887
+  org19  201 14.063129
+  org20  201 19.073108
 mock-gem document requests: 20
-arrival offsets (ms): 0 996 1996 2995 3996 4996 5995 6995 7996 8996 9995 10996 11995 12996 13995 14996 15995 16994 17995 18995
-inter-arrival gaps (ms): 996 1000 999 1001 1000 999 1000 1001 1000 999 1001 999 1001 999 1001 999 999 1001 1000
-min gap: 996 ms   mean gap: 1000 ms
-wall clock: 19143 ms   503 gem_busy: 0   unexpected answers: 0
+arrival offsets (ms): 0 995 1994 2994 3994 4994 5993 6993 7995 8995 9993 10994 11994 12994 13993 14994 15994 16994 17993 18994
+inter-arrival gaps (ms): 995 999 1000 1000 1000 999 1000 1002 1000 998 1001 1000 1000 999 1001 1000 1000 999 1001
+min gap: 995 ms   mean gap: 1000 ms
+wall clock: 19135 ms   503 gem_busy: 0   unexpected answers: 0
 RESULT: PASS (every GeM request ≥ 980 ms apart)

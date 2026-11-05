@@ -82,15 +82,22 @@
     {
       "idx": 11,
       "version": "7",
-      "when": 1793854289835,
-      "tag": "0011_gem_lease_single_run",
+      "when": 1793854927787,
+      "tag": "0011_vault_expiry_idx",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
-      "when": 1793854297837,
-      "tag": "0012_capacity_indexes",
+      "when": 1793855368308,
+      "tag": "0012_gem_lease_single_run",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793855375031,
+      "tag": "0013_capacity_indexes",
       "breakpoints": true
     }
   ]

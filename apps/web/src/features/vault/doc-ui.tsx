@@ -15,10 +15,10 @@ const ICONS: Record<string, LucideIcon> = {
 
 export const CATEGORY_TONE: Record<DocCategory, string> = {
   Statutory: 'bg-primary-soft text-primary',
-  Financial: 'bg-success-soft text-success',
-  Experience: 'bg-info-soft text-info',
+  Financial: 'bg-success-soft text-[hsl(158_72%_27%)] dark:text-success',
+  Experience: 'bg-info-soft text-[hsl(205_85%_36%)] dark:text-info',
   OEM: 'bg-accent-soft text-accent',
-  Quality: 'bg-warning-soft text-warning',
+  Quality: 'bg-warning-soft text-[hsl(32_90%_32%)] dark:text-warning',
   Other: 'bg-muted text-muted-foreground',
 };
 

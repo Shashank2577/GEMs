@@ -217,6 +217,8 @@ export const vaultDocuments = pgTable('vault_documents', {
 }, (t) => ({
   orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type),
   shaIdx: index('vault_org_sha_idx').on(t.orgId, t.contentSha256),
+  // 005 T009 (NFR-004): the daily reminder scan filters on expiry_date across orgs.
+  expiryIdx: index('vault_expiry_idx').on(t.expiryDate),
 }));
 
 /** Previous files of a vault document, kept on renewal/replace (FR-065; at most 5 per document). */
@@ -272,7 +274,7 @@ export const tenders = pgTable('tenders', {
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
   // 008/FR-027: ~6 % of tenders are open and every feed/dashboard query filters on it. Built CONCURRENTLY by the
-  // hand-edited non-transactional migration 0012 (`-- tp:non-transactional`, see migrate.ts).
+  // hand-edited non-transactional migration 0013 (`-- tp:non-transactional`, see migrate.ts).
   openCreatedIdx: index('tenders_open_created_idx').on(t.createdAt.desc().nullsFirst()).where(sql`status = 'open'`),
   openEndIdx: index('tenders_open_end_idx').on(t.endAt).where(sql`status = 'open'`),
   // DESC NULLS LAST = the feed's "highest value" sort; also serves minValue/maxValue ranges.
@@ -551,7 +553,7 @@ export const notifications = pgTable('notifications', {
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
-  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0012).
+  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0013).
   pendingIdx: index('notifications_pending_idx').on(t.createdAt).where(sql`status = 'pending' AND channel IN ('email','whatsapp')`),
 }));
 

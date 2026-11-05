@@ -142,7 +142,8 @@ test.describe('US3 vault', () => {
     await expect(drawer(page).getByText('Expires in 10d')).toBeVisible();
     await ev(page, 'ac04-expiring-in-10d');
     await closeDrawer(page);
-    r = await uiUpload(page, { name: 'ISO_9001_old.png', mime: 'image/png', bytes: png, title: 'ISO yesterday', expiry: istDay(-1) });
+    r = await uiUpload(page, { name: 'ISO_9001_old.png', mime: 'image/png', bytes: makePng(65, 48), // different bytes: duplicates are refused since US6 (FR-067)
+      title: 'ISO yesterday', expiry: istDay(-1) });
     expect(r.status()).toBe(201);
     dto = (await r.json()) as VaultDoc;
     expect(dto).toMatchObject({ status: 'expired', daysToExpiry: -1 });
@@ -451,7 +452,7 @@ test.describe('US3 vault', () => {
     expect(sql(`select last_reminder_days is null from vault_documents where id='${doc.id}'`)).toBe('t');
   });
 
-  test('AC12 replace file -> PUT 200 new file fields, metadata kept, toast, old blob deleted, vault.file_replaced', async ({ page }) => {
+  test('AC12 replace file -> PUT 200 new file fields, metadata kept, toast, old blob kept as a version, vault.file_replaced', async ({ page }) => {
     await signupViaApi(page);
     const orgId = (await me(page.request)).org.id;
     const doc = await apiUploadOk(page.request, {
@@ -476,7 +477,11 @@ test.describe('US3 vault', () => {
     await expect(t).toContainText('Metadata kept. Update the expiry date if this is a renewed copy.');
     await expect(drawer(page).getByText(/renewed-cert\.pdf · .* · 3 pages/)).toBeVisible();
     await ev(page, 'ac12-after-replace');
-    expect(blobFiles(orgId)).toEqual([`${doc.id}/renewed-cert.pdf`]);   // old blob gone
+    // FR-032 amended by US6 (FR-065): the new file gets a unique key and the old blob is kept as a version.
+    const files = blobFiles(orgId);
+    expect(files).toHaveLength(2);
+    expect(files).toContain(`${doc.id}/old-cert.pdf`);
+    expect(files.find((f) => f !== `${doc.id}/old-cert.pdf`)).toMatch(new RegExp(`^${doc.id}/[0-9a-f-]{36}/renewed-cert\\.pdf$`));
     expect(Buffer.from(await (await page.request.get(`/api/vault/${doc.id}/download`)).body()).equals(fresh)).toBe(true);
     expect(await activityActions(page.request, doc.id)).toContain('vault.file_replaced');
   });
@@ -484,8 +489,9 @@ test.describe('US3 vault', () => {
   test('AC13 delete -> confirm, 200 {ok:true}, row+blob gone, CRAC and OEM links cleared, toast, drawer closes', async ({ page }) => {
     await signupViaApi(page);
     const orgId = (await me(page.request)).org.id;
-    const doc = await apiUploadOk(page.request, { name: 'crac.pdf', bytes: await makePdf(1), fields: { title: 'CRAC to delete', type: 'crac' } });
-    const keep = await apiUploadOk(page.request, { name: 'other.pdf', bytes: await makePdf(1), fields: { title: 'Untouched doc' } });
+    // Both linked from the profile's OEM list, so both must be oem_authorization documents (FR-061, US5); CRAC links only need vault ownership.
+    const doc = await apiUploadOk(page.request, { name: 'crac.pdf', bytes: await makePdf(1), fields: { title: 'CRAC to delete', type: 'oem_authorization' } });
+    const keep = await apiUploadOk(page.request, { name: 'other.pdf', bytes: await makePdf(1, 'other'), fields: { title: 'Untouched doc', type: 'oem_authorization' } });
     const pc = await page.request.post('/api/past-contracts', { data: { buyer: 'PMC', buyerType: 'state', title: 'CCTV supply', value: 5000000, cracDocumentId: doc.id } });
     expect(pc.status(), await pc.text()).toBe(201);
     const pcId = (await pc.json()).id as string;
