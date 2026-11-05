@@ -1,0 +1,14 @@
+$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run test/housekeeping.test.ts --reporter=verbose
+ RUN  v2.1.9 /home/user/GEMs-us7/apps/api
+ ✓ test/housekeeping.test.ts > RETENTION table (FR-070) > is pinned: these values are what production deletes
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > before 02:00 IST the step does nothing
+stdout | test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > the scheduled step deletes exactly the expired rows and R2 objects and logs the JSON summary
+{"level":"info","msg":"housekeeping finished","job":"housekeeping","day":"2026-11-06","deleted":{"sessions":1,"invitations":2,"notifications":4,"tenderEvents":1,"tenderRaw":1,"rateLimits":0,"packets":2,"packetBlobs":2}}
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > the scheduled step deletes exactly the expired rows and R2 objects and logs the JSON summary
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > runs once per IST day: a later tick the same day skips; a forced second run deletes 0 (idempotent)
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > the rate_limits rule on its own: windows older than 1 day go, newer ones stay
+ ✓ test/housekeeping.test.ts > housekeeping on a fixed clock (US7 scenario 5) > a failed R2 delete keeps the packet row (no orphaned object) and a failed run releases its day claim
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  09:00:21
+   Duration  2.59s (transform 1.03s, setup 0ms, collect 1.83s, tests 517ms, environment 0ms, prepare 61ms)

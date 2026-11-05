@@ -1,6 +1,6 @@
 # ADR-0002: Neon connection handling — pooled endpoint now, Hyperdrive with a single `pg` driver next
 
-**Status**: Proposed (change)
+**Status**: Implemented — code (2) in 008/US7 (#362, PR #551); the Hyperdrive binding itself is enabled by an operator (docs/runbook.md § Hyperdrive), until then the Worker uses the pooled `DATABASE_URL` (1)
 **Date**: 2026-11-05
 **Priority**: MUST (pooled endpoint) · SHOULD (Hyperdrive + single driver)
 
@@ -49,3 +49,13 @@ transaction patterns used here (`db.transaction` in auth/org routes; no session-
 - Production `DATABASE_URL` host contains `-pooler`; `/api/health` p50 < 150 ms from a Mumbai vantage point.
 - After (2): `pnpm typecheck` passes with `@neondatabase/serverless` removed; API tests unchanged; a 50-concurrent
   `GET /api/tenders` run shows zero `too many connections` errors.
+
+## Implementation notes (008/US7)
+
+- One driver: `createNodeDb(url, { max, connectionTimeoutMillis })` (`pg`, 10 s connect timeout); `createNeonDb` and
+  `@neondatabase/serverless` are gone. The Worker uses `env.HYPERDRIVE.connectionString` when the binding exists, else
+  the `DATABASE_URL` secret (`workerDatabaseUrl`, tested both ways), pool max 5.
+- `wrangler.toml` ships the `[[hyperdrive]]` table **commented out**: it needs a real config id that only an operator
+  can create (`wrangler hyperdrive create … --caching-disabled`), and a placeholder id would make `wrangler deploy` fail.
+  Staging's binding belongs inside `[env.staging]` (spec 008 US2), never as a bare `[[env.staging.hyperdrive]]`.
+- Acceptance still open: the staging load/latency verification (T111) after the binding is enabled.

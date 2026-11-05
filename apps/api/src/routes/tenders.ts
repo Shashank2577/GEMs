@@ -3,7 +3,7 @@
  * Tenders are global public GeM data; everything org-specific (matches, analyses, workspaces,
  * seen/dismissed) is joined and filtered by the caller's org (Constitution IV).
  */
-import { and, asc, desc, eq, getTableColumns, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   analyses, bidWorkspaces, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, watchlists,
@@ -13,6 +13,7 @@ import { uuidSchema } from '@tp/core/contracts/common';
 import type { AppDeps } from '../deps';
 import { conflict, notFound } from '../lib/errors';
 import { canSeeTender, DEMO_SOURCE, visibleTenderSource } from '../lib/tender-scope';
+import { tenderSearchCondition } from '../lib/tender-search';
 import { parseWith } from '../lib/validate';
 import { orgId, requireAuth, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
@@ -72,17 +73,8 @@ function buildFilters(q: TenderQuery, org: string, now: Date, scope: SQL, omit?:
   // the closing-date sort reads only still-open rows. Every open-feed query stays on the open-tender
   // partial indexes (008/FR-027).
   if (status === 'open') conds.push(sql`coalesce(${tenders.endAt}, 'infinity'::timestamptz) >= ${now}`);
-  if (q.q) {
-    for (const word of q.q.split(/\s+/).filter(Boolean).slice(0, 8)) {
-      const like = `%${word.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
-      conds.push(or(
-        ilike(tenders.title, like), ilike(tenders.bidNumber, like), ilike(tenders.category, like),
-        ilike(tenders.ministry, like), ilike(tenders.department, like), ilike(tenders.organisation, like),
-        ilike(tenders.buyerOffice, like), ilike(tenders.state, like), ilike(tenders.city, like),
-        sql`${tenders.items}::text ilike ${like}`,
-      )!);
-    }
-  }
+  // 008/FR-073: GIN-backed full-text search (websearch syntax, prefix lexemes) OR bid-number prefix.
+  if (q.q) conds.push(tenderSearchCondition(q.q));
   if (omit !== 'state' && q.state.length) conds.push(inArray(tenders.state, q.state));
   if (omit !== 'ministry' && q.ministry.length) conds.push(inArray(tenders.ministry, q.ministry));
   if (omit !== 'category' && q.category.length) conds.push(inArray(tenders.category, q.category));

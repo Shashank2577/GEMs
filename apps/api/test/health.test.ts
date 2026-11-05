@@ -286,7 +286,9 @@ describe('error reporter (FR-046)', () => {
   it('runScheduledJobs reports each failed step with its job name', async () => {
     const { errors, calls } = fakeReporter();
     const broken = new Proxy(ctx.db, { get() { throw new Error('db gone'); } }) as typeof ctx.db;
-    const report = await runScheduledJobs({ ...ctx.deps, db: broken, errors, logger: silent }, { trigger: 'cron' });
+    // Inside the daily housekeeping window (after 02:00 IST, 008/FR-070), so that step needs the database too.
+    const clock = { now: () => new Date('2026-11-05T00:00:00Z') };
+    const report = await runScheduledJobs({ ...ctx.deps, db: broken, errors, logger: silent, clock }, { trigger: 'cron' });
     expect(report.every((s) => !s.ok)).toBe(true);
     expect(calls.map((c) => c.context)).toEqual(report.map((s) => ({ job: s.step })));
   });

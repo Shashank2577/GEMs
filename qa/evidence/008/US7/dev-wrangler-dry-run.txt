@@ -1,0 +1,41 @@
+# wrangler.toml with the [assets] table removed (apps/web/dist is not built here); everything else as committed
+$ pnpm exec wrangler deploy --dry-run -c wrangler.dryrun.toml --env='' --outdir out
+ ⛅️ wrangler 4.157.0
+────────────────────
+▲ [WARNING] Processing ../../../tmp/claude-0/-home-user-GEMs/0c8c4288-1d58-571e-ab58-46adf40160da/scratchpad/wrangler.dryrun.toml configuration:
+    - Unexpected fields found in top-level field: "run_worker_first"
+Total Upload: 5033.52 KiB / gzip: 1173.59 KiB
+Your Worker has access to the following bindings:
+Binding                                                                 Resource                  
+env.HYPERDRIVE (00000000000000000000000000000000)                       Hyperdrive Config         
+env.BLOBS (tenderpilot-blobs)                                           R2 Bucket                 
+env.APP_URL ("https://tenderpilot.workers.dev")                         Environment Variable      
+env.GEM_BASE_URL ("https://bidplus.gem.gov.in")                         Environment Variable      
+env.LLM_MODEL ("claude-sonnet-5-5")                                     Environment Variable      
+env.MAIL_FROM ("TenderPilot <alerts@tenderpilot.in>")                   Environment Variable      
+env.PACKET_MAX_INPUT_BYTES ("41943040")                                 Environment Variable      
+env.TRUST_PROXY ("cloudflare")                                          Environment Variable      
+--dry-run: exiting now.
+$ pnpm exec wrangler deploy --dry-run -c wrangler.dryrun.toml --env staging --outdir out-staging
+ ⛅️ wrangler 4.157.0
+────────────────────
+▲ [WARNING] Processing ../../../tmp/claude-0/-home-user-GEMs/0c8c4288-1d58-571e-ab58-46adf40160da/scratchpad/wrangler.dryrun.toml configuration:
+    - Unexpected fields found in top-level field: "run_worker_first"
+    - "env.staging" environment configuration
+      - "vars" exists at the top level, but not on "env.staging".
+        This is not what you probably want, since "vars" is not inherited by environments.
+        Please add "vars" to "env.staging".
+      - "r2_buckets" exists at the top level, but not on "env.staging".
+        This is not what you probably want, since "r2_buckets" is not inherited by environments.
+        Please add "r2_buckets" to "env.staging".
+Total Upload: 5033.52 KiB / gzip: 1173.59 KiB
+Your Worker has access to the following bindings:
+Binding                                                Resource               
+env.HYPERDRIVE (00000000000000000000000000000001)      Hyperdrive Config      
+--dry-run: exiting now.
+$ grep -c 'node_modules/@neondatabase/serverless' out/worker.js   # neon driver code bundled?
+0
+$ grep -c 'cloudflare:sockets' out/worker.js   # pg's Workers socket path
+1
+$ grep -n neondatabase packages/*/package.json apps/*/package.json
+(none)
