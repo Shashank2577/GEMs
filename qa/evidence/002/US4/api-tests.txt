@@ -1,0 +1,32 @@
+TEST_DATABASE_URL=...tenderpilot_test_us4 pnpm --filter @tp/api exec vitest run
+Test Files  18 passed | 1 skipped (19)
+Tests  298 passed | 1 skipped (299)   (skipped: perf/dashboard.perf.test.ts, opt-in)
+
+--- test/prefs.test.ts (verbose) ---
+ ✓ test/prefs.test.ts > 002/FR-031 notification preferences > GET returns the defaults when no row exists
+ ✓ test/prefs.test.ts > 002/FR-031 notification preferences > PUT upserts the full object (also when no row exists) and GET round-trips it
+ ✓ test/prefs.test.ts > 002/FR-031 notification preferences > PUT rejects a partial object (full object required)
+ ✓ test/prefs.test.ts > 002/FR-031 notification preferences > preferences are isolated per org for a user in two orgs
+ ✓ test/prefs.test.ts > 002/FR-031 notification preferences > a viewer can edit their own preferences
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > with defaults: in-app row created, email attempted (log mailer → skipped), WhatsApp off
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > is limited to 1 per minute per user (429 rate_limited + Retry-After)
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > attempts only enabled channels: WhatsApp on with a phone → attempted; in-app/email off → nothing
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > WhatsApp on but the mobile was cleared later → skipped without calling the provider
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > reports `sent` from a configured provider and `failed` when it throws
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > requires a signed-in web session
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+
+--- related cases (verbose) ---
+ ✓ test/vault.test.ts > vault > patch updates metadata and resets reminders when expiry changes
+ ✓ test/vault.test.ts > expiry reminders > notifies members once per threshold and respects prefs (FR-022)
+ ✓ test/vault.test.ts > expiry reminders — isolation, IST boundary, renewals and manual run (T046, T050) > POST /vault/reminders/run: bid manager and owner 200, analyst and viewer 403, idempotent, own org only, logs activity (FR-052)
+ ✓ test/vault.test.ts > expiry reminders — isolation, IST boundary, renewals and manual run (T046, T050) > run with every member opted out of expiry reminders reports 0 notifications (FR-052)
+ ✓ test/vault.test.ts > expiry reminders — isolation, IST boundary, renewals and manual run (T046, T050) > IST boundary: at 2026-11-05T20:00Z (01:30 IST on the 6th) a document expiring 2026-11-05 is expired (FR-042)
+ ✓ test/vault.test.ts > expiry reminders — isolation, IST boundary, renewals and manual run (T046, T050) > editing the expiry after a sent reminder restarts the cycle with a new dedupe key; email titles carry "[<Org name>]" (FR-045, FR-049)
+ ✓ test/vault.test.ts > expiry reminders — isolation, IST boundary, renewals and manual run (T046, T050) > reminders are org-isolated: a member only of org B gets none for org A documents (FR-051)
+ ✓ test/auth.test.ts > auth > signup creates org + owner membership + prefs and sets a secure-ish session cookie
+ ✓ test/auth.test.ts > auth > PATCH /me updates name and validates phone; WhatsApp prefs need a phone
+ ✓ test/ingest.test.ts > runIngestion > daily digest: held before 08:00 IST, one digest email after, never twice a day
+ Test Files  3 passed (3)
+      Tests  114 passed (114)
