@@ -172,6 +172,14 @@ export async function seedDemoAndGetWorkspaces(request: APIRequestContext) {
   return { seed: await seeded.json(), workspaces: body.items as { id: string; stage: string; tender: { id: string; title: string } & Record<string, unknown> }[], list: body };
 }
 
+/**
+ * Wait (max 3 s) until finite CSS/Web animations have finished, so axe does not measure colour contrast on an overlay
+ * that is still fading in (Radix menus/dialogs animate opacity; a slow CI runner audits mid-animation otherwise).
+ */
+export async function settleAnimations(page: Page) {
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity), null, { timeout: 3_000 }).catch(() => { /* audit anyway */ });
+}
+
 export const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
 type AxeResults = Awaited<ReturnType<AxeBuilder['analyze']>>;
@@ -195,6 +203,7 @@ export async function a11y(page: Page, nameOrSpec: string, optsOrStory: A11yOpts
   const folder = basename(dirname(info.file));
   const spec = opts.spec ?? folder.match(/^(\d{3})-/)?.[1] ?? folder;
   const story = opts.story ?? basename(info.file).match(/US\d+/)?.[0] ?? 'misc';
+  await settleAnimations(page);
   let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
   for (const sel of opts.include ?? []) builder = builder.include(sel);
   for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
@@ -213,6 +222,7 @@ export async function a11y(page: Page, nameOrSpec: string, optsOrStory: A11yOpts
 
 /** Lightweight axe check (WCAG 2.1 A/AA): fails the test on any serious or critical violation; no evidence file. */
 export async function checkA11y(page: Page, opts: { include?: string[]; exclude?: string[]; disableRules?: string[] } = {}) {
+  await settleAnimations(page);
   let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
   for (const sel of opts.include ?? []) builder = builder.include(sel);
   for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
