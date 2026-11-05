@@ -40,3 +40,17 @@ export function outcomePayload(result: 'won' | 'lost', f: OutcomeForm):
   const notes = f.notes.trim();
   return { ok: true, outcome: { result, l1Price: l1, ourPrice: ours, notes: notes || null } };
 }
+
+/** Keyboard drag (FR-022, US2-13): the column one step left/right of `from` among the visible `stages`, or null at an edge. */
+export function adjacentStage(stages: readonly StageName[], from: StageName | null, dir: 1 | -1): StageName | null {
+  if (!from) return null;
+  const i = stages.indexOf(from);
+  if (i < 0) return null;
+  return stages[i + dir] ?? null;
+}
+
+/** "Truly empty" vs "filtered to nothing" (FR-027, US2-15): any active search/owner/closing filter means filtered. */
+export function emptyKind(total: number, filtering: boolean): 'pipeline' | 'filtered' | null {
+  if (total > 0) return null;
+  return filtering ? 'filtered' : 'pipeline';
+}

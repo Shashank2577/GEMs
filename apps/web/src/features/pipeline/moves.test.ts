@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { moveTargets, outcomePayload, parseRupees } from './moves';
+import { adjacentStage, emptyKind, moveTargets, outcomePayload, parseRupees } from './moves';
+import { PIPELINE_STAGES } from '@tp/core/contracts/apply';
 
 describe('moveTargets (FR-029)', () => {
   it('lists every other stage including Dropped, in order', () => {
@@ -29,5 +30,28 @@ describe('parseRupees / outcomePayload (FR-030)', () => {
   it('reports field errors for bad amounts and notes over 2000 characters', () => {
     const r = outcomePayload('won', { l1: 'abc', ours: '1', notes: 'x'.repeat(2001) });
     expect(r).toEqual({ ok: false, errors: { l1: expect.any(String), notes: 'Keep notes to 2000 characters or fewer' } });
+  });
+});
+
+describe('adjacentStage (keyboard drag, FR-022)', () => {
+  it('moves exactly one visible column per press, from the card\'s current column', () => {
+    expect(adjacentStage(PIPELINE_STAGES, 'identified', 1)).toBe('analysing');
+    expect(adjacentStage(PIPELINE_STAGES, adjacentStage(PIPELINE_STAGES, 'identified', 1), 1)).toBe('go'); // two presses → two columns
+    expect(adjacentStage(PIPELINE_STAGES, 'go', -1)).toBe('analysing');
+  });
+  it('stops at the edges and ignores hidden columns', () => {
+    expect(adjacentStage(PIPELINE_STAGES, 'identified', -1)).toBeNull();
+    expect(adjacentStage(PIPELINE_STAGES, 'lost', 1)).toBeNull();
+    expect(adjacentStage([...PIPELINE_STAGES, 'dropped'], 'lost', 1)).toBe('dropped');
+    expect(adjacentStage(PIPELINE_STAGES, 'dropped', 1)).toBeNull();
+    expect(adjacentStage(PIPELINE_STAGES, null, 1)).toBeNull();
+  });
+});
+
+describe('emptyKind (FR-027, US2-15)', () => {
+  it('only says "pipeline empty" without filters', () => {
+    expect(emptyKind(0, false)).toBe('pipeline');
+    expect(emptyKind(0, true)).toBe('filtered');
+    expect(emptyKind(3, true)).toBeNull();
   });
 });

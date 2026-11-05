@@ -9,7 +9,7 @@ import { forwardRef, memo, useEffect, useMemo, useRef, useState, type CSSPropert
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, useDroppable, useSensor, useSensors,
-  type DragEndEvent, type DragOverEvent, type DragStartEvent, type UniqueIdentifier,
+  type DragEndEvent, type DragOverEvent, type DragStartEvent, type KeyboardCoordinateGetter, type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { AlertTriangle, Archive, Columns3, GripVertical, KanbanSquare, MessageSquare, Search, Table2, Trophy, XCircle } from 'lucide-react';
@@ -26,7 +26,7 @@ import { STAGE_LABEL, type Stage } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useMoveCard, usePipeline } from './api';
 import { MoveToMenu } from './MoveToMenu';
-import { DROP_CONFIRM_BODY, DROP_CONFIRM_TITLE, SEARCH_DEBOUNCE_MS, VIEW_ONLY_NOTE } from './moves';
+import { DROP_CONFIRM_BODY, DROP_CONFIRM_TITLE, SEARCH_DEBOUNCE_MS, VIEW_ONLY_NOTE, adjacentStage, emptyKind } from './moves';
 import { OutcomeDialog, type OutcomeTarget } from './OutcomeDialog';
 import { matchesClosing, positionAt, type ClosingFilter } from './position';
 
@@ -142,10 +142,14 @@ export default function PipelinePage() {
         <ErrorState error={query.error} onRetry={() => query.refetch()} retrying={query.isFetching} />
       ) : query.isLoading ? (
         <BoardSkeleton />
-      ) : all.length === 0 ? (
+      ) : emptyKind(all.length, filtering) === 'pipeline' ? (
         <EmptyState icon={KanbanSquare} title="Your pipeline is empty"
           body="Open a tender you like and choose “Start bid” — it lands here in Identified. From there, drag it through analysis, preparation and submission."
           action={<Button asChild><Link to="/tenders?matched=1">Browse matched tenders</Link></Button>} />
+      ) : filtering && filtered.length === 0 ? (
+        // The server already applied `q`, so "no items" here means the filters matched nothing (US2-15).
+        <EmptyState icon={Search} title="No bids match these filters"
+          body="Try another search term, a wider closing window or a different owner — or choose “Clear filters” above to see every bid." />
       ) : view === 'table' ? (
         <PipelineTable items={filtered} focusStage={focusStage} />
       ) : (
@@ -168,6 +172,8 @@ function KanbanBoard({ items, canDrag, focusStage, stages }: { items: WorkspaceC
   const [confirmDrop, setConfirmDrop] = useState<PendingMove | null>(null);
   const [outcomeFor, setOutcomeFor] = useState<OutcomeTarget | null>(null);
   const snapshot = useRef<{ board: Board; stage: StageName; index: number } | null>(null);
+  const live = useRef({ board, stages });
+  live.current = { board, stages };
   const scroller = useRef<HTMLDivElement>(null);
 
   // Server data wins whenever we're not mid-drag.
@@ -182,7 +188,7 @@ function KanbanBoard({ items, canDrag, focusStage, stages }: { items: WorkspaceC
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: columnKeyboardCoordinates(live) }),
   );
 
   const stageOf = (id: UniqueIdentifier, b = board): StageName | null => {
@@ -306,6 +312,28 @@ function KanbanBoard({ items, canDrag, focusStage, stages }: { items: WorkspaceC
       <OutcomeDialog target={outcomeFor} onClose={() => setOutcomeFor(null)} />
     </DndContext>
   );
+}
+
+/**
+ * Keyboard drag (FR-022, US2-13): ←/→ move exactly one visible column per press, starting from the column the card
+ * is in now (its own column is also a droppable, which made the first press a no-op with dnd-kit's default getter).
+ * The target is the column's droppable rect; when it is off-screen the KeyboardSensor scrolls the board to it.
+ * ↑/↓ keep the sortable behaviour (reorder within a column).
+ */
+function columnKeyboardCoordinates(live: { current: { board: Board; stages: StageName[] } }): KeyboardCoordinateGetter {
+  return (event, args) => {
+    if (event.code !== 'ArrowRight' && event.code !== 'ArrowLeft') return sortableKeyboardCoordinates(event, args);
+    event.preventDefault();
+    const { board, stages } = live.current;
+    const current = stages.find((s) => board[s].some((c) => c.id === args.active)) ?? null;
+    const target = adjacentStage(stages, current, event.code === 'ArrowRight' ? 1 : -1);
+    if (!target) return undefined;
+    const rect = args.context.droppableRects.get(target);
+    if (!rect) return undefined;
+    // Also bring the column into view for sighted keyboard users (the sensor scrolls the board itself too).
+    document.querySelector<HTMLElement>(`[data-stage="${target}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    return { x: rect.left, y: rect.top };
+  };
 }
 
 const titleOf = (b: Board, id: UniqueIdentifier) => STAGES.flatMap((s) => b[s]).find((c) => c.id === id)?.tender.title ?? 'bid';
