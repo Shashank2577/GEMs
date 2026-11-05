@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { AlertOctagon, Bot, ChevronDown, Cpu, ExternalLink, Gavel, History, Info, Quote, RefreshCw, ShieldAlert, UserRoundPen } from 'lucide-react';
+import { AlertOctagon, Bot, ChevronDown, Cpu, ExternalLink, Gavel, History, Info, Loader2, Quote, RefreshCw, ShieldAlert, TriangleAlert, UserRoundPen } from 'lucide-react';
 import type { AnalysisDto, FactorStatus, Requirement, ScoreFactor } from '@tp/core/contracts/analyse';
 import {
   Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -12,7 +12,7 @@ import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useOverride } from './api';
 import { ChecklistCard } from './ChecklistCard';
-import { FACTOR_HELP, FACTOR_ICON, STATUS_META } from './labels';
+import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, analysisWarningText, failedAttemptCopy, friendlyAnalysisError, isAnalysisRunning, truncatedDocuments } from './labels';
 
 const eff = (f: ScoreFactor): FactorStatus => f.overridden?.status ?? f.status;
 
@@ -28,16 +28,44 @@ export function PageChip({ tenderId, req, className }: { tenderId: string; req?:
   const label = `p. ${req.source.page}`;
   const cls = cn('inline-flex h-5 items-center gap-1 rounded-md border bg-card px-1.5 text-2xs font-medium text-muted-foreground tabular', className);
   return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className={cn(cls, 'hover:border-primary/40 hover:text-primary focus-ring')} aria-label={`Open ${req.source.fileName ?? 'document'} at page ${req.source.page}`}>
+    <a href={href} target="_blank" rel="noreferrer" className={cn(cls, 'hover:border-primary/40 hover:text-primary focus-ring')} aria-label={`${label}: Open ${req.source.fileName ?? 'document'} at page ${req.source.page}`}>
       {label}<ExternalLink className="size-2.5" aria-hidden />
     </a>
   ) : <span className={cls}>{label}</span>;
 }
 
+/** Another member's analysis is running (FR-029): the page polls every 3 s until it finishes. */
+export function AnalysisInProgress({ hasResult }: { hasResult: boolean }) {
+  return (
+    <div role="status" className="flex items-center gap-3 rounded-xl border border-primary/25 bg-primary-soft/50 p-4 text-sm">
+      <Loader2 className="size-5 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden />
+      <div className="min-w-0">
+        <div className="font-semibold">Analysis in progress…</div>
+        <div className="text-muted-foreground">
+          {hasResult ? 'Someone on your team is re-analysing this tender. The previous result is shown until it finishes.' : 'Someone on your team is analysing this tender. The result will appear here when it finishes.'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** US3 #15: the newest attempt failed; the previous result stays visible below (FR-029). */
+function FailedAttemptWarning({ copy, canAnalyse, onReanalyse, reanalysing, disabled }: { copy: string; canAnalyse: boolean; onReanalyse: () => void; reanalysing: boolean; disabled: boolean }) {
+  return (
+    <div role="status" className="flex flex-col gap-3 rounded-xl border border-danger/30 bg-danger-soft/50 p-4 sm:flex-row sm:items-center">
+      <TriangleAlert className="size-5 shrink-0 text-danger" aria-hidden />
+      <p className="min-w-0 flex-1 text-sm">{copy}</p>
+      {canAnalyse && <Button size="sm" variant="secondary" onClick={onReanalyse} loading={reanalysing} disabled={disabled}>{!reanalysing && <RefreshCw />} Try again</Button>}
+    </div>
+  );
+}
+
 export function AnalysisPanel({
-  analysis, tenderId, onReanalyse, reanalysing, canAnalyse, hasWorkspace,
+  analysis, tenderId, onReanalyse, reanalysing, canAnalyse, hasWorkspace, analyseDisabled = false,
 }: {
   analysis: AnalysisDto; tenderId: string; onReanalyse: () => void; reanalysing: boolean; canAnalyse: boolean; hasWorkspace: boolean;
+  /** Another analysis is running (lastAttempt or a 409 analysis_running): keep Analyse buttons disabled (FR-028). */
+  analyseDisabled?: boolean;
 }) {
   const [overrideFor, setOverrideFor] = useState<ScoreFactor | null>(null);
   const canOverride = useCan('bid_manager');
@@ -47,13 +75,20 @@ export function AnalysisPanel({
     return m;
   }, [analysis.requirements]);
 
-  if (analysis.status === 'failed') {
+  const running = isAnalysisRunning(analysis);
+  const failedCopy = failedAttemptCopy(analysis);
+  const truncated = truncatedDocuments(analysis.documents);
+
+  const state = analysisPanelState(analysis);
+  if (state.kind === 'in_progress') return <AnalysisInProgress hasResult={false} />;
+
+  if (state.kind === 'failed') {
     return (
       <Card className="border-danger/30">
         <CardContent className="flex flex-col items-start gap-3 p-6">
           <div className="flex items-center gap-2 font-semibold text-danger"><AlertOctagon className="size-5" /> The last analysis failed</div>
-          <p className="text-sm text-muted-foreground">{analysis.error ?? 'Something went wrong while reading the documents.'} Try again, or upload a cleaner PDF in the Documents tab.</p>
-          {canAnalyse && <Button size="sm" onClick={onReanalyse} loading={reanalysing}><RefreshCw /> Try again</Button>}
+          <p className="text-sm text-muted-foreground">Reason: {friendlyAnalysisError(state.error)}. Try again, or upload a cleaner PDF in the Documents tab.</p>
+          {canAnalyse && <Button size="sm" onClick={onReanalyse} loading={reanalysing} disabled={analyseDisabled}><RefreshCw /> Try again</Button>}
         </CardContent>
       </Card>
     );
@@ -68,7 +103,15 @@ export function AnalysisPanel({
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="grid min-w-0 content-start gap-6">
-        <ScoreCard analysis={analysis} onReanalyse={onReanalyse} reanalysing={reanalysing} canAnalyse={canAnalyse} />
+        {running && <AnalysisInProgress hasResult />}
+        {!running && failedCopy && <FailedAttemptWarning copy={failedCopy} canAnalyse={canAnalyse} onReanalyse={onReanalyse} reanalysing={reanalysing} disabled={analyseDisabled} />}
+        {truncated.length > 0 && (
+          <div data-testid="truncated-note" className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft/50 p-4 text-sm">
+            <Info className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <p>{truncated.map((d) => `${d.fileName}: only the first ${d.analysed} of ${d.total} pages were read.`).join(' ')} Requirements later in the file were not analysed; upload the key sections as a separate PDF.</p>
+          </div>
+        )}
+        <ScoreCard analysis={analysis} onReanalyse={onReanalyse} reanalysing={reanalysing} canAnalyse={canAnalyse} disabled={analyseDisabled} />
 
         <Card>
           <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -104,7 +147,7 @@ export function AnalysisPanel({
   );
 }
 
-function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse }: { analysis: AnalysisDto; onReanalyse: () => void; reanalysing: boolean; canAnalyse: boolean }) {
+function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse, disabled }: { analysis: AnalysisDto; onReanalyse: () => void; reanalysing: boolean; canAnalyse: boolean; disabled: boolean }) {
   const reduce = useReducedMotion();
   const verdict = analysis.verdict ?? 'review';
   const conf = Math.round((analysis.confidence ?? 0) * 100);
@@ -136,6 +179,7 @@ function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse }: { analysi
             {analysis.stale && <Badge tone="warning"><History /> Outdated</Badge>}
           </div>
           <p className="mt-3 text-[15px] leading-relaxed text-foreground/90">{analysis.summary}</p>
+          <AnalysisWarnings analysis={analysis} />
           {blockers.length > 0 && (
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-soft/60 px-3 py-2 text-sm text-danger">
               <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -159,12 +203,29 @@ function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse }: { analysi
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground sm:flex-col sm:items-end">
               <span>Analysed {relativeTime(analysis.updatedAt)}</span>
-              {canAnalyse && <Button size="xs" variant="ghost" onClick={onReanalyse} loading={reanalysing}>{!reanalysing && <RefreshCw />} Re-analyse</Button>}
+              {canAnalyse && <Button size="xs" variant="ghost" onClick={onReanalyse} loading={reanalysing} disabled={disabled}>{!reanalysing && <RefreshCw />} Re-analyse</Button>}
             </div>
           </div>
         </div>
       </div>
     </Card>
+  );
+}
+
+/** Caveats of this analysis: AI budget/quota (008/FR-031, FR-037) and documents that could not be read. */
+function AnalysisWarnings({ analysis }: { analysis: AnalysisDto }) {
+  const lines = [...(analysis.warnings ?? []).map(analysisWarningText), ...(analysis.notes ?? [])];
+  if (!lines.length) return null;
+  return (
+    <ul role="status" aria-label="Analysis warnings" data-testid="analysis-warnings"
+      className="mt-3 grid gap-1.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
+      {lines.map((line) => (
+        <li key={line} className="flex items-start gap-2">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
+          <span>{line}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -215,7 +276,7 @@ function FactorRow({
           )}
           {quote && (
             <div className="mt-2">
-              <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 rounded text-xs font-medium text-primary hover:underline focus-ring">
+              <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 rounded text-xs font-medium text-primary-ink hover:underline focus-ring">
                 <Quote className="size-3" aria-hidden /> {open ? 'Hide evidence' : 'Show evidence'}
                 <ChevronDown className={cn('size-3 transition-transform', open && 'rotate-180')} aria-hidden />
               </button>

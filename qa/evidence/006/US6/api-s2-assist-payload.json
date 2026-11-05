@@ -1,0 +1,277 @@
+[
+  {
+    "label": "GET /api/assist/{id}",
+    "request": "GET /api/assist/8c9a5431-7ec8-459e-adb4-b20a4e0768c9",
+    "status": 200,
+    "response": {
+      "workspaceId": "8c9a5431-7ec8-459e-adb4-b20a4e0768c9",
+      "tender": {
+        "bidNumber": "GEM/2026/B/700001",
+        "title": "Supply of Laptops batch 1"
+      },
+      "fields": [
+        {
+          "key": "make",
+          "label": "Make",
+          "group": "product",
+          "help": "Manufacturer of the offered product.",
+          "input": "text",
+          "selectorHints": [
+            "\\bmake\\b",
+            "\\bmanufacturer\\b"
+          ],
+          "value": "Dell",
+          "source": "profile"
+        },
+        {
+          "key": "brand",
+          "label": "Brand",
+          "group": "product",
+          "help": "Brand name as on the OEM authorisation.",
+          "input": "text",
+          "selectorHints": [
+            "\\bbrand\\b"
+          ],
+          "value": "Dell",
+          "source": "profile"
+        },
+        {
+          "key": "model",
+          "label": "Model",
+          "group": "product",
+          "help": "Model number / name of the offered product.",
+          "input": "text",
+          "selectorHints": [
+            "\\bmodel\\b"
+          ],
+          "value": "",
+          "source": "empty"
+        },
+        {
+          "key": "oem_name",
+          "label": "OEM name",
+          "group": "product",
+          "help": "Original Equipment Manufacturer you are authorised by.",
+          "input": "text",
+          "selectorHints": [
+            "\\boem\\b",
+            "original equipment manufacturer"
+          ],
+          "value": "Dell",
+          "source": "profile"
+        },
+        {
+          "key": "product_description",
+          "label": "Product description",
+          "group": "product",
+          "help": "Short description of the offered product or service.",
+          "input": "textarea",
+          "selectorHints": [
+            "\\bdescription\\b",
+            "product details",
+            "item details"
+          ],
+          "value": "Laptop i5 16GB",
+          "source": "tender"
+        },
+        {
+          "key": "hsn_code",
+          "label": "HSN / SAC code",
+          "group": "product",
+          "help": "HSN (goods) or SAC (services) code.",
+          "input": "text",
+          "selectorHints": [
+            "\\bhsn\\b",
+            "\\bsac\\b"
+          ],
+          "value": "",
+          "source": "empty"
+        },
+        {
+          "key": "offered_quantity",
+          "label": "Offered quantity",
+          "group": "offer",
+          "help": "Quantity you are offering against the bid.",
+          "input": "number",
+          "selectorHints": [
+            "\\boffered quantity\\b",
+            "\\bquantity offered\\b",
+            "\\bqty\\b",
+            "\\bquantity\\b"
+          ],
+          "value": "40",
+          "source": "tender"
+        },
+        {
+          "key": "delivery_period_days",
+          "label": "Delivery period (days)",
+          "group": "offer",
+          "help": "Delivery period you commit to, in days.",
+          "input": "number",
+          "selectorHints": [
+            "\\bdelivery (period|days|time|schedule)\\b",
+            "\\bdelivery\\b"
+          ],
+          "value": "30",
+          "source": "analysis"
+        },
+        {
+          "key": "warranty_months",
+          "label": "Warranty (months)",
+          "group": "offer",
+          "help": "Warranty period offered, in months.",
+          "input": "number",
+          "selectorHints": [
+            "\\bwarranty\\b",
+            "\\bguarantee period\\b"
+          ],
+          "value": "",
+          "source": "empty"
+        },
+        {
+          "key": "country_of_origin",
+          "label": "Country of origin",
+          "group": "compliance",
+          "help": "Country where the product is manufactured.",
+          "input": "select",
+          "selectorHints": [
+            "country of origin",
+            "\\borigin\\b"
+          ],
+          "value": "India",
+          "source": "profile"
+        },
+        {
+          "key": "local_content_pct",
+          "label": "Local content (%)",
+          "group": "compliance",
+          "help": "Make in India local content percentage (Class-I ≥ 50%, Class-II ≥ 20%).",
+          "input": "number",
+          "selectorHints": [
+            "local content",
+            "\\bmii\\b",
+            "make in india"
+          ],
+          "value": "62",
+          "source": "profile"
+        },
+        {
+          "key": "specs_compliance",
+          "label": "Specification compliance",
+          "group": "compliance",
+          "help": "Whether the offer complies with the bid specifications.",
+          "input": "select",
+          "selectorHints": [
+            "\\bcompl(y|iance|ied)\\b",
+            "specification",
+            "\\bspecs?\\b"
+          ],
+          "value": "Yes",
+          "source": "profile"
+        },
+        {
+          "key": "mse_claim",
+          "label": "MSE preference claimed",
+          "group": "declaration",
+          "help": "Claim MSE purchase preference / exemptions (needs a valid Udyam certificate).",
+          "input": "select",
+          "selectorHints": [
+            "\\bmse\\b",
+            "\\bmsme\\b",
+            "micro (and|&) small",
+            "\\budyam\\b"
+          ],
+          "value": "Yes",
+          "source": "profile"
+        },
+        {
+          "key": "startup_claim",
+          "label": "Startup exemption claimed",
+          "group": "declaration",
+          "help": "Claim DPIIT Startup exemptions.",
+          "input": "select",
+          "selectorHints": [
+            "\\bstart ?up\\b",
+            "\\bdpiit\\b"
+          ],
+          "value": "No",
+          "source": "profile"
+        }
+      ],
+      "documents": [
+        {
+          "kind": "vault",
+          "title": "GST registration certificate",
+          "fileName": "gst.pdf",
+          "url": "http://localhost:8788/api/vault/9a820348-49ed-45ca-b7ae-3f679083b335/download",
+          "pages": 1
+        },
+        {
+          "kind": "vault",
+          "title": "PAN card of the firm",
+          "fileName": "pan.pdf",
+          "url": "http://localhost:8788/api/vault/c069fd53-e6e4-432b-af1c-731c09bac836/download",
+          "pages": 1
+        },
+        {
+          "kind": "vault",
+          "title": "Audited balance sheets — last 3 financial years",
+          "fileName": "bs-2024.pdf",
+          "url": "http://localhost:8788/api/vault/39d2ec60-caa1-4623-80da-b38a3c24c50e/download",
+          "pages": 3
+        },
+        {
+          "kind": "vault",
+          "title": "OEM authorisation certificate (MAF) for this bid",
+          "fileName": "maf.pdf",
+          "url": "http://localhost:8788/api/vault/b4929d8a-2ed4-4eed-85ea-982f63c64cfb/download",
+          "pages": 1
+        },
+        {
+          "kind": "annexure",
+          "title": "Undertaking regarding Non-Blacklisting / Non-Debarment",
+          "fileName": "non_blacklisting.pdf",
+          "url": "http://localhost:8788/api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/annexures/non_blacklisting.pdf?download=1",
+          "pages": 1
+        },
+        {
+          "kind": "annexure",
+          "title": "Self-Certificate of Local Content (Make in India)",
+          "fileName": "mii_self_cert.pdf",
+          "url": "http://localhost:8788/api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/annexures/mii_self_cert.pdf?download=1",
+          "pages": 1
+        }
+      ],
+      "humanSteps": [
+        {
+          "key": "price",
+          "title": "Enter your price on GeM",
+          "detail": "Type the unit price / total value yourself in the GeM price schedule. TenderPilot never sees or fills prices."
+        },
+        {
+          "key": "upload",
+          "title": "Upload the documents",
+          "detail": "Attach the packet and documents listed below in the GeM upload slots and check each preview."
+        },
+        {
+          "key": "auth",
+          "title": "Authenticate with OTP / DSC / e-Sign",
+          "detail": "Complete Aadhaar OTP, e-Sign or your Digital Signature Certificate on GeM. Only you can do this."
+        },
+        {
+          "key": "submit",
+          "title": "Click Final Submit",
+          "detail": "Review the bid summary on GeM and press Final Submit yourself, then record it here."
+        }
+      ],
+      "noFinancials": true,
+      "stage": "go",
+      "readiness": {
+        "percent": 83,
+        "blockers": 1,
+        "analysed": true
+      },
+      "workspaceUrl": "http://localhost:8788/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9"
+    }
+  }
+]

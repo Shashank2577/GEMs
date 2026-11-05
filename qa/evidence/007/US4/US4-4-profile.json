@@ -1,0 +1,91 @@
+{
+  "legalName": "Aarav Technologies Pvt Ltd",
+  "tradeName": "Aarav Tech",
+  "gstin": "27AAJCA4721K1ZK",
+  "pan": "AAJCA4721K",
+  "cin": "U72900PN2016PTC165432",
+  "udyamNumber": "UDYAM-MH-26-0012345",
+  "mseCategory": "micro",
+  "mseSocialCategory": "general",
+  "isStartup": false,
+  "dpiitNumber": null,
+  "miiClass": "class_1",
+  "localContentPct": 62,
+  "incorporationDate": "2016-03-14",
+  "address": "Office 402, Pride Purple Square, Baner Road, Baner, Pune",
+  "state": "Maharashtra",
+  "pincode": "411045",
+  "contactName": "Rohan Deshmukh",
+  "contactEmail": "bids@aaravtech.in",
+  "contactPhone": "+919822012345",
+  "signatoryName": "Ananya Kulkarni",
+  "signatoryDesignation": "Director",
+  "financials": [
+    {
+      "fy": "2022-23",
+      "audited": true,
+      "netWorth": 6490000,
+      "turnover": 18230000
+    },
+    {
+      "fy": "2023-24",
+      "audited": true,
+      "netWorth": 8640000,
+      "turnover": 24610000
+    },
+    {
+      "fy": "2024-25",
+      "audited": true,
+      "netWorth": 11260000,
+      "turnover": 31840000
+    }
+  ],
+  "categories": [
+    "Desktop Computers",
+    "Laptop - Notebook",
+    "CCTV Cameras",
+    "Network Video Recorder",
+    "Network Switches",
+    "Wireless Access Points",
+    "UPS",
+    "Multifunction Machines"
+  ],
+  "hsnCodes": [
+    "8471",
+    "8525",
+    "8517",
+    "8504",
+    "8443"
+  ],
+  "operatingStates": [
+    "Maharashtra",
+    "Goa",
+    "Gujarat",
+    "Madhya Pradesh",
+    "Karnataka"
+  ],
+  "oemAuthorizations": [
+    {
+      "oem": "CP PLUS",
+      "products": "IP cameras, NVRs",
+      "validTill": "2027-04-19",
+      "documentId": "5145e24c-99f3-4872-9438-f715481d4cc8"
+    },
+    {
+      "oem": "Dell Technologies",
+      "products": "Desktops, notebooks, PowerEdge servers",
+      "validTill": "2026-10-31",
+      "documentId": "73bf90f1-7db6-4848-a0fd-c931d14a4b6b"
+    },
+    {
+      "oem": "D-Link India",
+      "products": "Managed switches, Wi-Fi access points"
+    }
+  ],
+  "certifications": [
+    "ISO 9001:2015",
+    "MII Class-I self-certificate"
+  ],
+  "maxEmdCapacity": 1500000,
+  "updatedAt": "2026-11-05T06:00:23.189Z"
+}

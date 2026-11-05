@@ -23,6 +23,8 @@ export const TENDER_DOC_KIND_LABELS: Record<TenderDocKind, string> = {
 
 /** Max upload size for tender documents. */
 export const MAX_TENDER_DOC_BYTES = 25 * 1024 * 1024;
+/** Pages read from one uploaded/fetched PDF (NFR-005): keeps text extraction inside the 128 MB Worker budget. */
+export const MAX_EXTRACT_PAGES = 150;
 
 /** POST /analyses/:id/override */
 export const overrideFactorInputSchema = z.object({
@@ -46,8 +48,18 @@ export interface ScoringWeights { weights: Record<FactorKey, number>; defaults: 
 export const STALE_REASONS = ['corrigendum', 'document_added', 'document_removed', 'profile_changed', 'vault_changed', 'weights_changed'] as const;
 export type StaleReason = (typeof STALE_REASONS)[number];
 
+/**
+ * Stale reasons a Re-score fixes (FR-037): only the company side changed, the stored requirements are
+ * still right. Any other reason (or a stale flag without a reason) needs a full re-analysis.
+ */
+export const RESCORABLE_STALE_REASONS = ['profile_changed', 'vault_changed', 'weights_changed'] as const satisfies readonly StaleReason[];
+export const isRescorableReason = (reason: StaleReason | null | undefined): boolean =>
+  !!reason && (RESCORABLE_STALE_REASONS as readonly string[]).includes(reason);
+
 /** Non-blocking upload warnings (FR-010). */
-export interface TenderDocumentWarning { code: 'bid_number_mismatch'; found: string }
+export type TenderDocumentWarning =
+  | { code: 'bid_number_mismatch'; found: string }
+  | { code: 'pages_truncated'; analysed: number; total: number };
 
 /** Tender document (GeM-fetched when orgId is null, else uploaded by the org). Text is omitted. */
 export interface TenderDocumentDto {
@@ -57,7 +69,10 @@ export interface TenderDocumentDto {
   kind: TenderDocKind;
   fileName: string;
   sizeBytes: number;
+  /** Pages read (capped at 150, 004/NFR-005). */
   pageCount: number | null;
+  /** The PDF's real page count; > pageCount means the document was truncated. Null for rows that predate the column. */
+  totalPages: number | null;
   sourceUrl: string | null;
   hasText: boolean;
   source: 'gem' | 'upload';
@@ -70,6 +85,15 @@ export interface TenderDocumentDto {
 
 /** POST /tenders/:id/documents response (201). */
 export interface UploadTenderDocumentResponse extends TenderDocumentDto { warnings: TenderDocumentWarning[] }
+
+/**
+ * Analysis caveats (008/FR-031, FR-037). The web renders them:
+ * `llm_budget_exhausted` → "AI review covered {covered} of {total} documents; the rest were checked by rules only."
+ * `llm_quota_reached` → "Monthly AI review limit reached — this analysis used rules only."
+ */
+export type AnalysisWarning =
+  | { code: 'llm_budget_exhausted'; covered: number; total: number }
+  | { code: 'llm_quota_reached' };
 
 export type AnalysisStatus = 'pending' | 'running' | 'done' | 'failed';
 export type Verdict = 'go' | 'review' | 'no_go';
@@ -93,9 +117,18 @@ export interface AnalysisDto {
   staleAt: string | null;
   /** Analysis notes, e.g. pages not read by AI (FR-051). */
   notes: string[];
+  /** Machine-readable caveats (008/FR-031); empty when the analysis ran in full. */
+  warnings: AnalysisWarning[];
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
   /** Documents the analysis read. */
-  documents?: { id: string; fileName: string; kind: TenderDocKind; pageCount: number | null }[];
+  documents?: { id: string; fileName: string; kind: TenderDocKind; pageCount: number | null; totalPages?: number | null }[];
+  /**
+   * GET …/analysis only (FR-029): the newest attempt when it is still running or failed. The DTO
+   * itself is then the latest done analysis (or that attempt when nothing has completed yet).
+   */
+  lastAttempt?: AnalysisLastAttempt;
 }
+
+export interface AnalysisLastAttempt { status: 'running' | 'failed'; error: string | null; at: string }

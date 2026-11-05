@@ -1,0 +1,8 @@
+{
+  "Add company basics": "/profile",
+  "Tell us what you sell": "/profile",
+  "Create a watchlist": "/watchlists?new=1",
+  "Upload key documents": "/vault?upload=1",
+  "Check eligibility on a tender": "/tenders?matched=1",
+  "Invite a teammate": "/settings/team"
+}

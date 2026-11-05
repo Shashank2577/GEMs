@@ -1,0 +1,49 @@
+[
+  {
+    "method": "PUT",
+    "url": "/api/profile",
+    "body": {
+      "legalName": "Aarav Technologies Pvt Ltd",
+      "gstin": "27AAJCA4721K1ZK",
+      "pan": "AAJCA4721K",
+      "state": "Maharashtra",
+      "mseCategory": null,
+      "isStartup": false
+    }
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "company": true
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "url": "/api/profile",
+    "body": {
+      "categories": [
+        "Desktop computers",
+        "CCTV & surveillance",
+        "Biometric devices"
+      ],
+      "hsnCodes": [
+        "8471"
+      ],
+      "operatingStates": [
+        "Maharashtra"
+      ]
+    }
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "categories": true
+      }
+    }
+  }
+]

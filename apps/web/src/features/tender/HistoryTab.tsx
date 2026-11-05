@@ -21,7 +21,7 @@ const EVENT_META: Record<TenderEventDto['kind'], { label: string; icon: LucideIc
 };
 
 function activityIcon(action: string): LucideIcon {
-  if (action === 'tender.analysed') return Gauge;
+  if (action === 'tender.analysed' || action === 'analysis.rescored') return Gauge;
   if (action === 'analysis.factor_overridden') return UserRoundPen;
   if (action.startsWith('tender.document')) return FilePlus2;
   return History;
@@ -91,6 +91,7 @@ function ActivityEntry({ a }: { a: ActivityItem }) {
   const meta = a.meta as Record<string, unknown>;
   let extra: string | null = null;
   if (a.action === 'tender.analysed' && meta.score != null) extra = `Score ${meta.score}/100 · ${meta.verdict === 'go' ? 'Go' : meta.verdict === 'review' ? 'Review' : 'No-Go'}${meta.method === 'rules+llm' ? ' · AI-assisted' : ''}`;
+  if (a.action === 'analysis.rescored' && meta.score != null) extra = `Score ${meta.from != null && meta.from !== meta.score ? `${meta.from} → ` : ''}${meta.score}/100 · ${meta.verdict === 'go' ? 'Go' : meta.verdict === 'review' ? 'Review' : 'No-Go'}`;
   if (a.action === 'analysis.factor_overridden') extra = `${String(meta.label ?? meta.factorKey)}: ${String(meta.from)} → ${String(meta.to)} — “${String(meta.reason ?? '')}”`;
   if (a.action.startsWith('tender.document') && meta.fileName) extra = `${String(meta.fileName)}${meta.pages ? ` · ${meta.pages} pages` : ''}`;
   return (

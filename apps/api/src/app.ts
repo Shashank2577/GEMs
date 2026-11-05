@@ -5,6 +5,7 @@
  */
 import { Hono } from 'hono';
 import type { AppDeps } from './deps';
+import { readOnlyTokenGuard } from './middleware/auth';
 import { bodyLimits } from './middleware/body-limit';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { ipLimit } from './middleware/rate-limit';
@@ -24,6 +25,7 @@ import { profileRoutes } from './routes/profile';
 import { sessionsRoutes } from './routes/sessions';
 import { tendersRoutes } from './routes/tenders';
 import { vaultRoutes } from './routes/vault';
+import { viewsRoutes } from './routes/views';
 import { watchlistsRoutes } from './routes/watchlists';
 import { workspacesRoutes } from './routes/workspaces';
 import type { AppEnv } from './types';
@@ -39,6 +41,7 @@ export const routers = {
   org: orgRoutes,
   tenders: tendersRoutes,
   watchlists: watchlistsRoutes,
+  views: viewsRoutes,
   ingestion: ingestionRoutes,
   notifications: notificationsRoutes,
   analysis: analysisRoutes,
@@ -65,6 +68,8 @@ export function createApp(deps: AppDeps) {
   api.use('*', bodyLimits);
   // 008/FR-019 `api.ip` for requests without credentials (`api.user` is applied once authenticated, middleware/auth.ts).
   api.use('*', ipLimit);
+  // 006/FR-074: read-only API tokens may only GET (uses the credentials ipLimit resolved).
+  api.use('*', readOnlyTokenGuard);
 
   for (const r of Object.values(routers)) api.route('/', r);
 

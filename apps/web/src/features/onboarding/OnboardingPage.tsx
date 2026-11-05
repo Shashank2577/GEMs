@@ -17,7 +17,7 @@ import type { DocType } from '@tp/core/vault/status';
 import { Logo } from '@/components/layout/Logo';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Badge, Button, Field, Input, Select, Stepper, Switch, toast } from '@/components/ui';
-import { errorMessage } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatINRCompact, formatNumberIN, pluralize } from '@/lib/format';
 import { useDocumentTitle } from '@/lib/hooks';
@@ -27,44 +27,8 @@ import { useProfile, useSaveProfile } from '@/features/profile/api';
 import { useUpdateOrg } from '@/features/settings/api';
 import { useCreateWatchlist, useWatchlistPreview } from '@/features/watchlists/api';
 import { ChipInput, MultiSelect } from '@/features/watchlists/ChipInput';
-import { useUploadVault } from '@/features/vault/api';
-
-// Popular GeM categories with the keywords that find them in bid titles.
-export const POPULAR_CATEGORIES: { label: string; keywords: string[] }[] = [
-  { label: 'Desktop computers', keywords: ['desktop'] },
-  { label: 'Laptops & notebooks', keywords: ['laptop', 'notebook'] },
-  { label: 'CCTV & surveillance', keywords: ['cctv', 'surveillance', 'network video recorder'] },
-  { label: 'Networking (switches, Wi-Fi)', keywords: ['network switch', 'access point', 'router'] },
-  { label: 'UPS & power', keywords: ['ups', 'inverter'] },
-  { label: 'Printers & MFMs', keywords: ['printer', 'multifunction machine'] },
-  { label: 'Servers & storage', keywords: ['server', 'storage'] },
-  { label: 'Monitors & displays', keywords: ['monitor', 'interactive flat panel'] },
-  { label: 'Furniture', keywords: ['chair', 'table', 'almirah'] },
-  { label: 'Medical equipment', keywords: ['hospital bed', 'patient monitor', 'medical'] },
-  { label: 'Stationery & paper', keywords: ['paper', 'stationery'] },
-  { label: 'Manpower services', keywords: ['manpower', 'outsourcing'] },
-  { label: 'Housekeeping & cleaning', keywords: ['housekeeping', 'cleaning'] },
-  { label: 'Vehicle hiring', keywords: ['vehicle hiring', 'taxi'] },
-  { label: 'Solar & electricals', keywords: ['solar', 'led light'] },
-  { label: 'Security services', keywords: ['security manpower', 'security guard'] },
-];
-
-export function keywordsFor(categories: string[]): string[] {
-  const out = new Set<string>();
-  for (const c of categories) {
-    const known = POPULAR_CATEGORIES.find((p) => p.label === c);
-    (known ? known.keywords : [c.toLowerCase()]).forEach((k) => out.add(k));
-  }
-  return [...out].slice(0, 30);
-}
-
-const STEPS = [
-  { key: 'company', label: 'Company basics' },
-  { key: 'categories', label: 'What you sell' },
-  { key: 'watchlist', label: 'First watchlist' },
-  { key: 'documents', label: 'Key documents' },
-  { key: 'done', label: 'Done' },
-] as const;
+import { useUploadVault, useVault } from '@/features/vault/api';
+import { POPULAR_CATEGORIES, STEPS, initialStep, keywordsFor, watchlistSeed, watchlistStepReady } from './steps';
 
 type MseCat = 'micro' | 'small' | 'medium' | null;
 
@@ -76,11 +40,8 @@ export default function OnboardingPage() {
   const updateOrg = useUpdateOrg();
   const reduce = useReducedMotion();
   const state = me?.org.onboardingState ?? {};
-  const initial = useMemo(() => {
-    const i = STEPS.findIndex((s) => s.key !== 'done' && !state[s.key]);
-    return i < 0 ? STEPS.length - 1 : i;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initial = useMemo(() => initialStep(state), []);
   const [step, setStep] = useState(initial);
   const [dir, setDir] = useState(1);
 
@@ -95,7 +56,7 @@ export default function OnboardingPage() {
   const [hsn, setHsn] = useState<string[]>([]);
   const [states, setStates] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const [watchlistDone, setWatchlistDone] = useState(false);
+  const [watchlistDone, setWatchlistDone] = useState(() => !!me?.org.onboardingState?.watchlist);
   useEffect(() => {
     if (hydrated || !profile.data) return;
     const p = profile.data.profile;
@@ -112,7 +73,15 @@ export default function OnboardingPage() {
   }, [profile.data, hydrated, me?.org.name]);
 
   const go = (to: number) => { setDir(to > step ? 1 : -1); setStep(to); window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' }); };
-  const tick = (keys: Record<string, boolean>) => updateOrg.mutateAsync({ onboardingState: keys }).catch(() => undefined);
+  // FR-050: retry once after 1 s on network/5xx errors (never on 4xx: it would fail again), then tell the user without blocking navigation.
+  const tick = async (keys: Record<string, boolean>) => {
+    const toastFail = () => toast.error('Couldn’t save your progress — your data is saved, but setup may restart at this step');
+    try { await updateOrg.mutateAsync({ onboardingState: keys }); return; } catch (e) {
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) { toastFail(); return; }
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+    try { await updateOrg.mutateAsync({ onboardingState: keys }); } catch { toastFail(); }
+  };
 
   if (me && !can('bid_manager')) {
     return (
@@ -143,7 +112,11 @@ export default function OnboardingPage() {
             <CategoriesStep {...{ categories, setCategories, hsn, setHsn, states, setStates }} onBack={() => go(0)}
               onNext={async () => { await tick({ categories: true }); go(2); }} />
           )}
-          {step === 2 && (
+          {step === 2 && !watchlistStepReady({ hydrated, profileFailed: profile.isError }) && (
+            // FR-043/FR-046: WatchlistStep seeds its form once at mount, so wait for the profile values (a direct resume lands here).
+            <div className="flex justify-center py-24" role="status" aria-label="Loading your setup"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div>
+          )}
+          {step === 2 && watchlistStepReady({ hydrated, profileFailed: profile.isError }) && (
             <WatchlistStep categories={categories} states={states} hsn={hsn} onBack={() => go(1)} already={watchlistDone}
               onNext={async () => { setWatchlistDone(true); await tick({ watchlist: true }); go(3); }} />
           )}
@@ -372,8 +345,8 @@ function useDebounced<T>(v: T, ms = 400): T {
 
 function WatchlistStep({ categories, states, hsn, onBack, onNext, already }: { categories: string[]; states: string[]; hsn: string[]; onBack: () => void; onNext: () => Promise<void>; already: boolean }) {
   const create = useCreateWatchlist();
-  const [name, setName] = useState(() => (categories.length ? `${categories.slice(0, 2).join(' & ')}${states.length === 1 ? ` – ${states[0]}` : ''}` : 'My first watchlist').slice(0, 80));
-  const [keywords, setKeywords] = useState(() => keywordsFor(categories));
+  const [name, setName] = useState(() => watchlistSeed(categories, states).name);
+  const [keywords, setKeywords] = useState(() => watchlistSeed(categories, states).keywords);
   const [wlStates, setWlStates] = useState(states);
   const criteria = useMemo(() => ({ keywords, states: wlStates, hsnCodes: [] as string[], categories: [] as string[] }), [keywords, wlStates]);
   const debounced = useDebounced(criteria);
@@ -437,7 +410,15 @@ const KEY_DOCS: { type: DocType; title: string; body: string }[] = [
 
 function DocumentsStep({ onBack, onNext }: { onBack: () => void; onNext: (uploaded: number) => Promise<void> }) {
   const upload = useUploadVault();
-  const [done, setDone] = useState<Partial<Record<DocType, string>>>({});
+  const [uploadedNow, setDone] = useState<Partial<Record<DocType, string>>>({});
+  // FR-051: documents already in the vault are pre-marked (showing their vault title) and counted.
+  const gst = useVault({ type: 'gst' }), pan = useVault({ type: 'pan' }), udyam = useVault({ type: 'udyam' });
+  const inVault: Partial<Record<DocType, string>> = {};
+  for (const [t, q] of [['gst', gst], ['pan', pan], ['udyam', udyam]] as const) {
+    const first = q.data?.items?.[0];
+    if (first) inVault[t] = first.title;
+  }
+  const done: Partial<Record<DocType, string>> = { ...inVault, ...uploadedNow };
   const [busy, setBusy] = useState<DocType | null>(null);
   const [moving, setMoving] = useState(false);
   const pick = async (type: DocType, title: string, file: File | undefined) => {

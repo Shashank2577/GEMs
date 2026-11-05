@@ -1,0 +1,103 @@
+[
+  {
+    "method": "PUT",
+    "url": "/api/profile",
+    "body": {
+      "legalName": "Aarav Technologies Pvt Ltd",
+      "gstin": "27AAJCA4721K1ZK",
+      "pan": "AAJCA4721K",
+      "state": "Maharashtra",
+      "mseCategory": null,
+      "isStartup": false
+    }
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "company": true
+      }
+    }
+  },
+  {
+    "method": "PUT",
+    "url": "/api/profile",
+    "body": {
+      "categories": [
+        "Desktop computers",
+        "CCTV & surveillance",
+        "Biometric devices"
+      ],
+      "hsnCodes": [],
+      "operatingStates": [
+        "Maharashtra"
+      ]
+    }
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "categories": true
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "url": "/api/watchlists",
+    "body": {
+      "name": "Desktop computers & CCTV & surveillance – Maharashtra",
+      "criteria": {
+        "keywords": [
+          "desktop",
+          "cctv",
+          "surveillance",
+          "network video recorder",
+          "biometric devices"
+        ],
+        "states": [
+          "Maharashtra"
+        ],
+        "hsnCodes": [],
+        "categories": [],
+        "excludeKeywords": [],
+        "ministries": [],
+        "bidTypes": []
+      }
+    }
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "watchlist": true
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "url": "/api/vault",
+    "body": null
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "documents": true
+      }
+    }
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "completed": true
+      }
+    }
+  }
+]

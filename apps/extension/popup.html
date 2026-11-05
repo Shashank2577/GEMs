@@ -19,7 +19,7 @@
 
     <section id="settings" class="card" hidden>
       <h2>Connect to TenderPilot</h2>
-      <p class="muted">Create a personal API token in TenderPilot → Settings → API tokens.</p>
+      <p class="muted">Create an “Extension (read-only)” API token in TenderPilot → Settings → API tokens.</p>
       <label>TenderPilot URL<input id="api-base" type="url" placeholder="https://app.tenderpilot.in" autocomplete="off" /></label>
       <label>API token<input id="token" type="password" placeholder="tp_…" autocomplete="off" /></label>
       <div class="row"><button id="save" class="btn primary">Save &amp; connect</button><span id="settings-status" class="muted" role="status"></span></div>
@@ -34,8 +34,10 @@
       <div class="actions">
         <button id="scan" class="btn">Highlight fields</button>
         <button id="fill" class="btn primary">Fill allowed fields</button>
+        <button id="clear" class="btn wide">Clear highlights</button>
       </div>
       <p id="page-status" class="status" role="status" aria-live="polite"></p>
+      <section id="fill-report" class="card report" aria-live="polite" hidden></section>
 
       <section class="card">
         <h3>Prepared values <span class="pill">non-financial only</span></h3>

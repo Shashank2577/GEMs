@@ -1,7 +1,8 @@
-import { lazy, Suspense, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate, Outlet, useLocation, type RouteObject } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { LogoMark } from '@/components/layout/Logo';
+import { dropLandingShell } from '@/features/landing/shell';
 import { RequireAuth, safeNext, useAuth } from '@/lib/auth';
 
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
@@ -39,7 +40,10 @@ const S = ({ children }: { children: ReactNode }) => <Suspense fallback={<Splash
 function PublicOnly() {
   const { me, isLoading } = useAuth();
   const loc = useLocation();
-  if (isLoading) return <Splash />;
+  useEffect(() => { if (me) dropLandingShell(); }, [me]);
+  // The landing page (and only it) renders while the session check is in flight: it is public marketing content and
+  // waiting on /api/auth/me would delay LCP (007/NFR-003). A signed-in visitor is redirected as soon as the check settles.
+  if (isLoading && loc.pathname !== '/') return <Splash />;
   if (me) return <Navigate to={safeNext(new URLSearchParams(loc.search).get('next'))} replace />;
   return <S><Outlet /></S>;
 }

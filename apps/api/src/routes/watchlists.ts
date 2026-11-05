@@ -20,7 +20,7 @@ import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
 import type { AppEnv } from '../types';
-import { decorateTenders } from './tenders';
+import { decorateTenders, tenderListColumns } from './tenders';
 
 export const watchlistsRoutes = new Hono<AppEnv>();
 
@@ -221,8 +221,8 @@ watchlistsRoutes.post('/watchlists/preview', requireAuth, rateLimit('watchlist.p
   const cands = await candidateTenders(deps, criteria, visibleTenderSource(c.var.org));
   cands.sort(byPreviewOrder);
   const top = cands.slice(0, 5);
-  // Full rows only for the sample.
-  const full = top.length ? await deps.db.select().from(tenders).where(inArray(tenders.id, top.map((x) => x.id))) : [];
+  // List projection only for the sample (008/FR-028: no `raw`).
+  const full = top.length ? await deps.db.select(tenderListColumns).from(tenders).where(inArray(tenders.id, top.map((x) => x.id))) : [];
   const fullBy = new Map(full.map((r) => [r.id, r]));
   const sample = await decorateTenders(deps, orgId(c), top.map((x) => fullBy.get(x.id)).filter((r): r is NonNullable<typeof r> => !!r));
   // Show the reasons this *draft* would produce.

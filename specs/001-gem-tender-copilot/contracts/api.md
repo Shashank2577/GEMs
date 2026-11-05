@@ -13,6 +13,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 ## Platform — owner: API foundation (`apps/api/src/routes/auth.ts`, `routes/org.ts`, `routes/sessions.ts`)
 
 "S" = session (cookie) only; an `Authorization: Bearer tp_…` token gets 403 `forbidden`.
+A read-only token (`scope:"read"`, 006/FR-074) may only `GET`/`HEAD`: every other method on every `/api` route gets 403 `read_only_token`.
 
 | Method | Path | Body / Query | Returns |
 |---|---|---|---|
@@ -32,7 +33,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | DELETE (S) | /me/sessions/:id | – | `{ok:true}`; 404 for another user's session |
 | GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` (PUT needs the full object, per org) | prefs |
 | POST (S) | /me/notifications/test | – (1/min per user → 429 `rate_limited` + `Retry-After`) | `{inApp:'sent',email,whatsapp,skipReasons?}`, email/whatsapp each `sent\|skipped\|failed\|off`; `skipReasons` (only when something was skipped) maps a channel to `not_configured\|no_phone` (002/FR-034) |
-| GET/POST/DELETE | /me/api-tokens[/:id] | POST (S) `{name, expiresInDays?: 30\|90\|365\|null}` (default 90, null = never) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens per org (002/FR-037) |
+| GET/POST/DELETE | /me/api-tokens[/:id] | POST (S) `{name, expiresInDays?: 30\|90\|365\|null, scope?: "full"\|"read"}` (default 90, null = never; scope default `full`, fixed at creation) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint,scope}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens per org (002/FR-037); `scope:"read"` = "Extension (read-only)" (006/FR-074) |
 | GET | /org | – | org |
 | GET | /org/members | – | `{items:[{userId,name,email,phone,role,joinedAt}], total, invitations:[{id,email,role,createdAt,expiresAt,invitedBy}]}` (pending = unexpired, unaccepted) |
 | POST (M) | /org/invitations | `{email,role}` | `{id,email,role,inviteUrl,expiresAt}`, 201; replaces a pending invite for the same email; 409 `conflict` if already a member; 403 `forbidden` when a non-owner invites an owner |
@@ -41,7 +42,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member; 409 `last_owner` when it would leave no owner (FR-021) |
 | DELETE (S) | /org/members/me | – | `{ok:true,nextOrgId}`: leave the active org (FR-027); 409 `last_owner` |
 | PATCH (M) | /org | `{name?, onboardingState?, scoringWeights?}` | org |
-| GET | /activity | `entityType?, entityId?, userId?, page?, pageSize?` | `{items:[{id,user:{id,name}\|null,action,entityType,entityId,meta,createdAt}], total}`; `user` is null when the actor no longer exists; newest first, paginated by `page`/`pageSize` |
+| GET | /activity | `entityType?` (one or a comma-separated list, max 12), `entityId?, userId?, page?, pageSize?` | `{items:[{id,user:{id,name}\|null,action,entityType,entityId,meta,createdAt,target?:{label,href}\|null}], total}` (`target` = the entity's display name and link, resolved server-side); `user` is null when the actor no longer exists; newest first, paginated by `page`/`pageSize`. Includes `auth.password_changed` (`POST /me/password`, meta `{otherSessionsRevoked}`) and `auth.sessions_revoked` (`POST /me/sessions/revoke-others` when ≥1 revoked, `DELETE /me/sessions/:id`; meta `{scope:'others'\|'one'\|'current',count}`), both `entityType:'user'` in the active org (002/FR-042) |
 | GET | /health | – | `{ok, db, version}` (no auth) |
 
 ### Platform error codes
@@ -59,6 +60,7 @@ and `conflict` (409):
 | `bad_origin` | 403 | A cookie-authenticated write whose `Origin` differs from `APP_URL` (or `Sec-Fetch-Site: cross-site` without `Origin`). Bearer-token requests are exempt (FR-028). |
 | `token_limit` | 409 | The user already has 10 active API tokens in this org (FR-037). |
 | `last_owner` | 409 | Demoting, removing or leaving as the only Owner (FR-021, FR-027). |
+| `read_only_token` | 403 | "This API token is read-only": a non-GET request authenticated with a read-only API token (006/FR-074). |
 | `no_organization` | 403 | The user is not (or no longer) a member of the organization the request acts on, e.g. creating a token after being removed. |
 
 Security headers on every response (FR-050): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (`SAMEORIGIN`
@@ -160,7 +162,7 @@ Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/
 | 402 | `plan_expired` | the trial or plan has ended (writes only) | – |
 | 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
 | 413 | `packet_too_large` | packet would exceed 40 MB or 40 items | – |
-| 422 | `document_too_long` | tender document over 300 pages | – |
+| 422 | `document_too_long` | tender document over 300 pages (refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning) | – |
 | 422 | `scanned_document` | tender document has no extractable text | – |
 | 429 | `rate_limited` | a rate-limit rule is over its limit; header `Retry-After: <s>` | `{rule, retryAfter}` |
 | 429 | `sync_cooldown` | manual "Sync now" within the cooldown | `{retryAt}` |

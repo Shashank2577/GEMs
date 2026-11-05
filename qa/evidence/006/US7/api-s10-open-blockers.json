@@ -1,0 +1,25 @@
+[
+  {
+    "label": "activity workspace.submitted",
+    "request": "GET /api/activity?entityType=workspace",
+    "status": 200,
+    "response": {
+      "id": "95540e50-7a6b-4690-9669-b5298749f594",
+      "action": "workspace.submitted",
+      "entityType": "workspace",
+      "entityId": "44db3e1f-125b-4aa7-bdc1-2d9b6b628cb4",
+      "meta": {
+        "from": "go",
+        "note": null,
+        "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+        "submittedAt": "2026-11-05T07:14:13.406Z",
+        "openBlockers": 1
+      },
+      "createdAt": "2026-11-05T07:14:13.411Z",
+      "user": {
+        "id": "5f1908e1-cdd4-408a-95a5-7c160925f1f1",
+        "name": "QA analyst mw37mh2b12"
+      }
+    }
+  }
+]

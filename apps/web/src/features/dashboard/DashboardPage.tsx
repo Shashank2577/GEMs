@@ -22,13 +22,19 @@ import type { Stage } from '@/lib/types';
 import { useDashboard, useSeedDemo } from './api';
 import { describeActivity, SELF_CONTAINED } from './activity';
 import { MatchesTrend, PipelineFunnel, VerdictDonut } from './charts';
+import { DecisionsCard } from './DecisionsCard';
+import { DemoBanner } from './DemoBanner';
+import { MyBidsCard } from './MyBidsCard';
 import { StaleBanner } from './StaleBanner';
-import { greeting, isEmptyOrg, pctDelta, summaryLine } from './summary';
+import { greeting, isEmptyOrg, pctDelta, roleGate, summaryLine } from './summary';
+
+/** FR-073: shown instead of "Create a watchlist" to roles that would get a 403. */
+export const ASK_FOR_WATCHLISTS = 'Ask an Owner or Bid Manager to set up watchlists.';
 
 const ONBOARDING_REDIRECT_KEY = 'tp:onboarding-redirected';
 
 export default function DashboardPage() {
-  const { me, can } = useAuth();
+  const { me, can, role } = useAuth();
   const now = useNow(60_000);
   const q = useDashboard();
   useDocumentTitle('Dashboard');
@@ -46,6 +52,17 @@ export default function DashboardPage() {
 
   const firstName = me?.user.name.split(' ')[0] ?? '';
   const d = q.data;
+  // FR-073: setup is a bid_manager+ job (analysts/viewers get Go / No-Go in its place). FR-071/072: persona widgets.
+  const gate = roleGate(role);
+  const showSetup = !!d && !d.setupComplete && gate.setupCard;
+  const showPersona = gate.persona; // viewers see neither widget
+  const isOwner = gate.ownerLayout;
+  const persona = (
+    <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+      <MyBidsCard items={d?.myWork} />
+      <DecisionsCard items={d?.awaitingDecision} />
+    </div>
+  );
 
   return (
     <div className="grid gap-6 [&>*]:min-w-0">
@@ -74,12 +91,15 @@ export default function DashboardPage() {
         <>
           {/* FR-012: a failed background refresh keeps the cached widgets and shows a non-blocking banner. */}
           {q.isError && d && <StaleBanner generatedAt={d.generatedAt} onRetry={() => q.refetch()} retrying={q.isFetching} />}
+          {d?.demo && <DemoBanner />}
           <KpiGrid d={d} />
+          {showPersona && !isOwner && persona}
           {d && isEmptyOrg(d) && <GetStartedBanner />}
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             <ClosingSoon d={d} className="lg:col-span-2" />
-            {d && !d.setupComplete ? <SetupCard d={d} /> : <VerdictCard d={d} />}
+            {showSetup ? <SetupCard d={d} /> : <VerdictCard d={d} />}
           </div>
+          {showPersona && isOwner && persona}
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             <Card className="lg:col-span-2">
               <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -91,7 +111,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>{d ? <MatchesTrend data={d.matchesByDay} /> : <Skeleton className="h-56 w-full" />}</CardContent>
             </Card>
-            {d && !d.setupComplete ? <VerdictCard d={d} /> : <ExpiringCard d={d} />}
+            {showSetup ? <VerdictCard d={d} /> : <ExpiringCard d={d} />}
           </div>
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             <Card>
@@ -101,10 +121,10 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>{d ? <PipelineFunnel pipeline={d.pipeline} value={d.pipelineValue} /> : <SkeletonRows n={7} />}</CardContent>
             </Card>
-            {d && !d.setupComplete ? <ExpiringCard d={d} /> : <RecentMatches d={d} />}
+            {showSetup ? <ExpiringCard d={d} /> : <RecentMatches d={d} />}
             <ActivityCard d={d} />
           </div>
-          {d && !d.setupComplete && <RecentMatches d={d} />}
+          {showSetup && <RecentMatches d={d} />}
         </>
       )}
     </div>
@@ -167,7 +187,11 @@ function GetStartedBanner() {
               {!seed.isPending && <FlaskConical />} Explore with demo data
             </Button>
           )}
-          <Button asChild><Link to="/watchlists?new=1"><Radar /> Create a watchlist</Link></Button>
+          {can('analyst') ? (
+            <Button asChild><Link to="/watchlists?new=1"><Radar /> Create a watchlist</Link></Button>
+          ) : (
+            <p className="max-w-60 self-center text-sm text-muted-foreground">{ASK_FOR_WATCHLISTS}</p>
+          )}
         </div>
       </div>
     </Card>
@@ -234,7 +258,7 @@ function SetupCard({ d }: { d: DashboardResponse }) {
           <CardTitle>Finish setting up</CardTitle>
           <span className="tabular text-xs font-medium text-muted-foreground">{done}/{d.setup.length}</span>
         </div>
-        <Progress value={pct} className="mt-2" />
+        <Progress value={pct} className="mt-2" aria-label={`Setup ${done} of ${d.setup.length} done`} />
       </CardHeader>
       <CardContent className="flex-1">
         <ul className="flex flex-col gap-1">
@@ -307,6 +331,7 @@ function ExpiringCard({ d }: { d?: DashboardResponse }) {
 }
 
 function RecentMatches({ d }: { d?: DashboardResponse }) {
+  const { can } = useAuth();
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
@@ -318,8 +343,8 @@ function RecentMatches({ d }: { d?: DashboardResponse }) {
       </CardHeader>
       <CardContent className="flex-1">
         {!d ? <SkeletonRows n={4} /> : d.recentMatches.length === 0 ? (
-          <EmptyState compact icon={Radar} title="No matches yet" body="Create a watchlist and we’ll match every new GeM bid against it."
-            action={<Button size="sm" asChild><Link to="/watchlists?new=1">Create watchlist</Link></Button>} />
+          <EmptyState compact icon={Radar} title="No matches yet" body={can('analyst') ? 'Create a watchlist and we’ll match every new GeM bid against it.' : ASK_FOR_WATCHLISTS}
+            action={can('analyst') ? <Button size="sm" asChild><Link to="/watchlists?new=1">Create watchlist</Link></Button> : undefined} />
         ) : (
           <ul className="flex flex-col gap-1">
             {d.recentMatches.map((m) => (

@@ -74,7 +74,7 @@ export function RequirementsTab({ analysis, tenderId, documents, bidNumber }: {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 font-medium">
             {r.label}
-            {r.mandatory && <Tooltip content="Mandatory for eligibility"><span className="size-1.5 rounded-full bg-danger" aria-label="mandatory" /></Tooltip>}
+            {r.mandatory && <Tooltip content="Mandatory for eligibility"><span className="size-1.5 rounded-full bg-danger" role="img" aria-label="mandatory" /></Tooltip>}
           </div>
           {r.source.quote && <p className="mt-0.5 line-clamp-1 text-xs font-normal text-muted-foreground md:max-w-[320px]" title={r.source.quote}>“{r.source.quote}”</p>}
         </div>

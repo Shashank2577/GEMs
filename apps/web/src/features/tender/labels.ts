@@ -4,9 +4,9 @@ import {
   FileBadge, FileCheck2, FileSpreadsheet, FileText, Flag, Handshake, Landmark, ReceiptText, ScrollText, ShieldCheck, Sparkles,
   Timer, Truck, type LucideIcon,
 } from 'lucide-react';
-import type { AnalysisDto, FactorStatus, Requirement, StaleReason, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
+import { RESCORABLE_STALE_REASONS, isRescorableReason, type AnalysisDto, type AnalysisWarning, type FactorStatus, type Requirement, type StaleReason, type TenderDocKind, type TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
-import { formatDateIST, formatINR } from '@/lib/format';
+import { formatDateIST, formatINR, relativeTime } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
   turnover: Banknote, experience: Award, similarWork: Handshake, emd: Landmark, mii: Flag, oem: BadgeCheck,
@@ -43,10 +43,17 @@ export const STALE_REASON_COPY: Record<StaleReason, string> = {
   corrigendum: 'A corrigendum changed this bid after it was analysed. The score below may be outdated.',
   document_added: 'A document was added since this analysis. Re-analyse to include it.',
   document_removed: 'A document was removed since this analysis. Re-analyse to update the score.',
-  profile_changed: 'Your company profile changed since this analysis. Re-analyse to update the score.',
-  vault_changed: 'Your document vault changed since this analysis. Re-analyse to update the score.',
-  weights_changed: 'Scoring weights changed since this analysis. Re-analyse to update the score.',
+  profile_changed: 'Your company profile changed since this analysis. Re-score to update the score.',
+  vault_changed: 'Your document vault changed since this analysis. Re-score to update the score.',
+  weights_changed: 'Scoring weights changed since this analysis. Re-score to update the score.',
 };
+
+/**
+ * Reasons a Re-score fixes (profile, vault, weights); a document change or corrigendum needs a full
+ * Re-analyse (FR-037). Shared with the API, which refuses other reasons with 409 `reanalysis_required`.
+ */
+export const RESCORE_REASONS: readonly StaleReason[] = RESCORABLE_STALE_REASONS;
+export const canRescoreFor = (reason: StaleReason | null | undefined) => isRescorableReason(reason);
 
 export const staleReasonCopy = (reason: StaleReason | null | undefined) => STALE_REASON_COPY[reason ?? 'corrigendum'] ?? STALE_REASON_COPY.corrigendum;
 
@@ -108,6 +115,53 @@ export function mismatchedDocuments(analysis: Pick<AnalysisDto, 'createdAt'>, do
   return (documents ?? []).filter((d) => d.bidNumberFound && !(Date.parse(d.createdAt) > at));
 }
 
+/** How often the page re-reads the analysis while another member's run is in progress (FR-029). */
+export const ANALYSIS_POLL_MS = 3000;
+
+/** Another analysis for this org+tender is running (GET …/analysis `lastAttempt`, FR-028/FR-029). */
+export function isAnalysisRunning(a: Pick<AnalysisDto, 'lastAttempt'> | null | undefined): boolean {
+  return a?.lastAttempt?.status === 'running';
+}
+
+/**
+ * US3 #15 warning when the newest attempt failed but a previous result is shown, else null:
+ * "The last re-analysis failed: <reason>. Showing the previous result from <relative time>."
+ */
+export function failedAttemptCopy(a: Pick<AnalysisDto, 'status' | 'lastAttempt' | 'updatedAt'> | null | undefined, now: Date = new Date()): string | null {
+  if (!a || a.status !== 'done' || a.lastAttempt?.status !== 'failed') return null;
+  const reason = friendlyAnalysisError(a.lastAttempt.error).replace(/[.\s]+$/, '');
+  return `The last re-analysis failed: ${reason}. Showing the previous result from ${relativeTime(a.updatedAt, now)}.`;
+}
+
+/**
+ * A user-safe reason for a failed analysis (S6). The raw error is kept in logs and the DB; only the
+ * known-safe cases are shown, anything else (stack-ish or provider text) becomes a generic message.
+ */
+export function friendlyAnalysisError(raw: string | null | undefined): string {
+  const e = (raw ?? '').trim();
+  if (/timed out|took too long/i.test(e)) return 'it took too long and timed out';
+  if (/pdf|unreadable|password/i.test(e)) return 'a document could not be read';
+  return 'something went wrong while reading the documents';
+}
+
+/** Documents whose page count was capped (S1): `pageCount` read of `totalPages`. */
+export function truncatedDocuments(docs: readonly { fileName: string; pageCount: number | null; totalPages?: number | null }[] | undefined) {
+  return (docs ?? []).filter((d) => d.pageCount != null && d.totalPages != null && d.totalPages > d.pageCount)
+    .map((d) => ({ fileName: d.fileName, analysed: d.pageCount as number, total: d.totalPages as number }));
+}
+
+/**
+ * What the Analysis tab shows: the result, a failed first attempt ("Try again"), or "in progress".
+ * `lastAttempt` wins over a `running`/`pending` row: a first-ever run that timed out (S3, FR-028) is
+ * failed, never "in progress" forever, even if an older API still reports the row as running.
+ */
+export function analysisPanelState(a: Pick<AnalysisDto, 'status' | 'error' | 'lastAttempt'>): { kind: 'result' } | { kind: 'in_progress' } | { kind: 'failed'; error: string | null } {
+  if (a.status === 'done') return { kind: 'result' };
+  if (a.lastAttempt?.status === 'failed') return { kind: 'failed', error: a.lastAttempt.error ?? a.error ?? null };
+  if (a.status === 'failed') return { kind: 'failed', error: a.error ?? null };
+  return { kind: 'in_progress' };
+}
+
 /** The "Check documents: … is for GEM/…." prefix the API puts on an analysis summary, if any. */
 export function documentCheckPrefix(summary: string | null | undefined): string | null {
   return matchCheckPrefix(summary);
@@ -131,8 +185,21 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   'tender.document_uploaded': 'uploaded a document',
   'tender.document_fetched': 'fetched the bid document from GeM',
   'analysis.factor_overridden': 'overrode a factor',
+  'analysis.rescored': 're-scored the analysis',
   'tender.dismissed': 'dismissed this tender',
   'workspace.created': 'started a bid workspace',
 };
 
 export { CalendarClock };
+
+/** User-facing text of an analysis warning (spec 008 FR-031, FR-037). */
+export function analysisWarningText(w: AnalysisWarning): string {
+  switch (w.code) {
+    case 'llm_budget_exhausted':
+      return `AI review covered ${w.covered} of ${w.total} document${w.total === 1 ? '' : 's'}; the rest were checked by rules only.`;
+    case 'llm_quota_reached':
+      return 'Monthly AI review limit reached — this analysis used rules only.';
+    default:
+      return 'Part of this analysis used rules only.';
+  }
+}

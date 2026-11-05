@@ -30,12 +30,13 @@ import { autoMap } from '@tp/core/packet/mapping';
 import { parseMentions } from '@tp/core/packet/mentions';
 import { parseBidResult, type BidResultHint } from '@tp/core/gem/award';
 import { GemClient } from '@tp/core/gem/client';
+import { GEM_LEASE_MAX_WAIT_MS } from '@tp/core/contracts/caps';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, conflict, forbidden, notFound, validationError } from '../lib/errors';
 import { hit, rateLimited, release, type LimitOptions } from '../lib/rate-limit';
 import { parseJson, parseWith } from '../lib/validate';
-import { orgId, requireAuth, requireRole, roleAtLeast, userId } from '../middleware/auth';
+import { orgId, refuseReadOnlyToken, requireAuth, requireRole, roleAtLeast, userId } from '../middleware/auth';
 import {
   asMappable, orgMembers, getTenderRow, getWorkspace, latestAnalysis, listComments, listWorkspaceCards, readinessFor, vaultRows, workspaceDetail,
   workspaceDto, type WorkspaceRow,
@@ -384,10 +385,12 @@ workspacesRoutes.post('/workspaces/:id/submitted', requireRole('analyst'), async
   if (w.stage === 'won' || w.stage === 'lost') throw conflict('This bid already has an outcome recorded.');
   if (w.stage === 'dropped') throw conflict('This bid was dropped. Move it back to the pipeline first.');
   const at = body.submittedAt ? new Date(body.submittedAt) : deps.clock.now();
+  // FR-084: the checklist items still open (missing/expired, not overridden) when the human says they submitted — informational only.
+  const openBlockers = (await readinessOf(deps, org, w)).readiness.blockers.length;
   const updated = await touch(deps, org, w.id, {
     stage: 'submitted', submittedAt: at, ...(w.stage !== 'submitted' ? { position: await nextPosition(deps, org, 'submitted') } : {}),
   });
-  await log(c, w, 'workspace.submitted', { from: w.stage, submittedAt: at.toISOString(), note: body.note ?? null });
+  await log(c, w, 'workspace.submitted', { from: w.stage, submittedAt: at.toISOString(), note: body.note ?? null, openBlockers });
   return c.json(await workspaceDto(deps, updated));
 });
 
@@ -411,6 +414,7 @@ export const HINT_TTL_MS = 15 * 60_000;
  * decides whether to use it; nothing is entered on GeM. Requires a workspace for the tender in the caller's org.
  */
 workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (c) => {
+  refuseReadOnlyToken(c); // 006/FR-074: outbound GeM call + cache write + org quota => not a pure read
   const { deps } = c.var;
   const org = orgId(c);
   const t = await getTenderRow(deps, c.req.param('id'), c.var.org);
@@ -429,6 +433,9 @@ workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
     maxRetries: 1, backoffMs: Math.min(1000, Math.max(10, deps.gem.minIntervalMs)), timeoutMs: 15_000,
+    // 008/FR-024: every GeM request takes the cluster-wide lease. A 503 gem_busy lands in the catch below, which
+    // gives the per-bid slot back and degrades to { available: false, reason: 'gem_unavailable' }.
+    beforeRequest: () => deps.gemLease.acquire(GEM_LEASE_MAX_WAIT_MS),
   });
   let hint: BidResultHint;
   try {

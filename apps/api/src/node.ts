@@ -10,6 +10,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { compress } from 'hono/compress';
 import { Hono } from 'hono';
 import { createNodeDb } from '@tp/db';
 import { spaCspFor } from '@tp/core/security/headers';
@@ -75,6 +76,9 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
 
   if (hasWeb) {
     const root = relative(process.cwd(), webDist) || '.';
+    // gzip/deflate the static SPA (Cloudflare does this at the edge on the Worker; Node needs it for landing LCP, 007/NFR-003).
+    // Registered after the API routes, so API responses are untouched.
+    server.use('/*', compress());
     server.use('/*', serveStatic({
       root,
       onFound: (path, c) => {

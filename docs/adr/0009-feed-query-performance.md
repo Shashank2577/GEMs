@@ -6,8 +6,8 @@
 
 ## Context
 
-`GET /tenders` (`routes/tenders.ts`) runs five queries per call over the same WHERE: page, `count(*)`, and three
-facet `GROUP BY`s (state, ministry, category). Default filter is `status = 'open' AND (end_at IS NULL OR end_at >= now)`;
+`GET /tenders` (`routes/tenders.ts`) ran five queries per call over the same WHERE: page, `count(*)`, and three
+facet `GROUP BY`s (state, ministry, category) — since 0015's rework, page + one GROUPING SETS query (decision 6). Default filter is `status = 'open' AND (end_at IS NULL OR end_at >= now)`;
 default sort `created_at DESC`; optional `q` expands to `ILIKE '%word%'` across 10 text columns plus
 `items::text`, up to 8 words. Per-org predicates are correlated `EXISTS` on `tender_matches`, `analyses`,
 `bid_workspaces` (all have `(org_id, tender_id)` leading index columns — fine).
@@ -25,14 +25,32 @@ rows), `matchAndNotify`, `refreshMatches`, `decorateTenders` callers.
 1. **Partial indexes on open tenders (MUST)** — `packages/db/src/schema.ts` + migration:
    ```sql
    CREATE INDEX tenders_open_created_idx ON tenders (created_at DESC) WHERE status = 'open';
-   CREATE INDEX tenders_open_end_idx     ON tenders (end_at)          WHERE status = 'open';
+   CREATE INDEX tenders_open_closing_idx ON tenders (coalesce(end_at, 'infinity')) WHERE status = 'open';
+   -- (was tenders_open_end_idx ON (end_at); 008 migration 0018 indexes the feed's "still open" expression instead)
    CREATE INDEX tenders_open_value_idx   ON tenders (estimated_value) WHERE status = 'open';
-   CREATE INDEX tenders_open_state_idx   ON tenders (state)           WHERE status = 'open';
+   CREATE INDEX tenders_open_state_idx   ON tenders (state, created_at DESC, coalesce(end_at, 'infinity'))
+                                                                        WHERE status = 'open';
+   -- (008 migration 0019, PR #515 QA round 1: on (state) alone the planner never chose it for ?state=X)
    CREATE INDEX tenders_open_ministry_idx ON tenders (ministry)       WHERE status = 'open';
    CREATE INDEX tenders_open_category_idx ON tenders (category)       WHERE status = 'open';
    ```
    The open subset is small, so facets and sorts become index-range scans. Keep `tenders_end_idx` for the
    cron's "close expired" update; drop `tenders_state_idx` (superseded).
+
+   **State filter (amended 2026-11-05, 0019).** PostgreSQL does not use expression statistics of a *partial* index, so
+   it estimates the feed's "still open" condition (`coalesce(end_at, 'infinity') >= $now`) at the default 1/3. With
+   `tenders_open_state_idx (state)` that made it prefer, at 500k rows, `tenders_open_created_idx` + filter for the
+   `?state=X` page and `BitmapAnd(tenders_open_closing_idx, tenders_state_idx)` (non-partial) for count/facets. The
+   index is therefore `(state, created_at DESC, coalesce(end_at, 'infinity'))`: state equality and "still open" are both
+   Index Conds, rows come out in the default sort order, and count/facets are one bitmap scan of it.
+   The feed writes `status = 'open'` as a literal — the partial indexes' exact predicate — so the planner can prove
+   the indexes apply even under a generic plan (statement-caching poolers). `perf-indexes.test.ts` asserts the index
+   name and its Index Cond for the page and the shared count/facet query.
+6. **One scan for the total and the facets** (008/FR-033, PR #515 QA round 1). The total and every facet whose own
+   filter is not set share the request's WHERE, so they are one `GROUP BY GROUPING SETS ((state), (ministry),
+   (category), ())` query, ranked in SQL (`row_number()`: count desc, value asc, top 60); a facet whose filter is set
+   (it leaves that filter out) keeps its own query. At 500k / 30k open each scan of the open set costs ~15–20 ms of
+   Postgres CPU; four per request was what queued at concurrency 10 (feed p95 ~260–360 ms → ~95–150 ms).
 2. **Column projection (MUST)** — a shared `tenderListColumns` object (everything except `raw`, `content_hash`)
    used by `routes/tenders.ts`, `routes/watchlists.ts#candidateTenders`, `services/ingest.ts#matchAndNotify`.
    `raw` is only read by `GET /tenders/:id` debugging paths (currently none) — consider moving it to ADR-0012 retention.

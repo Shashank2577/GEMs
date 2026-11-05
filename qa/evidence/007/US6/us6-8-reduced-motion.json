@@ -1,0 +1,17 @@
+{
+  "baseline": {
+    "animated": 12,
+    "hidden": 12,
+    "shifted": 12
+  },
+  "reduced": {
+    "animated": 0,
+    "hidden": 0,
+    "shifted": 0
+  },
+  "pricingCardOpacity": [
+    1,
+    1,
+    1
+  ]
+}

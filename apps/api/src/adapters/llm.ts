@@ -42,6 +42,10 @@ export function createAnthropicClient(opts: AnthropicOptions): LlmClient {
   async function complete(req: LlmRequest): Promise<LlmResult> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 90_000);
+    // The caller's signal (analysis budget, 008/FR-031) aborts the same fetch.
+    const onAbort = () => ctrl.abort();
+    if (req.signal?.aborted) ctrl.abort();
+    else req.signal?.addEventListener('abort', onAbort, { once: true });
     try {
       const res = await f(`${base}/v1/messages`, {
         method: 'POST',
@@ -77,6 +81,7 @@ export function createAnthropicClient(opts: AnthropicOptions): LlmClient {
       throw new LlmError(`Anthropic request failed: ${(e as Error).message}`);
     } finally {
       clearTimeout(timer);
+      req.signal?.removeEventListener('abort', onAbort);
     }
   }
 

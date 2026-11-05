@@ -65,6 +65,7 @@ beforeAll(async () => {
   ok(await request(ctx.app, 'POST', `/workspaces/${ids.workspace}/overrides`, { cookie: a.bidManager.cookie, json: { itemId: 'oem_authorization', reason: 'Renewed MAF arriving tomorrow' } }), 'override');
   ids.packet = ok(await request(ctx.app, 'POST', `/workspaces/${ids.workspace}/packets`, { cookie: a.analyst.cookie, json: {} }), 'packet').id;
   ids.watchlist = ok(await request(ctx.app, 'POST', '/watchlists', { cookie: a.analyst.cookie, json: { name: 'A laptops', criteria: { keywords: ['laptop'] } } }), 'watchlist').id;
+  ids.view = ok(await request(ctx.app, 'POST', '/views', { cookie: a.analyst.cookie, json: { name: 'A laptops view', params: { q: ['laptop'] } } }), 'saved view').id;
   ids.pastContract = ok(await request(ctx.app, 'POST', '/past-contracts', {
     cookie: a.analyst.cookie, json: { buyer: 'NIC, MeitY', title: 'Supply of 200 laptops', value: 12_000_000, startDate: '2024-04-01', endDate: '2024-09-30' },
   }), 'past contract').id;
@@ -109,6 +110,7 @@ const FOREIGN: Record<string, () => Call> = {
   'GET /tenders/:id/documents/:docId/download': () => asB('GET', `/tenders/${ids.tender}/documents/${ids.tenderDoc}/download`),
   'GET /tenders/:id/analysis': () => asB('GET', `/tenders/${ids.tender}/analysis`),
   'POST /analyses/:id/override': () => asB('POST', `/analyses/${ids.analysis}/override`, { factorKey: 'emd', status: 'fail', reason: 'Hijack attempt' }),
+  'POST /analyses/:id/rescore': () => asB('POST', `/analyses/${ids.analysis}/rescore`),
   'GET /vault/:id': () => asB('GET', `/vault/${ids.vault}`),
   'PUT /vault/:id/file': () => asBForm('PUT', `/vault/${ids.vault}/file`),
   'PATCH /past-contracts/:id': () => asB('PATCH', `/past-contracts/${ids.pastContract}`, { value: 1 }),
@@ -139,6 +141,8 @@ const FOREIGN: Record<string, () => Call> = {
 
 /** Implemented routes not (yet) in the contract, swept the same way. */
 const FOREIGN_EXTRA: Record<string, () => Call> = {
+  'PATCH /views/:id': () => asB('PATCH', `/views/${ids.view}`, { name: 'Hijack' }),
+  'DELETE /views/:id': () => asB('DELETE', `/views/${ids.view}`),
   'GET /workspaces/:id/packets': () => asB('GET', `/workspaces/${ids.workspace}/packets`),
   'DELETE /workspaces/:id/overrides/:itemId': () => asB('DELETE', `/workspaces/${ids.workspace}/overrides/oem_authorization`),
   'POST /workspaces/:id/annexures/:key/preview': () =>
@@ -182,6 +186,7 @@ const CONTROLS: Record<string, (id: string) => Promise<{ status: number; found: 
   invitation: listed('/org/members', 'invitations'),
   session: listed('/me/sessions'),
   watchlist: listed('/watchlists'),
+  view: async (id) => { const r = await request(ctx.app, 'GET', '/views', { cookie: A.org.analyst.cookie }); return { status: r.status, found: (r.body.items ?? r.body).some((v: { id: string }) => v.id === id) }; },
   pastContract: listed('/past-contracts'),
   notification: listed('/notifications'),
   comment: async (id) => { const r = await asA(`/workspaces/${ids.workspace}/comments`); return { status: r.status, found: r.body.items.some((c: { id: string }) => c.id === id) }; },
@@ -237,7 +242,9 @@ async function snapshotOrgA(): Promise<string> {
   const tables = (res as unknown as { rows: { table_name: string }[] }).rows.map((r) => r.table_name);
   const out: Record<string, unknown[]> = {};
   for (const t of tables) {
-    const rows = await ctx.db.execute(sql.raw(`select * from "${t}" where org_id = '${A.org.orgId}' order by 1`));
+    // Order by the whole row: `order by 1` is org_id in some tables (memberships, notification_prefs), which left
+    // the order to the heap and made the before/after comparison flaky under load.
+    const rows = await ctx.db.execute(sql.raw(`select * from "${t}" as r where org_id = '${A.org.orgId}' order by r::text`));
     out[t] = (rows as unknown as { rows: unknown[] }).rows;
   }
   const org = await ctx.db.execute(sql.raw(`select * from organizations where id = '${A.org.orgId}'`));

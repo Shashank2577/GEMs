@@ -1,5 +1,5 @@
 {
-  "id": "a1edcf8a-69ac-4f72-b310-ce40221338ee",
+  "id": "2a09eef4-78e9-4181-96ce-d13e7094f442",
   "prevId": "28eb4db6-e3b0-46f2-a3b6-0041b078fdfd",
   "version": "7",
   "dialect": "postgresql",
@@ -446,6 +446,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'full'"
         },
         "created_at": {
           "name": "created_at",
@@ -1606,22 +1613,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "notifications_pending_idx": {
-          "name": "notifications_pending_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'pending'",
           "concurrently": false,
           "method": "btree",
           "with": {}

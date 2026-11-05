@@ -5,6 +5,9 @@ import { activityLog, analyses, bidWorkspaces, gemResultHints, notifications, te
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { HINT_ORG_LIMIT } from '../src/routes/workspaces';
 import { hit, reset } from '../src/lib/rate-limit';
+import { serviceUnavailable } from '../src/lib/errors';
+import { GEM_BUSY_MESSAGE } from '../src/lib/gem-lease';
+import { GEM_LEASE_MAX_WAIT_MS } from '@tp/core/contracts/caps';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
@@ -232,6 +235,76 @@ describe('POST /workspaces/:id/submitted & outcome', () => {
   });
 });
 
+describe('POST /workspaces/:id/submitted logs the open blockers (T091; 006/FR-084)', () => {
+  it('records openBlockers = the checklist items still missing/expired, and does not block the submission', async () => {
+    const t = await seedTender(ctx, 9);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const created = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    const id = created.body.id as string;
+    const detail = await request(ctx.app, 'GET', `/workspaces/${id}`, { cookie: s.org.analyst.cookie });
+    const blockers = detail.body.readiness.blockers.length as number;
+    expect(blockers).toBeGreaterThan(0); // the seeded vault has no document for one mandatory item
+    const r = await request(ctx.app, 'POST', `/workspaces/${id}/submitted`, { cookie: s.org.analyst.cookie, json: { note: 'Done' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('submitted');
+    const [act] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, id), eq(activityLog.action, 'workspace.submitted')));
+    expect(act.meta).toMatchObject({ note: 'Done', openBlockers: blockers });
+  });
+});
+
+describe('outcome price validation, dropped guard and override-aware blockers (006/FR-081, FR-084)', () => {
+  let id: string;
+  let n = 0;
+  const fresh = async () => {
+    const t = await seedTender(ctx, 40 + n++);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const created = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    return created.body.id as string;
+  };
+  const blockersOf = async (wid: string) => (await request(ctx.app, 'GET', `/workspaces/${wid}`, { cookie: s.org.analyst.cookie })).body.readiness.blockers as { id?: string; itemId?: string; item?: { id: string } }[];
+  const idOf = (b: { id?: string; itemId?: string; item?: { id: string } }) => (b.item?.id ?? b.itemId ?? b.id)!;
+  const openedBlockers = async (wid: string) => {
+    const [act] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, wid), eq(activityLog.action, 'workspace.submitted')));
+    return (act.meta as { openBlockers: number }).openBlockers;
+  };
+
+  it('rejects a negative, fractional or > 1e13 L1 price with 400', async () => {
+    id = await fresh();
+    expect((await request(ctx.app, 'POST', `/workspaces/${id}/submitted`, { cookie: s.org.analyst.cookie })).status).toBe(200);
+    for (const l1Price of [-5, 1.5, 1e13 + 1]) {
+      const r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.bidManager.cookie, json: { outcome: { result: 'won', l1Price } } });
+      expect(r.status).toBe(400);
+    }
+  });
+
+  it('POST submitted on a dropped bid → 409 with the move-back message', async () => {
+    const wid = await fresh();
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${wid}`, { cookie: s.org.analyst.cookie, json: { stage: 'dropped' } })).status).toBe(200);
+    const r = await request(ctx.app, 'POST', `/workspaces/${wid}/submitted`, { cookie: s.org.analyst.cookie });
+    expect(r.status).toBe(409);
+    expect(r.body.error.message).toBe('This bid was dropped. Move it back to the pipeline first.');
+  });
+
+  it('openBlockers is 0 when nothing is open, and an overridden item does not count as open', async () => {
+    const wid = await fresh();
+    const open = await blockersOf(wid);
+    expect(open.length).toBeGreaterThan(0);
+    const first = idOf(open[0]!);
+    expect((await request(ctx.app, 'POST', `/workspaces/${wid}/overrides`, { cookie: s.org.bidManager.cookie, json: { itemId: first, reason: 'Waived by the bid manager' } })).status).toBe(201);
+    expect((await blockersOf(wid)).length).toBe(open.length - 1);
+    expect((await request(ctx.app, 'POST', `/workspaces/${wid}/submitted`, { cookie: s.org.analyst.cookie })).status).toBe(200);
+    expect(await openedBlockers(wid)).toBe(open.length - 1);
+
+    const zero = await fresh();
+    for (const b of await blockersOf(zero)) {
+      expect((await request(ctx.app, 'POST', `/workspaces/${zero}/overrides`, { cookie: s.org.bidManager.cookie, json: { itemId: idOf(b), reason: 'Waived by the bid manager' } })).status).toBe(201);
+    }
+    expect(await blockersOf(zero)).toHaveLength(0);
+    expect((await request(ctx.app, 'POST', `/workspaces/${zero}/submitted`, { cookie: s.org.analyst.cookie })).status).toBe(200);
+    expect(await openedBlockers(zero)).toBe(0);
+  });
+});
+
 describe('PATCH /workspaces/:id — won/lost only after submission (T020; 006/FR-008)', () => {
   let goId: string;
   beforeAll(async () => {
@@ -295,6 +368,20 @@ describe('readiness without an analysis (T021; 006/FR-009)', () => {
     // Analysed workspaces say so.
     const other = await request(ctx.app, 'GET', `/workspaces/${wsId}`, { cookie: s.org.viewer.cookie });
     expect(other.body.readiness.analysed).toBe(true);
+  });
+
+  it('a failed re-analysis does not hide the previous done analysis from readiness (FR-029)', async () => {
+    const t = await seedTender(ctx, 61);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const c = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    expect(c.status).toBe(201);
+    const before = await request(ctx.app, 'GET', `/workspaces/${c.body.id}`, { cookie: s.org.viewer.cookie });
+    expect(before.body.readiness.analysed).toBe(true);
+    await ctx.db.insert(analyses).values({ orgId: s.org.orgId, tenderId: t.id, status: 'failed', method: 'rules', error: 'boom', createdAt: new Date(NOW.getTime() + 60_000) });
+    const after = await request(ctx.app, 'GET', `/workspaces/${c.body.id}`, { cookie: s.org.viewer.cookie });
+    expect(after.body.readiness).toMatchObject({ analysed: true, total: before.body.readiness.total });
+    expect(after.body.readiness.total).toBeGreaterThan(0);
+    expect(after.body.analysis).toMatchObject({ status: 'done' });
   });
 
   it('treats a running (unfinished) analysis as not analysed', async () => {
@@ -664,6 +751,33 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
         expect(mock.state.requests.results).toBe(before + 1);
       } finally {
         await reset(ctx.db, demo.orgId, 'gem_result_org');
+      }
+    });
+
+    it('takes the cluster-wide GeM lease before fetching; gem_busy degrades to gem_unavailable and gives the bid slot back (008/FR-024)', async () => {
+      const t = await tenderOf('submitted');
+      await ctx.db.delete(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId!));
+      const waits: number[] = [];
+      let busy = true;
+      const leased = await createTestContext({
+        now: NOW, keepData: true, gemBaseUrl: GEM, fetch: async (input, init) => mock.app.fetch(new Request(input as string, init)),
+        gemLease: { async acquire(maxWaitMs) { waits.push(maxWaitMs); if (busy) throw serviceUnavailable('gem_busy', GEM_BUSY_MESSAGE); } },
+      });
+      try {
+        const before = mock.state.requests.results;
+        const r = await hint(t.id, demo.analyst.cookie, leased.app);
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({ available: false, reason: 'gem_unavailable' });
+        expect(waits).toEqual([GEM_LEASE_MAX_WAIT_MS]);
+        expect(mock.state.requests.results).toBe(before); // refused by the lease: GeM never asked
+        busy = false;
+        const ok = await hint(t.id, demo.analyst.cookie, leased.app); // slot was released, so this may fetch
+        expect(ok.status).toBe(200);
+        expect(ok.body.available).toBe(true);
+        expect(waits).toEqual([GEM_LEASE_MAX_WAIT_MS, GEM_LEASE_MAX_WAIT_MS]);
+        expect(mock.state.requests.results).toBe(before + 1);
+      } finally {
+        await leased.close();
       }
     });
 

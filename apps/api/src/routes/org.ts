@@ -2,16 +2,17 @@
  * Organization routes (FR-031..033): /org, /org/members, /org/invitations (+ resend, 002/FR-020), /activity.
  * Mounted at /api.
  */
-import { and, asc, count, desc, eq, gt, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Hono, type Context } from 'hono';
-import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db, type Role } from '@tp/db';
+import { activityLog, apiTokens, invitations, memberships, organizations, savedViews, sessions, users, type Db, type Role } from '@tp/db';
 import {
   activityQuerySchema, changeRoleInputSchema, inviteInputSchema, updateOrgInputSchema,
   type ActivityItem, type CreatedInvitation, type Member, type MembersResponse, type PendingInvitation,
 } from '@tp/core/contracts/auth';
 import { ROLE_LABELS } from '@tp/core/contracts/common';
 import { logActivity } from '../lib/activity';
+import { enrichActivity } from '../lib/activity-target';
 import { randomToken, sha256Hex } from '../lib/crypto';
 import { HttpError, conflict, forbidden, notFound } from '../lib/errors';
 import { parseJson, parseQuery } from '../lib/validate';
@@ -85,9 +86,20 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
   const { db } = c.var.deps;
   const patch: Partial<typeof organizations.$inferInsert> = {};
   if (body.name !== undefined) patch.name = body.name;
-  if (body.onboardingState !== undefined) patch.onboardingState = { ...(c.var.org.onboardingState ?? {}), ...body.onboardingState };
+  // Merge in SQL (jsonb ||) so concurrent PATCHes of different keys never overwrite each other with a stale snapshot.
+  const mergeState = (o: Record<string, boolean>) => sql`coalesce(${organizations.onboardingState}, '{}'::jsonb) || ${JSON.stringify(o)}::jsonb`;
+  if (body.onboardingState !== undefined) patch.onboardingState = mergeState(body.onboardingState) as unknown as Record<string, boolean>;
   if (body.scoringWeights !== undefined) patch.scoringWeights = body.scoringWeights;
   if (!Object.keys(patch).length) return c.json(c.var.org);
+  const notCompleted = sql`coalesce((${organizations.onboardingState}->>'completed')::boolean, false) = false`;
+  // FR-052: the completed flip is a conditional UPDATE, so exactly one of N concurrent requests gets a row back
+  // (the others re-check the predicate after the row lock is released) and logs `onboarding.completed`.
+  let completedAt: Date | null = null;
+  if (body.onboardingState?.completed === true) {
+    const [flipped] = await db.update(organizations).set({ onboardingState: mergeState(body.onboardingState) as unknown as Record<string, boolean> })
+      .where(and(eq(organizations.id, orgId(c)), notCompleted)).returning({ createdAt: organizations.createdAt });
+    completedAt = flipped?.createdAt ?? null;
+  }
   const [org] = await db.update(organizations).set(patch).where(eq(organizations.id, orgId(c))).returning({
     id: organizations.id, name: organizations.name, slug: organizations.slug, plan: organizations.plan,
     onboardingState: organizations.onboardingState, scoringWeights: organizations.scoringWeights,
@@ -97,6 +109,13 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
     await logActivity(db, {
       orgId: orgId(c), userId: userId(c), action: 'org.updated', entityType: 'organization', entityId: orgId(c),
       meta: { fields: Object.keys(patch).filter((k) => k !== 'onboardingState') },
+    });
+  }
+  // FR-052 / SC-001: how long sign-up to "finished setting up" took.
+  if (completedAt) {
+    const durationSec = Math.max(0, Math.round((c.var.deps.clock.now().getTime() - completedAt.getTime()) / 1000));
+    await logActivity(db, {
+      orgId: orgId(c), userId: userId(c), action: 'onboarding.completed', entityType: 'organization', entityId: orgId(c), meta: { durationSec },
     });
   }
   return c.json(org);
@@ -209,6 +228,7 @@ orgRoutes.delete('/org/members/me', requireSession, async (c) => {
     await assertNotLastOwner(tx, oid, uid, 'leave');
     await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, uid)));
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, uid)));
     await logActivity(tx, { orgId: oid, userId: uid, action: 'member.left', entityType: 'user', entityId: uid, meta: { name: c.var.user.name, email: c.var.user.email, role: c.var.role } });
     const [next] = await tx.select({ orgId: memberships.orgId }).from(memberships)
       .where(eq(memberships.userId, uid)).orderBy(asc(memberships.createdAt)).limit(1);
@@ -260,6 +280,7 @@ orgRoutes.delete('/org/members/:userId', requireRole('owner'), async (c) => {
     // Already gone (left or removed concurrently): nothing to do, nothing to log.
     if (!removed) throw notFound('Member');
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, target)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, target)));
     await logActivity(tx, { orgId: oid, userId: userId(c), action: 'member.removed', entityType: 'user', entityId: target, meta: { name: m.name, email: m.email, role: removed.role } });
   });
   return c.json({ ok: true as const });
@@ -271,7 +292,8 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
   const q = parseQuery(c, activityQuerySchema);
   const { db } = c.var.deps;
   const conds: SQL[] = [eq(activityLog.orgId, orgId(c))];
-  if (q.entityType) conds.push(eq(activityLog.entityType, q.entityType));
+  const types = (q.entityType ?? '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 12);
+  if (types.length) conds.push(inArray(activityLog.entityType, types));
   if (q.entityId) conds.push(eq(activityLog.entityId, q.entityId));
   if (q.userId) conds.push(eq(activityLog.userId, q.userId));
   const where = and(...conds);
@@ -284,9 +306,9 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
       .limit(q.pageSize).offset((q.page - 1) * q.pageSize),
     db.select({ n: count() }).from(activityLog).where(where),
   ]);
-  const items: ActivityItem[] = rows.map((r) => ({
+  const items: ActivityItem[] = await enrichActivity(db, orgId(c), rows.map((r) => ({
     id: r.id, action: r.action, entityType: r.entityType, entityId: r.entityId, meta: r.meta ?? {},
     createdAt: r.createdAt.toISOString(), user: r.userId ? { id: r.userId, name: r.userName ?? '' } : null,
-  }));
+  })));
   return c.json({ items, total: Number(n) });
 });

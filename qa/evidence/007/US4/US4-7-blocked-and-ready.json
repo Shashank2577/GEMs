@@ -1,0 +1,37 @@
+{
+  "stages": [
+    "identified",
+    "go",
+    "ready",
+    "analysing",
+    "submitted",
+    "won",
+    "lost",
+    "preparing"
+  ],
+  "ready": [
+    {
+      "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+      "verdict": "go"
+    }
+  ],
+  "blocked": {
+    "id": "8fb8be2b-3be1-47db-91c5-8bb6111655e6",
+    "status": 409,
+    "body": {
+      "error": {
+        "code": "not_ready",
+        "message": "1 required document is missing or expired. Replace it in the vault, or ask a Bid Manager to override with a reason.",
+        "details": {
+          "blockers": [
+            {
+              "itemId": "oem_authorization",
+              "label": "OEM authorisation certificate (MAF) for this bid",
+              "state": "expired"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
