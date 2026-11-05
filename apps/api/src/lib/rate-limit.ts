@@ -21,7 +21,7 @@ import { authAttempts, passwordResets, type Db } from '@tp/db';
 import type { TrustProxy } from '../env';
 import { HttpError, serviceUnavailable, tooManyRequests } from './errors';
 
-export type AttemptKind = 'login_email' | 'login_ip' | 'reset_email' | 'reset_ip' | 'test_alert';
+export type AttemptKind = 'login_email' | 'login_ip' | 'reset_email' | 'reset_ip' | 'test_alert' | 'gem_result_org' | 'gem_result_bid';
 
 export interface LimitOptions {
   /** Maximum attempts allowed in one window; the attempt after that is rejected. */

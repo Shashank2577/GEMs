@@ -46,12 +46,15 @@ PranavTamada/Tender_Scraper, IshanMaheshwari-777/GEM-SCRAPER, Mujahid-Alam/gem-t
    QA never fixes code.
 6. **Rework** — on `qa:rejected`: developer fixes, QA re-runs (max 3 rounds; then label `needs-human`, comment the pattern, move on).
 7. **Merge** — only with `qa:approved` and no open blocking review finding:
-   `git fetch origin main && git rebase origin/main` (resolve conflicts; if migrations collide, delete your branch's generated
-   migration files and re-run `drizzle-kit generate`; if `pnpm-lock.yaml` conflicts, take main's and re-run `pnpm install`),
-   re-run the gate, `git push --force-with-lease`, then merge the PR with GitHub MCP `merge_pull_request` (method `squash`,
-   commit message keeps the trailers). If the merge API reports the PR is behind/not mergeable, rebase and retry.
-   Then close the story and task issues (state `closed`, reason `completed`) with a comment linking the PR and the verdict
-   (the repo default branch is not `main`, so `Closes` keywords will not auto-close).
+   `git fetch origin main && git merge origin/main` into the story branch (normal merge commit — **no rebase, no force-push**;
+   the PR is squash-merged so main stays linear). Resolve conflicts:
+   - migrations: `git checkout origin/main -- packages/db/migrations/meta/`, delete your branch's new `.sql`, run
+     `cd packages/db && pnpm exec drizzle-kit generate`, `git add -A packages/db`, then drop/recreate your local test DB;
+   - `pnpm-lock.yaml`: take main's and re-run `pnpm install`;
+   - `apps/api/test/roles-matrix.test.ts`: add a `MATRIX` entry for every new mutating route.
+   Re-run the gate, push, then merge the PR with GitHub MCP `merge_pull_request` (method `squash`, message keeps the trailers).
+   If the API reports conflicts/behind, merge main again and retry. Then close the story and task issues (state `closed`,
+   reason `completed`) with the merge note (the repo default branch is not `main`, so `Closes` keywords do not auto-close).
 8. Remove `status:*` progress labels on close. Move to the next story.
 
 Stories with no story issue ("cross-cutting" tasks) follow the same loop with branch `story/GEM-<epic>-hardening`;

@@ -35,6 +35,7 @@ export function flattenText(text: string): string {
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\u00A0/g, ' ')
     .replace(/\s*\/\s*(?=\/)/g, '') // "/ /" leftovers from removed Hindi
+    .replace(/\(\s*\)/g, ' ') // "( )" leftovers from removed Hindi in parentheses
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -51,13 +52,19 @@ function unitMultiplier(unit: string | undefined): number {
 }
 
 /** "50 Lakh (s)" → 5000000, "1.5 Crore (s)" → 15000000, "96,000" → 96000, "Rs. 2,50,000/-" → 250000. */
-export function parseIndianAmount(s: string): number | null {
+export function parseIndianAmount(input: string): number | null {
+  // Blank out durations ("3 Years") and parenthesised text ("(For 3 Years)"): they are not the amount.
+  const blank = (m: string) => ' '.repeat(m.length);
+  const s = input
+    .replace(/\([^)]*\)/g, blank)
+    .replace(/\d[\d,]*(?:\.\d+)?\s*(?:years?|months?|days?)\b/gi, blank);
   const withUnit = s.match(new RegExp(`(\\d[\\d,]*(?:\\.\\d+)?)\\s*${UNIT_RE}\\b`, 'i'));
-  if (withUnit) {
+  const plain = s.match(/(?:₹|Rs\.?|INR)?\s*(\d[\d,]*(?:\.\d+)?)/i);
+  // The first amount wins: "39,00,000 … 1.2 Crore" is 39 lakh, not 1.2 crore.
+  if (withUnit && (!plain || withUnit.index! <= plain.index! + plain[0].length - plain[1].length)) {
     const n = Number.parseFloat(withUnit[1].replace(/,/g, ''));
     if (Number.isFinite(n)) return Math.round(n * unitMultiplier(withUnit[2]));
   }
-  const plain = s.match(/(?:₹|Rs\.?|INR)?\s*(\d[\d,]*(?:\.\d+)?)/i);
   if (!plain) return null;
   const n = Number.parseFloat(plain[1].replace(/,/g, ''));
   return Number.isFinite(n) ? Math.round(n) : null;
@@ -87,10 +94,64 @@ interface LabelDef {
   mandatory: boolean;
   /** Boundary-only labels are used to delimit values but produce no requirement. */
   boundaryOnly?: boolean;
+  /** Only read on page 1 (header fields such as "Dated:"). */
+  firstPageOnly?: boolean;
+  /**
+   * Rest of a long label after the head matched by `re`. When the label wraps, pdf text may put the value
+   * inside it ("Minimum Average 1.2 Crore (s) Annual Turnover of the bidder"); see `matchTail`.
+   */
+  tail?: string;
+  /** Letters/digits of the tail that must be present for the hit to count (0 = head alone is enough). */
+  minTail?: number;
 }
 
+const alnum = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Match the tail of a wrapped label after its head, allowing one gap of up to six tokens (the value
+ * interleaved by the wrap). Tokens are compared on letters/digits only, so "same/ similar" and
+ * "(For 3 Years)" match however they were broken. Returns where the label ends and the gap, or null
+ * when less than `minTail` characters of the tail were found.
+ */
+function matchTail(flat: string, from: number, tail: string, minTail: number): { end: number; gap: [number, number] | null } | null {
+  let rest = alnum(tail);
+  const tokens = [...flat.slice(from, from + 400).matchAll(/\S+/g)].map((m) => ({ s: from + m.index, e: from + m.index + m[0].length, a: alnum(m[0]) }));
+  const consume = (i: number): { i: number; n: number; end: number } => {
+    let n = 0;
+    let end = -1;
+    while (i < tokens.length && rest) {
+      const a = tokens[i].a;
+      if (a && !rest.startsWith(a)) break;
+      if (!a && n === 0) break; // a gap may not start the consumed run with bare punctuation
+      rest = rest.slice(a.length);
+      n += a.length;
+      end = tokens[i].e;
+      i++;
+    }
+    return { i, n, end };
+  };
+  const total = rest.length;
+  const pre = consume(0);
+  let end = pre.end >= 0 ? pre.end : from;
+  let gap: [number, number] | null = null;
+  if (rest && pre.i < tokens.length) {
+    for (let g = pre.i + 1; g <= Math.min(tokens.length - 1, pre.i + 6); g++) {
+      const saved = rest;
+      const post = consume(g);
+      if (post.n >= Math.min(6, saved.length)) {
+        gap = [tokens[pre.i].s, tokens[g - 1].e];
+        end = post.end;
+        break;
+      }
+      rest = saved;
+    }
+  }
+  return total - rest.length >= minTail ? { end, gap } : null;
+}
+
+/** "Yes", "No", and the newer GeM forms "Yes | Complete" / "No | Complete" (FR-018). */
 const yesNo = (v: string): Parsed => {
-  const m = v.match(/\b(yes|no)\b/i);
+  const m = v.match(/\b(yes|no)\b(?:\s*\|\s*complete\b)?/i);
   return m ? { value: m[1].toLowerCase() === 'yes', numeric: null } : null;
 };
 const amount = (v: string): Parsed => {
@@ -114,6 +175,40 @@ const daysP = (v: string): Parsed => {
   if (!m) return null;
   const n = Number.parseInt(m[1], 10);
   return { value: `${n} days`, numeric: n };
+};
+/**
+ * Delivery days, either a plain "30" / "30 (Days)" or, in GeM's consignee table, the last column of the
+ * first consignee row ("1 Anil Kumar 110001,ABC Bhawan, New Delhi 25 30" → 30). A table row whose
+ * columns cannot be told apart yields nothing rather than the S.No.
+ */
+const deliveryP = (v: string): Parsed => {
+  const s = v.replace(/^[\s:/|-]+/, '');
+  if (/^1\s+[^\d\s(]/.test(s)) {
+    // Row 1 ends at its "quantity days" pair; a later "2 <name>" is row 2, but "2 Lodhi Road" in an address is not.
+    const pair = /\s\d[\d,]*(?:\.\d+)?\s+\d{1,4}(?=\s+2\s+[^\d\s(]|\s*$)/.exec(s);
+    const row = (pair ? s.slice(0, pair.index + pair[0].length) : s).replace(/[\s:/|-]+$/, '');
+    const m = row.match(/\s(\d[\d,]*(?:\.\d+)?)\s+(\d{1,4})$/);
+    if (!m) return null;
+    const n = Number.parseInt(m[2], 10);
+    return { value: `${n} days`, numeric: n };
+  }
+  return daysP(s);
+};
+/** "2 Year(s)", "1 Year(s) 6 Month(s)", "90 Day(s)" → total months (FR-019). */
+const contractP = (v: string): Parsed => {
+  const m = v.match(/^[\s:/|-]*((?:\d+(?:\.\d+)?\s*(?:Years?|Months?|Days?)\s*(?:\(\s*s\s*\))?[\s,]*(?:and\s+)?)+)/i);
+  if (!m) return null;
+  let months = 0;
+  const parts: string[] = [];
+  for (const [, num, unit] of m[1].matchAll(/(\d+(?:\.\d+)?)\s*(Year|Month|Day)/gi)) {
+    const n = Number.parseFloat(num);
+    if (!n) continue;
+    const u = unit.toLowerCase();
+    months += u === 'year' ? n * 12 : u === 'month' ? n : n / 30;
+    parts.push(`${n} ${u}${n === 1 ? '' : 's'}`);
+  }
+  if (!parts.length) return null;
+  return { value: parts.join(' '), numeric: Math.round(months * 10) / 10 };
 };
 const monthsP = (v: string): Parsed => {
   const m = v.match(/(\d+)/);
@@ -143,22 +238,26 @@ const dateP = (v: string): Parsed => {
 const L = (s: string) => new RegExp(s.replace(/ /g, '\\s*'), 'gi');
 
 const LABELS: LabelDef[] = [
+  // Header "Dated: dd-mm-yyyy" (case-sensitive, page 1 only: prose says "dated 23.03.2012").
+  { key: 'bid_published_at', label: 'Bid published on', re: /\bDated\s*:/g, parse: dateP, mandatory: false, firstPageOnly: true },
   { key: 'bid_end', label: 'Bid end date', re: L('Bid End Date ?/ ?Time'), parse: dateP, mandatory: false },
   { key: 'bid_opening', label: 'Bid opening date', re: L('Bid Opening Date ?/ ?Time'), parse: dateP, mandatory: false },
-  { key: 'offer_validity', label: 'Bid offer validity', re: L('Bid Offer Validity( \\(From End Date\\))?'), parse: daysP, mandatory: false },
+  { key: 'offer_validity', label: 'Bid offer validity', re: L('Bid Offer'), tail: 'Validity (From End Date)', minTail: 8, parse: daysP, mandatory: false },
   { key: 'ministry', label: 'Ministry / State', re: L('Ministry ?/ ?State Name'), parse: textP, mandatory: false },
   { key: 'department', label: 'Department', re: L('Department Name'), parse: textP, mandatory: false },
   { key: 'organisation', label: 'Organisation', re: L('Organi[sz]ation Name'), parse: textP, mandatory: false },
   { key: 'office', label: 'Office', re: L('Office Name'), parse: textP, mandatory: false },
   { key: 'total_quantity', label: 'Total quantity', re: L('Total Quantity'), parse: intP, mandatory: false },
   { key: 'item_category', label: 'Item category', re: L('Item Category'), parse: textP, mandatory: false },
+  // Service bids; case-sensitive so ATC prose ("during the contract period") is not read as the label.
+  { key: 'contract_period', label: 'Contract period', re: /\bContract\s*Period\b/g, parse: contractP, mandatory: false },
   { key: 'estimated_value', label: 'Estimated bid value', re: L('Estimated Bid Value'), parse: amount, mandatory: false },
-  { key: 'turnover_min', label: 'Minimum average annual turnover (bidder)', re: L('Minimum Average Annual Turnover of the bidder'), parse: amount, mandatory: true },
-  { key: 'oem_turnover', label: 'OEM average annual turnover', re: L('OEM Average Turnover'), parse: amount, mandatory: true },
-  { key: 'experience_years', label: 'Years of past experience', re: L('Years of Past Experience Required'), parse: yearsP, mandatory: true },
+  { key: 'turnover_min', label: 'Minimum average annual turnover (bidder)', re: L('Minimum Average'), tail: 'Annual Turnover of the bidder (For 3 Years)', minTail: 14, parse: amount, mandatory: true },
+  { key: 'oem_turnover', label: 'OEM average annual turnover', re: L('OEM Average'), tail: 'Turnover (Last 3 Years)', minTail: 8, parse: amount, mandatory: true },
+  { key: 'experience_years', label: 'Years of past experience', re: L('Years of Past'), tail: 'Experience Required for same/similar service', minTail: 18, parse: yearsP, mandatory: true },
   { key: 'past_performance', label: 'Past performance', re: L('Past Performance'), parse: pctP, mandatory: true },
-  { key: 'mse_exemption', label: 'MSE exemption (experience & turnover)', re: L('MSE Exemption for Years Of Experience'), parse: yesNo, mandatory: false },
-  { key: 'startup_exemption', label: 'Startup exemption (experience & turnover)', re: L('Startup Exemption for Years Of Experience'), parse: yesNo, mandatory: false },
+  { key: 'mse_exemption', label: 'MSE exemption (experience & turnover)', re: L('MSE (Exemption|Relaxation)'), tail: 'for Years Of Experience and Turnover', minTail: 8, parse: yesNo, mandatory: false },
+  { key: 'startup_exemption', label: 'Startup exemption (experience & turnover)', re: L('Startup (Exemption|Relaxation)'), tail: 'for Years Of Experience and Turnover', minTail: 8, parse: yesNo, mandatory: false },
   { key: 'documents_required', label: 'Documents required from seller', re: L('Document(s)? required from seller'), parse: textP, mandatory: true },
   { key: 'bid_to_ra', label: 'Bid to reverse auction', re: L('Bid to RA enabled'), parse: yesNo, mandatory: false },
   { key: 'bid_type', label: 'Type of bid', re: L('Type of Bid'), parse: textP, mandatory: false },
@@ -168,10 +267,10 @@ const LABELS: LabelDef[] = [
   { key: 'epbg_duration', label: 'ePBG duration', re: L('Duration of ePBG required ?\\(Months\\)\\.?'), parse: monthsP, mandatory: false },
   { key: 'mii', label: 'Make in India (MII) compliance', re: L('MII (Compliance|Purchase Preference)'), parse: yesNo, mandatory: true },
   { key: 'mse_purchase_preference', label: 'MSE purchase preference', re: L('MSE Purchase Preference'), parse: yesNo, mandatory: false },
-  { key: 'delivery_days', label: 'Delivery period', re: L('Delivery (Days|Period)( \\(in days\\))?'), parse: daysP, mandatory: true },
+  { key: 'delivery_days', label: 'Delivery period', re: L('Delivery (Days|Period)( \\(in days\\))?'), parse: deliveryP, mandatory: true },
   // Boundaries only
   { key: '_', label: '', re: L('Advisory Bank'), mandatory: false, boundaryOnly: true },
-  { key: '_', label: '', re: L('Time allowed for Technical Clarifications'), mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: /\bTime\b/g, tail: 'allowed for Technical Clarifications during technical evaluation', minTail: 19, mandatory: false, boundaryOnly: true },
   { key: '_', label: '', re: L('EMD Detail'), mandatory: false, boundaryOnly: true },
   { key: '_', label: '', re: L('ePBG Detail'), mandatory: false, boundaryOnly: true },
   { key: '_', label: '', re: L('\\(a\\)\\. EMD EXEMPTION'), mandatory: false, boundaryOnly: true },
@@ -186,10 +285,20 @@ const LABELS: LabelDef[] = [
   { key: '_', label: '', re: L('Address'), mandatory: false, boundaryOnly: true },
   { key: '_', label: '', re: /\bQuantity\b(?=\s+\d)/gi, mandatory: false, boundaryOnly: true },
   { key: '_', label: '', re: /\*\s*In case any bidder/gi, mandatory: false, boundaryOnly: true },
-  { key: '_', label: '', re: /\bGEM\/\d{4}\/[A-Z]\/\d+\s*\|\s*Page\s*\d+/gi, mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: /\bGEM\/\d{4}\/[A-Z]\/\d+\s*[|/]\s*Page\s*\d+/gi, mandatory: false, boundaryOnly: true },
+  // Other GeM "Bid Details" rows and page furniture we do not extract, so values stop before them.
+  { key: '_', label: '', re: /\bBid Number\b/g, mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: /\bPage\s*\d+\s*(?:of|\/)\s*\d+\b/gi, mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: L('Primary product category'), mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: L('Similar Category'), mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: L('Inspection Required'), mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: L('Do you want to show documents'), mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: L('RA Qualification Rule'), mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: L('Arbitration Clause'), mandatory: false, boundaryOnly: true },
+  { key: '_', label: '', re: L('Mediation Clause'), mandatory: false, boundaryOnly: true },
 ];
 
-interface Hit { def: LabelDef; start: number; end: number }
+interface Hit { def: LabelDef; start: number; end: number; gap: [number, number] | null }
 
 function findHits(flat: string): Hit[] {
   const hits: Hit[] = [];
@@ -197,8 +306,12 @@ function findHits(flat: string): Hit[] {
     def.re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = def.re.exec(flat))) {
-      hits.push({ def, start: m.index, end: m.index + m[0].length });
+      const end = m.index + m[0].length;
       if (m[0].length === 0) def.re.lastIndex++;
+      if (def.tail) {
+        const t = matchTail(flat, end, def.tail, def.minTail ?? 0);
+        if (t) hits.push({ def, start: m.index, end: t.end, gap: t.gap });
+      } else hits.push({ def, start: m.index, end, gap: null });
     }
   }
   hits.sort((a, b) => a.start - b.start || b.end - a.end);
@@ -213,7 +326,8 @@ function findHits(flat: string): Hit[] {
 }
 
 function clip(s: string, max = 220): string {
-  const t = s.trim();
+  // Trailing "/" is what remains of the next row's stripped Hindi label.
+  const t = s.trim().replace(/[\s/|]+$/, '');
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
@@ -245,6 +359,88 @@ function sentenceAround(flat: string, idx: number, len: number): string {
   return clip(flat.slice(start, end), 260);
 }
 
+// ───────────── Consignee state (FR-019) ─────────────
+
+/**
+ * States and union territories of India. List ported from erenmyeager15/india-government-tenders-scraper
+ * `src/routes.ts` INDIAN_STATES (Apache-2.0, see NOTICE); aliases added here.
+ */
+export const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha',
+  'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Jammu and Kashmir',
+  'Ladakh', 'Lakshadweep', 'Puducherry',
+] as const;
+
+const STATE_ALIASES: Record<string, (typeof INDIAN_STATES)[number]> = {
+  orissa: 'Odisha', pondicherry: 'Puducherry', uttaranchal: 'Uttarakhand', 'jammu & kashmir': 'Jammu and Kashmir',
+  'j&k': 'Jammu and Kashmir', 'andaman & nicobar': 'Andaman and Nicobar Islands', 'andaman and nicobar': 'Andaman and Nicobar Islands',
+  'nct of delhi': 'Delhi', 'daman and diu': 'Dadra and Nagar Haveli and Daman and Diu', 'dadra and nagar haveli': 'Dadra and Nagar Haveli and Daman and Diu',
+};
+
+const STATE_RE = new RegExp(
+  `(?<![A-Za-z])(${[...INDIAN_STATES, ...Object.keys(STATE_ALIASES)]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\&]/g, '\\$&').replace(/ /g, '\\s+'))
+    .join('|')})(?![A-Za-z])`,
+  'i',
+);
+
+/**
+ * The first Indian state / UT named in `text` (longest name wins at the same position), canonicalised.
+ * Idea from erenmyeager15 `inferIndianState`, but position-ordered and word-bounded.
+ */
+export function inferIndianState(text: string): { state: string; index: number; length: number } | null {
+  const m = STATE_RE.exec(text);
+  if (!m) return null;
+  const raw = m[1].replace(/\s+/g, ' ').toLowerCase();
+  const state = STATE_ALIASES[raw] ?? INDIAN_STATES.find((s) => s.toLowerCase() === raw);
+  return state ? { state, index: m.index, length: m[0].length } : null;
+}
+
+/**
+ * State of the first consignee row. Several states can occur in one address ("Punjab National Bank
+ * Building, Sector 5, Gurugram, Haryana"): the state closes the address, so the last one before the
+ * second row ("2 <name>") wins.
+ */
+function firstRowState(block: string): { state: string; index: number; length: number } | null {
+  const rowStart = /(?:^|\s)1\s+[^\d\s(]/.exec(block);
+  const from = rowStart ? rowStart.index : 0;
+  const row2 = /\s\d[\d,]*(?:\.\d+)?\s+\d{1,4}\s+2\s+[^\d\s(]/.exec(block.slice(from));
+  const row = block.slice(from, row2 ? from + row2.index : undefined);
+  let last: { state: string; index: number; length: number } | null = null;
+  for (let off = 0; ;) {
+    const h = inferIndianState(row.slice(off));
+    if (!h) break;
+    last = { ...h, index: h.index + off + from };
+    off += h.index + h.length;
+  }
+  return last ?? inferIndianState(block);
+}
+
+const CONSIGNEE_START = /Consignees?\s*\/\s*Reporting\s*Officer/i;
+const CONSIGNEE_END = /Technical\s*Specifications|Buyer\s*Added\s*Bid\s*Specific|Specification\s*Document|Pre[- ]?Dispatch\s*Inspection|Disclaimer/i;
+
+/** State of the first consignee, read only from the consignee / reporting-officer block (FR-019). */
+function consigneeState(flats: string[]): { state: string; page: number; quote: string } | null {
+  for (let i = 0; i < flats.length; i++) {
+    const flat = flats[i];
+    const start = CONSIGNEE_START.exec(flat);
+    if (!start) continue;
+    const rest = flat.slice(start.index, start.index + 1500);
+    const end = CONSIGNEE_END.exec(rest.slice(start[0].length));
+    const block = end ? rest.slice(0, start[0].length + end.index) : rest;
+    const hit = firstRowState(block);
+    if (hit) {
+      // Start the quote at a word boundary, at most 120 characters before the state.
+      const from = hit.index > 120 ? block.indexOf(' ', hit.index - 120) + 1 : 0;
+      return { state: hit.state, page: i + 1, quote: clip(block.slice(from, hit.index + hit.length + 40)) };
+    }
+  }
+  return null;
+}
+
 // ───────────── Main extractor ─────────────
 
 export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): Requirement[] {
@@ -264,10 +460,19 @@ export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): 
     const hits = findHits(flat);
     hits.forEach((h, j) => {
       if (h.def.boundaryOnly || !h.def.parse) return;
+      if (h.def.firstPageOnly && page !== 1) return;
       if (have.has(h.def.key)) return;
-      const next = hits[j + 1];
+      let next = hits[j + 1];
+      if (h.def.key === 'documents_required') {
+        // GeM lists documents named like labels ("…,Past Performance,Bidder Turnover"): a label that
+        // directly follows a comma is a list item, not the next row.
+        let k = j + 1;
+        while (hits[k] && /,\s*$/.test(flat.slice(Math.max(0, hits[k].start - 3), hits[k].start))) k++;
+        next = hits[k];
+      }
       const end = Math.min(next ? next.start : flat.length, h.end + (h.def.key === 'documents_required' ? 600 : 260));
-      const raw = flat.slice(h.end, end);
+      // A value interleaved inside the wrapped label comes first.
+      const raw = h.gap ? `${flat.slice(h.gap[0], h.gap[1])} ${flat.slice(h.end, end)}` : flat.slice(h.end, end);
       if (h.def.key === 'documents_required') {
         const items = splitDocumentList(raw);
         if (!items.length) return;
@@ -278,6 +483,8 @@ export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): 
       const parsed = h.def.parse(raw);
       if (!parsed || parsed.value === '' || parsed.value == null) return;
       have.add(h.def.key);
+      // "Contract Period" in a later page's ATC heading is less certain than the page-1 bid-details row.
+      const confidence = h.def.key === 'contract_period' && page > 1 ? 0.8 : 0.95;
       out.push({
         key: h.def.key,
         label: h.def.label,
@@ -286,7 +493,7 @@ export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): 
         mandatory: h.def.mandatory,
         source: src(page, flat.slice(h.start, end)),
         method: 'RULE',
-        confidence: 0.95,
+        confidence,
       });
     });
   });
@@ -392,6 +599,14 @@ export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): 
     }
   });
 
+  const consignee = consigneeState(flats);
+  if (consignee) {
+    out.push({
+      key: 'consignee_state', label: 'Consignee state', value: consignee.state, numeric: null, mandatory: false,
+      source: src(consignee.page, consignee.quote), method: 'RULE', confidence: 0.8,
+    });
+  }
+
   // OEM authorisation listed in "Document required from seller" even if not on another page.
   if (!have.has('oem_auth') && dl && /OEM Authori[sz]ation/i.test(docLabels)) {
     out.push({
@@ -437,11 +652,17 @@ export function requirementId(r: Requirement): string {
 /**
  * Combine requirement lists from several documents, in order (bid document first, then ATC,
  * corrigenda…). For single-valued keys a later document wins (a corrigendum supersedes the
- * original); multi-valued keys are unioned. `fallback` fills keys no document provided.
+ * original), except `bid_published_at`, where the earliest document wins; multi-valued keys are unioned. `fallback` fills keys no document provided.
  */
 export function combineRequirements(lists: Requirement[][], fallback: Requirement[] = []): Requirement[] {
   const map = new Map<string, Requirement>();
-  for (const list of lists) for (const r of list) map.set(requirementId(r), r);
+  for (const list of lists) {
+    for (const r of list) {
+      // The publication date belongs to the bid document: a corrigendum's own "Dated:" must not replace it.
+      if (r.key === 'bid_published_at' && map.has(r.key)) continue;
+      map.set(requirementId(r), r);
+    }
+  }
   for (const r of fallback) if (!map.has(requirementId(r))) map.set(requirementId(r), r);
   return [...map.values()];
 }

@@ -35,9 +35,9 @@ How to re-check:
    `isolation.test.ts` (002 resource sweep) must pass.
 4. Update the table and the "Last checked" line above in the release PR.
 
-### Before running migration 0009 (demo data-fix, 008/FR-016)
+### Before running migration 0010 (demo data-fix, 008/FR-016)
 
-`packages/db/migrations/0009_demo_source_datafix.sql` deletes data. Before migrating any environment that has had
+`packages/db/migrations/0010_demo_source_datafix.sql` deletes data. Before migrating any environment that has had
 demo data loaded:
 
 1. Create a Neon branch (or snapshot) of the database and note its name in the release PR; it is the rollback path.

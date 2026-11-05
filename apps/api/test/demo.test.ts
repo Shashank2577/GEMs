@@ -286,7 +286,7 @@ describe('008/FR-016 R3: the seeder fingerprint content_hash = demo-<bid> also h
     expect((await matchAndNotify(ctx.deps, [copy!.id], NOW)).matchesCreated).toBe(0);
     // A 'demo' row with the same bid number exists, so step 1 cannot convert the copy: step 1b deletes it.
     expect((await ctx.db.select().from(tenders).where(and(eq(tenders.source, 'demo'), eq(tenders.bidNumber, bid)))).length).toBe(1);
-    for (const stmt of readFileSync(fileURLToPath(new URL('../../../packages/db/migrations/0009_demo_source_datafix.sql', import.meta.url)), 'utf8').split('--> statement-breakpoint')) {
+    for (const stmt of readFileSync(fileURLToPath(new URL('../../../packages/db/migrations/0010_demo_source_datafix.sql', import.meta.url)), 'utf8').split('--> statement-breakpoint')) {
       if (stmt.replace(/--.*$/gm, '').trim()) await ctx.db.execute(sql.raw(stmt));
     }
     expect(await ctx.db.select().from(tenders).where(eq(tenders.id, copy!.id))).toHaveLength(0);
@@ -294,8 +294,8 @@ describe('008/FR-016 R3: the seeder fingerprint content_hash = demo-<bid> also h
   });
 });
 
-describe('008/T047 data-fix migration 0009_demo_source_datafix (US3 scenario 3)', () => {
-  const MIGRATION = fileURLToPath(new URL('../../../packages/db/migrations/0009_demo_source_datafix.sql', import.meta.url));
+describe('008/T047 data-fix migration 0010_demo_source_datafix (US3 scenario 3)', () => {
+  const MIGRATION = fileURLToPath(new URL('../../../packages/db/migrations/0010_demo_source_datafix.sql', import.meta.url));
   const runMigration = async () => {
     for (const stmt of readFileSync(MIGRATION, 'utf8').split('--> statement-breakpoint')) {
       if (stmt.replace(/--.*$/gm, '').trim()) await ctx.db.execute(sql.raw(stmt));
