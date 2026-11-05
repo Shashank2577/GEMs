@@ -1,0 +1,62 @@
+# Every label the system reads, in one place (#323). REQ-001, REQ-007.
+#
+# Labels are the workflow's state machine (CONVENTIONS.md), so a label that
+# exists only because someone once created it by hand is a state that a
+# new adopter's repo silently lacks. Seven of them did on the control plane
+# itself until this file: role:security, role:operations,
+# security:approved, security:rejected, signoff:approved,
+# signoff:change-requested and type:change-request. The first two left the
+# security and operations roles unroutable; the sign-off three blocked all
+# refinement (#198).
+#
+# `scripts/foundry-init.py` creates whatever is missing here on the control
+# plane, plus one `product:<key>` label per product (#290). It never edits
+# or deletes an existing label, so a colour someone chose by hand stays.
+#
+# The `role:*` set matches role-packs/orchestrator/policy.yaml's
+# routing.supported. A new role adds its label here in the same PR.
+version: 0
+
+labels:
+  # Workflow state.
+  - {name: "status:needs-refinement", color: "d4c5f9", description: "Not yet specific enough to dispatch"}
+  - {name: "status:ready", color: "0e8a16", description: "Approved by a person; the orchestrator may dispatch it"}
+  - {name: "status:in-progress", color: "fbca04", description: "A session is working on it"}
+  - {name: "status:in-review", color: "1d76db", description: "A pull request is open and waiting on review"}
+  - {name: "status:blocked", color: "b60205", description: "Waiting on something outside the item"}
+  - {name: "needs-human", color: "d93f0b", description: "A structured escalation is waiting for a person's decision"}
+
+  # Who the item is routed to.
+  - {name: "role:developer", color: "5319e7", description: "Routed to the developer role"}
+  - {name: "role:qa", color: "5319e7", description: "Routed to the QA role"}
+  - {name: "role:product-manager", color: "5319e7", description: "Routed to the product-manager role"}
+  - {name: "role:devops", color: "5319e7", description: "Routed to the devops role"}
+  - {name: "role:architect", color: "5319e7", description: "Routed to the architect role"}
+  - {name: "role:techwriter", color: "5319e7", description: "Routed to the techwriter role"}
+  - {name: "role:delivery-lead", color: "5319e7", description: "Routed to the delivery-lead role"}
+  - {name: "role:security", color: "5319e7", description: "Routed to the security role"}
+  - {name: "role:operations", color: "5319e7", description: "Routed to the operations role"}
+
+  # What kind of work it is.
+  - {name: "type:story", color: "c2e0c6", description: "A user-facing increment with acceptance criteria"}
+  - {name: "type:bug", color: "ee0701", description: "Something that should work and does not"}
+  - {name: "type:task", color: "c5def5", description: "Work with no user-facing change"}
+  - {name: "type:change-request", color: "f9d0c4", description: "A client change request against signed-off scope"}
+
+  # Verdicts. Each pair is mutually exclusive; a rejection blocks closure.
+  - {name: "qa:approved", color: "0e8a16", description: "QA verdict: acceptance criteria met"}
+  - {name: "qa:rejected", color: "b60205", description: "QA verdict: not met; blocks closure"}
+  - {name: "security:approved", color: "0e8a16", description: "Security verdict: no blocking finding"}
+  - {name: "security:rejected", color: "b60205", description: "Security verdict: blocking finding; blocks merge"}
+
+  # Client sign-off (policies/signoff.yaml).
+  - {name: "signoff:requested", color: "fef2c0", description: "Waiting on the client's sign-off"}
+  - {name: "signoff:approved", color: "0e8a16", description: "The client signed off"}
+  - {name: "signoff:change-requested", color: "d93f0b", description: "The client asked for changes before signing off"}
+
+# Created per product, not listed above: product:<key> for every key under
+# policies/products.yaml's `products:` (#290).
+product_label:
+  prefix: "product:"
+  color: "bfdadc"
+  description: "Work item belongs to product {key} (policies/products.yaml)"
