@@ -1,0 +1,9 @@
+{
+  "status": 401,
+  "body": {
+    "error": {
+      "code": "unauthorized",
+      "message": "Please sign in to continue"
+    }
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "closingSoon": [
+    {
+      "id": "463239cc-7ac8-4aa9-8304-602b32d583ce",
+      "bidNumber": "GEM/2026/B/6448851",
+      "title": "Network Video Recorder – 32 channel with 4 x 8 TB HDD",
+      "buyer": "Maharashtra State Police",
+      "state": "Maharashtra",
+      "endAt": "2026-11-05T08:02:00.000Z",
+      "emdAmount": 19000,
+      "estimatedValue": 962000,
+      "analysis": {
+        "score": 96,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "3fc203d0-5b8b-470e-8fab-501f6bf9fb85",
+        "stage": "ready"
+      }
+    },
+    {
+      "id": "c3926ac5-93d4-4491-a0c7-9d60b9d9fdd7",
+      "bidNumber": "GEM/2026/B/6456770",
+      "title": "LED Monitor 24\" IPS, Full HD (MII Class-I)",
+      "buyer": "Indian Army",
+      "state": "Maharashtra",
+      "endAt": "2026-11-05T12:02:00.000Z",
+      "emdAmount": 0,
+      "estimatedValue": 332000,
+      "analysis": {
+        "score": 96,
+        "verdict": "go"
+      },
+      "workspace": null
+    },
+    {
+      "id": "dfaa3e55-5d5a-4031-9670-c46991e26e91",
+      "bidNumber": "GEM/2026/B/6464689",
+      "title": "Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor",
+      "buyer": "Indian Army",
+      "state": "Maharashtra",
+      "endAt": "2026-11-06T05:30:00.000Z",
+      "emdAmount": 34000,
+      "estimatedValue": 1690000,
+      "analysis": {
+        "score": 82,
+        "verdict": "no_go"
+      },
+      "workspace": {
+        "id": "669d1b20-66f4-4903-9304-3763a830d473",
+        "stage": "preparing"
+      }
+    },
+    {
+      "id": "4b687eea-2008-4dc7-9b4d-e67c53300777",
+      "bidNumber": "GEM/2026/B/6472608",
+      "title": "CCTV Camera – IP Bullet 4 MP with IR, PoE (MII compliant)",
+      "buyer": "CRPF",
+      "state": "Gujarat",
+      "endAt": "2026-11-06T19:30:00.000Z",
+      "emdAmount": 66000,
+      "estimatedValue": 2196000,
+      "analysis": {
+        "score": 100,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "473e1245-3f9b-409a-abec-d1c89192a4a4",
+        "stage": "preparing"
+      }
+    },
+    {
+      "id": "e7c889c7-1f1e-4788-a459-53e0944157fd",
+      "bidNumber": "GEM/2026/B/6480527",
+      "title": "Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based",
+      "buyer": "Indian Institute of Technology Bombay",
+      "state": "Maharashtra",
+      "endAt": "2026-11-07T07:30:00.000Z",
+      "emdAmount": 89000,
+      "estimatedValue": 2980000,
+      "analysis": {
+        "score": 100,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "053d6e57-9868-4f89-8e2e-6cff30d098df",
+        "stage": "go"
+      }
+    },
+    {
+      "id": "614ef00a-3b00-43a8-9743-eac001280c3f",
+      "bidNumber": "GEM/2026/B/6488446",
+      "title": "Multifunction Machine MFM (Q2) – A3 mono laser, 35 ppm, duplex",
+      "buyer": "Directorate of Education, Goa",
+      "state": "Goa",
+      "endAt": "2026-11-08T01:30:00.000Z",
+      "emdAmount": 110000,
+      "estimatedValue": 3666000,
+      "analysis": {
+        "score": 100,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "75c79a8f-7c79-400e-aad0-928e88cbf57b",
+        "stage": "analysing"
+      }
+    },
+    {
+      "id": "75f566c6-49cc-4999-8768-4295da30585e",
+      "bidNumber": "GEM/2026/B/6496365",
+      "title": "Network Switch – Layer 2 Managed, 24 x 1G PoE+ with 4 x 10G SFP+",
+      "buyer": "Bharat Petroleum Corporation Limited",
+      "state": "Maharashtra",
+      "endAt": "2026-11-08T21:30:00.000Z",
+      "emdAmount": 54000,
+      "estimatedValue": 1795000,
+      "analysis": {
+        "score": 94,
+        "verdict": "go"
+      },
+      "workspace": null
+    },
+    {
+      "id": "cd80444d-1567-46b8-b693-b55902250135",
+      "bidNumber": "GEM/2026/B/6504284",
+      "title": "Next Generation Firewall (NGFW) – 5 Gbps threat protection, 3-year subscription",
+      "buyer": "NIC",
+      "state": "Delhi",
+      "endAt": "2026-11-09T17:30:00.000Z",
+      "emdAmount": 61000,
+      "estimatedValue": 2043000,
+      "analysis": {
+        "score": 92,
+        "verdict": "go"
+      },
+      "workspace": {
+        "id": "275fe227-b5c6-46dd-84c2-e6562f9674d0",
+        "stage": "go"
+      }
+    }
+  ],
+  "tiles": {
+    "newMatchesToday": 8,
+    "closingThisWeek": 11,
+    "activeBids": 13,
+    "emdAtStake": 1177000,
+    "winRate": 67,
+    "expiringDocs": 3
+  },
+  "stats": {
+    "newMatchesYesterday": 0,
+    "closingToday": 2,
+    "won": 2,
+    "lost": 1,
+    "expiredDocs": 1,
+    "analysesThisWeek": 14,
+    "openTenders": 34
+  }
+}

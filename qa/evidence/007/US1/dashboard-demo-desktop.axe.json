@@ -1,0 +1,2727 @@
+{
+  "url": "http://localhost:8788/dashboard",
+  "timestamp": "2026-11-05T03:03:16.375Z",
+  "violations": [
+    {
+      "id": "aria-progressbar-name",
+      "impact": "serious",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag111",
+        "EN-301-549",
+        "EN-9.1.1.1",
+        "RGAAv4",
+        "RGAA-11.1.1"
+      ],
+      "description": "Ensure every ARIA progressbar node has an accessible name",
+      "help": "ARIA progressbar nodes must have an accessible name",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-progressbar-name?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "aria-label",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute does not exist or is empty"
+            },
+            {
+              "id": "aria-labelledby",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty"
+            },
+            {
+              "id": "non-empty-title",
+              "data": {
+                "messageKey": "noAttr"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element has no title attribute"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div aria-valuemax=\"100\" aria-valuemin=\"0\" aria-valuenow=\"83\" aria-valuetext=\"83%\" role=\"progressbar\" data-state=\"loading\" data-value=\"83\" data-max=\"100\" class=\"relative w-full overflow-hidden rounded-full bg-muted h-2 mt-2\">",
+          "target": [
+            ".bg-muted"
+          ],
+          "failureSummary": "Fix any of the following:\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#7d8092",
+                "bgColor": "#fafafc",
+                "contrastRatio": 3.74,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<aside class=\"fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out md:block w-[248px]\" aria-label=\"Sidebar\">",
+                  "target": [
+                    "aside"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mb-1.5 mt-6 px-2.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/80\">Organization</p>",
+          "target": [
+            ".mb-1\\.5"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7d8092, background color: #fafafc, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+                  "target": [
+                    "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+          "target": [
+            "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#1183d4",
+                "bgColor": "#ebf7ff",
+                "contrastRatio": 3.69,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-info/20 bg-info-soft text-info h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Analysing</span>",
+                  "target": [
+                    ".border-info\\/20"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.69 (foreground color: #1183d4, background color: #ebf7ff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-info/20 bg-info-soft text-info h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Analysing</span>",
+          "target": [
+            ".border-info\\/20"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.69 (foreground color: #1183d4, background color: #ebf7ff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+                  "target": [
+                    "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs font-semibold\">Go</span>",
+          "target": [
+            "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#189567",
+                "bgColor": "#e9fbf3",
+                "contrastRatio": 3.53,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+                  "target": [
+                    "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-success/20 bg-success-soft text-success h-5 px-1.5 text-2xs\"><span class=\"size-1.5 rounded-full bg-current\" aria-hidden=\"true\"></span>Go</span>",
+          "target": [
+            "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .items-end.flex-col.gap-1 > .gap-1\\.5 > .border-success\\/20.bg-success-soft.text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #189567, background color: #e9fbf3, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#de2141",
+                "bgColor": "#ffedf0",
+                "contrastRatio": 4.23,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs shrink-0\">Expired 5d ago</span>",
+                  "target": [
+                    ".border-danger\\/20"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-danger/20 bg-danger-soft text-danger h-5 px-1.5 text-2xs shrink-0\">Expired 5d ago</span>",
+          "target": [
+            ".border-danger\\/20"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.23 (foreground color: #de2141, background color: #ffedf0, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ]
+    },
+    {
+      "id": "label-content-name-mismatch",
+      "impact": "serious",
+      "tags": [
+        "cat.semantics",
+        "wcag21a",
+        "wcag253",
+        "EN-301-549",
+        "EN-9.2.5.3",
+        "RGAAv4",
+        "RGAA-6.1.5"
+      ],
+      "description": "Ensure that elements labelled through their content must have their visible text as part of their accessible name",
+      "help": "Elements must have their visible text as part of their accessible name",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-content-name-mismatch?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "label-content-name-mismatch",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Text inside the element is not included in the accessible name"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: own Traders mw2ynsvf18. Switch organization\">",
+          "target": [
+            "#radix-\\:r3\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+        },
+        {
+          "any": [
+            {
+              "id": "label-content-name-mismatch",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Text inside the element is not included in the accessible name"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+          "target": [
+            "#radix-\\:rg\\:"
+          ],
+          "failureSummary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+        }
+      ]
+    }
+  ],
+  "incomplete": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">OT</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">OT</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(1) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">96</span>",
+          "target": [
+            "li:nth-child(1) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">96</span>",
+          "target": [
+            "li:nth-child(2) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(3) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">82</span>",
+          "target": [
+            "li:nth-child(3) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(4) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">100</span>",
+          "target": [
+            "li:nth-child(4) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">100</span>",
+          "target": [
+            "li:nth-child(5) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(6) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">100</span>",
+          "target": [
+            "li:nth-child(6) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">94</span>",
+          "target": [
+            "li:nth-child(7) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" class=\"-rotate-90\">",
+                  "target": [
+                    "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .-rotate-90[height=\"40\"][viewBox=\"0 0 40 40\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular font-semibold tracking-tight\" style=\"font-size: 12px;\">92</span>",
+          "target": [
+            "li:nth-child(8) > .py-3.px-2.hover\\:bg-muted\\/60 > .justify-center.relative[role=\"img\"] > .inset-0.leading-none.absolute > .tracking-tight.font-semibold.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"73.6923076923077\" dy=\"0.71em\">24 Oct</tspan>",
+          "target": [
+            "tspan[x=\"73.6923076923077\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"177.0769230769231\" dy=\"0.71em\">26 Oct</tspan>",
+          "target": [
+            "tspan[x=\"177.0769230769231\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"280.46153846153845\" dy=\"0.71em\">28 Oct</tspan>",
+          "target": [
+            "tspan[x=\"280.46153846153845\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"383.84615384615387\" dy=\"0.71em\">30 Oct</tspan>",
+          "target": [
+            "tspan[x=\"383.84615384615387\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"487.2307692307692\" dy=\"0.71em\">1 Nov</tspan>",
+          "target": [
+            "tspan[x=\"487.2307692307692\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"590.6153846153846\" dy=\"0.71em\">3 Nov</tspan>",
+          "target": [
+            "tspan[x=\"590.6153846153846\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"686.7578125\" dy=\"0.71em\">5 Nov</tspan>",
+          "target": [
+            "tspan[x=\"686.7578125\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">0</tspan>",
+          "target": [
+            "text[y=\"194\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">2</tspan>",
+          "target": [
+            "text[y=\"147.5\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">4</tspan>",
+          "target": [
+            "text[y=\"101\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">6</tspan>",
+          "target": [
+            "text[y=\"54.5\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">8</tspan>",
+          "target": [
+            "text[y=\"8.25\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "18.0pt (24px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "3:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\">",
+                  "target": [
+                    "svg[viewBox=\"0 0 120 120\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular text-2xl font-semibold tracking-tight\">20</span>",
+          "target": [
+            ".pointer-events-none > .text-2xl.tracking-tight.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\">",
+                  "target": [
+                    "svg[viewBox=\"0 0 120 120\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-2xs font-medium uppercase tracking-wider text-muted-foreground\">analysed</span>",
+          "target": [
+            ".pointer-events-none > .uppercase.tracking-wider.text-2xs"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(1) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(1) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T03:03:14.719Z\" title=\"05 Nov 2026, 8:33 am IST\">just now</time>",
+          "target": [
+            "time[datetime=\"2026-11-05T03:03:14.719Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(2) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(2) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T03:02:02.735Z\" title=\"05 Nov 2026, 8:32 am IST\">1 minute ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-05T03:02:02.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(3) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(3) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-05T00:03:14.735Z\" title=\"05 Nov 2026, 5:33 am IST\">3 hours ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-05T00:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(4) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(4) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T23:03:14.735Z\" title=\"05 Nov 2026, 4:33 am IST\">4 hours ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-04T23:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(5) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(5) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T20:03:14.735Z\" title=\"05 Nov 2026, 1:33 am IST\">7 hours ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-04T20:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(6) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(6) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T19:03:14.735Z\" title=\"05 Nov 2026, 12:33 am IST\">8 hours ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-04T19:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(7) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(7) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-04T01:03:14.735Z\" title=\"04 Nov 2026, 6:33 am IST\">yesterday</time>",
+          "target": [
+            "time[datetime=\"2026-11-04T01:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(8) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-muted-foreground\">",
+          "target": [
+            "li:nth-child(8) > .leading-snug.text-\\[13px\\].flex-1 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(8) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/tenders/dfaa3e55-5d5a-4031-9670-c46991e26e91\">Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor</a>",
+          "target": [
+            "li:nth-child(8) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T21:03:14.735Z\" title=\"04 Nov 2026, 2:33 am IST\">yesterday</time>",
+          "target": [
+            "time[datetime=\"2026-11-03T21:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(9) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-muted-foreground\">",
+          "target": [
+            "li:nth-child(9) > .leading-snug.text-\\[13px\\].flex-1 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(9) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/workspaces/6d28c39c-80f6-411c-b192-7bb0edc0b8d8\">Desktop Computers (Q2) – Intel Core i5, 16 GB RAM, 512 GB SSD, 23.8\" monitor</a>",
+          "target": [
+            "li:nth-child(9) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T11:03:14.735Z\" title=\"03 Nov 2026, 4:33 pm IST\">2 days ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-03T11:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(10) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-muted-foreground\">",
+          "target": [
+            "li:nth-child(10) > .leading-snug.text-\\[13px\\].flex-1 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(10) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/workspaces/b7ececcb-585d-45ad-992c-59c314e7ab01\">Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based</a>",
+          "target": [
+            "li:nth-child(10) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T03:03:14.735Z\" title=\"03 Nov 2026, 8:33 am IST\">2 days ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-03T03:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(11) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-muted-foreground\">",
+          "target": [
+            "li:nth-child(11) > .leading-snug.text-\\[13px\\].flex-1 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(11) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/tenders/e7c889c7-1f1e-4788-a459-53e0944157fd\">Wi-Fi 6 Access Point – Indoor, ceiling mount, controller based</a>",
+          "target": [
+            "li:nth-child(11) > .leading-snug.text-\\[13px\\].flex-1 > p > .hover\\:underline.rounded.text-foreground"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-03T01:03:14.735Z\" title=\"03 Nov 2026, 6:33 am IST\">2 days ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-03T01:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(12) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-muted-foreground\"><span class=\"font-medium text-foreground\">Priya Sharma</span> created the watchlist <a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/watchlists\">CCTV &amp; surveillance – West India</a></p>",
+          "target": [
+            "li:nth-child(12) > .leading-snug.text-\\[13px\\].flex-1 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(12) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/watchlists\">CCTV &amp; surveillance – West India</a>",
+          "target": [
+            ".hover\\:underline.rounded[href$=\"watchlists\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-02T09:03:14.735Z\" title=\"02 Nov 2026, 2:33 pm IST\">3 days ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-02T09:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"flex size-full items-center justify-center font-semibold\" title=\"Priya Sharma\" style=\"background: rgb(249, 236, 220); color: rgb(122, 81, 31);\">PS</span>",
+          "target": [
+            "li:nth-child(13) > .z-\\[1\\].ring-2.ring-background > .size-full.font-semibold[title=\"Priya Sharma\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-muted-foreground\"><span class=\"font-medium text-foreground\">Priya Sharma</span> uploaded <a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/vault\">Audited balance sheet FY 2024-25</a></p>",
+          "target": [
+            "li:nth-child(13) > .leading-snug.text-\\[13px\\].flex-1 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-medium text-foreground\">Priya Sharma</span>",
+          "target": [
+            "li:nth-child(13) > .leading-snug.text-\\[13px\\].flex-1 > p > .text-foreground.font-medium:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"rounded-xl border bg-card text-card-foreground shadow-xs flex flex-col\">",
+                  "target": [
+                    ".text-card-foreground.rounded-xl.shadow-xs:nth-child(3)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"font-medium text-foreground hover:underline focus-ring rounded\" href=\"/vault\">Audited balance sheet FY 2024-25</a>",
+          "target": [
+            ".hover\\:underline.rounded[href$=\"vault\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "pseudoContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<ol class=\"scrollbar-thin relative -mr-2 grid max-h-[520px] gap-4 overflow-y-auto pr-2 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-border\">",
+                  "target": [
+                    "ol"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a pseudo element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<time class=\"text-2xs text-muted-foreground\" datetime=\"2026-11-02T05:03:14.735Z\" title=\"02 Nov 2026, 10:33 am IST\">3 days ago</time>",
+          "target": [
+            "time[datetime=\"2026-11-02T05:03:14.735Z\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+        }
+      ]
+    }
+  ],
+  "passes": 26
+}

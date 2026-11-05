@@ -85,7 +85,7 @@ task is sized at ≤ 1 day.
 - [x] T021 [P] [US1] Plain-English activity sentences and self-contained actions in `apps/web/src/features/dashboard/activity.ts` FR-006
 - [x] T022 [US1] Stale-data banner: when `useDashboard()` has data and `isError` (background refresh failed), keep widgets and render "Couldn’t refresh — showing data from HH:MM IST" (from `generatedAt`) with "Retry"; reserve the full `ErrorState` for no-data errors, in `apps/web/src/features/dashboard/DashboardPage.tsx` and new `apps/web/src/features/dashboard/StaleBanner.tsx` FR-012 (#308)
 - [x] T023 [US1] Expiring-document rows link to `/vault?status=expiring` (consistent with the tile) and the "Closing this week" count clarifies "matched or in your pipeline" in the tile tooltip, in `apps/web/src/features/dashboard/DashboardPage.tsx` FR-009 (#309)
-- [ ] T024 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in `qa/evidence/007/US1/` — `e2e/007-experience-growth/US1-dashboard.e2e.ts` covering scenarios US1-1…US1-15 (API checks via `page.request`, 500/503/slow routes via `page.route`, desktop + `@mobile` 375 px first-viewport check SC-008) and `qa/evidence/007/US1/VERDICT.md` FR-001…FR-013, SC-002, SC-008 (#310)
+- [x] T024 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in `qa/evidence/007/US1/` — `e2e/007-experience-growth/US1-dashboard.e2e.ts` covering scenarios US1-1…US1-15 (API checks via `page.request`, 500/503/slow routes via `page.route`, desktop + `@mobile` 375 px first-viewport check SC-008) and `qa/evidence/007/US1/VERDICT.md` FR-001…FR-013, SC-002, SC-008 (#310)
 
 **Checkpoint**: User Story 1 fully functional and verified
 
