@@ -1,0 +1,36 @@
+# One-off, owner-approved (2026-11-05): applies branch protection on main per docs/runbook.md
+# "Branch protection on main" (008/US1 FR-003). Manual trigger only. Uses PROJECT_TOKEN (classic PAT, repo scope)
+# because GITHUB_TOKEN cannot administer branch protection.
+name: apply-branch-protection
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY to set protection on main'
+        required: true
+permissions: { contents: read }
+jobs:
+  protect:
+    if: github.event.inputs.confirm == 'APPLY'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply protection
+        env: { GH_TOKEN: '${{ secrets.PROJECT_TOKEN }}' }
+        run: |
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/branches/main/protection" \
+            -H "Accept: application/vnd.github+json" --input - <<'JSON'
+          {
+            "required_status_checks": { "strict": true,
+              "contexts": ["typecheck", "unit", "api", "e2e", "migrations-additive", "dod", "ci-gate"] },
+            "enforce_admins": true,
+            "required_pull_request_reviews": null,
+            "restrictions": null,
+            "allow_force_pushes": false,
+            "allow_deletions": false
+          }
+          JSON
+      - name: Verify
+        env: { GH_TOKEN: '${{ secrets.PROJECT_TOKEN }}' }
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/branches/main/protection" \
+            --jq '{checks: .required_status_checks.contexts, strict: .required_status_checks.strict, admins: .enforce_admins.enabled, force_push: .allow_force_pushes.enabled, deletions: .allow_deletions.enabled}'
