@@ -28,12 +28,19 @@ listed here with its licence.
      Period" as a GeM label;
    - INDIAN_STATES (list copied) and the inferIndianState idea (here word-bounded, position-ordered and
      scoped to the consignee block).
+   Spec 006 Apply (ported at commit 46925c6, 2026-11-05):
+   - apps/api/src/services/packet.ts buildWorkspacePacket loadBytes — the "independent Uint8Array copy before
+     PDF load" hardening (Uint8Array.from(bytes) before parsing) adapted from src/pdf.ts parseGemPdfText.
    Licence text: https://www.apache.org/licenses/LICENSE-2.0
 
 2. gem-search — https://github.com/arush15june/gem-search
    Licence: MIT License, Copyright (c) 2026 Aarush Jain
    Used in: packages/core/src/gem/client.ts and packages/core/src/gem/parse.ts (public endpoint payload
    fields and pagination parameters).
+   Also used in: packages/core/src/gem/award.ts (parseBidResult — TypeScript port of get_bid_result() from
+   gem.py: the bid-result view route /bidding/bid/getBidResultView/<b_id> and the bidder-row / categories
+   regular expressions), with the test fixture packages/core/test/fixtures/gem/bid-result.html built to the
+   same markup (spec 007, T004/T032).
    Licence text: https://opensource.org/license/mit
 
 3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc

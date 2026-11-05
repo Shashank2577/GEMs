@@ -1,0 +1,9 @@
+{
+  "status": 403,
+  "body": {
+    "error": {
+      "code": "forbidden",
+      "message": "You need to be at least an Analyst to do that"
+    }
+  }
+}

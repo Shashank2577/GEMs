@@ -165,7 +165,7 @@ Auth column: `—` public, `S` session cookie only, `A` any member (cookie or be
 | (gap) POST `/api/me/sessions/revoke-others` | S | – | 200 `{revoked:n}` | – |
 | (gap) DELETE `/api/org/members/me` | S | – | 200 `{ok, nextOrgId:string|null}` | 409 last_owner |
 | (gap) POST `/api/org/invitations/:id/resend` | M | – | 201 `CreatedInvitation` | 404 |
-| (gap) POST `/api/me/notifications/test` | A | – | 200 `{inApp:'sent', email:'sent'|'skipped'|'failed'|'off', whatsapp:…}` | 429 (1/min) |
+| (gap) POST `/api/me/notifications/test` | S | – | 200 `{inApp:'sent', email:'sent'|'skipped'|'failed'|'off', whatsapp:…}` (in-app row always created) | 403 (token); 429 (1/min) |
 
 ## Data model touch-points (`packages/db/src/schema.ts`)
 
