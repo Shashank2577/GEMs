@@ -61,6 +61,10 @@ export async function truncateAll(db: Db): Promise<void> {
 export interface TestContextOptions {
   /** Provide an LLM fake (default null = rules-only mode). */
   llm?: LlmClient | null;
+  /** OCR-tier fake (`deps.llmFor('ocr')`, 004/FR-050); default null = OCR unavailable. */
+  llmOcr?: LlmClient | null;
+  /** Escalation-tier fake (`deps.llmFor('escalation')`); default null = escalation off. */
+  llmEscalation?: LlmClient | null;
   /** Initial clock time (default: real now). The clock only moves when you call set/advance. */
   now?: Date | string;
   /** Skip truncation (e.g. a second context on the same DB). */
@@ -96,6 +100,7 @@ export async function createTestContext(opts: TestContextOptions = {}) {
     db,
     blobs: createFsBlobStore(blobDir),
     llm: opts.llm ?? null,
+    llmFor: (purpose) => (purpose === 'ocr' ? opts.llmOcr : purpose === 'escalation' ? opts.llmEscalation : opts.llm) ?? null,
     mailer,
     whatsapp,
     gem: loadGemConfig(env),

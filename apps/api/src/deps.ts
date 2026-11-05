@@ -35,11 +35,24 @@ export interface BlobStore {
 
 // ───────────── LLM ─────────────
 
+/** A base64 PDF sent as a `document` content block (004/FR-052 OCR). */
+export interface LlmDocumentBlock { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } }
+
 export interface LlmRequest {
   system?: string;
+  /** The instruction text. With `documents` it follows them in the same user message. */
   prompt: string;
-  /** Default 2048. */
+  /** PDF document blocks placed before the prompt text (OCR only; never company data, 004/FR-054). */
+  documents?: LlmDocumentBlock[];
+  /**
+   * Default 2048. Requests are not streamed, so the adapter caps this at `MAX_NON_STREAMING_TOKENS`: a larger
+   * output budget would need streaming to keep the connection alive (callers split the work instead, e.g. OCR parts).
+   */
   maxTokens?: number;
+  /** Overrides the client's request timeout for this call (ms), e.g. OCR transcription of several pages. */
+  timeoutMs?: number;
+  /** JSON Schema of the reply: sent as `output_config.format` (structured output, 004/FR-049) by `completeJson`. */
+  jsonSchema?: Record<string, unknown>;
   /** Aborts the provider request (008/FR-031: a timed-out call stops spending tokens and isolate time). */
   signal?: AbortSignal;
 }
@@ -61,10 +74,14 @@ export interface LlmClient {
   complete(req: LlmRequest): Promise<LlmResult>;
   /**
    * Ask for JSON and parse it (tolerates ```json fences and leading prose).
-   * Throws `LlmError` when the reply is not valid JSON. Validate the result with zod.
+   * Throws `LlmError` when the reply is not valid JSON, the model refused or the reply hit `max_tokens`.
+   * Validate the result with zod.
    */
   completeJson<T = unknown>(req: LlmRequest, opts?: LlmCallOptions): Promise<T>;
 }
+
+/** What an LLM client is used for; each purpose has its own model (004/FR-050). */
+export type LlmPurpose = 'enrichment' | 'ocr' | 'escalation';
 
 // ───────────── Messaging ─────────────
 
@@ -174,6 +191,11 @@ export interface AppDeps {
   blobs: BlobStore;
   /** null when ANTHROPIC_API_KEY is not set — rules-only mode (Constitution III). */
   llm: LlmClient | null;
+  /**
+   * The client for a purpose, or null when it is off: `enrichment` = `llm` (LLM_MODEL), `ocr` = LLM_OCR_MODEL (on
+   * whenever an API key is set), `escalation` = LLM_ESCALATION_MODEL (only when set). 004/FR-050.
+   */
+  llmFor(purpose: LlmPurpose): LlmClient | null;
   mailer: Mailer;
   whatsapp: WhatsApp;
   gem: GemConfig;

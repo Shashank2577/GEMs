@@ -90,3 +90,11 @@ Servers restarted on this code (API :8791, mock-gem :4014, fresh DBs `tenderpilo
 Screenshots: ![sc7](https://raw.githubusercontent.com/Shashank2577/GEMs/ed586fb893d4301030fabcec66c00606655653ce/qa/evidence/008/US4/sc7-analysis-budget-warning-desktop.png) ![sc7b](https://raw.githubusercontent.com/Shashank2577/GEMs/ed586fb893d4301030fabcec66c00606655653ce/qa/evidence/008/US4/sc7b-slow-llm-done-desktop.png) ![sc8](https://raw.githubusercontent.com/Shashank2577/GEMs/ed586fb893d4301030fabcec66c00606655653ce/qa/evidence/008/US4/sc8-301-pages-422-toast-desktop.png) ![sc8b](https://raw.githubusercontent.com/Shashank2577/GEMs/ed586fb893d4301030fabcec66c00606655653ce/qa/evidence/008/US4/sc8b-200-pages-truncated-warning-desktop.png)
 
 Observations (not blocking): (1) in sc8b the LLM endpoint was not running, so enrichment failed and the analysis fell back to rules with an `llm_budget_exhausted covered 0 of 1` warning — the code is reused for "LLM unavailable"; wording is slightly off for that case. (2) The `4f8d276` merge only renumbered migrations and merged main; `analyse.ts` is unchanged from `1c81196`.
+
+---
+
+**NOTE (2026-11-05, added by 004/US7 PR #560; the verdict above is unchanged history):** 008/FR-031's caps were raised by
+004/FR-051 to 8 LLM calls per analysis (automatic OCR included) and 480,000 characters. Scenario 7 now expects a tender
+with 10 one-chunk documents, ≤ 8 calls, ≤ 480,000 characters and the warning "AI review covered **8 of 10** documents;
+the rest were checked by rules only." (see spec US4 scenario 7 amendment and `e2e/008-operations-scale/US4-capacity.e2e.ts`
+sc7). The "2 calls / 2 of 5" rows above record what was tested at the time.

@@ -20,7 +20,7 @@
  * Analyst+ (tender work).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Role } from '@tp/db';
+import { tenderDocuments, tenders, type Role } from '@tp/db';
 import { DECISION_FORBIDDEN_MESSAGE } from '@tp/core/contracts/apply';
 import { createTestContext, request, seedOrgWithRoles, type RequestOptions, type SignedUp, type TestContext } from './helpers';
 import { seedAnalysis, seedTender } from './workspace-fixtures';
@@ -80,6 +80,7 @@ const MATRIX: Entry[] = [
   // ── analyse ──
   { method: 'POST', path: '/api/tenders/:id/documents', min: 'analyst' },
   { method: 'DELETE', path: '/api/tenders/:id/documents/:docId', min: 'analyst' },
+  { method: 'POST', path: '/api/tenders/:id/documents/:docId/ocr', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/fetch-documents', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/analyse', min: 'analyst' },
   { method: 'POST', path: '/api/analyses/:id/override', min: 'bid_manager' },
@@ -260,6 +261,33 @@ describe('006/FR-074 read-only API tokens: every mutating route', () => {
     expect(me.status).toBe(200);
     expect(me.body.org).toMatchObject({ id: o.orgId, name: 'Read Only Matrix' });
     expect((await request(ctx.app, 'GET', '/api/org/members', { cookie: o.owner.cookie })).body.items).toHaveLength(4);
+  });
+});
+
+/**
+ * Handler-level role gate on a query flag (review N7): `POST …/ocr?force=1` re-reads a document whose text already came
+ * from AI OCR — Bid Manager+. The MATRIX row above covers the route gate (analyst+); the flag is checked only when it
+ * applies (an org-owned document with OCR text), so it needs a real document rather than a random id.
+ */
+describe('role matrix: POST /api/tenders/:id/documents/:docId/ocr?force=1 (bid_manager+)', () => {
+  it('re-reading OCR text: viewer/analyst → 403, bid_manager/owner pass the gate; on a document that still needs OCR the flag is ignored', async () => {
+    const [t] = await ctx.db.insert(tenders).values({
+      bidNumber: 'GEM/2026/B/9999001', title: 'Force OCR matrix', category: 'IT services', sourceUrl: 'https://bidplus.gem.gov.in/all-bids#force-matrix',
+      contentHash: 'force-matrix', endAt: new Date('2026-12-31T09:30:00Z'),
+    }).returning();
+    const doc = (name: string, text: string, textSource: 'pdf' | 'ocr') => ctx.db.insert(tenderDocuments).values({
+      tenderId: t!.id, orgId: org.orgId, kind: 'bid', fileName: name, blobKey: `tenders/${t!.id}/${name}`, sizeBytes: 10, pageCount: 1, totalPages: 1, text, textSource,
+    }).returning().then((r) => r[0]!);
+    const ocrd = await doc('ocrd.pdf', 'Text read by AI OCR', 'ocr');
+    const scan = await doc('scan.pdf', '', 'pdf');
+    for (const role of ROLES) {
+      const r = await request(ctx.app, 'POST', `/api/tenders/${t!.id}/documents/${ocrd.id}/ocr?force=1`, { cookie: userFor(org, role).cookie });
+      if (RANK[role] >= RANK.bid_manager) expect(r.status, `${role}: ${r.text}`).not.toBe(403);
+      else expect(r.status, `${role}: ${r.text}`).toBe(403);
+      if (role === 'analyst') expect(r.body.error).toEqual({ code: 'forbidden', message: 'Only a bid manager or owner can re-run AI OCR on a document' });
+    }
+    const plain = await request(ctx.app, 'POST', `/api/tenders/${t!.id}/documents/${scan.id}/ocr?force=1`, { cookie: org.analyst.cookie });
+    expect(plain.status, plain.text).not.toBe(403);
   });
 });
 

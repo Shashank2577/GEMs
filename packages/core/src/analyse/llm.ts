@@ -9,18 +9,22 @@ import type { Requirement } from './types';
 import { MULTI_KEYS, requirementId } from './rules';
 
 /** Matches `LlmClient.completeJson` in apps/api (`deps.llm`). */
-export type CompleteJson = (req: { system?: string; prompt: string; maxTokens?: number }) => Promise<unknown>;
+export type CompleteJson = (req: { system?: string; prompt: string; maxTokens?: number; jsonSchema?: Record<string, unknown> }) => Promise<unknown>;
 
 /**
  * Version of the LLM extraction (prompt, model choice, parser). 008/FR-072: GeM-public documents keep the requirements
  * extracted at this version in `tender_documents` and every org's analysis reuses them; bumping this constant makes
  * the next analysis of each document re-extract it once. A test pins the value so a change is always deliberate.
+ * v2 (004/US7): the prompt now carries a JSON schema and large documents are read in page chunks (FR-051), so v1
+ * extractions (first 60k characters only) are re-extracted once.
  */
-export const CURRENT_EXTRACTOR_VERSION = 'llm-extract-2026-11-v1';
+export const CURRENT_EXTRACTOR_VERSION = 'llm-extract-2026-11-v2';
 
 /** The LLM's confidence is capped so a clean RULE match (0.95) is never displaced. */
 export const LLM_MAX_CONFIDENCE = 0.9;
-const MAX_CHARS = 60_000;
+/** Characters of document text in one enrichment prompt / one page chunk (FR-047, FR-051). */
+export const MAX_CHUNK_CHARS = 60_000;
+const MAX_CHARS = MAX_CHUNK_CHARS;
 
 export const LLM_REQUIREMENT_KEYS = [
   'turnover_min', 'oem_turnover', 'experience_years', 'similar_work', 'past_performance', 'emd', 'epbg',
@@ -34,20 +38,50 @@ a bidder must upload. Be literal: only report what the text states. Amounts are 
 1 crore = 10000000). Years, days and percentages are plain numbers. Never invent requirements. Pages are marked
 "=== Page N ===". Ignore financial price bids.`;
 
-export interface LlmPrompt { system: string; prompt: string; maxTokens: number }
+export interface LlmPrompt { system: string; prompt: string; maxTokens: number; jsonSchema: Record<string, unknown> }
+
+/**
+ * JSON Schema of the reply (`output_config.format`, FR-049), mirroring `llmItemSchema`. Structured outputs accept no
+ * numeric/length bounds, so ranges stay in zod, which still validates every item.
+ */
+export const LLM_REQUIREMENTS_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['requirements'],
+  properties: {
+    requirements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['key', 'label', 'value', 'numeric', 'mandatory', 'page', 'quote', 'confidence'],
+        properties: {
+          key: { type: 'string', enum: [...LLM_REQUIREMENT_KEYS] },
+          label: { type: 'string' },
+          value: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] },
+          numeric: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+          mandatory: { type: 'boolean' },
+          page: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+          quote: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          confidence: { type: 'number' },
+        },
+      },
+    },
+  },
+};
 
 /**
  * `maxChars` caps the document text included (default 60,000); an analysis passes what is left of its overall
- * 90,000-character budget (008/FR-031).
+ * character budget (008/FR-031). `startPage` is the document page number of `pages[0]` (chunks after the first, FR-051).
  */
-export function buildLlmPrompt(pages: string[], known: Requirement[] = [], maxChars = MAX_CHARS): LlmPrompt {
+export function buildLlmPrompt(pages: string[], known: Requirement[] = [], maxChars = MAX_CHARS, startPage = 1): LlmPrompt {
   let budget = Math.max(0, Math.min(MAX_CHARS, maxChars));
   const parts: string[] = [];
   pages.forEach((p, i) => {
     if (budget <= 0) return;
     const text = p.replace(/[ \t]+/g, ' ').trim().slice(0, budget);
     budget -= text.length;
-    parts.push(`=== Page ${i + 1} ===\n${text}`);
+    parts.push(`=== Page ${startPage + i} ===\n${text}`);
   });
   const knownList = known
     .filter((r) => r.method === 'RULE')
@@ -65,7 +99,7 @@ non-blacklisting or other undertakings, delivery or completion period, and anyth
 
 Document text:
 ${parts.join('\n\n')}`;
-  return { system: SYSTEM, prompt, maxTokens: 4096 };
+  return { system: SYSTEM, prompt, maxTokens: 4096, jsonSchema: LLM_REQUIREMENTS_JSON_SCHEMA };
 }
 
 const llmItemSchema = z.object({
@@ -151,21 +185,80 @@ export function mergeRequirements(rules: Requirement[], llm: Requirement[]): Req
 /** Characters sent for one prompt (system + user text) — what the 008/FR-031 budget counts. */
 export const promptChars = (p: Pick<LlmPrompt, 'system' | 'prompt'>) => p.system.length + p.prompt.length;
 
+/** A document is read by the model in at most this many page-aligned chunks of ≤ 60,000 characters (FR-051). */
+export const MAX_LLM_CHUNKS_PER_DOCUMENT = 4;
+
+export interface PageChunk {
+  /** 1-based document page number of `pages[0]`. */
+  startPage: number;
+  pages: string[];
+}
+
+/** Characters of a page as `buildLlmPrompt` includes them. */
+export const pageChars = (p: string) => p.replace(/[ \t]+/g, ' ').trim().length;
+
+/**
+ * Split a document into page-aligned chunks of ≤ `maxChars` characters of page text (a single page longer than that gets
+ * a chunk of its own and is cut by the prompt builder). At most `maxChunks` chunks are returned; `unreadFromPage` is the
+ * first page of the rest (1-based), or undefined when everything fits (FR-051).
+ */
+export function chunkPages(pages: string[], maxChars = MAX_CHARS, maxChunks = MAX_LLM_CHUNKS_PER_DOCUMENT): { chunks: PageChunk[]; unreadFromPage?: number } {
+  const chunks: PageChunk[] = [];
+  let cur: string[] = [];
+  let curStart = 1;
+  let size = 0;
+  for (let i = 0; i < pages.length; i++) {
+    const n = pageChars(pages[i]!);
+    if (cur.length && size + n > maxChars) {
+      chunks.push({ startPage: curStart, pages: cur });
+      if (chunks.length >= maxChunks) return { chunks, unreadFromPage: i + 1 };
+      cur = []; curStart = i + 1; size = 0;
+    }
+    cur.push(pages[i]!);
+    size += n;
+  }
+  if (cur.length) chunks.push({ startPage: curStart, pages: cur });
+  return { chunks };
+}
+
+/** "Pages 181–240 of X.pdf were not read by AI" (FR-051). `from`/`to` are 1-based and inclusive. */
+export function unreadPagesNote(fileName: string, from: number, to: number): string {
+  return from === to
+    ? `Page ${from} of ${fileName} was not read by AI`
+    : `Pages ${from}–${to} of ${fileName} were not read by AI`;
+}
+
+/** A chunk whose text was cut to fit (a single page over 60,000 characters, or the analysis's character budget). */
+export function partlyReadPagesNote(fileName: string, from: number, to: number): string {
+  return from === to
+    ? `Page ${from} of ${fileName} was only partly read by AI`
+    : `Pages ${from}–${to} of ${fileName} were only partly read by AI`;
+}
+
 export interface LlmExtractResult {
   requirements: Requirement[];
   used: boolean;
   error?: string;
   /** Characters sent to the LLM (0 when not called). */
   inputChars: number;
-  /** The LLM's own requirements before the merge (set when `used`), what the shared extraction cache stores. */
+  /** The validated items the model returned, before merging (escalation compares them with the rules). Empty when not used. */
+  llmItems: Requirement[];
+  /**
+   * The LLM's own requirements before the merge (set when `used`), what the shared extraction cache stores (008/FR-072).
+   * Same array as `llmItems`; kept as an optional alias for the cache code path.
+   */
   llm?: Requirement[];
   /**
    * True only when the reply carried a valid `requirements` array with at least one valid item: an empty or malformed
    * reply is used for this analysis (rules only) but must never be cached and served to every org (008/FR-072).
    */
   cacheable?: boolean;
+  /**
+   * The reply was a well-formed requirements array (possibly empty, review S5). A later chunk of a document that simply
+   * has no requirements on its pages is valid and does not stop the document's extraction from being shared.
+   */
+  valid?: boolean;
 }
-
 
 /** Run the LLM extractor and merge; on any failure, fall back to the rule results. */
 export async function enrichWithLlm(
@@ -173,17 +266,155 @@ export async function enrichWithLlm(
   rules: Requirement[],
   completeJson: CompleteJson | null | undefined,
   src: { documentId?: string; fileName?: string } = {},
-  opts: { maxChars?: number } = {},
+  opts: { maxChars?: number; startPage?: number } = {},
 ): Promise<LlmExtractResult> {
-  if (!completeJson || !pages.length) return { requirements: rules, used: false, inputChars: 0 };
-  const prompt = buildLlmPrompt(pages, rules, opts.maxChars);
+  if (!completeJson || !pages.length) return { requirements: rules, used: false, inputChars: 0, llmItems: [] };
+  const prompt = buildLlmPrompt(pages, rules, opts.maxChars, opts.startPage);
   const inputChars = promptChars(prompt);
   try {
     const reply = await completeJson(prompt);
     const llm = parseLlmRequirements(reply, src);
-    const cacheable = replyArray(reply) !== null && llm.length > 0;
-    return { requirements: mergeRequirements(rules, llm), used: true, inputChars, llm, cacheable };
+    const valid = replyArray(reply) !== null;
+    const cacheable = valid && llm.length > 0;
+    return { requirements: mergeRequirements(rules, llm), used: true, inputChars, llmItems: llm, llm, cacheable, valid };
   } catch (e) {
-    return { requirements: rules, used: false, error: (e as Error).message, inputChars };
+    return { requirements: rules, used: false, error: (e as Error).message, inputChars, llmItems: [] };
+  }
+}
+
+// ───────────── Escalation (FR-050) ─────────────
+
+/** Requirements that can turn a verdict into No-Go; an uncertain one is adjudicated by the escalation model. */
+export const BLOCKING_KEYS = ['turnover_min', 'experience_years', 'oem_auth', 'emd'] as const;
+/** A rule result below this confidence is uncertain. */
+export const ESCALATION_CONFIDENCE = 0.75;
+const ESCALATION_MAX_CHARS = 30_000;
+
+/** Yes/No-like values compare as booleans so `true` and "Yes" are not a conflict. */
+const valueKey = (r: Requirement) => {
+  const v = norm(r.value ?? r.label);
+  return /^(true|yes|required|mandatory)\b/.test(v) ? 'true' : /^(false|no|not required)\b/.test(v) ? 'false' : v;
+};
+const sameValue = (a: Requirement, b: Requirement) =>
+  a.numeric != null && b.numeric != null ? a.numeric === b.numeric : valueKey(a) === valueKey(b);
+
+/**
+ * Blocking keys to adjudicate: the rules found it with confidence < 0.75, or the rule and the LLM disagree on its value.
+ * Returns the rule item and, for a conflict, the LLM's competing item.
+ */
+export function escalationCandidates(rules: Requirement[], llmItems: Requirement[]): { key: string; rule: Requirement; llm?: Requirement }[] {
+  const out: { key: string; rule: Requirement; llm?: Requirement }[] = [];
+  for (const key of BLOCKING_KEYS) {
+    const rule = rules.find((r) => r.key === key && r.method === 'RULE');
+    if (!rule) continue;
+    const llm = llmItems.find((r) => r.key === key);
+    const conflict = !!llm && !sameValue(rule, llm);
+    if (rule.confidence < ESCALATION_CONFIDENCE || conflict) out.push({ key, rule, ...(conflict ? { llm } : {}) });
+  }
+  return out;
+}
+
+const ESCALATION_SYSTEM = `You are a senior Indian public-procurement analyst adjudicating ONE disputed or uncertain eligibility requirement
+of a Government e-Marketplace (GeM) bid. Decide from the document text only. Quote the exact supporting text (max 200
+characters) and its page number. If the text does not state the requirement, return no item for that key. Amounts are
+integer rupees (1 lakh = 100000, 1 crore = 10000000). Pages are marked "=== Page N ===".`;
+
+export function buildEscalationPrompt(pages: string[], candidates: ReturnType<typeof escalationCandidates>): LlmPrompt {
+  const cited = new Set<number>();
+  for (const c of candidates) for (const r of [c.rule, c.llm]) if (r?.source.page) cited.add(r.source.page);
+  // Pages the rules / the model cited, then (when nothing was cited) the start of the document.
+  const order = cited.size ? [...cited].sort((a, b) => a - b).filter((n) => n >= 1 && n <= pages.length) : pages.map((_, i) => i + 1);
+  let budget = ESCALATION_MAX_CHARS;
+  const parts: string[] = [];
+  for (const n of order) {
+    if (budget <= 0) break;
+    const text = pages[n - 1]!.replace(/[ \t]+/g, ' ').trim().slice(0, budget);
+    budget -= text.length;
+    parts.push(`=== Page ${n} ===\n${text}`);
+  }
+  const show = (r: Requirement | undefined) => (r ? `${typeof r.value === 'string' ? r.value : JSON.stringify(r.value ?? null)}${r.source.quote ? ` (quote: "${r.source.quote}")` : ''}` : '(none)');
+  const list = candidates.map((c) => `- ${c.key}: rules found ${show(c.rule)} with confidence ${c.rule.confidence}; model found ${show(c.llm)}`).join('\n');
+  const prompt = `Adjudicate these requirements:
+${list}
+
+Return JSON of the form:
+{"requirements":[{"key":"<${candidates.map((c) => c.key).join('|')}>","label":"short human label","value":"string|number|boolean","numeric":number|null,"mandatory":true|false,"page":number,"quote":"exact supporting text, max 200 chars","confidence":0..1}]}
+
+Document text:
+${parts.join('\n\n')}`;
+  return { system: ESCALATION_SYSTEM, prompt, maxTokens: 2048, jsonSchema: LLM_REQUIREMENTS_JSON_SCHEMA };
+}
+
+const squash = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** The quote occurs (case- and whitespace-insensitively) on the page it cites. */
+export function quoteOnPage(pages: string[], r: Pick<Requirement, 'source'>): boolean {
+  const { page, quote } = r.source;
+  if (!page || !quote || page < 1 || page > pages.length) return false;
+  const q = squash(quote);
+  return q.length > 0 && squash(pages[page - 1]!).includes(q);
+}
+
+const showValue = (r: Requirement) => (typeof r.value === 'string' ? r.value : JSON.stringify(r.value ?? null));
+
+/**
+ * Merge adjudicated items into `current`: for a candidate key, an item WITH a quote may replace the existing
+ * single-valued requirement (never a MANUAL one) when it contradicts it or is more confident. The result stays an LLM
+ * item, capped at 0.9, and is scored by the deterministic engine like any other (FR-048).
+ *
+ * A RULE item is never overridden silently (review S9): the adjudicated item replaces it only when its quote is found
+ * on the page it cites (`pages`) AND its confidence is at least the rule's. Otherwise a conflicting answer leaves the
+ * rule item in place, marked `needsReview` with what the model read, for a human to check. As the LLM is capped at
+ * 0.9, a clean rule match (0.95) is always kept.
+ */
+export function applyEscalation(
+  current: Requirement[], adjudicated: Requirement[], candidates: ReturnType<typeof escalationCandidates>, pages: string[] = [],
+): Requirement[] {
+  const out = [...current];
+  for (const c of candidates) {
+    const a = adjudicated.find((r) => r.key === c.key && r.source.quote);
+    if (!a) continue;
+    const i = out.findIndex((r) => r.key === c.key);
+    if (i < 0) { out.push(a); continue; }
+    const existing = out[i]!;
+    if (existing.method === 'MANUAL') continue;
+    const differs = !sameValue(existing, a);
+    if (!differs && a.confidence <= existing.confidence) continue;
+    if (existing.method === 'RULE' && !(quoteOnPage(pages, a) && a.confidence >= existing.confidence)) {
+      if (differs) {
+        out[i] = {
+          ...existing,
+          needsReview: `AI review read ${showValue(a)}${a.source.page ? ` on page ${a.source.page}` : ''} (“${a.source.quote}”), `
+            + 'which differs from this value — check it against the document.',
+        };
+      }
+      continue;
+    }
+    out[i] = a;
+  }
+  return out;
+}
+
+export interface EscalationResult { requirements: Requirement[]; used: boolean; keys: string[]; inputChars: number; error?: string }
+
+/** Ask the escalation model to adjudicate uncertain/conflicting blocking requirements; falls back to `current` on error. */
+export async function escalateWithLlm(
+  pages: string[],
+  current: Requirement[],
+  rules: Requirement[],
+  llmItems: Requirement[],
+  completeJson: CompleteJson | null | undefined,
+  src: { documentId?: string; fileName?: string } = {},
+): Promise<EscalationResult> {
+  const candidates = completeJson ? escalationCandidates(rules, llmItems) : [];
+  if (!completeJson || !candidates.length || !pages.length) return { requirements: current, used: false, keys: [], inputChars: 0 };
+  const prompt = buildEscalationPrompt(pages, candidates);
+  const inputChars = promptChars(prompt);
+  const keys = candidates.map((c) => c.key);
+  try {
+    const adjudicated = parseLlmRequirements(await completeJson(prompt), src).filter((r) => keys.includes(r.key));
+    return { requirements: applyEscalation(current, adjudicated, candidates, pages), used: true, keys, inputChars };
+  } catch (e) {
+    return { requirements: current, used: false, keys, inputChars, error: (e as Error).message };
   }
 }

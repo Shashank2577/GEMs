@@ -54,6 +54,7 @@ export const RATE_LIMIT_RULES = {
     routes: 'POST /vault, PUT /vault/:id/file, POST /tenders/:id/documents',
   },
   'gem.fetch.org': { limit: 30, windowSec: HOUR, subject: 'org', engine: 'generic', failClosed: false, routes: 'POST /tenders/:id/fetch-documents' },
+  'ocr.org': { limit: 20, windowSec: HOUR, subject: 'org', engine: 'generic', failClosed: false, routes: 'POST /tenders/:id/documents/:docId/ocr' },
   'analyse.user': { limit: 30, windowSec: HOUR, subject: 'user', engine: 'generic', failClosed: false, routes: 'POST /tenders/:id/analyse' },
   'packet.org': { limit: 30, windowSec: HOUR, subject: 'org', engine: 'generic', failClosed: false, routes: 'POST /workspaces/:id/packets' },
   'api.user': { limit: 600, windowSec: MIN, subject: 'user_or_token', engine: 'generic', failClosed: false, routes: 'every authenticated /api/*' },

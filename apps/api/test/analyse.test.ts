@@ -884,18 +884,31 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
     }
   });
 
-  it('5 documents → ≤ 2 LLM calls, ≤ 90,000 characters, rules for the rest, warning llm_budget_exhausted (2 of 5)', async () => {
+  // The 008/FR-031 limits before 004/FR-051 raised them to 8 calls / 480,000 characters.
+  const TWO = { maxCalls: 2, maxChars: 90_000 };
+  const svcInput = () => ({ orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} });
+
+  it('5 documents with a 2-call / 90,000-character budget → 2 calls, rules for the rest, warning llm_budget_exhausted (2 of 5)', async () => {
+    calls.length = 0;
+    const { analyseTender } = await import('../src/services/analyse');
+    const { analysis } = await analyseTender({ ...ctx.deps, llm: countingLlm() }, svcInput(), { llmBudget: TWO });
+    expect(calls.length).toBe(2);
+    expect(calls.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(90_000);
+    expect(analysis.method).toBe('rules+llm');
+    expect(analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+    // Persisted: the analysis panel reads it back.
+    const again = await request(ctx.app, 'GET', `/tenders/${fiveDocs}/analysis`, { cookie: roles.viewer.cookie });
+    expect(again.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+  });
+
+  it('default budget (004/FR-051): 5 documents → 5 calls (≤ 8), every document covered, no warning', async () => {
     calls.length = 0;
     const app = createApp({ ...ctx.deps, llm: countingLlm() });
     const r = await request(app, 'POST', `/tenders/${fiveDocs}/analyse`, { cookie: roles.analyst.cookie });
     expect(r.status).toBe(201);
-    expect(calls.length).toBe(2);
-    expect(calls.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(90_000);
+    expect(calls.length).toBe(5);
     expect(r.body.method).toBe('rules+llm');
-    expect(r.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
-    // Persisted: the analysis panel reads it back.
-    const again = await request(ctx.app, 'GET', `/tenders/${fiveDocs}/analysis`, { cookie: roles.viewer.cookie });
-    expect(again.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+    expect(r.body.warnings).toEqual([]);
   });
 
   it('caps the total characters across calls (a small budget gives the 2nd call only what is left)', async () => {
@@ -913,7 +926,7 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
     calls.length = 0;
     const hang = countingLlm(() => new Promise(() => {}));
     const t0 = Date.now();
-    const slow = await analyseTender({ ...ctx.deps, llm: hang }, input, { llmBudget: { callTimeoutMs: 50 } });
+    const slow = await analyseTender({ ...ctx.deps, llm: hang }, input, { llmBudget: { callTimeoutMs: 50, ...TWO } });
     expect(Date.now() - t0).toBeLessThan(5_000);
     expect(calls.length).toBe(2);
     expect(slow.analysis).toMatchObject({ status: 'done', method: 'rules', warnings: [{ code: 'llm_budget_exhausted', covered: 0, total: 5 }] });
@@ -969,7 +982,7 @@ describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
       })) as unknown as typeof fetch,
     });
     const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs, viewer: {} };
-    const r = await analyseTender({ ...ctx.deps, llm }, input, { llmBudget: { callTimeoutMs: 50 } });
+    const r = await analyseTender({ ...ctx.deps, llm }, input, { llmBudget: { callTimeoutMs: 50, ...TWO } });
     expect(r.analysis.method).toBe('rules');
     expect(signals).toHaveLength(2);
     expect(signals.every((sig) => sig.aborted)).toBe(true);
