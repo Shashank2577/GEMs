@@ -25,6 +25,7 @@ import { GemClient } from '@tp/core/gem/client';
 import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
+import { REAL_ONLY } from '../lib/tender-scope';
 
 export interface RunIngestionOptions {
   trigger?: 'cron' | 'manual' | 'seed';
@@ -372,6 +373,9 @@ export async function matchAndNotify(
   opts: { orgId?: string; watchlistId?: string; notify?: boolean } = {},
 ): Promise<{ matchesCreated: number; notificationsCreated: number }> {
   const { db } = deps;
+  // Duplicate ids (e.g. a tender both created and updated in one run) would otherwise yield duplicate rows across
+  // `in (…)` chunks, inflating `matchesCreated` and repeating watchlist names in the alert body.
+  tenderIds = [...new Set(tenderIds)];
   const conds = [eq(watchlists.active, true)];
   if (opts.orgId) conds.push(eq(watchlists.orgId, opts.orgId));
   if (opts.watchlistId) conds.push(eq(watchlists.id, opts.watchlistId));
@@ -379,28 +383,39 @@ export async function matchAndNotify(
   if (!lists.length || !tenderIds.length) return { matchesCreated: 0, notificationsCreated: 0 };
   const rows: TenderRow[] = [];
   for (let i = 0; i < tenderIds.length; i += 500) {
-    rows.push(...(await db.select().from(tenders).where(inArray(tenders.id, tenderIds.slice(i, i + 500)))));
+    // Only real tenders are matched here: demo tenders never alert anyone (008/FR-016). A demo org's own watchlist
+    // refresh (routes/watchlists.ts#refreshMatches) matches its demo tenders silently, without this function.
+    rows.push(...(await db.select().from(tenders).where(and(REAL_ONLY, inArray(tenders.id, tenderIds.slice(i, i + 500))))));
+  }
+
+  const hits: { t: TenderRow; w: (typeof lists)[number]; reasons: string[]; relevance: number }[] = [];
+  for (const t of rows) {
+    for (const w of lists) {
+      const r = matchTender(t, w.criteria as WatchlistCriteria, { now });
+      if (r.matched) hits.push({ t, w, reasons: r.reasons, relevance: r.relevance });
+    }
+  }
+  // Insert in batches; only pairs that were actually new (not already stored) count and notify.
+  const inserted = new Set<string>();
+  for (let i = 0; i < hits.length; i += 500) {
+    const ins = await db.insert(tenderMatches)
+      .values(hits.slice(i, i + 500).map((h) => ({ orgId: h.w.orgId, tenderId: h.t.id, watchlistId: h.w.id, reasons: h.reasons, relevance: h.relevance, createdAt: now })))
+      .onConflictDoNothing()
+      .returning({ tenderId: tenderMatches.tenderId, watchlistId: tenderMatches.watchlistId });
+    for (const x of ins) inserted.add(`${x.watchlistId}:${x.tenderId}`);
   }
 
   // (orgId, tenderId) → watchlist names that newly matched
   const fresh = new Map<string, { orgId: string; tender: TenderRow; names: string[]; reasons: string[] }>();
   let matchesCreated = 0;
-  for (const t of rows) {
-    for (const w of lists) {
-      const r = matchTender(t, w.criteria as WatchlistCriteria, { now });
-      if (!r.matched) continue;
-      const [ins] = await db.insert(tenderMatches)
-        .values({ orgId: w.orgId, tenderId: t.id, watchlistId: w.id, reasons: r.reasons, relevance: r.relevance, createdAt: now })
-        .onConflictDoNothing()
-        .returning({ id: tenderMatches.id });
-      if (!ins) continue;
-      matchesCreated++;
-      const key = `${w.orgId}:${t.id}`;
-      const f = fresh.get(key) ?? { orgId: w.orgId, tender: t, names: [], reasons: [] };
-      f.names.push(w.name);
-      for (const reason of r.reasons) if (!f.reasons.includes(reason)) f.reasons.push(reason);
-      fresh.set(key, f);
-    }
+  for (const { t, w, reasons } of hits) {
+    if (!inserted.has(`${w.id}:${t.id}`)) continue;
+    matchesCreated++;
+    const key = `${w.orgId}:${t.id}`;
+    const f = fresh.get(key) ?? { orgId: w.orgId, tender: t, names: [], reasons: [] };
+    f.names.push(w.name);
+    for (const reason of reasons) if (!f.reasons.includes(reason)) f.reasons.push(reason);
+    fresh.set(key, f);
   }
   if (!fresh.size || opts.notify === false) return { matchesCreated, notificationsCreated: 0 };
 

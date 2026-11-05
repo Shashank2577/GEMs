@@ -1,0 +1,10 @@
+# sc6-preview-paused — project desktop — 2026-11-05T04:32:05.762Z
+statuses: 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 429
+### call 31
+> POST /api/watchlists/preview
+< 429
+< retry-after: 54
+< ratelimit-remaining: 569
+< content-type: application/json
+{"error":{"code":"rate_limited","message":"Too many requests. Try again in 54 seconds.","details":{"rule":"watchlist.preview.user","retryAfter":54}}}
+

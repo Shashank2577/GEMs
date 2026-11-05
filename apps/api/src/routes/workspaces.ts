@@ -13,13 +13,14 @@
  *   DELETE /workspaces/:id/comments/:commentId   → 204; the author or bid_manager+, else 403                 viewer+
  *   PUT   /workspaces/:id/assist-values   allow-listed non-financial values only (price-like → 400)    analyst+
  *   POST  /workspaces/:id/submitted       human confirms they submitted on GeM                          analyst+
+ *   GET   /tenders/:id/result-hint        optional L1 hint from GeM's public result page (007/FR-030)    analyst+
  *
  * TenderPilot never submits on GeM (Constitution I): "submitted" only records what the human did.
  */
-import { and, eq, inArray, max } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, max, ne, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { bidWorkspaces, comments, memberships, notifications } from '@tp/db';
+import { bidWorkspaces, comments, gemResultHints, memberships, notifications } from '@tp/db';
 import {
   STAGES, STAGE_LABELS, assistValuesSchema, canTransition, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
   workspaceUpdateSchema, type StageName, type WorkspaceListResponse,
@@ -27,9 +28,12 @@ import {
 import { validateAssistValues, isForbiddenKey } from '@tp/core/assist/allowlist';
 import { autoMap } from '@tp/core/packet/mapping';
 import { parseMentions } from '@tp/core/packet/mentions';
+import { parseBidResult, type BidResultHint } from '@tp/core/gem/award';
+import { GemClient } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, conflict, forbidden, notFound, validationError } from '../lib/errors';
+import { hit, rateLimited, release, type LimitOptions } from '../lib/rate-limit';
 import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, roleAtLeast, userId } from '../middleware/auth';
 import {
@@ -55,10 +59,43 @@ async function readinessOf(deps: AppDeps, org: string, w: WorkspaceRow) {
   return { analysis: a, readiness: readinessFor(w, a, docs, deps.clock.now()), docs };
 }
 
+/** A transaction handle (FR-033: column reads and writes of one move share it). */
+type Tx = Parameters<Parameters<AppDeps['db']['transaction']>[0]>[0];
+
 async function nextPosition(deps: AppDeps, org: string, stage: StageName): Promise<number> {
-  const [r] = await deps.db.select({ m: max(bidWorkspaces.position) }).from(bidWorkspaces)
+  return nextPositionIn(deps.db, org, stage);
+}
+
+async function nextPositionIn(db: AppDeps['db'] | Tx, org: string, stage: StageName): Promise<number> {
+  const [r] = await (db as AppDeps['db']).select({ m: max(bidWorkspaces.position) }).from(bidWorkspaces)
     .where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.stage, stage)));
   return (r?.m ?? 0) + 1;
+}
+
+/** Below this gap two neighbouring positions are treated as exhausted (007/FR-033). */
+export const MIN_POSITION_GAP = 1e-9;
+
+/**
+ * Where a card asked for `requested` in `stage` lands (007/FR-033). Normally the requested fractional position
+ * is used as is. When it is not representable — it collides with a neighbour once stored as `real` (float4), or
+ * the neighbours differ by < 1e-9 — the column is renumbered 1, 2, 3, … in its current order with the card
+ * inserted at the requested slot; `renumber` lists the sibling updates to apply in the same transaction.
+ */
+async function planPosition(tx: Tx, org: string, id: string, stage: StageName, requested: number): Promise<{ position: number; renumber: { id: string; position: number }[] | null }> {
+  const sibs = await tx.select({ id: bidWorkspaces.id, position: bidWorkspaces.position }).from(bidWorkspaces)
+    .where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.stage, stage), ne(bidWorkspaces.id, id)))
+    .orderBy(asc(bidWorkspaces.position), desc(bidWorkspaces.updatedAt));
+  const found = sibs.findIndex((s) => s.position >= requested);
+  const at = found < 0 ? sibs.length : found;
+  // Compare in float4, exactly as Postgres `real` stores both sides.
+  const lower = sibs[at - 1] ? Math.fround(sibs[at - 1]!.position) : undefined;
+  const upper = sibs[at] ? Math.fround(sibs[at]!.position) : undefined;
+  const stored = Math.fround(requested);
+  const exhausted = (upper !== undefined && !(stored < upper)) || (lower !== undefined && !(stored > lower))
+    || (lower !== undefined && upper !== undefined && upper - lower < MIN_POSITION_GAP);
+  if (!exhausted) return { position: requested, renumber: null };
+  const order = [...sibs.slice(0, at).map((s) => s.id), id, ...sibs.slice(at).map((s) => s.id)];
+  return { position: at + 1, renumber: order.map((x, i) => ({ id: x, position: i + 1 })).filter((x) => x.id !== id) };
 }
 
 async function notify(deps: AppDeps, org: string, userIds: string[], n: { kind: 'assignment' | 'mention'; title: string; body: string; link: string; dedupeKey: string }) {
@@ -75,7 +112,7 @@ async function notify(deps: AppDeps, org: string, userIds: string[], n: { kind: 
 workspacesRoutes.post('/tenders/:id/workspace', requireRole('analyst'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
-  const t = await getTenderRow(deps, c.req.param('id'));
+  const t = await getTenderRow(deps, c.req.param('id'), c.var.org);
   const [existing] = await deps.db.select().from(bidWorkspaces).where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.tenderId, t.id)));
   if (existing) return c.json({ ...(await workspaceDto(deps, existing)), created: false });
 
@@ -144,7 +181,6 @@ workspacesRoutes.patch('/workspaces/:id', requireRole('analyst'), async (c) => {
   if (body.ownerId !== undefined) set.ownerId = body.ownerId;
   if (body.assigneeIds !== undefined) set.assigneeIds = [...new Set(body.assigneeIds)];
   if (body.dueAt !== undefined) set.dueAt = body.dueAt ? new Date(body.dueAt) : null;
-  if (body.position !== undefined) set.position = body.position;
 
   let stage = body.stage;
   // FR-008 (T020): won/lost — by stage or by outcome — only once the bid was submitted (or to correct a result).
@@ -170,11 +206,31 @@ workspacesRoutes.patch('/workspaces/:id', requireRole('analyst'), async (c) => {
     }
     if (stage === 'submitted' && !w.submittedAt) set.submittedAt = now;
     set.stage = stage;
-    if (body.position === undefined) set.position = await nextPosition(deps, org, stage);
   }
-  if (!Object.keys(set).length) return c.json(await workspaceDto(deps, w));
+  const targetStage = (set.stage ?? w.stage) as StageName;
+  const placing = body.position !== undefined || set.stage !== undefined;
+  if (!Object.keys(set).length && !placing) return c.json(await workspaceDto(deps, w));
 
-  const updated = await touch(deps, org, w.id, set);
+  // FR-033: position planning, any renumbering and the update run in ONE transaction, serialised per
+  // (org, target column) by an advisory lock so concurrent moves cannot interleave their reads and writes.
+  const updated: WorkspaceRow = await deps.db.transaction(async (tx) => {
+    if (placing) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${org}:${targetStage}`}))`);
+      if (body.position === undefined) {
+        set.position = await nextPositionIn(tx, org, targetStage);
+      } else {
+        const plan = await planPosition(tx, org, w.id, targetStage, body.position);
+        set.position = plan.position;
+        for (const r of plan.renumber ?? []) {
+          await tx.update(bidWorkspaces).set({ position: r.position }).where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.id, r.id)));
+        }
+      }
+    }
+    const [u] = await tx.update(bidWorkspaces).set({ ...set, updatedAt: now })
+      .where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.id, w.id))).returning();
+    if (!u) throw notFound('Bid workspace');
+    return u;
+  });
   if (set.stage) await log(c, w, 'workspace.stage_changed', { from: w.stage, to: set.stage, fromLabel: STAGE_LABELS[w.stage], toLabel: STAGE_LABELS[set.stage as StageName] });
   if (body.outcome) await log(c, w, 'workspace.outcome_recorded', { result: body.outcome.result, l1Price: body.outcome.l1Price ?? null });
   const newPeople = [...(body.ownerId && body.ownerId !== w.ownerId ? [body.ownerId] : []), ...(body.assigneeIds ?? []).filter((a) => !(w.assigneeIds ?? []).includes(a))]
@@ -333,4 +389,60 @@ workspacesRoutes.post('/workspaces/:id/submitted', requireRole('analyst'), async
   });
   await log(c, w, 'workspace.submitted', { from: w.stage, submittedAt: at.toISOString(), note: body.note ?? null });
   return c.json(await workspaceDto(deps, updated));
+});
+
+// ───────────── optional L1 hint (007/T033, FR-030) ─────────────
+
+/**
+ * GeM traffic for hints is bounded by DB-backed state, so it holds across Worker isolates and Node processes:
+ * - every lookup counts against the org (≤ 20 per hour, lib/rate-limit `hit()`), checked first;
+ * - the last parsed hint per GeM bid is kept in `gem_result_hints` (public data) and served to ANY authorised org
+ *   for 15 minutes, with no GeM call;
+ * - only when GeM really has to be asked is the per-bid slot taken (≤ 1 fetch per bid per 15 minutes); a failed
+ *   fetch gives the slot back so the next lookup may retry (still bounded by the per-org limit).
+ * Over a limit → the standard 429 `rate_limited`; the web then simply shows no hint.
+ */
+export const HINT_ORG_LIMIT: LimitOptions = { limit: 20, windowMs: 60 * 60_000 };
+export const HINT_BID_LIMIT: LimitOptions = { limit: 1, windowMs: 15 * 60_000 };
+export const HINT_TTL_MS = 15 * 60_000;
+
+/**
+ * Read-only: fetches GeM's PUBLIC result page through the polite GemClient and suggests the L1 price. The user
+ * decides whether to use it; nothing is entered on GeM. Requires a workspace for the tender in the caller's org.
+ */
+workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (c) => {
+  const { deps } = c.var;
+  const org = orgId(c);
+  const t = await getTenderRow(deps, c.req.param('id'), c.var.org);
+  const [w] = await deps.db.select({ id: bidWorkspaces.id }).from(bidWorkspaces).where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.tenderId, t.id)));
+  if (!w) throw notFound('Bid workspace');
+  if (!t.gemBidId) return c.json({ available: false, reason: 'no_gem_id' } satisfies BidResultHint);
+  const now = deps.clock.now();
+  const perOrg = await hit(deps.db, org, 'gem_result_org', HINT_ORG_LIMIT, now);
+  if (perOrg.over) throw rateLimited(perOrg.retryAfterSec);
+
+  const [cached] = await deps.db.select().from(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId));
+  if (cached && now.getTime() - cached.fetchedAt.getTime() < HINT_TTL_MS) return c.json(cached.hint as BidResultHint);
+
+  const bid = await hit(deps.db, t.gemBidId, 'gem_result_bid', HINT_BID_LIMIT, now);
+  if (bid.over) throw rateLimited(bid.retryAfterSec);
+  const client = new GemClient(deps.fetch, {
+    baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
+    maxRetries: 1, backoffMs: Math.min(1000, Math.max(10, deps.gem.minIntervalMs)), timeoutMs: 15_000,
+  });
+  let hint: BidResultHint;
+  try {
+    const page = await client.fetchBidResultHtml(t.gemBidId);
+    const r = page ? parseBidResult(page.html) : null;
+    hint = r && r.bidders.length
+      ? { available: true, l1Price: r.l1Price, bidders: r.bidders.map(({ rank, level, price }) => ({ rank, level, price })), sourceUrl: page!.url, fetchedAt: now.toISOString() }
+      : { available: false, reason: 'not_published' };
+  } catch (e) {
+    deps.logger.warn('result-hint: GeM fetch failed', { tenderId: t.id, error: (e as Error).message });
+    await release(deps.db, t.gemBidId, 'gem_result_bid');
+    return c.json({ available: false, reason: 'gem_unavailable' } satisfies BidResultHint);
+  }
+  await deps.db.insert(gemResultHints).values({ gemBidId: t.gemBidId, hint, fetchedAt: now })
+    .onConflictDoUpdate({ target: gemResultHints.gemBidId, set: { hint, fetchedAt: now } });
+  return c.json(hint);
 });

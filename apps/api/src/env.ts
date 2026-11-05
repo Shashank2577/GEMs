@@ -22,12 +22,25 @@ export interface RuntimeEnv {
   WHATSAPP_PHONE_ID?: string;
   WHATSAPP_API_VERSION?: string;
   LOG_REQUESTS?: string;
-  /** Which proxy header carries the client IP: "cloudflare" (cf-connecting-ip), "xff"/"1" (x-forwarded-for), unset = none. */
+  /**
+   * Which proxy header carries the client IP: "cloudflare" (cf-connecting-ip; Worker only, set by worker.ts and refused
+   * by the Node server), "1"/"xff" (right-most x-forwarded-for hop), unset = socket address (lib/client-ip.ts).
+   */
   TRUST_PROXY?: string;
   /** Packet build input cap in bytes (006/FR-056, NFR-003). Default 60 MB. */
   PACKET_MAX_INPUT_BYTES?: string;
   /** "development" | "production" | "test" */
   NODE_ENV?: string;
+  /** Operator token for /api/admin/* (008/FR-042). Unset → admin routes answer 404. */
+  ADMIN_TOKEN?: string;
+  /** Sentry DSN; unset → error reporter is a no-op (008/FR-046). */
+  SENTRY_DSN?: string;
+  /** "debug" | "info" | "warn" | "error" (default info). */
+  LOG_LEVEL?: string;
+  /** /api/health reports `ingestion_stale` when the last successful sync is older than this (default 120). */
+  HEALTH_INGESTION_MAX_AGE_MIN?: string;
+  /** Minimum minutes between manual "Sync now" runs (008/FR-026, default 10). */
+  MANUAL_SYNC_COOLDOWN_MIN?: string;
 }
 
 export interface AppConfig {
@@ -43,6 +56,20 @@ export interface AppConfig {
   trustProxy: TrustProxy;
   /** Max Σ stored input size of a packet build before it is refused with 413 (006/FR-056, NFR-003). */
   packetMaxInputBytes: number;
+  /** Null when ADMIN_TOKEN is unset. */
+  adminToken: string | null;
+  /** Null when SENTRY_DSN is unset. */
+  sentryDsn: string | null;
+  logLevel: LogLevel;
+  healthIngestionMaxAgeMin: number;
+  manualSyncCooldownMin: number;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+function parseLogLevel(v: string | undefined): LogLevel {
+  const l = (v ?? '').toLowerCase();
+  return l === 'debug' || l === 'warn' || l === 'error' ? l : 'info';
 }
 
 export type TrustProxy = 'cloudflare' | 'xff' | 'none';
@@ -79,7 +106,18 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     packetMaxInputBytes: positiveInt(env.PACKET_MAX_INPUT_BYTES, DEFAULT_PACKET_MAX_INPUT_BYTES),
+    adminToken: env.ADMIN_TOKEN || null,
+    sentryDsn: env.SENTRY_DSN || null,
+    logLevel: parseLogLevel(env.LOG_LEVEL),
+    healthIngestionMaxAgeMin: nonNegativeInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),
+    manualSyncCooldownMin: nonNegativeInt(env.MANUAL_SYNC_COOLDOWN_MIN, 10),
   };
+}
+
+/** Like positiveInt but 0 is allowed (e.g. MANUAL_SYNC_COOLDOWN_MIN=0 turns the cooldown off). */
+function nonNegativeInt(v: string | undefined, dflt: number): number {
+  const n = Number(v);
+  return v != null && v !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : dflt;
 }
 
 export interface GemConfig {

@@ -12,6 +12,7 @@ import { tenderQuerySchema, type Facet, type TenderListItem, type TenderQuery } 
 import { uuidSchema } from '@tp/core/contracts/common';
 import type { AppDeps } from '../deps';
 import { conflict, notFound } from '../lib/errors';
+import { canSeeTender, visibleTenderSource } from '../lib/tender-scope';
 import { parseWith } from '../lib/validate';
 import { orgId, requireAuth, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
@@ -36,9 +37,12 @@ export function rawQuery(c: Context): Record<string, string | string[]> {
 
 const NEW_WINDOW_MS = 7 * 86_400_000;
 
-/** Build WHERE conditions for GET /tenders (optionally omitting one facet's own filter). */
-function buildFilters(q: TenderQuery, org: string, now: Date, omit?: 'state' | 'ministry' | 'category'): SQL[] {
-  const conds: SQL[] = [];
+/**
+ * Build WHERE conditions for GET /tenders (optionally omitting one facet's own filter). `scope` is the org's
+ * visible-source filter (lib/tender-scope.ts): demo tenders only for orgs that loaded the demo (008/FR-016).
+ */
+function buildFilters(q: TenderQuery, org: string, now: Date, scope: SQL, omit?: 'state' | 'ministry' | 'category'): SQL[] {
+  const conds: SQL[] = [scope];
   const status = q.status ?? 'open';
   if (status !== 'all') conds.push(eq(tenders.status, status));
   if (status === 'open') conds.push(or(isNull(tenders.endAt), gte(tenders.endAt, now))!);
@@ -163,15 +167,16 @@ tendersRoutes.get('/tenders', requireAuth, async (c) => {
   const q = parseWith(tenderQuerySchema, rawQuery(c), 'query');
   const org = orgId(c);
   const now = deps.clock.now();
-  const where = and(...buildFilters(q, org, now));
+  const scope = visibleTenderSource(c.var.org);
+  const where = and(...buildFilters(q, org, now, scope));
   const offset = (q.page - 1) * q.pageSize;
 
   const [rows, [{ total }], states, ministries, categories] = await Promise.all([
     deps.db.select().from(tenders).where(where).orderBy(...orderBy(q, org)).limit(q.pageSize).offset(offset),
     deps.db.select({ total: sql<number>`count(*)::int` }).from(tenders).where(where),
-    facet(deps, tenders.state, buildFilters(q, org, now, 'state')),
-    facet(deps, tenders.ministry, buildFilters(q, org, now, 'ministry')),
-    facet(deps, tenders.category, buildFilters(q, org, now, 'category')),
+    facet(deps, tenders.state, buildFilters(q, org, now, scope, 'state')),
+    facet(deps, tenders.ministry, buildFilters(q, org, now, scope, 'ministry')),
+    facet(deps, tenders.category, buildFilters(q, org, now, scope, 'category')),
   ]);
   const items = await decorateTenders(deps, org, rows);
   return c.json({ items, total: Number(total), facets: { states, ministries, categories } });
@@ -181,7 +186,8 @@ async function loadTender(c: Context<AppEnv>): Promise<TenderRow> {
   const id = c.req.param('id');
   if (!uuidSchema.safeParse(id).success) throw notFound('Tender');
   const [t] = await c.var.deps.db.select().from(tenders).where(eq(tenders.id, id!));
-  if (!t) throw notFound('Tender');
+  // Demo tenders do not exist for orgs that never loaded the demo (008/FR-016).
+  if (!t || !canSeeTender(c.var.org, t)) throw notFound('Tender');
   return t;
 }
 

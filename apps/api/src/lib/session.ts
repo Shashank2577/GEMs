@@ -108,6 +108,7 @@ export async function resolveAuth(c: Context<AppEnv>): Promise<ResolvedAuth | nu
   if (bearer) {
     const [t] = await db.select().from(apiTokens).where(eq(apiTokens.tokenHash, await sha256Hex(bearer)));
     if (!t) return null;
+    if (t.expiresAt && t.expiresAt.getTime() <= now.getTime()) return null; // 002/FR-037: expired → 401
     const user = await loadUser(db, t.userId);
     if (!user) return null;
     const m = await loadMembership(db, t.userId, t.orgId);

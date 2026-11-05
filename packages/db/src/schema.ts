@@ -76,6 +76,20 @@ export const authAttempts = pgTable('auth_attempts', {
   count: integer('count').notNull().default(0),
 }, (t) => ({ pk: primaryKey({ columns: [t.key, t.kind] }) }));
 
+/**
+ * Generic fixed-window request counters (008/FR-017): one row per (`<rule>:<subject>`, aligned window start).
+ * Written by `apps/api/src/lib/rate-limiter.ts` with a single upsert; dead windows are pruned by the scheduler.
+ */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.key, t.windowStart] }),
+  // Pruning deletes by window_start (lib/rate-limiter.ts#pruneRateLimits).
+  windowIdx: index('rate_limits_window_idx').on(t.windowStart),
+}));
+
 /** Single-use password reset links (002/FR-011). Only the SHA-256 of the token is stored. */
 export const passwordResets = pgTable('password_resets', {
   id: id(),
@@ -96,9 +110,16 @@ export const apiTokens = pgTable('api_tokens', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   tokenHash: text('token_hash').notNull(),
+  /** Last 4 characters of the secret, shown in the list as `tp_…a1B2` (002/FR-037). Null for tokens created before it existed. */
+  tokenHint: text('token_hint'),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  /** Null = never expires (002/FR-037). Expired tokens are rejected by resolveAuth. */
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: createdAt(),
-}, (t) => ({ tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash) }));
+}, (t) => ({
+  tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash),
+  orgUserIdx: index('api_tokens_org_user_idx').on(t.orgId, t.userId),
+}));
 
 export const notificationPrefs = pgTable('notification_prefs', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -416,7 +437,22 @@ export const bidWorkspaces = pgTable('bid_workspaces', {
   position: real('position').notNull().default(0), // kanban order within stage
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId) }));
+}, (t) => ({
+  uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId),
+  /** Pipeline/dashboard stage aggregates (007/NFR-001). */
+  orgStageIdx: index('bid_workspaces_org_stage_idx').on(t.orgId, t.stage),
+}));
+
+/**
+ * Last parsed GeM bid-result hint per BidPlus `b_id` (007/T033, FR-030). Public data, not org-scoped: any org with a
+ * workspace for the tender is served from here within the TTL instead of fetching GeM again.
+ * `hint` is a `BidResultHint` from @tp/core/gem/award (available, or not published yet).
+ */
+export const gemResultHints = pgTable('gem_result_hints', {
+  gemBidId: text('gem_bid_id').primaryKey(),
+  hint: jsonb('hint').$type<Record<string, unknown>>().notNull(),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull(),
+});
 
 export const comments = pgTable('comments', {
   id: id(),
