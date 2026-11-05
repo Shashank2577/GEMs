@@ -12,3 +12,4 @@ playwright-report
 *.log
 .cairn/*.db
 .cairn/cache
+qa/.runs
