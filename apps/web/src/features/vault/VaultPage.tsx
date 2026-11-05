@@ -66,7 +66,7 @@ function DocCard({ doc, onOpen }: { doc: VaultDocumentDto; onOpen: () => void })
 
 function GridSkeleton() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {Array.from({ length: 8 }, (_, i) => (
         <Card key={i} className="p-4">
           <div className="flex gap-3"><Skeleton className="size-10 rounded-lg" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div></div>
@@ -96,7 +96,7 @@ function Onboarding({ onUpload }: { onUpload: (t: DocType) => void }) {
       </div>
       <div className="px-5 py-5 sm:px-8">
         <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">Documents most GeM bids ask for</h3>
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {common.map((d) => (
             <li key={d.type}>
               <button
@@ -316,7 +316,7 @@ export default function VaultPage() {
               action={<Button variant="secondary" size="sm" onClick={clearFilters}>Clear filters</Button>}
             />
           ) : view === 'grid' ? (
-            <div className={cn('grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 transition-opacity', list.isPlaceholderData && 'opacity-60')}>
+            <div className={cn('grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 transition-opacity', list.isPlaceholderData && 'opacity-60')}>
               {list.data.items.map((d) => <DocCard key={d.id} doc={d} onOpen={() => setDoc(d.id)} />)}
             </div>
           ) : (

@@ -10,7 +10,7 @@ on:
   workflow_dispatch: {}
   schedule: [{ cron: '17 * * * *' }]
 permissions: { contents: read, issues: read, pull-requests: read }
-concurrency: { group: project-board, cancel-in-progress: false }
+concurrency: { group: 'project-board-${{ github.event.issue.number || github.event.pull_request.number || github.event_name }}', cancel-in-progress: false }
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -55,7 +55,14 @@ jobs:
               if (L.has('status:ready')) return 'Ready';
               return 'Backlog';
             };
-            const items = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'all', per_page: 100 });
+            // Event runs touch only the changed issue/PR; schedule + manual runs do a full re-sync.
+            const ev = context.payload;
+            let items;
+            if (context.eventName === 'issues' && ev.issue) items = [ev.issue];
+            else if (context.eventName === 'pull_request' && ev.pull_request) {
+              const pr = ev.pull_request;
+              items = [{ node_id: pr.node_id, labels: pr.labels, state: pr.state, pull_request: { merged_at: pr.merged_at } }];
+            } else items = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'all', per_page: 100 });
             for (const it of items) {
               const isPr = !!it.pull_request;
               const { addProjectV2ItemById } = await gql(`mutation($p:ID!,$c:ID!){addProjectV2ItemById(input:{projectId:$p,contentId:$c}){item{id}}}`, { p: project.id, c: it.node_id });

@@ -8,7 +8,7 @@ import { test, expect, signupViaApi, seedDemo, evidence, collectRunArtifacts, un
 import {
   BASE_URL, addMember, fmtIST, inAppNotifs, istDate, lastReminderDays, notificationsForDoc, pageFor, runReminders, setLastReminderDays,
   setPrefs, shiftExpiry, uploadDoc,
-} from './support';
+} from './support-us4';
 
 const SPEC = '005', STORY = 'US4';
 const ev = (page: import('@playwright/test').Page, name: string) => evidence(page, SPEC, STORY, name);

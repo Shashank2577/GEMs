@@ -1,6 +1,6 @@
 /** Profile & Vault API (T055; FR-020–FR-022, US3 acceptance 1–4). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
 import { activityLog, companyProfiles, notifications, vaultDocuments } from '@tp/db';
 import { createApp } from '../src/app';
@@ -75,6 +75,141 @@ describe('profile', () => {
     const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { pan: 'AAACI1681G' } });
     expect(r.status).toBe(400);
     expect(r.body.error.details.fields.pan).toMatch(/AAPFU0939F/);
+  });
+
+  // T013 — remaining profile rules (FR-003, FR-006, FR-007, FR-008)
+  /** Each order-sensitive test seeds the fields it relies on (no expectedUpdatedAt → last write wins). */
+  const seedProfile = async (o = org) => {
+    const r = await request(ctx.app, 'PUT', '/profile', {
+      cookie: o.analyst.cookie,
+      json: { legalName: 'Sharma Infotech Pvt Ltd', gstin: '27AAPFU0939F1ZV', pan: 'AAPFU0939F', miiClass: 'class_1', localContentPct: 60, tradeName: 'Sharma IT' },
+    });
+    expect(r.status).toBe(200);
+    return r.body.profile as { updatedAt: string };
+  };
+
+  it.each(['+91 98123-45678', '09812345678', '919812345678'])('normalises phone %s to E.164 (FR-006)', async (phone) => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { contactPhone: phone } });
+    expect(r.status).toBe(200);
+    expect(r.body.profile.contactPhone).toBe('+919812345678');
+  });
+
+  it('rejects a 3-digit HSN code (FR-008)', async () => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { hsnCodes: ['847'] } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe('validation_error');
+    expect(r.body.error.details.fields['hsnCodes.0']).toBe('HSN/SAC codes have 4, 6 or 8 digits');
+  });
+
+  it('rejects Class-II with 55% local content (FR-007)', async () => {
+    await seedProfile();
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { miiClass: 'class_2', localContentPct: 55 } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields.localContentPct).toBe('Class-II means 20% to under 50% local content');
+    expect((await request(ctx.app, 'GET', '/profile', { cookie: org.viewer.cookie })).body.profile.miiClass).toBe('class_1');
+  });
+
+  it('rejects an invalid contact email (FR-006)', async () => {
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { contactEmail: 'bids@' } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields.contactEmail).toBe('Enter a valid email address');
+  });
+
+  it('requires sign-in to read the profile', async () => {
+    const r = await request(ctx.app, 'GET', '/profile');
+    expect(r.status).toBe(401);
+    expect(r.body.error.code).toBe('unauthorized');
+  });
+
+  it('logs profile.updated with only the keys that were sent (FR-003)', async () => {
+    await seedProfile();
+    const where = and(eq(activityLog.orgId, org.orgId), eq(activityLog.action, 'profile.updated'));
+    const before = new Set((await ctx.db.select({ id: activityLog.id }).from(activityLog).where(where)).map((a) => a.id));
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Sharma IT', contactEmail: 'Bids@Sharma.in' } });
+    expect(r.status).toBe(200);
+    expect(r.body.profile.contactEmail).toBe('bids@sharma.in');
+    expect(r.body.profile.legalName).toBe('Sharma Infotech Pvt Ltd');
+    const added = (await ctx.db.select().from(activityLog).where(where)).filter((a) => !before.has(a.id));
+    expect(added).toHaveLength(1);
+    expect(((added[0]!.meta as { fields: string[] }).fields).sort()).toEqual(['contactEmail', 'tradeName']);
+  });
+
+  // T020 — optimistic concurrency (FR-014)
+  it('saves when expectedUpdatedAt matches and answers 409 when someone else saved in between', async () => {
+    try {
+      const loaded = (await seedProfile()).updatedAt;
+      expect(loaded).toBeTruthy();
+      // A saves on top of the version both loaded → 200, and the activity log does not record expectedUpdatedAt as a field.
+      ctx.clock.set('2026-11-04T09:15:00Z'); // 2:45 PM IST
+      const a = await request(ctx.app, 'PUT', '/profile', { cookie: org.owner.cookie, json: { tradeName: 'Sharma IT Solutions', expectedUpdatedAt: loaded } });
+      expect(a.status).toBe(200);
+      expect(a.body.profile.updatedAt).toBe('2026-11-04T09:15:00.000Z');
+      const [lastLog] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, org.orgId), eq(activityLog.action, 'profile.updated'))).orderBy(desc(activityLog.createdAt)).limit(1);
+      expect((lastLog!.meta as { fields: string[] }).fields).toEqual(['tradeName']);
+      // B still holds the older copy → 409, nothing of B's is stored.
+      ctx.clock.set('2026-11-04T09:20:00Z');
+      const b = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Stale edit', expectedUpdatedAt: loaded } });
+      expect(b.status).toBe(409);
+      expect(b.body.error.code).toBe('conflict');
+      expect(b.body.error.message).toBe('Someone else saved the profile at 4 Nov 2026, 2:45 PM IST. Reload to see their changes.');
+      expect(b.body.error.details).toEqual({ updatedAt: '2026-11-04T09:15:00.000Z' });
+      const after = (await request(ctx.app, 'GET', '/profile', { cookie: org.viewer.cookie })).body.profile;
+      expect(after.tradeName).toBe('Sharma IT Solutions');
+      expect(after.updatedAt).toBe('2026-11-04T09:15:00.000Z');
+      // null means "no profile saved yet" and therefore also conflicts with an existing row.
+      const n = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'X', expectedUpdatedAt: null } });
+      expect(n.status).toBe(409);
+      expect(n.body.error.details.updatedAt).toBe('2026-11-04T09:15:00.000Z');
+      // After reloading, B can save; omitting expectedUpdatedAt keeps last-write-wins for older clients.
+      const b2 = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Sharma IT', expectedUpdatedAt: after.updatedAt } });
+      expect(b2.status).toBe(200);
+      expect((await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { tradeName: 'Sharma IT' } })).status).toBe(200);
+      const bad = await request(ctx.app, 'PUT', '/profile', { cookie: org.analyst.cookie, json: { expectedUpdatedAt: 'yesterday' } });
+      expect(bad.status).toBe(400);
+    } finally {
+      ctx.clock.set(NOW);
+    }
+  });
+
+  it('expectedUpdatedAt: null saves the first profile of a fresh org', async () => {
+    const fresh = await seedOrgWithRoles(ctx.app, 'Fresh Traders');
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: fresh.analyst.cookie, json: { legalName: 'Fresh Traders', expectedUpdatedAt: null } });
+    expect(r.status).toBe(200);
+    expect(r.body.profile.updatedAt).toBe(NOW.toISOString());
+  });
+
+  it('two concurrent saves of the same version: exactly one wins (row lock, FR-014)', async () => {
+    const race = await seedOrgWithRoles(ctx.app, 'Race Existing');
+    const base = await seedProfile(race);
+    const results = await Promise.all(['A', 'B'].map((who) =>
+      request(ctx.app, 'PUT', '/profile', { cookie: (who === 'A' ? race.owner : race.analyst).cookie, json: { tradeName: `Saved by ${who}`, expectedUpdatedAt: base.updatedAt } })));
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const winner = results.find((r) => r.status === 200)!;
+    const stored = (await request(ctx.app, 'GET', '/profile', { cookie: race.viewer.cookie })).body.profile;
+    expect(stored.tradeName).toBe(winner.body.profile.tradeName);
+  });
+
+  it('two concurrent first saves of a fresh org: exactly one wins', async () => {
+    const race = await seedOrgWithRoles(ctx.app, 'Race Fresh');
+    const results = await Promise.all(['A', 'B'].map((who) =>
+      request(ctx.app, 'PUT', '/profile', { cookie: (who === 'A' ? race.owner : race.analyst).cookie, json: { legalName: `Saved by ${who}`, expectedUpdatedAt: null } })));
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const loser = results.find((r) => r.status === 409)!;
+    expect(loser.body.error.details.updatedAt).toBe(NOW.toISOString());
+  });
+
+  it('compares at millisecond precision when updated_at has microseconds (e.g. set by SQL now())', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Precise Co');
+    await seedProfile(o);
+    await ctx.db.execute(sql`update company_profiles set updated_at = '2026-11-04 04:30:00.123456+00'::timestamptz where org_id = ${o.orgId}`);
+    const loaded = (await request(ctx.app, 'GET', '/profile', { cookie: o.analyst.cookie })).body.profile.updatedAt;
+    expect(loaded).toBe('2026-11-04T04:30:00.123Z');
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { tradeName: 'Precise', expectedUpdatedAt: loaded } });
+    expect(r.status).toBe(200);
+    // …and with a real now() timestamp.
+    await ctx.db.execute(sql`update company_profiles set updated_at = now() where org_id = ${o.orgId}`);
+    const loaded2 = (await request(ctx.app, 'GET', '/profile', { cookie: o.analyst.cookie })).body.profile.updatedAt;
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { tradeName: 'Precise 2', expectedUpdatedAt: loaded2 } })).status).toBe(200);
   });
 
   it('viewer cannot edit the profile', async () => {
