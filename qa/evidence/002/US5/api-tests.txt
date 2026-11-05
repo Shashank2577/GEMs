@@ -1,0 +1,28 @@
+# API suite @ c0a2c8bb7c4b5f16d124de484804dcd500d27578 (clean checkout)
+# TEST_DATABASE_URL=.../tenderpilot_test_us5 pnpm --filter @tp/api exec vitest run
+ ✓ test/vault.perf.test.ts (4 tests) 861ms
+   ✓ vault performance with 500 documents (NFR-003) > GET /vault median < 400 ms (including sorted and searched variants) 322ms
+
+ Test Files  21 passed | 1 skipped (22)
+      Tests  387 passed | 1 skipped (388)
+   Start at  04:13:20
+   Duration  49.05s (transform 1.41s, setup 0ms, collect 13.78s, tests 30.93s, environment 4ms, prepare 1.13s)
+
+
+# tokens.test.ts verbose
+
+ RUN  v2.1.9 /home/user/wt-us5-clean/apps/api
+
+ ✓ test/tokens.test.ts > 002/FR-037 token expiry and hint > defaults to 90 days, stores a 4-char hint and returns expiresAt/hint in summaries
+ ✓ test/tokens.test.ts > 002/FR-037 token expiry and hint > accepts 30, 365 and null (never); rejects other values with 400
+ ✓ test/tokens.test.ts > 002/FR-037 token expiry and hint > an expired token returns 401; a never-expiring token keeps working
+ ✓ test/tokens.test.ts > 002/FR-037 at most 10 active tokens per user per org > the 11th active token is 409 token_limit; revoking or expiry frees a slot; other users/orgs unaffected 317ms
+ ✓ test/tokens.test.ts > 002/FR-036 bearer tokens cannot manage the account > POST /me/api-tokens, /me/password and /auth/switch-org are 403 with a bearer token
+ ✓ test/tokens.test.ts > 002/FR-036 bearer tokens cannot manage the account > a token stops working once its owner is removed from the org
+ ✓ test/tokens.test.ts > 002/FR-036 bearer tokens cannot manage the account > a role change applies to the next token request
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  04:14:10
+   Duration  3.10s (transform 886ms, setup 0ms, collect 1.62s, tests 1.16s, environment 0ms, prepare 76ms)
+
