@@ -37,6 +37,14 @@ export function assertWritable(c: Context<AppEnv>, auth: Pick<ResolvedAuth, 'kin
 }
 
 /**
+ * 006/FR-074: for GET routes with side effects (outbound calls, cache writes, quota use) — refuse read-only tokens
+ * with the same 403 as the global guard. Call after requireAuth/requireRole (needs the resolved token scope).
+ */
+export function refuseReadOnlyToken(c: Context<AppEnv>): void {
+  if (isReadOnlyToken({ kind: c.var.authKind, tokenScope: c.var.apiTokenScope })) throw new HttpError(403, 'read_only_token', API_TOKEN_READ_ONLY_MESSAGE);
+}
+
+/**
  * 006/FR-074 global guard (mounted on `/api/*` right after `ipLimit`, app.ts): refuses every non-GET request that
  * carries a read-only token, including routes that do not use requireAuth (e.g. `/auth/logout`). Uses the
  * credentials `ipLimit` already resolved (no extra query). Refusals go through `authenticate`, so they still count

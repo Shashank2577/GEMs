@@ -142,7 +142,16 @@ describe('006/FR-074 read-only ("Extension (read-only)") API token', () => {
     expect(cookie.status).toBe(201);
   });
 
-  it('is refused before any cross-org lookup and cannot read another org', async () => {
+  it('GET /tenders/:id/result-hint (outbound call, cache write, quota) is 403 read_only_token for a read token', async () => {
+    const [ws] = await ctx.db.select().from(bidWorkspaces).where(eq(bidWorkspaces.id, wsId));
+    const r = await request(ctx.app, 'GET', `/tenders/${ws.tenderId}/result-hint`, { bearer: readToken });
+    expect(r.status).toBe(403);
+    expect(r.body.error).toEqual(READ_ONLY);
+    const ok = await request(ctx.app, 'GET', `/tenders/${ws.tenderId}/result-hint`, { bearer: token });
+    expect(ok.status).toBe(200);
+  });
+
+  it('another org\'s read token cannot read this workspace (404) and its writes are 403 read_only_token', async () => {
     const other = await signup(ctx.app);
     const otherWs = await request(ctx.app, 'GET', '/workspaces', { cookie: other.cookie });
     expect(otherWs.status).toBe(200);

@@ -139,8 +139,7 @@ async function init() {
       const r = await sendToPage({ type: 'tp:fill', fields });
       if (!r.ok) throw new Error(r.error);
       if ('report' in r) {
-        const manual = r.report.skipped.filter((x) => x.reason.startsWith('left for you')).length;
-        setStatus(`Filled ${r.report.filled.length} field(s), skipped ${r.report.skipped.length}${manual ? ` (${manual} for you to choose)` : ''}. ${r.report.forbidden} protected field(s) untouched — enter price and authenticate yourself.`, true);
+        setStatus(`Filled ${r.report.filled.length} field(s). ${r.report.forbidden} protected field(s) untouched — enter price and authenticate yourself.`, true);
         renderFillReport($('fill-report'), r.report);
       }
     } catch (e) { showError((e as Error).message); }
