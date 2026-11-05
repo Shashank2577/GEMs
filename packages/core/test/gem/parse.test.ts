@@ -126,6 +126,7 @@ describe('parseBidPlusDoc on recorded fixtures', () => {
     expect(changes.endAt).toEqual({ from: '2026-11-18T09:30:00.000Z', to: '2026-11-25T09:30:00.000Z' });
     expect(isCorrigendum(changes)).toBe(true);
     expect(isCorrigendum({ status: { from: 'open', to: 'closed' } })).toBe(false);
+    expect(diffTenders({ title: 'Laptops  and Bags' }, { title: ' laptops and bags ' })).toEqual({});
   });
 });
 

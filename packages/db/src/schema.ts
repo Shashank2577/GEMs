@@ -4,6 +4,7 @@
  */
 import { sql } from 'drizzle-orm';
 import type { AnalysisWarning } from '@tp/core/contracts/analyse';
+import type { NotificationKind } from '@tp/core/contracts/identify';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -572,7 +573,7 @@ export const notifications = pgTable('notifications', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   channel: text('channel').$type<'in_app' | 'email' | 'whatsapp'>().notNull(),
-  kind: text('kind').$type<'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system'>().notNull(),
+  kind: text('kind').$type<NotificationKind>().notNull(), // derived from NOTIFICATION_KINDS in @tp/core
   title: text('title').notNull(),
   body: text('body').notNull(),
   link: text('link'),
