@@ -1,0 +1,9 @@
+# sc2-health-stale — project desktop — 2026-11-05T05:55:30.293Z
+### Health, last success 180 min ago
+> GET /api/health
+< 503  (12 ms)
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: 65e33487-65d8-4b2e-803a-a0cbb6830bf9
+{"ok":false,"db":true,"version":"0.1.0","ingestion":{"lastSuccessAt":"2026-11-05T02:55:30.290Z","ageMinutes":180,"lastStatus":"success","state":"stale"},"alerts":{"pendingOlderThan30m":0},"reasons":["ingestion_stale"]}
+

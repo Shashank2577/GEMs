@@ -1,0 +1,11 @@
+# sc8-no-dsn-noop — project desktop — 2026-11-05T05:55:43.493Z
+three failing requests → 500, 500, 500
+### Health after the errors (server still up)
+> GET /api/health
+< 200
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: 2031b5d3-e8bd-4fa4-85ec-23367fb13b2d
+{"ok":true,"db":true,"version":"0.1.0","ingestion":{"lastSuccessAt":null,"ageMinutes":null,"lastStatus":null,"state":"never"},"alerts":{"pendingOlderThan30m":0},"reasons":[]}
+
+sentry mentions in the server log produced during the test: 0
