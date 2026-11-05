@@ -22,6 +22,26 @@ export const STAGE_LABELS: Record<StageName, string> = {
   submitted: 'Submitted', won: 'Won', lost: 'Lost', dropped: 'Dropped',
 };
 
+/** Stages that require a recorded GeM submission first (FR-008). */
+export const OUTCOME_STAGES: readonly StageName[] = ['won', 'lost'];
+/** Stages from which a bid may be marked won or lost (submitted, or correcting an existing result) (FR-008). */
+export const OUTCOME_ALLOWED_FROM: readonly StageName[] = ['submitted', 'won', 'lost'];
+export const INVALID_TRANSITION_MESSAGE =
+  'Record the submission on GeM first — a bid can only be won or lost after it was submitted.';
+
+export type TransitionCheck = { ok: true } | { ok: false; code: 'invalid_transition'; message: string };
+
+/**
+ * Stage transition rules (T019; FR-008). Every move is allowed except reaching `won`/`lost` from a stage
+ * other than `submitted`, `won` or `lost`. The `ready` guard (FR-005) needs readiness and lives in the API.
+ */
+export function canTransition(from: StageName, to: StageName): TransitionCheck {
+  if (OUTCOME_STAGES.includes(to) && !OUTCOME_ALLOWED_FROM.includes(from)) {
+    return { ok: false, code: 'invalid_transition', message: INVALID_TRANSITION_MESSAGE };
+  }
+  return { ok: true };
+}
+
 /** Active pipeline columns (Kanban), in order. */
 export const PIPELINE_STAGES: StageName[] = ['identified', 'analysing', 'go', 'preparing', 'ready', 'submitted', 'won', 'lost'];
 
@@ -127,7 +147,8 @@ export interface WorkspaceCard {
   outcome: WorkspaceOutcome | null;
   tender: Pick<WorkspaceTender, 'id' | 'bidNumber' | 'title' | 'organisation' | 'ministry' | 'state' | 'endAt' | 'emdAmount' | 'estimatedValue' | 'status'>;
   analysis: { id: string; score: number | null; verdict: 'go' | 'review' | 'no_go' | null; stale: boolean } | null;
-  readiness: { percent: number; blockers: number; total: number; covered: number };
+  /** `analysed: false` (with percent 0) when the tender has no analysis yet (FR-009). */
+  readiness: { percent: number; blockers: number; total: number; covered: number; analysed: boolean };
   commentCount: number;
 }
 
