@@ -1,6 +1,7 @@
 /** Dashboard charts — themed with design tokens (hsl(var(--…))) so light/dark both work. */
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useReducedMotion } from 'framer-motion';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { DashboardResponse, DashboardStage } from '@tp/core/contracts/experience';
 import { formatINRCompact, formatNumberIN, pluralize } from '@/lib/format';
@@ -26,6 +27,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 /** Single-series area chart: distinct matched tenders per IST day (last 14 days). */
 export function MatchesTrend({ data }: { data: DashboardResponse['matchesByDay'] }) {
   const total = data.reduce((a, b) => a + b.count, 0);
+  const reduce = useReducedMotion(); // FR-093: no chart motion when the user prefers reduced motion
   return (
     <div className="h-56 w-full" role="img" aria-label={`New matches over the last 14 days: ${total} in total`}>
       <ResponsiveContainer width="100%" height="100%">
@@ -42,7 +44,7 @@ export function MatchesTrend({ data }: { data: DashboardResponse['matchesByDay']
           <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeDasharray: '3 3' }} />
           <Area type="monotone" dataKey="count" stroke="hsl(var(--chart-1))" strokeWidth={2} fill="url(#tp-matches-fill)"
-            activeDot={{ r: 4, strokeWidth: 2, stroke: 'hsl(var(--card))' }} dot={false} isAnimationActive />
+            activeDot={{ r: 4, strokeWidth: 2, stroke: 'hsl(var(--card))' }} dot={false} isAnimationActive={!reduce} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -67,7 +69,7 @@ export function VerdictDonut({ verdicts }: { verdicts: DashboardResponse['verdic
   const c = RING.size / 2;
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row lg:flex-col xl:flex-row">
-      <div className="relative size-40 shrink-0" role="img" aria-label={rows.map((r) => `${r.name} ${r.value}`).join(', ')}>
+      <div className="relative size-40 shrink-0" role="img" aria-label={`Go/No-Go verdicts, ${total} analysed: ${rows.map((r) => `${r.name} ${r.value}`).join(', ')}`}>
         <svg viewBox={`0 0 ${RING.size} ${RING.size}`} width="100%" height="100%" className="block size-full" aria-hidden data-testid="verdict-ring">
           <circle cx={c} cy={c} r={RING.r} fill="none" strokeWidth={RING.width} style={{ stroke: 'hsl(var(--muted-foreground) / 0.22)' }} />
           {segments.map((s) => (

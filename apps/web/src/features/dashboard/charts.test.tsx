@@ -20,7 +20,7 @@ describe('VerdictDonut', () => {
     for (const [, , len] of arcs) expect(Number(len)).toBeGreaterThan(1);
     expect(arcs[0]![3]).toContain('hsl(var(--success))');
     expect(arcs[1]![3]).toContain('hsl(var(--danger))');
-    expect(html).toContain('aria-label="Go 17, Review 0, No-Go 3"');
+    expect(html).toContain('aria-label="Go/No-Go verdicts, 20 analysed: Go 17, Review 0, No-Go 3"');
   });
 
   it('shows a visible track (not --muted) when nothing is analysed', () => {
@@ -28,5 +28,6 @@ describe('VerdictDonut', () => {
     expect(html).not.toContain('data-verdict');
     expect(html).toMatch(/<circle[^>]*style="stroke:hsl\(var\(--muted-foreground\) \/ 0\.22\)"/);
     expect(html).toContain('>0</span>');
+    expect(html).toContain('aria-label="Go/No-Go verdicts, 0 analysed: Go 0, Review 0, No-Go 0"');
   });
 });
