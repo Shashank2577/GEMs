@@ -2,7 +2,7 @@
 # Structure (minimal permissions, per-job timeouts, prod dependency audit) adapted from erenmyeager15 ci.yml (Apache-2.0).
 #
 #   typecheck ─────────────────────────────── always
-#   changes ─┬─ unit ── api ── e2e            skipped for docs-only PRs
+#   changes ─┬─ unit ── api ── e2e-shard ×8 ── e2e (merge)   skipped for docs-only PRs
 #            └─ migrations-additive
 #   ci-gate ── always; fails if any job above failed or was cancelled (incl. `changes` erroring, which would
 #              otherwise skip every gated job, and skipped counts as passing for required checks)
@@ -136,11 +136,17 @@ jobs:
       - name: API integration tests
         run: pnpm --filter @tp/api test
 
-  e2e:
-    name: e2e
+  # E2E is split across E2E_SHARDS runners (NFR-007: full pipeline < 30 min). Every spec file runs as its own
+  # Playwright invocation on a fresh database (scripts/e2e-ci.sh); the `e2e` job below merges the shard reports.
+  e2e-shard:
+    name: e2e-shard-${{ matrix.shard }}
     needs: api
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     services:
       postgres:
         image: postgres:16
@@ -155,8 +161,9 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      # start-api.sh drops/recreates this database via psql (no scripts/local-pg.sh in CI).
+      # start-api.sh drops/recreates this database via psql before every spec file (no scripts/local-pg.sh in CI).
       E2E_DATABASE_URL: postgres://tp:tp@localhost:5433/tenderpilot_e2e
+      E2E_SHARDS: '8'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -167,8 +174,50 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: E2E (Playwright, real API + SPA + mock-gem)
-        run: CI=1 pnpm e2e
+      - name: E2E (Playwright, real API + SPA + mock-gem, one fresh DB per spec file)
+        run: CI=1 scripts/e2e-ci.sh ${{ matrix.shard }} "$E2E_SHARDS"
+      - name: Upload shard report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-shard-${{ github.run_id }}-${{ matrix.shard }}
+          # blob reports carry every attachment (traces, videos, screenshots); qa/evidence holds the evidence copies.
+          path: |
+            qa/evidence/**
+            qa/.runs/8788/blob/**
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 1
+
+  e2e:
+    name: e2e
+    needs: [api, e2e-shard]
+    # Skipped when api did not pass (scenario 3); otherwise always runs so the evidence is published even when a shard
+    # failed, and then fails itself.
+    if: ${{ !cancelled() && needs.api.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Download shard reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-shard-${{ github.run_id }}-*
+          merge-multiple: true
+      - name: Merge shard reports (results.json + HTML report with traces and videos)
+        run: |
+          mkdir -p "$RUNNER_TEMP/blobs"
+          for z in qa/.runs/8788/blob/*/*.zip; do [ -e "$z" ] && cp "$z" "$RUNNER_TEMP/blobs/$(basename "$(dirname "$z")").zip"; done
+          ls "$RUNNER_TEMP/blobs"
+          rm -rf qa/.runs/8788/blob
+          PLAYWRIGHT_JSON_OUTPUT_FILE=qa/.runs/8788/results.json PLAYWRIGHT_HTML_OUTPUT_DIR=qa/.runs/8788/report PLAYWRIGHT_HTML_OPEN=never \
+            pnpm exec playwright merge-reports --reporter=json,html "$RUNNER_TEMP/blobs"
       - name: E2E job summary (total/passed/failed/flaky)
         if: always()
         run: pnpm exec tsx scripts/e2e-summary.ts qa/.runs/8788/results.json
@@ -184,6 +233,11 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 30
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.e2e-shard.result }}
+        run: |
+          if [ "$SHARDS" != "success" ]; then echo "::error::e2e shards: $SHARDS (see the e2e-shard-* jobs and the summary above)"; exit 1; fi
 
   migrations-additive:
     name: migrations-additive
@@ -222,7 +276,7 @@ jobs:
 
   ci-gate:
     name: ci-gate
-    needs: [changes, typecheck, unit, api, e2e, migrations-additive]
+    needs: [changes, typecheck, unit, api, e2e-shard, e2e, migrations-additive]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -53,7 +53,7 @@ describe('ci.yml → deploy hand-off (008 US1 scenario 8)', () => {
 
   it('ci-gate does not depend on deploy (a deploy skipped on PRs never affects the gate)', () => {
     const gate = job(ci, 'ci-gate');
-    expect(list(field(gate, 'needs')).sort()).toEqual(['api', 'changes', 'e2e', 'migrations-additive', 'typecheck', 'unit']);
+    expect(list(field(gate, 'needs')).sort()).toEqual(['api', 'changes', 'e2e', 'e2e-shard', 'migrations-additive', 'typecheck', 'unit']);
     expect(field(gate, 'if')).toBe('always()');
   });
 
@@ -77,5 +77,30 @@ describe('deploy.yml (reusable placeholder until US2/T036)', () => {
     const j = job(dep, 'deploy');
     const conc = block(j.join('\n'), 'concurrency', 4).map((l) => l.trim());
     expect(conc).toEqual(['group: deploy', 'cancel-in-progress: false']);
+  });
+});
+
+describe('ci.yml → sharded e2e (NFR-007) keeps the required `e2e` check', () => {
+  const ci = read('ci.yml');
+
+  it('runs e2e-shard as a matrix after api, one fresh-DB Playwright run per spec file', () => {
+    const shard = job(ci, 'e2e-shard');
+    expect(field(shard, 'needs')).toBe('api');
+    expect(field(shard, 'timeout-minutes')).toBe('30');
+    expect(shard.join('\n')).toContain('fail-fast: false');
+    expect(shard.join('\n')).toMatch(/run: CI=1 scripts\/e2e-ci\.sh \$\{\{ matrix\.shard \}\} "\$E2E_SHARDS"/);
+    const n = Number(/E2E_SHARDS: '(\d+)'/.exec(shard.join('\n'))?.[1]);
+    const matrix = /shard: \[([\d, ]+)\]/.exec(shard.join('\n'))?.[1].split(',').map((x) => Number(x.trim()));
+    expect(matrix).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+  });
+
+  it('the `e2e` job merges every shard, publishes the evidence, and fails unless all shards passed', () => {
+    const e2e = job(ci, 'e2e');
+    expect(list(field(e2e, 'needs'))).toEqual(['api', 'e2e-shard']);
+    expect(field(e2e, 'if')).toBe("${{ !cancelled() && needs.api.result == 'success' }}");
+    const text = e2e.join('\n');
+    expect(text).toContain('playwright merge-reports --reporter=json,html');
+    expect(text).toContain('name: e2e-evidence-${{ github.run_id }}');
+    expect(text).toMatch(/SHARDS: \$\{\{ needs\.e2e-shard\.result \}\}/);
   });
 });

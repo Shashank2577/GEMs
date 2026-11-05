@@ -294,7 +294,10 @@ export default defineConfig({
     expect(ci.unit.ifExpr).toBe("needs.changes.outputs.code == 'true'");
     expect(ci['migrations-additive'].ifExpr).toBe("needs.changes.outputs.code == 'true'");
     expect(ci.api.needs).toEqual(['unit']);
-    expect(ci.e2e.needs).toEqual(['api']);
+    // e2e runs as e2e-shard ×N after api, then the `e2e` merge job (skipped unless api passed)
+    expect(ci['e2e-shard'].needs).toEqual(['api']);
+    expect(ci.e2e.needs).toEqual(['api', 'e2e-shard']);
+    expect(ci.e2e.ifExpr).toContain("needs.api.result == 'success'");
     expect(ci['ci-gate'].block).toContain("grep -Eq '\"(failure|cancelled)\"'");
     expect(dodJobs.dod.block).toContain('Docs-only PR: Definition-of-Done check skipped.');
     expect(dodJobs.dod.block).toContain("steps.gate.outputs.run == 'true'");
