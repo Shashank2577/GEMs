@@ -233,6 +233,9 @@ test.describe('sc5 role change live', () => {
   test('sc9 (gap) role lowered while the page is open: mutation 403 -> toast with server message + /api/auth/me refetch hides the action', async ({ page, browser, baseURL }) => {
     const owner = await newOrg(browser, baseURL!);
     const bm = await join(owner.api, page.context(), 'bid_manager', 'Bina Manager');
+    // 008/FR-026: "Sync now" is disabled during the platform-wide 10-minute manual-sync cooldown, and the earlier
+    // sc5 test in this file runs a manual sync. Age every finished run so this test does not depend on test order.
+    sql("update ingestion_runs set started_at = started_at - interval '10 minutes', finished_at = finished_at - interval '10 minutes' where finished_at is not null");
     await page.goto('/settings/sync');
     const syncNow = page.getByRole('button', { name: 'Sync now' });
     await expect(syncNow).toBeVisible();
