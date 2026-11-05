@@ -26,11 +26,11 @@ rows), `matchAndNotify`, `refreshMatches`, `decorateTenders` callers.
    ```sql
    CREATE INDEX tenders_open_created_idx ON tenders (created_at DESC) WHERE status = 'open';
    CREATE INDEX tenders_open_closing_idx ON tenders (coalesce(end_at, 'infinity')) WHERE status = 'open';
-   -- (was tenders_open_end_idx ON (end_at); 008 migration 0016 indexes the feed's "still open" expression instead)
+   -- (was tenders_open_end_idx ON (end_at); 008 migration 0017 indexes the feed's "still open" expression instead)
    CREATE INDEX tenders_open_value_idx   ON tenders (estimated_value) WHERE status = 'open';
    CREATE INDEX tenders_open_state_idx   ON tenders (state, created_at DESC, coalesce(end_at, 'infinity'))
                                                                         WHERE status = 'open';
-   -- (008 migration 0017, PR #515 QA round 1: on (state) alone the planner never chose it for ?state=X)
+   -- (008 migration 0018, PR #515 QA round 1: on (state) alone the planner never chose it for ?state=X)
    CREATE INDEX tenders_open_ministry_idx ON tenders (ministry)       WHERE status = 'open';
    CREATE INDEX tenders_open_category_idx ON tenders (category)       WHERE status = 'open';
    ```

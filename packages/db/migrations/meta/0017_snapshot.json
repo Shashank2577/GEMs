@@ -1,6 +1,6 @@
 {
-  "id": "c9150096-69b2-424b-8d1b-597f24b3c4dc",
-  "prevId": "43ac93d4-fa32-4bdf-afda-124cb067d481",
+  "id": "99c04116-689e-486b-bcfa-e8d7da9556bf",
+  "prevId": "d018c59c-5291-460c-afdf-b6fc815984e6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -66,6 +66,33 @@
           "columns": [
             {
               "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "activity_org_type_idx": {
+          "name": "activity_org_type_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_type",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

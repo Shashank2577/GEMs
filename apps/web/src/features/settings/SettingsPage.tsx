@@ -1,6 +1,6 @@
 /**
  * Settings (T073; US6): Organization, Account, Team & roles, Notifications, Scoring weights, API tokens & extension,
- * Sync health. Sub-routes under /settings/* with a side nav (desktop) / scrollable tabs (phone).
+ * Sync health, Activity log. Sub-routes under /settings/* with a side nav (desktop) / scrollable tabs (phone).
  */
 import { lazy, Suspense } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
@@ -16,6 +16,7 @@ const NotificationsSection = lazy(() => import('./sections/NotificationsSection'
 const ScoringSection = lazy(() => import('./sections/ScoringSection'));
 const TokensSection = lazy(() => import('./sections/TokensSection'));
 const SyncSection = lazy(() => import('./sections/SyncSection'));
+const ActivitySection = lazy(() => import('./sections/ActivitySection'));
 
 export default function SettingsPage() {
   const { can } = useAuth();
@@ -50,6 +51,7 @@ export default function SettingsPage() {
               <Route path="api-tokens" element={<TokensSection />} />
               <Route path="tokens" element={<Navigate to="/settings/api-tokens" replace />} />
               <Route path="sync" element={<SyncSection />} />
+              <Route path="activity" element={<ActivitySection />} />
               <Route path="*" element={<Navigate to="/settings/organization" replace />} />
             </Routes>
           </Suspense>

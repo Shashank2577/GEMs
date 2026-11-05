@@ -2,7 +2,7 @@
  * Organization routes (FR-031..033): /org, /org/members, /org/invitations (+ resend, 002/FR-020), /activity.
  * Mounted at /api.
  */
-import { and, asc, count, desc, eq, gt, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Hono, type Context } from 'hono';
 import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db, type Role } from '@tp/db';
@@ -12,6 +12,7 @@ import {
 } from '@tp/core/contracts/auth';
 import { ROLE_LABELS } from '@tp/core/contracts/common';
 import { logActivity } from '../lib/activity';
+import { enrichActivity } from '../lib/activity-target';
 import { randomToken, sha256Hex } from '../lib/crypto';
 import { HttpError, conflict, forbidden, notFound } from '../lib/errors';
 import { parseJson, parseQuery } from '../lib/validate';
@@ -289,7 +290,8 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
   const q = parseQuery(c, activityQuerySchema);
   const { db } = c.var.deps;
   const conds: SQL[] = [eq(activityLog.orgId, orgId(c))];
-  if (q.entityType) conds.push(eq(activityLog.entityType, q.entityType));
+  const types = (q.entityType ?? '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 12);
+  if (types.length) conds.push(inArray(activityLog.entityType, types));
   if (q.entityId) conds.push(eq(activityLog.entityId, q.entityId));
   if (q.userId) conds.push(eq(activityLog.userId, q.userId));
   const where = and(...conds);
@@ -302,9 +304,9 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
       .limit(q.pageSize).offset((q.page - 1) * q.pageSize),
     db.select({ n: count() }).from(activityLog).where(where),
   ]);
-  const items: ActivityItem[] = rows.map((r) => ({
+  const items: ActivityItem[] = await enrichActivity(db, orgId(c), rows.map((r) => ({
     id: r.id, action: r.action, entityType: r.entityType, entityId: r.entityId, meta: r.meta ?? {},
     createdAt: r.createdAt.toISOString(), user: r.userId ? { id: r.userId, name: r.userName ?? '' } : null,
-  }));
+  })));
   return c.json({ items, total: Number(n) });
 });

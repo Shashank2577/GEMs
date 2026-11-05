@@ -1,5 +1,5 @@
 {
-  "id": "e33b22fb-4969-41cd-a781-7bc3c0d030eb",
+  "id": "d1ea393b-feae-4fb7-8b09-17f68c90eb1e",
   "prevId": "ae21616d-fcc7-45e6-9776-2abf72a71dc1",
   "version": "7",
   "dialect": "postgresql",
@@ -66,6 +66,33 @@
           "columns": [
             {
               "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "activity_org_type_idx": {
+          "name": "activity_org_type_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_type",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -231,13 +258,6 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "warnings": {
-          "name": "warnings",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
         "created_by": {
           "name": "created_by",
           "type": "uuid",
@@ -274,33 +294,6 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "analyses_org_tender_created_idx": {
-          "name": "analyses_org_tender_created_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "tender_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "first"
             }
           ],
           "isUnique": false,
@@ -1147,32 +1140,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.gem_throttle": {
-      "name": "gem_throttle",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "next_slot_at": {
-          "name": "next_slot_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.ingestion_runs": {
       "name": "ingestion_runs",
       "schema": "",
@@ -1258,24 +1225,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "ingestion_runs_one_running_uq": {
-          "name": "ingestion_runs_one_running_uq",
-          "columns": [
-            {
-              "expression": "(true)",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "status = 'running'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -1690,22 +1640,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "notifications_pending_idx": {
-          "name": "notifications_pending_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'pending' AND channel IN ('email','whatsapp')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2960,114 +2894,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "tenders_open_created_idx": {
-          "name": "tenders_open_created_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "first"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'open'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "tenders_open_closing_idx": {
-          "name": "tenders_open_closing_idx",
-          "columns": [
-            {
-              "expression": "coalesce(\"end_at\", 'infinity'::timestamptz)",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'open'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "tenders_open_value_idx": {
-          "name": "tenders_open_value_idx",
-          "columns": [
-            {
-              "expression": "estimated_value",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'open'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "tenders_open_state_idx": {
-          "name": "tenders_open_state_idx",
-          "columns": [
-            {
-              "expression": "state",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "first"
-            },
-            {
-              "expression": "coalesce(\"end_at\", 'infinity'::timestamptz)",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'open'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "tenders_open_ministry_idx": {
-          "name": "tenders_open_ministry_idx",
-          "columns": [
-            {
-              "expression": "ministry",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'open'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "tenders_open_category_idx": {
-          "name": "tenders_open_category_idx",
-          "columns": [
-            {
-              "expression": "category",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "status = 'open'",
           "concurrently": false,
           "method": "btree",
           "with": {}
