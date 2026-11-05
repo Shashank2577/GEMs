@@ -155,7 +155,7 @@ Auth column: `—` public, `S` session cookie only, `A` any member (cookie or be
 | DELETE `/api/org/invitations/:id` | M | – | 200 `{ok}` | 404 |
 | PATCH `/api/org/members/:userId` | O | `{role}` | 200 `Member` | 403; 404; 409 last_owner |
 | DELETE `/api/org/members/:userId` | O | – | 200 `{ok}` | 403; 404; 409 last_owner |
-| GET `/api/activity` | A | `page,pageSize,entityType,entityId,userId` | 200 `{items:ActivityItem[],total}` | 400 |
+| GET `/api/activity` | A | `page,pageSize,entityType (one or comma-separated list),entityId,userId` | 200 `{items:ActivityItem[] (each with optional server-resolved target:{label,href}|null),total}` | 400 |
 | GET/PUT `/api/scoring-weights` | A / M | PUT: partial weights, `{}` resets | 200 `{weights,defaults,custom}` | 400; 403 |
 | GET `/api/ingestion/runs`, POST `/api/ingestion/run` | A / M | – | runs summary / run result | 403 |
 | (gap) POST `/api/auth/forgot-password` | — | `{email}` | 200 `{ok:true}` always | 400; 429 |

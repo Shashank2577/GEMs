@@ -16,8 +16,8 @@ export interface SettingsItem {
   /** Minimum role to see the item (default: viewer). */
   min?: Role;
   /**
-   * `false` while the sub-page is not routed yet: hidden from the side nav and the palette so neither links to a
-   * page that would only redirect. Activity log (002/FR-044, T085) flips this when `/settings/activity` ships.
+   * `false` while a sub-page is not routed yet: hidden from the side nav and the palette so neither links to a
+   * page that would only redirect. Every page is routed now (Activity log shipped with 002/FR-044, T085).
    */
   ready?: boolean;
 }
@@ -30,7 +30,7 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
   { to: 'scoring', label: 'Scoring weights', icon: SlidersHorizontal, description: 'Tune Go / No-Go', keywords: ['scoring', 'weights', 'go no-go', 'score'] },
   { to: 'api-tokens', label: 'API tokens & extension', icon: KeyRound, description: 'Chrome co-pilot', keywords: ['api token', 'tokens', 'chrome extension', 'co-pilot', 'integration'] },
   { to: 'sync', label: 'Sync health', icon: Activity, description: 'GeM ingestion runs', keywords: ['sync', 'ingestion', 'gem runs', 'health'] },
-  { to: 'activity', label: 'Activity log', icon: History, description: 'Who did what, when', keywords: ['activity', 'audit', 'history', 'log'], ready: false },
+  { to: 'activity', label: 'Activity log', icon: History, description: 'Who did what, when', keywords: ['activity', 'audit', 'history', 'log'] },
 ];
 
 /** Items the current user may open: routed (`ready !== false`) and at or above `min` role. */
