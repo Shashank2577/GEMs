@@ -1,0 +1,12 @@
+# sc3-sync-cooldown — project desktop — 2026-11-05T05:54:38.194Z
+latest manual sync finished_at (set to now-4min): 2026-11-05T05:50:38.352Z → expected retryAt 2026-11-05T06:00:38.352Z
+### Sync now 4 minutes after a finished manual sync
+> POST /api/ingestion/run {}
+< 429
+{"error":{"code":"sync_cooldown","message":"GeM was synced moments ago. Next manual sync at 11:30 am IST.","details":{"retryAt":"2026-11-05T06:00:38.352Z"}}}
+
+mock-gem requests during the refused call: 0
+GET /api/ingestion/runs → nextManualSyncAt=2026-11-05T06:00:38.352Z manualSyncCooldownMin=10
+expected tooltip: "Next manual sync at 11:30 am IST"
+feed popover: Sync now disabled; tooltip (title) = "Next manual sync at 11:30 am IST"
+settings: Sync now disabled; tooltip = "Next manual sync at 11:30 am IST"

@@ -1,0 +1,8 @@
+# QA re-run on a 500k fixture: apps/api/test/perf-indexes.test.ts with constants raised to 500,000 tenders / 1,000,000 notifications / 500 pending
+# (scratch copy, not committed; real SQL captured from GET /api/tenders; EXPLAIN (ANALYZE, FORMAT JSON); fixture = packages/db/src/fixtures/bulk-tenders.ts). 11 tests passed.
+/tenders                                           ms=0.11   indexes=tenders_open_created_idx
+/tenders?sort=endAt                                ms=0.77   indexes=tenders_open_closing_idx   (Index Cond: COALESCE(end_at,'infinity') >= now())
+/tenders?minValue=500000&sort=value                ms=0.228  indexes=tenders_open_value_idx
+/tenders?state=Maharashtra                         ms=0.234  indexes=tenders_open_created_idx   <-- NOT tenders_open_state_idx (see explain-state.txt)
+/tenders?state=Maharashtra&ministry=Ministry of Defence&sort=endAt   ms=7.799  indexes=tenders_open_ministry_idx, tenders_state_idx
+dispatcher select (1,000,000 notifications, 500 pending)   ms=3.112   indexes=notifications_pending_idx (+ users_pkey, organizations_pkey, notification_prefs_org_id_user_id_pk)

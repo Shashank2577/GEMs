@@ -1,0 +1,11 @@
+# sc9-scanned-document — project desktop — 2026-11-05T05:54:52.327Z
+### upload of a 4-page PDF without text
+> POST /api/tenders/:id/documents
+< 201
+{"id":"e0cb43fb-68fa-4be6-a090-4320fd143f55","tenderId":"195fdd80-04eb-47db-9a22-dcfea0c42db1","orgId":"730e0864-0687-4c92-9821-fa7b022ad824","kind":"bid","fileName":"scanned-bid.pdf","sizeBytes":602,"pageCount":4,"sourceUrl":null,"hasText":false,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T05:54:52.432Z","warnings":[]}
+
+### Analyse
+> POST /api/tenders/:id/analyse
+< 422
+{"error":{"code":"scanned_document","message":"This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.","details":{"documents":["scanned-bid.pdf"]}}}
+

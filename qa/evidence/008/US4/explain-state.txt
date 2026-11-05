@@ -1,0 +1,47 @@
+-- QA re-capture on the 500k fixture (500,036 tenders / 30,036 open; 1,000,000 notifications / 500 pending) — 2026-11-05T05:47:37Z
+-- page query for ?state=Maharashtra (hand-written equivalent of routes/tenders.ts WHERE/ORDER)
+                                                      QUERY PLAN                                                       
+-----------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.041..0.337 rows=25 loops=1)
+   ->  Index Scan using tenders_open_created_idx on tenders (actual time=0.040..0.333 rows=25 loops=1)
+         Filter: ((state = 'Maharashtra'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now()))
+         Rows Removed by Filter: 180
+ Planning Time: 0.666 ms
+ Execution Time: 0.369 ms
+(6 rows)
+
+-- count/facet-style query for ?state=Maharashtra
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate (actual time=33.750..33.753 rows=1 loops=1)
+   ->  Bitmap Heap Scan on tenders (actual time=10.874..33.476 rows=3569 loops=1)
+         Recheck Cond: ((COALESCE(end_at, 'infinity'::timestamp with time zone) >= now()) AND (status = 'open'::text) AND (state = 'Maharashtra'::text))
+         Heap Blocks: exact=3110
+         ->  BitmapAnd (actual time=10.456..10.458 rows=0 loops=1)
+               ->  Bitmap Index Scan on tenders_open_closing_idx (actual time=1.664..1.665 rows=30036 loops=1)
+                     Index Cond: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+               ->  Bitmap Index Scan on tenders_state_idx (actual time=8.130..8.130 rows=59410 loops=1)
+                     Index Cond: (state = 'Maharashtra'::text)
+ Planning Time: 0.618 ms
+ Execution Time: 33.901 ms
+(11 rows)
+
+-- a rarer state (Goa)
+                                                                      QUERY PLAN                                                                       
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=5.195..5.202 rows=25 loops=1)
+   ->  Sort (actual time=5.193..5.196 rows=25 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: top-N heapsort  Memory: 26kB
+         ->  Bitmap Heap Scan on tenders (actual time=2.498..5.114 rows=298 loops=1)
+               Recheck Cond: ((state = 'Goa'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now()) AND (status = 'open'::text))
+               Heap Blocks: exact=298
+               ->  BitmapAnd (actual time=2.437..2.439 rows=0 loops=1)
+                     ->  Bitmap Index Scan on tenders_state_idx (actual time=0.760..0.761 rows=4951 loops=1)
+                           Index Cond: (state = 'Goa'::text)
+                     ->  Bitmap Index Scan on tenders_open_closing_idx (actual time=1.414..1.415 rows=30036 loops=1)
+                           Index Cond: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.673 ms
+ Execution Time: 5.297 ms
+(14 rows)
+
