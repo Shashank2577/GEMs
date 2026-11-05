@@ -28,7 +28,7 @@ import { useUpdateOrg } from '@/features/settings/api';
 import { useCreateWatchlist, useWatchlistPreview } from '@/features/watchlists/api';
 import { ChipInput, MultiSelect } from '@/features/watchlists/ChipInput';
 import { useUploadVault, useVault } from '@/features/vault/api';
-import { POPULAR_CATEGORIES, STEPS, initialStep, keywordsFor } from './steps';
+import { POPULAR_CATEGORIES, STEPS, initialStep, keywordsFor, watchlistSeed, watchlistStepReady } from './steps';
 
 type MseCat = 'micro' | 'small' | 'medium' | null;
 
@@ -112,7 +112,11 @@ export default function OnboardingPage() {
             <CategoriesStep {...{ categories, setCategories, hsn, setHsn, states, setStates }} onBack={() => go(0)}
               onNext={async () => { await tick({ categories: true }); go(2); }} />
           )}
-          {step === 2 && (
+          {step === 2 && !watchlistStepReady({ hydrated, profileFailed: profile.isError }) && (
+            // FR-043/FR-046: WatchlistStep seeds its form once at mount, so wait for the profile values (a direct resume lands here).
+            <div className="flex justify-center py-24" role="status" aria-label="Loading your setup"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div>
+          )}
+          {step === 2 && watchlistStepReady({ hydrated, profileFailed: profile.isError }) && (
             <WatchlistStep categories={categories} states={states} hsn={hsn} onBack={() => go(1)} already={watchlistDone}
               onNext={async () => { setWatchlistDone(true); await tick({ watchlist: true }); go(3); }} />
           )}
@@ -341,8 +345,8 @@ function useDebounced<T>(v: T, ms = 400): T {
 
 function WatchlistStep({ categories, states, hsn, onBack, onNext, already }: { categories: string[]; states: string[]; hsn: string[]; onBack: () => void; onNext: () => Promise<void>; already: boolean }) {
   const create = useCreateWatchlist();
-  const [name, setName] = useState(() => (categories.length ? `${categories.slice(0, 2).join(' & ')}${states.length === 1 ? ` – ${states[0]}` : ''}` : 'My first watchlist').slice(0, 80));
-  const [keywords, setKeywords] = useState(() => keywordsFor(categories));
+  const [name, setName] = useState(() => watchlistSeed(categories, states).name);
+  const [keywords, setKeywords] = useState(() => watchlistSeed(categories, states).keywords);
   const [wlStates, setWlStates] = useState(states);
   const criteria = useMemo(() => ({ keywords, states: wlStates, hsnCodes: [] as string[], categories: [] as string[] }), [keywords, wlStates]);
   const debounced = useDebounced(criteria);

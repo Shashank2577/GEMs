@@ -44,3 +44,16 @@ export function initialStep(state: Record<string, boolean>): number {
   const i = STEPS.findIndex((s) => s.key !== 'done' && !state[s.key]);
   return i < 0 ? STEPS.length - 1 : i;
 }
+
+/** The WatchlistStep form is seeded once at mount, so it must not mount before the profile has hydrated (or failed to load). */
+export function watchlistStepReady(o: { hydrated: boolean; profileFailed: boolean }): boolean {
+  return o.hydrated || o.profileFailed;
+}
+
+/** Initial name/keywords for the first watchlist, derived from the profile's categories and operating states. */
+export function watchlistSeed(categories: string[], states: string[]): { name: string; keywords: string[] } {
+  const name = categories.length
+    ? `${categories.slice(0, 2).join(' & ')}${states.length === 1 ? ` – ${states[0]}` : ''}`
+    : 'My first watchlist';
+  return { name: name.slice(0, 80), keywords: keywordsFor(categories) };
+}
