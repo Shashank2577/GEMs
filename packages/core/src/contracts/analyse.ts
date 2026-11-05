@@ -48,6 +48,14 @@ export interface ScoringWeights { weights: Record<FactorKey, number>; defaults: 
 export const STALE_REASONS = ['corrigendum', 'document_added', 'document_removed', 'profile_changed', 'vault_changed', 'weights_changed'] as const;
 export type StaleReason = (typeof STALE_REASONS)[number];
 
+/**
+ * Stale reasons a Re-score fixes (FR-037): only the company side changed, the stored requirements are
+ * still right. Any other reason (or a stale flag without a reason) needs a full re-analysis.
+ */
+export const RESCORABLE_STALE_REASONS = ['profile_changed', 'vault_changed', 'weights_changed'] as const satisfies readonly StaleReason[];
+export const isRescorableReason = (reason: StaleReason | null | undefined): boolean =>
+  !!reason && (RESCORABLE_STALE_REASONS as readonly string[]).includes(reason);
+
 /** Non-blocking upload warnings (FR-010). */
 export type TenderDocumentWarning =
   | { code: 'bid_number_mismatch'; found: string }

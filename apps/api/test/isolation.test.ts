@@ -10,7 +10,7 @@ import { asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   activityLog, analyses, annexureTemplates, apiTokens, bidWorkspaces, comments, companyProfiles, invitations, memberships, notificationPrefs,
-  notifications, organizations, packets, pastContracts, sessions, tenderDocuments, tenderMatches, vaultDocuments, watchlists,
+  notifications, organizations, packets, pastContracts, savedViews, sessions, tenderDocuments, tenderMatches, vaultDocuments, watchlists,
 } from '@tp/db';
 import { createTestContext, request, seedOrgWithRoles, uniqueEmail, type TestContext } from './helpers';
 import { file, NOW, pdf, seedAnalysis, seedApply } from './workspace-fixtures';
@@ -45,6 +45,7 @@ async function snapshotA() {
     templates: await byOrg(annexureTemplates),
     packets: await byOrg(packets),
     notifications: await byOrg(notifications),
+    savedViews: await byOrg(savedViews),
     activity: await ctx.db.select().from(activityLog).where(eq(activityLog.orgId, oid)).orderBy(asc(activityLog.id)),
     sessions: await ctx.db.select().from(sessions).where(inArray(sessions.userId, userIds)).orderBy(asc(sessions.id)),
   });
@@ -111,6 +112,10 @@ beforeAll(async () => {
   }).returning();
   ids.notification = n.id;
 
+  const sv = await request(ctx.app, 'POST', '/views', { cookie: a.analyst.cookie, json: { name: 'A closing soon', params: { q: ['laptop'] } } });
+  expect(sv.status, json(sv)).toBe(201);
+  ids.savedView = sv.body.id;
+
   const sess = await request(ctx.app, 'GET', '/me/sessions', { cookie: a.owner.cookie });
   ids.session = sess.body.items[0].id;
 });
@@ -127,6 +132,9 @@ describe('org B cannot read, update or delete org A’s resources by id (404, ne
     // watchlist
     ['update watchlist', () => ['PATCH', `/watchlists/${ids.watchlist}`, { json: { name: 'B renamed' } }]],
     ['delete watchlist', () => ['DELETE', `/watchlists/${ids.watchlist}`]],
+    // saved feed view
+    ['update saved view', () => ['PATCH', `/views/${ids.savedView}`, { json: { name: 'B renamed' } }]],
+    ['delete saved view', () => ['DELETE', `/views/${ids.savedView}`]],
     // vault document
     ['read vault doc', () => ['GET', `/vault/${ids.vault}`]],
     ['download vault doc', () => ['GET', `/vault/${ids.vault}/download`]],

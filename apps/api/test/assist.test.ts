@@ -163,3 +163,25 @@ describe('006/FR-074 read-only ("Extension (read-only)") API token', () => {
     expect(w.body.error).toEqual(READ_ONLY);
   });
 });
+
+describe('recorded outcome never reaches the assist payload (T094; 006/FR-083, NFR-005)', () => {
+  it('GET /assist/:id contains neither the L1/our price nor any outcome field after a result is recorded', async () => {
+    const before = await request(ctx.app, 'GET', `/assist/${wsId}`, { bearer: token });
+    expect(before.status).toBe(200);
+    expect((await request(ctx.app, 'POST', `/workspaces/${wsId}/submitted`, { cookie: s.org.analyst.cookie, json: {} })).status).toBe(200);
+    const rec = await request(ctx.app, 'PATCH', `/workspaces/${wsId}`, {
+      cookie: s.org.bidManager.cookie, json: { outcome: { result: 'won', l1Price: 7_654_321, ourPrice: 8_123_457, notes: 'secret-outcome-note' } },
+    });
+    expect(rec.status).toBe(200);
+    expect(rec.body.outcome).toMatchObject({ result: 'won', l1Price: 7_654_321, ourPrice: 8_123_457 });
+
+    for (const auth of [{ bearer: token }, { cookie: s.org.viewer.cookie }]) {
+      const r = await request(ctx.app, 'GET', `/assist/${wsId}`, auth);
+      expect(r.status).toBe(200);
+      const text = JSON.stringify(r.body);
+      expect(text).not.toMatch(/7654321|8123457|7,654,321|76,54,321|81,23,457|secret-outcome-note/);
+      expect(text).not.toMatch(/"(outcome|l1Price|ourPrice|result|submittedAt)"\s*:/);
+      expect(Object.keys(r.body).sort()).toEqual(Object.keys(before.body).sort());
+    }
+  });
+});

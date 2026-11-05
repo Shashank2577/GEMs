@@ -1,0 +1,6 @@
+{
+  "sentencesScanned": 213,
+  "faqAnswersExpanded": 6,
+  "forbiddenHits": [],
+  "patterns": "/auto-?submit(s|ting)? (your )?bids|we submit|enters? (your )?price|we (enter|type) (the |your )?(price|OTP)|handles? (OTP|DSC|e-?sign)|we (handle|enter) (the )?(OTP|DSC)/i"
+}

@@ -2,16 +2,17 @@
  * Organization routes (FR-031..033): /org, /org/members, /org/invitations (+ resend, 002/FR-020), /activity.
  * Mounted at /api.
  */
-import { and, asc, count, desc, eq, gt, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Hono, type Context } from 'hono';
-import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db, type Role } from '@tp/db';
+import { activityLog, apiTokens, invitations, memberships, organizations, savedViews, sessions, users, type Db, type Role } from '@tp/db';
 import {
   activityQuerySchema, changeRoleInputSchema, inviteInputSchema, updateOrgInputSchema,
   type ActivityItem, type CreatedInvitation, type Member, type MembersResponse, type PendingInvitation,
 } from '@tp/core/contracts/auth';
 import { ROLE_LABELS } from '@tp/core/contracts/common';
 import { logActivity } from '../lib/activity';
+import { enrichActivity } from '../lib/activity-target';
 import { randomToken, sha256Hex } from '../lib/crypto';
 import { HttpError, conflict, forbidden, notFound } from '../lib/errors';
 import { parseJson, parseQuery } from '../lib/validate';
@@ -227,6 +228,7 @@ orgRoutes.delete('/org/members/me', requireSession, async (c) => {
     await assertNotLastOwner(tx, oid, uid, 'leave');
     await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, uid)));
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, uid)));
     await logActivity(tx, { orgId: oid, userId: uid, action: 'member.left', entityType: 'user', entityId: uid, meta: { name: c.var.user.name, email: c.var.user.email, role: c.var.role } });
     const [next] = await tx.select({ orgId: memberships.orgId }).from(memberships)
       .where(eq(memberships.userId, uid)).orderBy(asc(memberships.createdAt)).limit(1);
@@ -278,6 +280,7 @@ orgRoutes.delete('/org/members/:userId', requireRole('owner'), async (c) => {
     // Already gone (left or removed concurrently): nothing to do, nothing to log.
     if (!removed) throw notFound('Member');
     await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, target)));
+    await tx.delete(savedViews).where(and(eq(savedViews.orgId, oid), eq(savedViews.userId, target)));
     await logActivity(tx, { orgId: oid, userId: userId(c), action: 'member.removed', entityType: 'user', entityId: target, meta: { name: m.name, email: m.email, role: removed.role } });
   });
   return c.json({ ok: true as const });
@@ -289,7 +292,8 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
   const q = parseQuery(c, activityQuerySchema);
   const { db } = c.var.deps;
   const conds: SQL[] = [eq(activityLog.orgId, orgId(c))];
-  if (q.entityType) conds.push(eq(activityLog.entityType, q.entityType));
+  const types = (q.entityType ?? '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 12);
+  if (types.length) conds.push(inArray(activityLog.entityType, types));
   if (q.entityId) conds.push(eq(activityLog.entityId, q.entityId));
   if (q.userId) conds.push(eq(activityLog.userId, q.userId));
   const where = and(...conds);
@@ -302,9 +306,9 @@ orgRoutes.get('/activity', requireAuth, async (c) => {
       .limit(q.pageSize).offset((q.page - 1) * q.pageSize),
     db.select({ n: count() }).from(activityLog).where(where),
   ]);
-  const items: ActivityItem[] = rows.map((r) => ({
+  const items: ActivityItem[] = await enrichActivity(db, orgId(c), rows.map((r) => ({
     id: r.id, action: r.action, entityType: r.entityType, entityId: r.entityId, meta: r.meta ?? {},
     createdAt: r.createdAt.toISOString(), user: r.userId ? { id: r.userId, name: r.userName ?? '' } : null,
-  }));
+  })));
   return c.json({ items, total: Number(n) });
 });

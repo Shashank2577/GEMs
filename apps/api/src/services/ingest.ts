@@ -313,7 +313,8 @@ async function upsertTender(
   await db.update(tenders).set({ ...merged, updatedAt: now }).where(eq(tenders.id, prev.id));
   await db.insert(tenderEvents).values({ tenderId: prev.id, kind, changes, createdAt: now });
   if (corrigendum) {
-    await db.update(analyses).set({ stale: true, updatedAt: now }).where(eq(analyses.tenderId, prev.id));
+    // The reason matters: a corrigendum needs a full re-analysis, Re-score refuses it (FR-037, FR-043).
+    await db.update(analyses).set({ stale: true, staleReason: 'corrigendum', staleAt: now, updatedAt: now }).where(eq(analyses.tenderId, prev.id));
   }
   return { id: prev.id, kind: 'updated', corrigendum };
 }

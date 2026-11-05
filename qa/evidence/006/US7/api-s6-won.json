@@ -1,0 +1,31 @@
+[
+  {
+    "label": "PATCH outcome (UI)",
+    "request": "PATCH /api/workspaces/64f27582-7b2f-4e43-80a5-f77e7c76d9c6 {\"outcome\":{\"result\":\"won\",\"l1Price\":2950000,\"ourPrice\":null,\"notes\":null}}",
+    "status": 200,
+    "response": {
+      "id": "64f27582-7b2f-4e43-80a5-f77e7c76d9c6",
+      "tenderId": "1874ba41-c3d5-42a7-b2d0-bdd4b550be72",
+      "stage": "won",
+      "owner": {
+        "id": "408b57f5-2fdf-4784-9936-f70c709daae3",
+        "name": "QA analyst mw37lyd06",
+        "email": "analyst.mw37lyd06@example.in"
+      },
+      "assignees": [],
+      "dueAt": "2026-11-20T07:13:45.012Z",
+      "mapping": {},
+      "overrides": [],
+      "assistValues": {},
+      "outcome": {
+        "at": "2026-11-05T07:13:47.237Z",
+        "result": "won",
+        "l1Price": 2950000
+      },
+      "submittedAt": "2026-11-05T07:13:45.850Z",
+      "position": 1,
+      "createdAt": "2026-11-05T07:13:45.722Z",
+      "updatedAt": "2026-11-05T07:13:47.237Z"
+    }
+  }
+]

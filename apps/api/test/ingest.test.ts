@@ -160,6 +160,8 @@ describe('runIngestion', () => {
     expect(events[0].changes).toEqual({ endAt: { from: t.endAt!.toISOString(), to: after.endAt!.toISOString() } });
     const [a] = await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id));
     expect(a.stale).toBe(true);
+    expect(a.staleReason).toBe('corrigendum'); // Re-score refuses it: a corrigendum needs a re-analysis (004/FR-037)
+    expect(a.staleAt).not.toBeNull();
     // Members who track it get an in-app heads-up; the match itself is not duplicated.
     expect(await count(notifications, and(eq(notifications.kind, 'deadline'), eq(notifications.orgId, team.orgId))!)).toBe(4);
     expect(await count(tenderMatches, eq(tenderMatches.tenderId, t.id))).toBe(1);
