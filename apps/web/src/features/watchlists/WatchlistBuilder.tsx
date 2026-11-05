@@ -79,6 +79,8 @@ function Preview({ draft }: { draft: Draft }) {
   const criteria = useDebouncedValue(useMemo(() => draftToCriteria(draft), [draft]), 400);
   const ready = hasCriteria(draft);
   const q = useWatchlistPreview(criteria, ready);
+  // While a 429 waits for its retry the query is not in error yet: the failure reason carries the wait.
+  const paused = previewPausedMessage(q.error ?? q.failureReason);
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex items-center justify-between gap-2">
@@ -88,8 +90,8 @@ function Preview({ draft }: { draft: Draft }) {
       <div className="mt-3 rounded-xl border bg-card p-4 shadow-xs" aria-live="polite">
         {!ready ? (
           <p className="text-sm text-muted-foreground">Add a keyword, state or buyer to see matching open bids.</p>
-        ) : q.isError && previewPausedMessage(q.error) ? (
-          <p className="text-sm text-muted-foreground" role="status">{previewPausedMessage(q.error)}</p>
+        ) : paused ? (
+          <p className="text-sm text-muted-foreground" role="status">{paused}</p>
         ) : q.isError ? (
           <p className="text-sm text-danger">Preview unavailable — {(q.error as Error).message}</p>
         ) : (

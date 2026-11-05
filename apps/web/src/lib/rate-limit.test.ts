@@ -1,7 +1,7 @@
 /** 008/US3 T056: 429 handling in the web client (FR-018, FR-041d). */
 import { describe, expect, it } from 'vitest';
 import { ApiError, formatRetryAfter, tooManyAttemptsMessage } from './api';
-import { previewPausedMessage } from '../features/watchlists/api';
+import { previewPausedMessage, previewRetry, previewRetryDelay } from '../features/watchlists/api';
 
 const limited = (retryAfter?: number, message = 'Too many attempts. Try again in 14 minutes.', rule = 'auth.fail.email') =>
   new ApiError(429, 'rate_limited', message, retryAfter === undefined ? { rule } : { rule, retryAfter });
@@ -43,5 +43,14 @@ describe('watchlist preview', () => {
     const e = new ApiError(429, 'rate_limited', 'Too many requests. Try again in 50 seconds.', { rule: 'watchlist.preview.user', retryAfter: 50 });
     expect(previewPausedMessage(e)).toBe('Preview paused — try again in 50 s');
     expect(previewPausedMessage(new ApiError(500, 'internal_error', 'x'))).toBeNull();
+  });
+
+  it('refetches by itself after Retry-After (N7), and never retries other errors', () => {
+    const e = new ApiError(429, 'rate_limited', 'x', { rule: 'watchlist.preview.user', retryAfter: 12 });
+    expect(previewRetry(0, e)).toBe(true);
+    expect(previewRetry(3, e)).toBe(false);
+    expect(previewRetryDelay(0, e)).toBe(12_000);
+    expect(previewRetry(0, new ApiError(400, 'validation_error', 'x'))).toBe(false);
+    expect(previewRetryDelay(0, new ApiError(429, 'rate_limited', 'x'))).toBe(5_000);
   });
 });

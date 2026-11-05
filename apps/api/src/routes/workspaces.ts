@@ -73,7 +73,7 @@ async function notify(deps: AppDeps, org: string, userIds: string[], n: { kind: 
 workspacesRoutes.post('/tenders/:id/workspace', requireRole('analyst'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
-  const t = await getTenderRow(deps, c.req.param('id'));
+  const t = await getTenderRow(deps, c.req.param('id'), c.var.org);
   const [existing] = await deps.db.select().from(bidWorkspaces).where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.tenderId, t.id)));
   if (existing) return c.json({ ...(await workspaceDto(deps, existing)), created: false });
 

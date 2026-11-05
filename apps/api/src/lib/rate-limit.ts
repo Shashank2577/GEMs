@@ -101,8 +101,8 @@ export function rateLimited(retryAfterSec: number, rule = 'auth.fail.email'): Ht
   return tooManyRequests(rule, retryAfterSec);
 }
 
-/** The rule name and Retry-After of the most restrictive blocked counter. */
-function worst(blocked: { rule: string; retryAfterSec: number }[]): HttpError {
+/** 429 naming the binding rule: the blocked counter with the longest Retry-After. */
+export function worst(blocked: { rule: string; retryAfterSec: number }[]): HttpError {
   const w = blocked.reduce((a, b) => (b.retryAfterSec > a.retryAfterSec ? b : a));
   return rateLimited(w.retryAfterSec, w.rule);
 }

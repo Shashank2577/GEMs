@@ -7,7 +7,8 @@
  * - Without it (chunked): the body is wrapped in a counting stream that errors as soon as the cap is passed, and the
  *   response becomes the 413 even if the handler caught the read error.
  *
- * Caps: multipart uploads = file cap + 64 KB for multipart overhead; everything else (JSON) 1 MB (`bodyLimits`, app.ts).
+ * Caps, by route (`bodyLimits`, app.ts): the three upload routes = file cap + 64 KB multipart overhead; every other
+ * request 1 MB, whatever its content type.
  */
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
@@ -34,8 +35,9 @@ function tooLarge(message: string, maxBytes: number): HttpError {
 /** Enforce `maxBytes` on the request body of this route. */
 export const bodyLimit = (maxBytes: number, message = `The request body is too large (at most ${Math.round(maxBytes / MB)} MB).`) =>
   createMiddleware<AppEnv>(async (c, next) => {
+    if (c.req.method === 'GET' || c.req.method === 'HEAD') return next();
     const raw = c.req.raw;
-    if (!raw.body || c.req.method === 'GET' || c.req.method === 'HEAD') return next();
+    if (!raw.body) return next();
     const declared = raw.headers.get('content-length');
     if (declared != null && declared.trim() !== '' && !raw.headers.has('transfer-encoding')) {
       const n = Number(declared);
@@ -69,13 +71,21 @@ export const bodyLimit = (maxBytes: number, message = `The request body is too l
     }
   });
 
-/**
- * Global cap for every /api request (mounted in app.ts): multipart bodies get the upload cap of their area (vault
- * 20 MB, otherwise the 25 MB tender-document cap; upload routes repeat their own cap), everything else 1 MB.
- */
+/** The upload routes and their caps; every other /api request is capped at 1 MB whatever its content type. */
+const UPLOAD_ROUTES: { method: string; path: RegExp; max: number; message: string }[] = [
+  { method: 'POST', path: /^\/api\/vault\/?$/, max: VAULT_UPLOAD_MAX_BYTES, message: VAULT_TOO_LARGE },
+  { method: 'PUT', path: /^\/api\/vault\/[^/]+\/file\/?$/, max: VAULT_UPLOAD_MAX_BYTES, message: VAULT_TOO_LARGE },
+  { method: 'POST', path: /^\/api\/tenders\/[^/]+\/documents\/?$/, max: TENDER_DOC_UPLOAD_MAX_BYTES, message: TENDER_DOC_TOO_LARGE },
+];
+
+/** Cap for a request, chosen by route (not by content type, which the client controls). */
+export function capFor(method: string, path: string): { max: number; message: string } {
+  const u = UPLOAD_ROUTES.find((r) => r.method === method && r.path.test(path));
+  return u ? { max: u.max, message: u.message } : { max: JSON_BODY_MAX_BYTES, message: JSON_TOO_LARGE };
+}
+
+/** Global cap for every /api request (mounted in app.ts); the upload routes also declare their cap on the route. */
 export const bodyLimits = createMiddleware<AppEnv>(async (c: Context<AppEnv>, next) => {
-  if (!/^multipart\/form-data/i.test(c.req.header('content-type') ?? '')) return bodyLimit(JSON_BODY_MAX_BYTES, JSON_TOO_LARGE)(c, next);
-  return /^\/api\/vault(\/|$)/.test(c.req.path)
-    ? bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_LARGE)(c, next)
-    : bodyLimit(TENDER_DOC_UPLOAD_MAX_BYTES, TENDER_DOC_TOO_LARGE)(c, next);
+  const { max, message } = capFor(c.req.method, c.req.path);
+  return bodyLimit(max, message)(c, next);
 });

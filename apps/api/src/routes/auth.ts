@@ -20,7 +20,7 @@ import { getDummyHash, hashPassword, randomToken, sha256Hex, verifyPassword } fr
 import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/errors';
 import { buildMe } from '../lib/me';
 import { defer } from '../lib/defer';
-import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, failClosed, hit, rateLimited, reset } from '../lib/rate-limit';
+import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, failClosed, hit, rateLimited, reset, worst } from '../lib/rate-limit';
 import { clearSessionCookie, firstMembership, loadMembership, loadUser, rememberOrg, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
 import { parseJson, parseWith } from '../lib/validate';
@@ -162,8 +162,11 @@ authRoutes.post('/auth/forgot-password', async (c) => {
     hit(db, email, 'reset_email', RESET_EMAIL_LIMIT, now),
     ip ? hit(db, ip, 'reset_ip', RESET_IP_LIMIT, now) : Promise.resolve(null),
   ]));
-  const blocked = [byEmail.over ? byEmail : null, byIp?.over ? byIp : null].filter((st) => st);
-  if (blocked.length) throw rateLimited(Math.max(...blocked.map((st) => st!.retryAfterSec)), byEmail.over ? 'auth.reset.email' : 'auth.reset.ip');
+  const blocked = [
+    byEmail.over ? { rule: 'auth.reset.email', retryAfterSec: byEmail.retryAfterSec } : null,
+    byIp?.over ? { rule: 'auth.reset.ip', retryAfterSec: byIp.retryAfterSec } : null,
+  ].filter((b): b is { rule: string; retryAfterSec: number } => !!b);
+  if (blocked.length) throw worst(blocked);
 
   defer(c, 'password reset email', async () => {
     const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));

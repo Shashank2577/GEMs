@@ -9,8 +9,12 @@
  * Per-user/org rules must come after `requireAuth`/`requireRole`; when the subject is unknown (no user, client IP not
  * determinable) the rule is skipped.
  *
- * Global rules: `api.ip` for requests without credentials (`ipLimit`, mounted in app.ts) and `api.user` for every
- * authenticated request (`limitAuthenticated`, called by middleware/auth.ts once the caller is known).
+ * Global rules: `api.ip` for requests without (valid) credentials (`ipLimit`, mounted in app.ts) and `api.user` for
+ * every authenticated request (`limitAuthenticated`, called by middleware/auth.ts once the caller is known).
+ *
+ * Windows are fixed (aligned to the clock), so a client can send up to 2× the limit across a window boundary
+ * (end of one window + start of the next). Accepted for these abuse caps; a sliding window would cost a second
+ * counter read per request.
  */
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
@@ -18,8 +22,31 @@ import { createMiddleware } from 'hono/factory';
 import { serviceUnavailable, tooManyRequests } from '../lib/errors';
 import { clientIp } from '../lib/client-ip';
 import { RATE_LIMIT_RULES, type GenericRuleName, type RateLimitSubject } from '../lib/rate-limit-rules';
-import { SESSION_COOKIE } from '../lib/session';
+import { SESSION_COOKIE, resolveAuth } from '../lib/session';
 import type { AppEnv } from '../types';
+
+/** A limiter slower than this is treated as unavailable (the request is not held up by a sick database). */
+export const LIMITER_TIMEOUT_MS = 300;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const t = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`rate limiter timed out after ${ms} ms`)), ms); });
+  return Promise.race([p, t]).finally(() => clearTimeout(timer));
+}
+
+/** One `rate_limit_unavailable` line per rule per 10 s (an outage would otherwise log on every request). */
+const WARN_EVERY_MS = 10_000;
+const lastWarn = new Map<string, { at: number; suppressed: number }>();
+/** Null when this warning should be skipped, else how many were skipped since the last one. */
+function sampleWarning(rule: string): number | null {
+  const now = Date.now();
+  const w = lastWarn.get(rule);
+  if (w && now - w.at < WARN_EVERY_MS) { w.suppressed++; return null; }
+  lastWarn.set(rule, { at: now, suppressed: 0 });
+  return w?.suppressed ?? 0;
+}
+/** Test hook: forget warning sampling state. */
+export function resetRateLimitWarnings(): void { lastWarn.clear(); }
 
 function subjectKey(c: Context<AppEnv>, subject: RateLimitSubject): string | null {
   switch (subject) {
@@ -39,9 +66,10 @@ export async function applyRateLimit(c: Context<AppEnv>, name: GenericRuleName):
   const { rateLimiter, clock, logger } = c.var.deps;
   let r;
   try {
-    r = await rateLimiter.hit(`${name}:${subject}`, rule.limit, rule.windowSec, clock.now());
+    r = await withTimeout(rateLimiter.hit(`${name}:${subject}`, rule.limit, rule.windowSec, clock.now()), LIMITER_TIMEOUT_MS);
   } catch (e) {
-    logger.warn('rate_limit_unavailable', { rule: name, rid: c.var.requestId, error: (e as Error)?.message });
+    const suppressed = sampleWarning(name);
+    if (suppressed !== null) logger.warn('rate_limit_unavailable', { rule: name, rid: c.var.requestId, error: (e as Error)?.message, suppressed });
     if (rule.failClosed) throw serviceUnavailable('service_unavailable', 'This is temporarily unavailable. Please try again in a minute.', { reason: 'rate_limit_unavailable' });
     return;
   }
@@ -61,16 +89,38 @@ export function hasCredentials(c: Context<AppEnv>): boolean {
   return /^Bearer\s+\S/i.test(c.req.header('authorization') ?? '') || !!getCookie(c, SESSION_COOKIE);
 }
 
+/** `api.ip` at most once per request. */
+async function countIp(c: Context<AppEnv>): Promise<void> {
+  if (c.var.ipCounted) return;
+  c.set('ipCounted', true);
+  await applyRateLimit(c, 'api.ip');
+}
+
 /**
- * Global `api.ip`: every request without credentials, except `/api/health`. Requests with credentials are counted
- * by `api.user` after authentication, or by `api.ip` when the credentials turn out to be invalid (middleware/auth.ts).
+ * Global `api.ip` (every /api request except `/api/health`):
+ * - no credentials → counted against the client IP;
+ * - credentials → resolved here once (cached in `c.var.preAuth` for requireAuth) and counted against the IP when
+ *   they do not resolve to a member, so forged cookies on public routes are limited too. Valid credentials are
+ *   limited per user (`api.user`) when the route authenticates.
  */
 export const ipLimit = createMiddleware<AppEnv>(async (c, next) => {
-  if (!/\/api\/health\/?$/.test(c.req.path) && !hasCredentials(c)) await applyRateLimit(c, 'api.ip');
+  if (!/\/api\/health\/?$/.test(c.req.path)) {
+    if (!hasCredentials(c)) await countIp(c);
+    else {
+      const auth = await resolveAuth(c);
+      c.set('preAuth', { auth });
+      if (!auth || !auth.org || !auth.role) await countIp(c);
+    }
+  }
   await next();
 });
 
-/** Called once per request by middleware/auth.ts: `api.user` for an authenticated caller, `api.ip` for bad credentials. */
-export async function limitAuthenticated(c: Context<AppEnv>, authenticated: boolean): Promise<void> {
-  await applyRateLimit(c, authenticated ? 'api.user' : 'api.ip');
+/** `api.user` for an authenticated caller (middleware/auth.ts, once per request). */
+export async function limitAuthenticated(c: Context<AppEnv>): Promise<void> {
+  await applyRateLimit(c, 'api.user');
+}
+
+/** `api.ip` for credentials that did not authenticate — only when credentials were sent, and only once. */
+export async function limitUnauthenticated(c: Context<AppEnv>): Promise<void> {
+  if (hasCredentials(c)) await countIp(c);
 }

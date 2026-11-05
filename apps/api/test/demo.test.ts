@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
-import { analyses, bidWorkspaces, companyProfiles, notifications, organizations, tenderMatches, tenders, vaultDocuments, watchlists } from '@tp/db';
+import { analyses, bidWorkspaces, comments, companyProfiles, notifications, organizations, tenderDocuments, tenderMatches, tenders, vaultDocuments, watchlists } from '@tp/db';
 import { seedDemo, demoPdf, demoBidNumber, DEMO_COMPANY } from '@tp/db/demo';
 import { matchAndNotify } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
@@ -242,10 +242,38 @@ describe('008/FR-016 demo isolation (US3 scenarios 1–2)', () => {
     const listed = await request(ctx.app, 'GET', '/watchlists', { cookie: b.cookie });
     expect(listed.body.items[0].matchCount).toBe(2); // lots 1 and 2, no demo bids
   });
+
+  it('a gem row still marked raw.demo = true (re-seeded by old code) stays invisible to non-demo orgs (S6)', async () => {
+    const [leak] = await ctx.db.insert(tenders).values({
+      bidNumber: 'GEM/2026/B/9999001', title: 'Laptop leak from an old seeder', category: 'Laptop - Notebook', state: 'Maharashtra',
+      endAt: new Date(NOW.getTime() + 5 * 86_400_000), sourceUrl: 'https://bidplus.gem.gov.in/all-bids', contentHash: 'leak', raw: { demo: true },
+    }).returning();
+    const feed = await request(ctx.app, 'GET', '/tenders?status=all&pageSize=100', { cookie: b.cookie });
+    expect(feed.body.items.some((t: { id: string }) => t.id === leak!.id)).toBe(false);
+    expect((await request(ctx.app, 'GET', `/tenders/${leak!.id}`, { cookie: b.cookie })).status).toBe(404);
+    expect((await matchAndNotify(ctx.deps, [leak!.id], NOW)).matchesCreated).toBe(0);
+  });
+
+  it('N8: a demo org’s saved watchlist matches what its preview showed — silently, no alerts', async () => {
+    const criteria = { keywords: ['cctv'] };
+    const prev = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: a.cookie, json: { criteria } });
+    expect(prev.body.count).toBeGreaterThan(0);
+    const notesBefore = (await ctx.db.select().from(notifications).where(eq(notifications.orgId, a.me.org.id))).length;
+    const wl = await request(ctx.app, 'POST', '/watchlists', { cookie: a.cookie, json: { name: 'Demo CCTV', criteria } });
+    expect(wl.status).toBe(201);
+    const listed = await request(ctx.app, 'GET', '/watchlists', { cookie: a.cookie });
+    const saved = listed.body.items.find((w: { id: string }) => w.id === wl.body.id);
+    expect(saved.openCount).toBe(prev.body.count);
+    expect((await ctx.db.select().from(notifications).where(eq(notifications.orgId, a.me.org.id))).length).toBe(notesBefore);
+    // Org B's identical watchlist never matches the demo bids.
+    const wlB = await request(ctx.app, 'POST', '/watchlists', { cookie: b.cookie, json: { name: 'CCTV', criteria } });
+    const listedB = await request(ctx.app, 'GET', '/watchlists', { cookie: b.cookie });
+    expect(listedB.body.items.find((w: { id: string }) => w.id === wlB.body.id).matchCount).toBe(0);
+  });
 });
 
-describe('008/T047 data-fix migration 0003_demo_source_datafix (US3 scenario 3)', () => {
-  const MIGRATION = fileURLToPath(new URL('../../../packages/db/migrations/0003_demo_source_datafix.sql', import.meta.url));
+describe('008/T047 data-fix migration 0007_demo_source_datafix (US3 scenario 3)', () => {
+  const MIGRATION = fileURLToPath(new URL('../../../packages/db/migrations/0007_demo_source_datafix.sql', import.meta.url));
   const runMigration = async () => {
     for (const stmt of readFileSync(MIGRATION, 'utf8').split('--> statement-breakpoint')) {
       if (stmt.replace(/--.*$/gm, '').trim()) await ctx.db.execute(sql.raw(stmt));
@@ -279,6 +307,19 @@ describe('008/T047 data-fix migration 0003_demo_source_datafix (US3 scenario 3)'
       title: 'New match', body: 'x', link: `/tenders/${tenderId}`, dedupeKey: key, status: 'sent' as const,
     });
     await ctx.db.insert(notifications).values([note(ids[0]!), note(ids[1]!, `legacy:${ids[1]}`), note(real.id)]);
+    // Work the non-demo org built on leaked demo tenders (S6): an analysis, a workspace with a comment, an upload.
+    await ctx.db.insert(analyses).values([
+      { orgId: realOrg.me.org.id, tenderId: ids[0]!, status: 'done', method: 'rules', score: 50, verdict: 'review', factors: [], requirements: [], checklist: [] },
+      { orgId: realOrg.me.org.id, tenderId: real.id, status: 'done', method: 'rules', score: 70, verdict: 'go', factors: [], requirements: [], checklist: [] },
+    ]);
+    const [ws] = await ctx.db.insert(bidWorkspaces).values([{ orgId: realOrg.me.org.id, tenderId: ids[0]! }, { orgId: realOrg.me.org.id, tenderId: real.id }]).returning();
+    await ctx.db.insert(comments).values({ orgId: realOrg.me.org.id, workspaceId: ws!.id, userId: realOrg.me.user.id, body: 'On a fake bid' });
+    await ctx.db.insert(tenderDocuments).values([
+      { tenderId: ids[0]!, orgId: realOrg.me.org.id, fileName: 'x.pdf', blobKey: 'k/x.pdf', sizeBytes: 1 },
+      { tenderId: ids[0]!, orgId: demoOrg.me.org.id, fileName: 'y.pdf', blobKey: 'k/y.pdf', sizeBytes: 1 },
+    ]);
+    const demoWsBefore = (await ctx.db.select().from(bidWorkspaces).where(eq(bidWorkspaces.orgId, demoOrg.me.org.id))).length;
+    const demoAnalysesBefore = (await ctx.db.select().from(analyses).where(eq(analyses.orgId, demoOrg.me.org.id))).length;
     const demoOrgMatchesBefore = (await ctx.db.select().from(tenderMatches).where(eq(tenderMatches.orgId, demoOrg.me.org.id))).length;
     expect(demoOrgMatchesBefore).toBeGreaterThan(0);
 
@@ -295,10 +336,18 @@ describe('008/T047 data-fix migration 0003_demo_source_datafix (US3 scenario 3)'
     expect(notes.map((n) => n.link)).toEqual([`/tenders/${real.id}`]);
     // The demo org keeps its demo matches.
     expect((await ctx.db.select().from(tenderMatches).where(eq(tenderMatches.orgId, demoOrg.me.org.id))).length).toBe(demoOrgMatchesBefore);
+    // Non-demo org: work on demo tenders is gone, work on the real tender stays; the demo org keeps everything.
+    expect((await ctx.db.select({ t: analyses.tenderId }).from(analyses).where(eq(analyses.orgId, realOrg.me.org.id))).map((r) => r.t)).toEqual([real.id]);
+    expect((await ctx.db.select({ t: bidWorkspaces.tenderId }).from(bidWorkspaces).where(eq(bidWorkspaces.orgId, realOrg.me.org.id))).map((r) => r.t)).toEqual([real.id]);
+    expect(await ctx.db.select().from(comments).where(eq(comments.workspaceId, ws!.id))).toHaveLength(0);
+    expect((await ctx.db.select({ o: tenderDocuments.orgId }).from(tenderDocuments).where(eq(tenderDocuments.tenderId, ids[0]!))).map((r) => r.o)).toEqual([demoOrg.me.org.id]);
+    expect((await ctx.db.select().from(bidWorkspaces).where(eq(bidWorkspaces.orgId, demoOrg.me.org.id))).length).toBe(demoWsBefore);
+    expect((await ctx.db.select().from(analyses).where(eq(analyses.orgId, demoOrg.me.org.id))).length).toBe(demoAnalysesBefore);
     const [o] = await ctx.db.select({ s: organizations.onboardingState }).from(organizations).where(eq(organizations.id, demoOrg.me.org.id));
     expect(o!.s.demo).toBe(true);
-    // Nothing else was reclassified.
-    const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(tenders).where(and(eq(tenders.source, 'demo'), ne(tenders.contentHash, sql`'demo-' || ${tenders.bidNumber}`)));
+    // Only demo-marked rows were reclassified (incl. the raw.demo gem leak inserted above); the real tender was not.
+    const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(tenders)
+      .where(and(eq(tenders.source, 'demo'), ne(tenders.contentHash, sql`'demo-' || ${tenders.bidNumber}`), sql`coalesce(${tenders.raw}->>'demo', '') <> 'true'`));
     expect(n).toBe(0);
   });
 });

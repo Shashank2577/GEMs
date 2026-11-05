@@ -8,7 +8,7 @@ import { ingestionRuns, tenders } from '@tp/db';
 import { ingestionRunInputSchema, type IngestionRunDto } from '@tp/core/contracts/identify';
 import { logActivity } from '../lib/activity';
 import { HttpError } from '../lib/errors';
-import { GEM_ONLY } from '../lib/tender-scope';
+import { REAL_ONLY } from '../lib/tender-scope';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { dispatchNotifications } from '../services/alerts';
@@ -73,7 +73,7 @@ ingestionRoutes.get('/ingestion/runs', requireAuth, async (c) => {
     deps.db.select({
       total: sql<number>`count(*)::int`,
       open: sql<number>`count(*) filter (where ${and(eq(tenders.status, 'open'), or(isNull(tenders.endAt), gte(tenders.endAt, now)))})::int`,
-    }).from(tenders).where(GEM_ONLY), // platform-wide counts: real GeM tenders only (008/FR-016)
+    }).from(tenders).where(REAL_ONLY), // platform-wide counts: real tenders only, no demo (008/FR-016)
   ]);
   return c.json({
     items: runs.map(runDto),

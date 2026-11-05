@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { rateLimits } from '@tp/db';
 import type { Logger } from '../src/deps';
 import { createPgRateLimiter, hit, pruneRateLimits, resetKey, windowStartOf } from '../src/lib/rate-limiter';
+import { resetRateLimitWarnings } from '../src/middleware/rate-limit';
 import { RATE_LIMIT_RULES, type GenericRuleName } from '../src/lib/rate-limit-rules';
 import { createTestContext, request, seedOrgWithRoles, signup, uniqueEmail, type TestContext, type TestResponse } from './helpers';
 import { file, pdf, seedTender } from './workspace-fixtures';
@@ -40,7 +41,11 @@ beforeEach(async () => {
   ctx.clock.set(NOW);
   await ctx.db.delete(rateLimits);
   warnings.length = 0;
+  resetRateLimitWarnings();
 });
+
+const countOf = async (key: string) =>
+  (await ctx.db.select({ n: rateLimits.count }).from(rateLimits).where(sql`${rateLimits.key} = ${key}`))[0]?.n ?? 0;
 
 /** Put the counter of `rule:subject` for the current window at `count`. */
 async function prefill(rule: GenericRuleName, subject: string, count: number) {
@@ -76,6 +81,13 @@ describe('Postgres fixed-window limiter (lib/rate-limiter.ts)', () => {
     const keys = (await ctx.db.select({ k: rateLimits.key }).from(rateLimits)).map((r) => r.k);
     expect(keys).toEqual(['test:roll']);
   });
+
+  it('prunes in bounded batches until every dead window is gone (N2)', async () => {
+    for (let i = 0; i < 5; i++) await hit(ctx.db, `test:dead${i}`, 2, 60, new Date(NOW.getTime() - 3 * 3_600_000));
+    await hit(ctx.db, 'test:live', 2, 60, NOW);
+    expect(await pruneRateLimits(ctx.db, NOW, 2)).toBe(5); // batches of 2, 2, 1
+    expect((await ctx.db.select({ k: rateLimits.key }).from(rateLimits)).map((r) => r.k)).toEqual(['test:live']);
+  });
 });
 
 describe('rule table (FR-019)', () => {
@@ -86,6 +98,7 @@ describe('rule table (FR-019)', () => {
       'auth.fail.ip': [30, 900, 'ip'],
       'auth.signup.ip': [20, 3600, 'ip'],
       'auth.reset.email': [3, 3600, 'email'],
+      'auth.reset.ip': [20, 3600, 'ip'],
       'watchlist.preview.user': [30, 60, 'user'],
       'upload.org': [120, 3600, 'org'],
       'gem.fetch.org': [30, 3600, 'org'],
@@ -180,6 +193,32 @@ describe('limit + 1 → 429 for every generic rule, open again in the next windo
     await prefill('api.ip', IP, 300);
     expect429(await request(ctx.app, 'GET', '/auth/me', { cookie: 'tp_session=forged', headers: { 'x-forwarded-for': IP } }), 'api.ip', 50);
   });
+
+  it('S2: one anonymous call to an authenticated route counts api.ip exactly once', async () => {
+    const r = await request(ctx.app, 'GET', '/auth/me', { headers: { 'x-forwarded-for': IP } });
+    expect(r.status).toBe(401);
+    expect(await countOf(`api.ip:${IP}`)).toBe(1);
+    const forged = await request(ctx.app, 'GET', '/auth/me', { cookie: 'tp_session=forged', headers: { 'x-forwarded-for': IP } });
+    expect(forged.status).toBe(401);
+    expect(await countOf(`api.ip:${IP}`)).toBe(2);
+  });
+
+  it('S3: a forged cookie on a public route is counted against the IP; a valid one is not', async () => {
+    const r = await request(ctx.app, 'GET', '/auth/invite/not-a-token', { cookie: 'tp_session=forged', headers: { 'x-forwarded-for': IP } });
+    expect(r.status).toBe(404);
+    expect(await countOf(`api.ip:${IP}`)).toBe(1);
+    const bearer = await request(ctx.app, 'GET', '/auth/invite/not-a-token', { bearer: 'tp_forged', headers: { 'x-forwarded-for': IP } });
+    expect(bearer.status).toBe(404);
+    expect(await countOf(`api.ip:${IP}`)).toBe(2);
+    await request(ctx.app, 'GET', '/auth/invite/not-a-token', { cookie: org.viewer.cookie, headers: { 'x-forwarded-for': IP } });
+    expect(await countOf(`api.ip:${IP}`)).toBe(2);
+  });
+
+  it('IPv6 clients share one bucket per /64 (S4)', async () => {
+    await request(ctx.app, 'GET', '/auth/invite/x', { headers: { 'x-forwarded-for': '2001:db8:aa:bb::1' } });
+    await request(ctx.app, 'GET', '/auth/invite/x', { headers: { 'x-forwarded-for': '2001:db8:aa:bb:ffff::9' } });
+    expect(await countOf('api.ip:2001:db8:aa:bb::/64')).toBe(2);
+  });
 });
 
 describe('auth rules (spec 002 counters) carry the rule name', () => {
@@ -230,6 +269,23 @@ describe('limiter unavailable (FR-020, scenario 8)', () => {
       expect(s.status).toBe(503);
       expect(s.body.error.code).toBe('service_unavailable');
     });
+  });
+
+  it('a limiter slower than 300 ms is treated as unavailable: allowed, one sampled warning (N3)', async () => {
+    const real = ctx.deps.rateLimiter;
+    ctx.deps.rateLimiter = { hit: () => new Promise(() => {}), reset: async () => {} };
+    try {
+      const t0 = performance.now();
+      for (let i = 0; i < 3; i++) {
+        const r = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: org.analyst.cookie, json: { criteria: { keywords: ['laptop'] } } });
+        expect(r.status).toBe(200);
+      }
+      expect(performance.now() - t0).toBeLessThan(3 * 2 * 300 + 1500);
+      expect(warnings.filter((w) => w.meta?.rule === 'watchlist.preview.user')).toHaveLength(1);
+      expect(String(warnings[0]!.meta?.error)).toMatch(/timed out after 300 ms/);
+    } finally {
+      ctx.deps.rateLimiter = real;
+    }
   });
 
   it('auth failure counters fail closed: login answers 503 instead of checking the password', async () => {
@@ -293,6 +349,19 @@ describe('body limits (FR-021, scenario 7)', () => {
     expect(r.res.status).toBe(413);
     expect(r.body.error.code).toBe('payload_too_large');
     expect(r.pulled).toBeLessThanOrEqual(27 * MB); // stopped just past 25 MB + overhead, not read to the end (30 MB)
+  });
+
+  it('caps are chosen by route, not content type: 5 MB multipart to PATCH /me is 413 (S1)', async () => {
+    const declared = await send('PATCH', '/me', { cookie: org.viewer.cookie, contentLength: 5 * MB, contentType: multipart });
+    expect(declared.res.status).toBe(413);
+    expect(declared.body.error.message).toBe('The request body is too large (at most 1 MB).');
+    expect(declared.pulled).toBe(0);
+    const fd = new FormData();
+    fd.append('file', new File([new Uint8Array(5 * MB)], 'big.bin'));
+    const streamed = await request(ctx.app, 'PATCH', '/me', { cookie: org.viewer.cookie, form: fd });
+    expect(streamed.status).toBe(413);
+    // Same for a JSON route that is not an upload route under /vault.
+    expect((await send('POST', '/vault/reminders/run', { cookie: org.owner.cookie, contentLength: 5 * MB, contentType: multipart })).res.status).toBe(413);
   });
 
   it('JSON bodies are capped at 1 MB (declared or streamed) and nothing is written', async () => {

@@ -26,6 +26,7 @@ import { GemClient, GemError } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, forbidden, notFound } from '../lib/errors';
+import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
 import { markStale } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
@@ -70,9 +71,10 @@ export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
   };
 }
 
-export async function getTender(deps: AppDeps, tenderId: string): Promise<TenderRow> {
+/** A tender the caller's org may see: demo tenders do not exist for orgs that never loaded the demo (008/FR-016). */
+export async function getTender(deps: AppDeps, tenderId: string, viewer: TenderViewer): Promise<TenderRow> {
   const [t] = await deps.db.select().from(tenders).where(eq(tenders.id, tenderId));
-  if (!t) throw notFound('Tender');
+  if (!t || !canSeeTender(viewer, t)) throw notFound('Tender');
   return t;
 }
 
@@ -109,11 +111,13 @@ async function extractOrThrow(bytes: Uint8Array): Promise<string[]> {
 
 export interface UploadInput {
   orgId: string; userId: string; tenderId: string; kind: TenderDocKind;
+  /** The caller's org (tender visibility, 008/FR-016). */
+  viewer: TenderViewer;
   file: { name: string; type?: string; bytes: Uint8Array };
 }
 
 export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): Promise<{ doc: DocRow; tender: TenderRow }> {
-  const tender = await getTender(deps, input.tenderId);
+  const tender = await getTender(deps, input.tenderId, input.viewer);
   const { bytes } = input.file;
   if (bytes.length === 0) throw new HttpError(400, 'bad_request', 'The file is empty');
   if (bytes.length > MAX_TENDER_DOC_BYTES) throw new HttpError(413, 'payload_too_large', 'The file is larger than 25 MB');
@@ -137,8 +141,8 @@ export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): P
 
 // ───────────── Remove (FR-009) ─────────────
 
-export async function removeTenderDocument(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; docId: string }): Promise<void> {
-  await getTender(deps, input.tenderId);
+export async function removeTenderDocument(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; docId: string; viewer: TenderViewer }): Promise<void> {
+  await getTender(deps, input.tenderId, input.viewer);
   const doc = await getTenderDocument(deps, input.tenderId, input.docId, input.orgId);
   if (doc.orgId === null) throw forbidden('Documents fetched from GeM are shared and cannot be removed');
   const deleted = await deps.db.delete(tenderDocuments)
@@ -161,8 +165,8 @@ export async function removeTenderDocument(deps: AppDeps, input: { orgId: string
 
 // ───────────── Fetch from GeM ─────────────
 
-export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
-  const tender = await getTender(deps, input.tenderId);
+export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
+  const tender = await getTender(deps, input.tenderId, input.viewer);
   const existing = (await listTenderDocuments(deps, tender.id, input.orgId)).filter((d) => d.orgId === null);
   if (existing.length) return { documents: existing, fetched: 0, tender };
   const ref = tender.gemBidId ?? tender.documentUrl;
@@ -229,8 +233,8 @@ function overridesOf(a: AnalysisRow | null): Record<string, FactorOverride> {
   return out;
 }
 
-export async function analyseTender(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
-  const tender = await getTender(deps, input.tenderId);
+export async function analyseTender(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
+  const tender = await getTender(deps, input.tenderId, input.viewer);
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
     try {

@@ -16,7 +16,7 @@
  *    (pending → services/alerts.ts). Deduped by (user, channel, `tender:<tenderId>:<orgId>`).
  * GeM being down never loses data: the run is recorded as `failed` (or `partial`) with the error.
  */
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import {
   analyses, ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
   type WatchlistCriteria,
@@ -25,7 +25,7 @@ import { GemClient } from '@tp/core/gem/client';
 import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
-import { GEM_ONLY } from '../lib/tender-scope';
+import { REAL_ONLY } from '../lib/tender-scope';
 
 export interface RunIngestionOptions {
   trigger?: 'cron' | 'manual' | 'seed';
@@ -370,7 +370,14 @@ export function tenderAlertBody(t: Pick<TenderRow, 'ministry' | 'department' | '
  */
 export async function matchAndNotify(
   deps: AppDeps, tenderIds: string[], now: Date,
-  opts: { orgId?: string; watchlistId?: string; notify?: boolean } = {},
+  opts: {
+    orgId?: string; watchlistId?: string; notify?: boolean;
+    /**
+     * Which tenders may be matched (default: real tenders only, `REAL_ONLY`). A demo org's own watchlist refresh passes its
+     * visible scope (with `notify: false`) so saved matches agree with the live preview; demo tenders never alert.
+     */
+    scope?: SQL;
+  } = {},
 ): Promise<{ matchesCreated: number; notificationsCreated: number }> {
   const { db } = deps;
   const conds = [eq(watchlists.active, true)];
@@ -381,7 +388,8 @@ export async function matchAndNotify(
   const rows: TenderRow[] = [];
   for (let i = 0; i < tenderIds.length; i += 500) {
     // Only real GeM tenders are matched: demo tenders never alert anyone (008/FR-016).
-    rows.push(...(await db.select().from(tenders).where(and(GEM_ONLY, inArray(tenders.id, tenderIds.slice(i, i + 500))))));
+    const scope = opts.scope && opts.notify === false && opts.watchlistId ? opts.scope : REAL_ONLY;
+    rows.push(...(await db.select().from(tenders).where(and(scope, inArray(tenders.id, tenderIds.slice(i, i + 500))))));
   }
 
   // (orgId, tenderId) → watchlist names that newly matched

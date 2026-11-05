@@ -8,9 +8,10 @@
  *   are reserved before PBKDF2 and a success clears the email counter, so only failures stick. The numbers come
  *   from that module so they are defined once.
  *
+ * When several counters of one request are over, the 429 names the binding one (longest Retry-After).
  * `failClosed`: when the counter cannot be written, auth rules refuse with 503 instead of allowing (FR-020).
  */
-import { LOGIN_EMAIL_LIMIT, LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT } from './rate-limit';
+import { LOGIN_EMAIL_LIMIT, LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT } from './rate-limit';
 
 /** What the counter is keyed by. `user_or_token`: the API token when the request uses one, else the user. */
 export type RateLimitSubject = 'email' | 'ip' | 'user' | 'org' | 'user_or_token';
@@ -41,6 +42,10 @@ export const RATE_LIMIT_RULES = {
   'auth.signup.ip': { limit: 20, windowSec: HOUR, subject: 'ip', engine: 'generic', failClosed: true, routes: 'POST /auth/signup' },
   'auth.reset.email': {
     limit: RESET_EMAIL_LIMIT.limit, windowSec: sec(RESET_EMAIL_LIMIT.windowMs), subject: 'email', engine: 'auth-attempts', failClosed: true,
+    routes: 'POST /auth/forgot-password',
+  },
+  'auth.reset.ip': {
+    limit: RESET_IP_LIMIT.limit, windowSec: sec(RESET_IP_LIMIT.windowMs), subject: 'ip', engine: 'auth-attempts', failClosed: true,
     routes: 'POST /auth/forgot-password',
   },
   'watchlist.preview.user': { limit: 30, windowSec: MIN, subject: 'user', engine: 'generic', failClosed: false, routes: 'POST /watchlists/preview' },

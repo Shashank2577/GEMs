@@ -22,7 +22,10 @@ export interface RuntimeEnv {
   WHATSAPP_PHONE_ID?: string;
   WHATSAPP_API_VERSION?: string;
   LOG_REQUESTS?: string;
-  /** Which proxy header carries the client IP: "cloudflare" (cf-connecting-ip), "xff"/"1" (x-forwarded-for), unset = none. */
+  /**
+   * Which proxy header carries the client IP: "cloudflare" (cf-connecting-ip; Worker only, set by worker.ts and refused
+   * by the Node server), "1"/"xff" (right-most x-forwarded-for hop), unset = socket address (lib/client-ip.ts).
+   */
   TRUST_PROXY?: string;
   /** "development" | "production" | "test" */
   NODE_ENV?: string;

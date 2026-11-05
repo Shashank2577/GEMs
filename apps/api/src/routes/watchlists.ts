@@ -14,7 +14,7 @@ import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { notFound, validationError } from '../lib/errors';
-import { GEM_ONLY, visibleTenderSource } from '../lib/tender-scope';
+import { visibleTenderSource } from '../lib/tender-scope';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
@@ -58,8 +58,11 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
 }
 
 /** Re-evaluate a watchlist's matches: drop ones that no longer match, add new ones (no alerts). */
-async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect): Promise<number> {
-  // Only real GeM tenders are matched (matchAndNotify ignores demo rows; demo matches come from the seeder).
+/**
+ * `scope` is the owning org's visible tenders (lib/tender-scope.ts): a demo org's saved watchlist matches the demo
+ * tenders its preview showed (silently — refreshes never alert); other orgs only ever match real GeM tenders.
+ */
+async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect, scope: SQL): Promise<number> {
   const now = deps.clock.now();
   const existing = await deps.db.select({ id: tenderMatches.id, tenderId: tenderMatches.tenderId }).from(tenderMatches)
     .where(eq(tenderMatches.watchlistId, w.id));
@@ -70,8 +73,8 @@ async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect):
     if (stale.length) await deps.db.delete(tenderMatches).where(inArray(tenderMatches.id, stale));
   }
   if (!w.active) return 0;
-  const cands = await candidateTenders(deps, w.criteria as WatchlistCriteriaDto, GEM_ONLY);
-  const r = await matchAndNotify(deps, cands.map((c) => c.row.id), now, { watchlistId: w.id, notify: false });
+  const cands = await candidateTenders(deps, w.criteria as WatchlistCriteriaDto, scope);
+  const r = await matchAndNotify(deps, cands.map((c) => c.row.id), now, { watchlistId: w.id, notify: false, scope });
   return r.matchesCreated;
 }
 
@@ -150,7 +153,7 @@ watchlistsRoutes.post('/watchlists', requireRole('analyst'), async (c) => {
     orgId: org, name: body.name, criteria: body.criteria as WatchlistCriteria, active: body.active ?? true,
     createdBy: userId(c), createdAt: now, updatedAt: now,
   }).returning();
-  const matched = await refreshMatches(deps, w);
+  const matched = await refreshMatches(deps, w, visibleTenderSource(c.var.org));
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'watchlist.created', entityType: 'watchlist', entityId: w.id, meta: { name: w.name, matched } });
   const [dto] = await serialize(deps, org, [w]);
   return c.json(dto, 201);
@@ -168,7 +171,7 @@ watchlistsRoutes.patch('/watchlists/:id', requireRole('analyst'), async (c) => {
     ...(body.active !== undefined ? { active: body.active } : {}),
     updatedAt: deps.clock.now(),
   }).where(and(eq(watchlists.id, w.id), eq(watchlists.orgId, org))).returning();
-  if (body.criteria || (body.active === true && !w.active)) await refreshMatches(deps, updated);
+  if (body.criteria || (body.active === true && !w.active)) await refreshMatches(deps, updated, visibleTenderSource(c.var.org));
   const action = body.active === false ? 'watchlist.paused' : body.active === true && !w.active ? 'watchlist.resumed' : 'watchlist.updated';
   await logActivity(deps.db, { orgId: org, userId: userId(c), action, entityType: 'watchlist', entityId: w.id, meta: { name: updated.name } });
   const [dto] = await serialize(deps, org, [updated]);
