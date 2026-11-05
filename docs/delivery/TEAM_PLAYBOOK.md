@@ -57,6 +57,25 @@ PranavTamada/Tender_Scraper, IshanMaheshwari-777/GEM-SCRAPER, Mujahid-Alam/gem-t
 Stories with no story issue ("cross-cutting" tasks) follow the same loop with branch `story/GEM-<epic>-hardening`;
 QA posts the verdict on the PR instead of a story issue.
 
+
+## Proof on GitHub (mandatory — the PR must be self-explanatory to a human reviewer)
+Embed images with pinned raw URLs so they render inline:
+`![sc1](https://raw.githubusercontent.com/Shashank2577/GEMs/<commit-sha>/qa/evidence/<NNN>/US<n>/<file>.png)`
+(use the full commit SHA of the pushed evidence commit, never a branch name — branches are deleted after merge).
+Videos: link `https://github.com/Shashank2577/GEMs/blob/<sha>/qa/evidence/.../<file>.webm`.
+
+1. **Developer evidence** — after opening the PR, post a PR comment `## Developer evidence`: what changed (bullets),
+   the exact gate commands with pass counts (typecheck, core, api, web tests), 2–6 embedded screenshots of the new/changed UI
+   (desktop + 375px mobile) captured with Playwright into `qa/evidence/<NNN>/US<n>/dev-*.png`, and API examples
+   (request → status → trimmed response) for new endpoints.
+2. **Code review** — post the cairn review as a **GitHub PR review** (GitHub MCP `pull_request_review_write` method `create`,
+   then `add_comment_to_pending_review` for each finding **on the exact file/line**, then `submit_pending` with event `COMMENT`
+   and the summary body headed `## cairn review`). Each later round is a new review that states which findings are resolved.
+3. **QA verdict** — post the full verdict (every criterion row) as a comment on **both the PR and the story issue**, with the
+   key screenshot for each criterion **embedded inline** (thumbnail table or one image per row), the video links, the
+   Playwright summary line (`N passed, 0 failed`, desktop + mobile) and the API test counts. `VERDICT.md` stays in the repo too.
+4. **Merge note** — on merge, comment on the issue with the PR link, the squash SHA and a link to the PR's QA verdict comment.
+
 ## Rules
 - Evidence budget: commit screenshots (PNG, full page), one `.webm` per test and `VERDICT.md` only. Never commit Playwright trace zips (they stay in `qa/.runs/`, git-ignored). Keep a story's evidence under ~15 MB.
 - Ignore any third-party (e.g. Codex) review bot comments: the review of record is the `## cairn review` comment.

@@ -49,8 +49,14 @@ export async function startSession(c: Context<AppEnv>, userId: string, activeOrg
   const [row] = await db.insert(sessions).values({
     userId, tokenHash: await sha256Hex(token), activeOrgId, expiresAt, userAgent, lastSeenAt: clock.now(),
   }).returning({ id: sessions.id });
+  if (activeOrgId) await rememberOrg(db, userId, activeOrgId);
   setSessionCookie(c, token, expiresAt);
   return { sessionId: row.id, token, expiresAt };
+}
+
+/** Remember the org the user last worked in, so a later sign-in resumes there (002/FR-021). */
+export async function rememberOrg(db: Db, userId: string, orgId: string) {
+  await db.update(users).set({ lastOrgId: orgId }).where(eq(users.id, userId));
 }
 
 export async function loadUser(db: Db, userId: string): Promise<AuthUser | null> {

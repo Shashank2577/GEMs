@@ -1,5 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { errorToastId } from '@/components/ui/toaster';
 
 /** Error envelope from the API: `{ error: { code, message, details? } }`. */
 export class ApiError extends Error {
@@ -148,9 +149,25 @@ export function handleSessionEnd(err: unknown, meta?: Record<string, unknown>): 
   return true;
 }
 
+/**
+ * 002/FR-029: a 403 `forbidden` from a mutation usually means the user's role was lowered while the page was open.
+ * Show the server's message and refetch `/auth/me` so role-gated UI (`can()`, `<RoleGate>`, nav) hides what the
+ * new role cannot do. Other 403 codes (`bad_origin`, `no_organization`) are left to their call sites.
+ */
+export function handleForbidden(err: unknown): boolean {
+  if (!(err instanceof ApiError) || err.status !== 403 || err.code !== 'forbidden') return false;
+  if (!queryClient.getQueryData(ME_KEY)) return false;
+  // Same id as `toast.error` from components/ui/toaster, so a call site toasting the same message shows one toast.
+  toast.error(err.message, { id: errorToastId(err.message) });
+  void queryClient.invalidateQueries({ queryKey: ME_KEY, exact: true });
+  return true;
+}
+
 export const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({ onError: (err, query) => { handleSessionEnd(err, query.meta); } }),
-  mutationCache: new MutationCache({ onError: (err, _vars, _ctx, mutation) => { handleSessionEnd(err, mutation.meta); } }),
+  mutationCache: new MutationCache({
+    onError: (err, _vars, _ctx, mutation) => { if (!handleSessionEnd(err, mutation.meta)) handleForbidden(err); },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

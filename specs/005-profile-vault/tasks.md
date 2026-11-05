@@ -178,17 +178,17 @@ task is sized at ≤ 1 day.
 ### Tests for User Story 5
 
 - [x] T055 [P] [US5] API test: past contracts CRUD in `apps/api/test/vault.test.ts` FR-054
-- [ ] T056 [P] [US5] API tests: `cracDocumentId` of another org / random UUID → 400 "That document is not in your vault"; PATCH only `endDate` < stored `startDate` → 400; cross-org PATCH/DELETE → 404 "Past contract not found"; malformed id → 404; list ordering end date desc then created desc; viewer POST → 403; activity rows for add/update/delete in `apps/api/test/vault.test.ts` FR-054…FR-057 (#147)
+- [x] T056 [P] [US5] API tests: `cracDocumentId` of another org / random UUID → 400 "That document is not in your vault"; PATCH only `endDate` < stored `startDate` → 400; cross-org PATCH/DELETE → 404 "Past contract not found"; malformed id → 404; list ordering end date desc then created desc; viewer POST → 403; activity rows for add/update/delete in `apps/api/test/vault.test.ts` FR-054…FR-057 (#147)
 
 ### Implementation for User Story 5
 
 - [x] T057 [US5] Past-contract routes with CRAC ownership check and activity in `apps/api/src/routes/profile.ts` FR-054, FR-055, FR-056, FR-057
 - [x] T058 [P] [US5] Experience UI: empty state, summary (count/total/largest), responsive table with Proof badge, contract dialog with client validation and Experience-only CRAC picker, delete confirmation in `apps/web/src/features/profile/PastContracts.tsx` FR-058, FR-059
 - [x] T059 [P] [US5] OEM editor rows (OEM, products, valid till + badge, `oem_authorization`-only vault picker) saved with the profile in `apps/web/src/features/profile/OemEditor.tsx` FR-060
-- [ ] T060 [US5] Validate OEM `documentId` ownership and type in `PUT /profile` (one query for all ids) → 400 `details.fields["oemAuthorizations.<i>.documentId"]` "Pick an OEM authorisation from your vault" in `apps/api/src/routes/profile.ts`; API tests (own doc OK, other org 400, wrong type 400) in `apps/api/test/vault.test.ts` FR-061 (#148)
-- [ ] T061 [US5] Inline CRAC upload: "Upload a new CRAC…" option in the picker opens `UploadDialog` (preset `crac`) above the contract dialog and selects the new document via `onUploaded(id)` without losing the draft in `apps/web/src/features/profile/PastContracts.tsx` FR-062 (#149)
-- [ ] T062 [P] [US5] "Use document expiry" in OEM rows when the linked document has an expiry and Valid till is empty/different in `apps/web/src/features/profile/OemEditor.tsx` FR-063 (#150)
-- [ ] T063 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in `qa/evidence/005/US5/` — scenarios 1–11: empty state, client errors, add/edit/delete contract with toasts and summary "1 contract · total ₹58.2 L · largest ₹58.2 L", CRAC linking ("Linked"/"No CRAC"), OEM rows + save, completeness change, cross-org CRAC via API; desktop + `@mobile` (table collapses to cards); spec `e2e/005-profile-vault/US5-experience-oem.e2e.ts`; `VERDICT.md` FR-054…FR-063 (#151)
+- [x] T060 [US5] Validate OEM `documentId` ownership and type in `PUT /profile` (one query for all ids) → 400 `details.fields["oemAuthorizations.<i>.documentId"]` "Pick an OEM authorisation from your vault" in `apps/api/src/routes/profile.ts`; API tests (own doc OK, other org 400, wrong type 400) in `apps/api/test/vault.test.ts` FR-061 (#148)
+- [x] T061 [US5] Inline CRAC upload: "Upload a new CRAC…" option in the picker opens `UploadDialog` (preset `crac`) above the contract dialog and selects the new document via `onUploaded(id)` without losing the draft in `apps/web/src/features/profile/PastContracts.tsx` FR-062 (#149)
+- [x] T062 [P] [US5] "Use document expiry" in OEM rows when the linked document has an expiry and Valid till is empty/different in `apps/web/src/features/profile/OemEditor.tsx` FR-063 (#150)
+- [x] T063 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in `qa/evidence/005/US5/` — scenarios 1–11: empty state, client errors, add/edit/delete contract with toasts and summary "1 contract · total ₹58.2 L · largest ₹58.2 L", CRAC linking ("Linked"/"No CRAC"), OEM rows + save, completeness change, cross-org CRAC via API; desktop + `@mobile` (table collapses to cards); spec `e2e/005-profile-vault/US5-experience-oem.e2e.ts`; `VERDICT.md` FR-054…FR-063 (#151)
 
 **Checkpoint**: Experience and OEM data verified
 
@@ -202,19 +202,19 @@ task is sized at ≤ 1 day.
 
 ### Tests for User Story 6
 
-- [ ] T064 [P] [US6] API tests: renew with new expiry resets `last_reminder_days` and logs `vault.renewed`; previous file listed in versions and downloadable; 6th renewal prunes the oldest version and its blob; delete removes versions + blobs; cross-org version ids → 404; duplicate upload → 409 `duplicate_document` and `allowDuplicate=1` → 201, in `apps/api/test/vault.test.ts` FR-064…FR-067 (#152)
+- [x] T064 [P] [US6] API tests: renew with new expiry resets `last_reminder_days` and logs `vault.renewed`; previous file listed in versions and downloadable; 6th renewal prunes the oldest version and its blob; delete removes versions + blobs; cross-org version ids → 404; duplicate upload → 409 `duplicate_document` and `allowDuplicate=1` → 201, in `apps/api/test/vault.test.ts` FR-064…FR-067 (#152)
 
 ### Implementation for User Story 6
 
-- [ ] T065 [US6] Schema: table `vault_document_versions` (`id, org_id, document_id, blob_key, file_name, mime_type, size_bytes, page_count, expiry_date, replaced_by, replaced_at`, idx `document_id, replaced_at`) and column `vault_documents.content_sha256` + idx `(org_id, content_sha256)` in `packages/db/src/schema.ts`; generated migration in `packages/db/migrations/` FR-065, FR-067 (#153)
-- [ ] T066 [US6] `PUT /vault/:id/file` accepts `issueDate`, `expiryDate`, `number` (validated with `vaultUpdateSchema` + issue ≤ expiry), resets `last_reminder_days` on expiry change, logs `vault.renewed {fromExpiry,toExpiry}` in `apps/api/src/routes/vault.ts` FR-064 (#154)
-- [ ] T067 [US6] Record the previous file into `vault_document_versions` instead of deleting its blob, prune to 5 (delete pruned blobs), delete versions + blobs on document delete in `apps/api/src/routes/vault.ts` FR-065 (#155)
-- [ ] T068 [P] [US6] `GET /vault/:id/versions` and `GET /vault/:id/versions/:versionId/download` (org-scoped, same secure headers) in `apps/api/src/routes/vault.ts`; DTO `VaultVersionDto` in `packages/core/src/contracts/vault.ts` FR-066 (#156)
-- [ ] T069 [P] [US6] SHA-256 via `crypto.subtle.digest` on upload/replace, 409 `duplicate_document {existingId,title}` unless `allowDuplicate=1`, backfill `content_sha256` lazily (null = unknown) in `apps/api/src/routes/vault.ts` FR-067, NFR-010 (#157)
-- [ ] T070 [US6] Web: **Renew** dialog (file, issue date default today, expiry pre-filled by `suggestExpiry`, number) calling `useReplaceVaultFile` with fields; toast "“<title>” renewed — valid till <date>" in new `apps/web/src/features/vault/RenewDialog.tsx`, `apps/web/src/features/vault/DocumentDrawer.tsx`, `apps/web/src/features/vault/api.ts` FR-064, FR-068 (#158)
-- [ ] T071 [P] [US6] Web: "Versions" list in the drawer with Download per version (`useVaultVersions`) in `apps/web/src/features/vault/DocumentDrawer.tsx`, `apps/web/src/features/vault/api.ts` FR-066, FR-068 (#159)
-- [ ] T072 [P] [US6] Web: duplicate prompt "This file is already in your vault as “<title>”." with **Open existing** / **Upload anyway** in `apps/web/src/features/vault/UploadDialog.tsx` FR-067 (#160)
-- [ ] T073 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in `qa/evidence/005/US6/` — renew flow, versions download, duplicate prompt both branches, viewer sees versions but no Renew; desktop + `@mobile`; spec `e2e/005-profile-vault/US6-renew-history.e2e.ts`; `VERDICT.md` FR-064…FR-068 (#161)
+- [x] T065 [US6] Schema: table `vault_document_versions` (`id, org_id, document_id, blob_key, file_name, mime_type, size_bytes, page_count, expiry_date, replaced_by, replaced_at`, idx `document_id, replaced_at`) and column `vault_documents.content_sha256` + idx `(org_id, content_sha256)` in `packages/db/src/schema.ts`; generated migration in `packages/db/migrations/` FR-065, FR-067 (#153)
+- [x] T066 [US6] `PUT /vault/:id/file` accepts `issueDate`, `expiryDate`, `number` (validated with `vaultUpdateSchema` + issue ≤ expiry), resets `last_reminder_days` on expiry change, logs `vault.renewed {fromExpiry,toExpiry}` in `apps/api/src/routes/vault.ts` FR-064 (#154)
+- [x] T067 [US6] Record the previous file into `vault_document_versions` instead of deleting its blob, prune to 5 (delete pruned blobs), delete versions + blobs on document delete in `apps/api/src/routes/vault.ts` FR-065 (#155)
+- [x] T068 [P] [US6] `GET /vault/:id/versions` and `GET /vault/:id/versions/:versionId/download` (org-scoped, same secure headers) in `apps/api/src/routes/vault.ts`; DTO `VaultVersionDto` in `packages/core/src/contracts/vault.ts` FR-066 (#156)
+- [x] T069 [P] [US6] SHA-256 via `crypto.subtle.digest` on upload/replace, 409 `duplicate_document {existingId,title}` unless `allowDuplicate=1`, backfill `content_sha256` lazily (null = unknown) in `apps/api/src/routes/vault.ts` FR-067, NFR-010 (#157)
+- [x] T070 [US6] Web: **Renew** dialog (file, issue date default today, expiry pre-filled by `suggestExpiry`, number) calling `useReplaceVaultFile` with fields; toast "“<title>” renewed — valid till <date>" in new `apps/web/src/features/vault/RenewDialog.tsx`, `apps/web/src/features/vault/DocumentDrawer.tsx`, `apps/web/src/features/vault/api.ts` FR-064, FR-068 (#158)
+- [x] T071 [P] [US6] Web: "Versions" list in the drawer with Download per version (`useVaultVersions`) in `apps/web/src/features/vault/DocumentDrawer.tsx`, `apps/web/src/features/vault/api.ts` FR-066, FR-068 (#159)
+- [x] T072 [P] [US6] Web: duplicate prompt "This file is already in your vault as “<title>”." with **Open existing** / **Upload anyway** in `apps/web/src/features/vault/UploadDialog.tsx` FR-067 (#160)
+- [x] T073 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in `qa/evidence/005/US6/` — renew flow, versions download, duplicate prompt both branches, viewer sees versions but no Renew; desktop + `@mobile`; spec `e2e/005-profile-vault/US6-renew-history.e2e.ts`; `VERDICT.md` FR-064…FR-068 (#161)
 
 **Checkpoint**: All user stories independently functional
 
