@@ -82,6 +82,7 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
   const body = await parseJson(c, updateOrgInputSchema);
   const { db } = c.var.deps;
   const patch: Partial<typeof organizations.$inferInsert> = {};
+  const justCompleted = body.onboardingState?.completed === true && !c.var.org.onboardingState?.completed;
   if (body.name !== undefined) patch.name = body.name;
   if (body.onboardingState !== undefined) patch.onboardingState = { ...(c.var.org.onboardingState ?? {}), ...body.onboardingState };
   if (body.scoringWeights !== undefined) patch.scoringWeights = body.scoringWeights;
@@ -95,6 +96,14 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
     await logActivity(db, {
       orgId: orgId(c), userId: userId(c), action: 'org.updated', entityType: 'organization', entityId: orgId(c),
       meta: { fields: Object.keys(patch).filter((k) => k !== 'onboardingState') },
+    });
+  }
+  // FR-052 / SC-001: how long sign-up to "finished setting up" took.
+  if (justCompleted) {
+    const [row] = await db.select({ createdAt: organizations.createdAt }).from(organizations).where(eq(organizations.id, orgId(c)));
+    const durationSec = row ? Math.max(0, Math.round((c.var.deps.clock.now().getTime() - row.createdAt.getTime()) / 1000)) : 0;
+    await logActivity(db, {
+      orgId: orgId(c), userId: userId(c), action: 'onboarding.completed', entityType: 'organization', entityId: orgId(c), meta: { durationSec },
     });
   }
   return c.json(org);

@@ -361,11 +361,11 @@ describe('invitations & roles', () => {
 
     // PATCH /org: bid_manager+
     expect((await request(ctx.app, 'PATCH', '/api/org', { cookie: analyst.cookie, json: { name: 'Hacked' } })).status).toBe(403);
-    const upd = await request(ctx.app, 'PATCH', '/api/org', { cookie: bidManager.cookie, json: { name: 'Roles Pvt Ltd', onboardingState: { profile: true } } });
+    const upd = await request(ctx.app, 'PATCH', '/api/org', { cookie: bidManager.cookie, json: { name: 'Roles Pvt Ltd', onboardingState: { company: true } } });
     expect(upd.status).toBe(200);
-    expect(upd.body).toMatchObject({ name: 'Roles Pvt Ltd', onboardingState: { profile: true } });
-    const upd2 = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { vault: true }, scoringWeights: { turnover: 20 } } });
-    expect(upd2.body.onboardingState).toEqual({ profile: true, vault: true });
+    expect(upd.body).toMatchObject({ name: 'Roles Pvt Ltd', onboardingState: { company: true } });
+    const upd2 = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { documents: true }, scoringWeights: { turnover: 20 } } });
+    expect(upd2.body.onboardingState).toEqual({ company: true, documents: true });
     expect(upd2.body.scoringWeights).toEqual({ turnover: 20 });
     expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: viewer.cookie })).body.org.name).toBe('Roles Pvt Ltd');
 
