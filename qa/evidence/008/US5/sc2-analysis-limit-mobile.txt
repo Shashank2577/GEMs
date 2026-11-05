@@ -1,0 +1,9 @@
+# sc2-analysis-limit — project mobile — 2026-11-05T09:32:13.071Z
+analyses this month (non-failed): 10
+### 11th analysis
+> POST /api/tenders/bf8961ee-e542-4508-a61f-cb6246ba7300/analyse (analyst)
+< 402
+{"error":{"code":"plan_limit_reached","message":"Your Free trial includes 10 analyses a month. You've used 10. Talk to us to upgrade, or wait until 1 Dec.","details":{"limit":"analysesPerMonth","used":10,"max":10,"plan":"trial","resetsAt":"2026-11-30T18:30:00.000Z"}}}
+
+message: Your Free trial includes 10 analyses a month. You've used 10. Talk to us to upgrade, or wait until 1 Dec.
+UI: dialog shown with heading "Plan limit reached", usage "10 / 10 analyses this month", links Talk to sales + Close; closed.

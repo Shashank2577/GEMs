@@ -1,0 +1,8 @@
+# sc4a-pro-vault — project desktop — 2026-11-05T09:31:17.200Z
+usage.vaultBytes = 10726932480 (9.990 GiB) of 10737418240
+### upload 11 MB at 9.99 GB
+> POST /api/vault (11 MB)
+< 402
+{"error":{"code":"plan_limit_reached","message":"Your Pro plan includes 10 GB of vault storage. You're using 9.99 GB and this file doesn't fit. Talk to us to upgrade, or delete old documents.","details":{"limit":"vaultBytes","used":10726932480,"max":10737418240,"plan":"pro"}}}
+
+a file that fits (7523 bytes) → 201

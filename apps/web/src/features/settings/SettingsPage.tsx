@@ -1,5 +1,5 @@
 /**
- * Settings (T073; US6): Organization, Account, Team & roles, Notifications, Scoring weights, API tokens & extension,
+ * Settings (T073; US6): Organization, Plan & usage (008/FR-041c), Account, Team & roles, Notifications, Scoring weights, API tokens & extension,
  * Sync health, Activity log. Sub-routes under /settings/* with a side nav (desktop) / scrollable tabs (phone).
  */
 import { lazy, Suspense } from 'react';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { visibleSettingsItems } from './items';
 
 const OrganizationSection = lazy(() => import('./sections/OrganizationSection'));
+const UsageSection = lazy(() => import('./sections/UsageSection'));
 const AccountSection = lazy(() => import('./sections/AccountSection'));
 const TeamSection = lazy(() => import('./sections/TeamSection'));
 const NotificationsSection = lazy(() => import('./sections/NotificationsSection'));
@@ -44,6 +45,7 @@ export default function SettingsPage() {
             <Routes>
               <Route index element={<Navigate to="organization" replace />} />
               <Route path="organization" element={<OrganizationSection />} />
+              <Route path="usage" element={<UsageSection />} />
               <Route path="account" element={<AccountSection />} />
               <Route path="team" element={<TeamSection />} />
               <Route path="notifications" element={<NotificationsSection />} />

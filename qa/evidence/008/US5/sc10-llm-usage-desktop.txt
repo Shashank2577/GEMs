@@ -1,0 +1,15 @@
+# sc10-llm-usage — project desktop — 2026-11-05T09:31:59.636Z
+### analyse
+> POST /api/tenders/e4c65a66-9f05-431f-8773-8c72a9d9cf42/analyse
+< 201
+{"id":"c1f129a7-b99b-4cee-b5a9-1f5d82833a14","orgId":"501b154a-42c1-42cf-925d-ccb2de0e1aed","tenderId":"e4c65a66-9f05-431f-8773-8c72a9d9cf42","status":"done","method":"rules+llm","requirements":[{"key":"bid_published_at","label":"Bid published on","value":"2026-11-28T00:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Dated: 28-11-2026 Bid Document Bid Details","fileName":"bid.pdf","documentId":"174f939d-d702-4372-86a7-6f0e7fb6cd12"},"numeric":null,"mandatory":false,"confidence":0.95},{"key":"bid_end","label":"Bid end date","value":"2026-11-28T15:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Bid End Date/Time 28-11-2026 15:00:00","fileName":"bid.pdf","documentId":"174f939d-d702-4372-86a7-6f0e7fb6cd12"},"numeric":null,"mandatory":false,"confidence":0.95},{"key":"bid_opening","label":"Bid opening date","value":"2026-11-28T15:30:00+05:30","method":"RULE","source":{"page":
+
+fake LLM calls during the analysis: 1 → [[1074,222]]
+llm_usage rows:
+c1f129a7-b99b-4cee-b5a9-1f5d82833a14 | extract | qa-fake | 1074 | 222 | f
+### GET /api/org/usage
+> GET /api/org/usage
+< 200
+{"plan":"trial","trialEndsAt":"2026-11-19T09:31:59.661Z","period":{"start":"2026-10-31T18:30:00.000Z","end":"2026-11-30T18:30:00.000Z"},"usage":{"seats":1,"watchlists":0,"analysesThisMonth":1,"llmAnalysesThisMonth":1,"vaultBytes":0,"packetsThisMonth":0,"llmTokensThisMonth":{"input":1074,"output":222}},"limits":{"seats":10,"watchlists":null,"analysesPerMonth":10,"llmAnalysesPerMonth":10,"vaultBytes":1073741824,"packetsPerMonth":10,"whatsapp":true}}
+
+fake LLM total in=1074 out=222; /api/org/usage llmTokensThisMonth={"input":1074,"output":222}
