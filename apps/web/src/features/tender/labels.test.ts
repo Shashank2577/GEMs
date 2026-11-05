@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Requirement } from '@tp/core/contracts/analyse';
 import type { TenderDocumentDto } from '@tp/core/contracts/analyse';
-import { REQ_GROUPS, STALE_REASON_COPY, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
+import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
 
 describe('staleReasonCopy (FR-043)', () => {
   it('falls back to the corrigendum copy when the reason is null or missing (legacy stale analyses)', () => {
@@ -70,6 +70,16 @@ describe('run lifecycle copy (FR-028, FR-029)', () => {
       .toBe('The last re-analysis failed: LLM provider down. Showing the previous result from 3 hours ago.');
     expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'failed', error: null, at: now.toISOString() } }, now))
       .toBe('The last re-analysis failed: unknown error. Showing the previous result from 3 hours ago.');
+  });
+
+  it('analysisPanelState: a first-ever run that timed out is failed with Try again, never "in progress" (S3)', () => {
+    const at = now.toISOString();
+    expect(analysisPanelState({ status: 'running', error: null, lastAttempt: { status: 'failed', error: 'timed out', at } })).toEqual({ kind: 'failed', error: 'timed out' });
+    expect(analysisPanelState({ status: 'failed', error: 'timed out', lastAttempt: { status: 'failed', error: 'timed out', at } })).toEqual({ kind: 'failed', error: 'timed out' });
+    expect(analysisPanelState({ status: 'running', error: null, lastAttempt: { status: 'running', error: null, at } })).toEqual({ kind: 'in_progress' });
+    expect(analysisPanelState({ status: 'pending', error: null })).toEqual({ kind: 'in_progress' });
+    expect(analysisPanelState({ status: 'failed', error: 'boom' })).toEqual({ kind: 'failed', error: 'boom' });
+    expect(analysisPanelState({ status: 'done', error: null, lastAttempt: { status: 'failed', error: 'x', at } })).toEqual({ kind: 'result' });
   });
 
   it('failedAttemptCopy is null without a failed attempt or without a previous result', () => {

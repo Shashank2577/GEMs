@@ -12,7 +12,7 @@ import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useOverride } from './api';
 import { ChecklistCard } from './ChecklistCard';
-import { FACTOR_HELP, FACTOR_ICON, STATUS_META, failedAttemptCopy, isAnalysisRunning } from './labels';
+import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, failedAttemptCopy, isAnalysisRunning } from './labels';
 
 const eff = (f: ScoreFactor): FactorStatus => f.overridden?.status ?? f.status;
 
@@ -78,14 +78,15 @@ export function AnalysisPanel({
   const running = isAnalysisRunning(analysis);
   const failedCopy = failedAttemptCopy(analysis);
 
-  if (analysis.status === 'running' || analysis.status === 'pending') return <AnalysisInProgress hasResult={false} />;
+  const state = analysisPanelState(analysis);
+  if (state.kind === 'in_progress') return <AnalysisInProgress hasResult={false} />;
 
-  if (analysis.status === 'failed') {
+  if (state.kind === 'failed') {
     return (
       <Card className="border-danger/30">
         <CardContent className="flex flex-col items-start gap-3 p-6">
           <div className="flex items-center gap-2 font-semibold text-danger"><AlertOctagon className="size-5" /> The last analysis failed</div>
-          <p className="text-sm text-muted-foreground">{analysis.error ?? 'Something went wrong while reading the documents.'} Try again, or upload a cleaner PDF in the Documents tab.</p>
+          <p className="text-sm text-muted-foreground">{state.error ?? 'Something went wrong while reading the documents.'} Try again, or upload a cleaner PDF in the Documents tab.</p>
           {canAnalyse && <Button size="sm" onClick={onReanalyse} loading={reanalysing} disabled={analyseDisabled}><RefreshCw /> Try again</Button>}
         </CardContent>
       </Card>

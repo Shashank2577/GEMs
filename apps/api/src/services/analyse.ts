@@ -8,7 +8,7 @@
  *   analyseTender        → rules (+ LLM when configured) → score → checklist → analyses row
  *   overrideFactor       → audited manual status change + re-score
  */
-import { and, asc, desc, eq, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import {
   analyses, companyProfiles, organizations, pastContracts, tenderDocuments, tenders, vaultDocuments,
   type Requirement, type ScoreFactor,
@@ -248,16 +248,66 @@ export async function latestAnalysis(deps: AppDeps, tenderId: string, orgId: str
 }
 
 /** Latest analysis with status `done` (FR-029): the result to show and to carry overrides from. */
+type Tx = Parameters<Parameters<AppDeps['db']['transaction']>[0]>[0];
+
+/** Latest analysis with status `done` (FR-029): the result to show and to carry overrides from. */
 export async function latestDoneAnalysis(deps: AppDeps, tenderId: string, orgId: string): Promise<AnalysisRow | null> {
-  const [a] = await deps.db.select().from(analyses)
+  return latestDoneIn(deps.db, tenderId, orgId);
+}
+
+async function latestDoneIn(db: AppDeps['db'] | Tx, tenderId: string, orgId: string): Promise<AnalysisRow | null> {
+  const [a] = await db.select().from(analyses)
     .where(and(eq(analyses.tenderId, tenderId), eq(analyses.orgId, orgId), eq(analyses.status, 'done')))
     .orderBy(desc(analyses.createdAt)).limit(1);
   return a ?? null;
 }
 
+/**
+ * Serialises the analysis lifecycle of one org+tender until the transaction ends: starting a run,
+ * finishing it (re-reading overrides) and overriding a factor all take it, so none interleave.
+ */
+const lockAnalyses = (tx: Tx, orgId: string, tenderId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${orgId}:${tenderId}`}, 0))`);
+
 /** A `running` analysis older than this is treated as failed ("timed out") (FR-028). */
 export const ANALYSIS_RUNNING_TIMEOUT_MS = 2 * 60 * 1000;
 export const ANALYSIS_TIMED_OUT = 'timed out';
+
+/**
+ * Wall-clock budget for the LLM stage of one run, across all its documents (FR-028). A `running` row
+ * counts as timed out ANALYSIS_RUNNING_TIMEOUT_MS after it was created, so a run must not legitimately
+ * take that long: capping the LLM stage (the only slow, unbounded stage) at 90 s leaves ~30 s for
+ * extraction, scoring and the DB writes. When the budget runs out, the in-flight call is abandoned and
+ * the remaining documents use rules only. We chose this budget over heart-beating `updatedAt`: it needs
+ * no background timer and keeps "timed out" a pure function of `createdAt`. A run that still overruns
+ * (e.g. a stalled DB) cannot clobber anything: the final write only applies while the row is `running`.
+ */
+export const ANALYSIS_LLM_BUDGET_MS = 90_000;
+
+class LlmBudgetExceeded extends Error {
+  constructor() { super('LLM time budget exhausted'); }
+}
+
+/** `p`, or a rejection once `ms` has elapsed. The underlying call is not cancelled, only ignored. */
+function withinBudget<T>(p: Promise<T>, ms: number): Promise<T> {
+  if (ms <= 0) return Promise.reject(new LlmBudgetExceeded());
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new LlmBudgetExceeded()), ms); });
+  return Promise.race([p, expired]).finally(() => clearTimeout(timer));
+}
+
+/** A late finisher whose row was already marked timed out (and maybe replaced) by a newer request. */
+const supersededError = () => new HttpError(409, 'analysis_superseded', 'This analysis took too long and was replaced. Reload to see the latest result.');
+
+/**
+ * A first-ever analysis whose `running` row has timed out (S3): reported as failed so the page offers
+ * "Try again" instead of showing "in progress" forever. Other rows are returned as they are.
+ */
+export function shownAnalysisDto(shown: AnalysisRow, lastAttempt: AnalysisDto['lastAttempt'], docs?: DocRow[]): AnalysisDto {
+  const dto = toAnalysisDto(shown, docs);
+  if (shown.status === 'running' && lastAttempt?.status === 'failed') return { ...dto, status: 'failed', error: lastAttempt.error };
+  return dto;
+}
 
 /**
  * `lastAttempt` for GET …/analysis (FR-029): set when the latest row is not the one shown (a newer
@@ -283,7 +333,11 @@ function overridesOf(a: AnalysisRow | null): Record<string, FactorOverride> {
   return out;
 }
 
-export async function analyseTender(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
+export async function analyseTender(
+  deps: AppDeps,
+  input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer },
+  opts: { llmBudgetMs?: number } = {},
+): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
   const tender = await getTender(deps, input.tenderId, input.viewer);
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
@@ -296,13 +350,11 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
   if (!docs.length) {
     throw new HttpError(422, 'no_documents', 'Add the bid document first — upload the PDF or fetch it from GeM.');
   }
-  // Overrides come from the latest DONE analysis: a failed attempt has no factors (FR-029).
-  const previous = await latestDoneAnalysis(deps, tender.id, input.orgId);
   const now = deps.clock.now();
   // One running analysis per org+tender (FR-028). The advisory lock serialises concurrent requests
   // for the same org+tender until commit, so the check and the insert cannot interleave.
   const row = await deps.db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${input.orgId}:${tender.id}`}, 0))`);
+    await lockAnalyses(tx, input.orgId, tender.id);
     const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
     const scope = and(eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'));
     await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
@@ -314,8 +366,12 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
     }).returning();
     return inserted;
   });
+  // Every write to this row from here on is guarded by `status = 'running'`: if a newer request marked
+  // it timed out (and maybe replaced it), the late finisher changes nothing and logs nothing (FR-028).
+  const ours = and(eq(analyses.id, row.id), eq(analyses.status, 'running'));
 
   const t0 = performance.now();
+  const llmDeadline = t0 + (opts.llmBudgetMs ?? ANALYSIS_LLM_BUDGET_MS);
   let extractMs = 0;
   let llmMs = 0;
   let pageTotal = 0;
@@ -331,10 +387,10 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
       const meta = { documentId: d.id, fileName: d.fileName, estimatedValue: tender.estimatedValue };
       const rules = extractRequirementsRules(pages, meta);
       extractMs += performance.now() - tx0;
-      if (deps.llm) {
+      if (deps.llm && performance.now() < llmDeadline) {
         const llm = deps.llm;
         const tl0 = performance.now();
-        const r = await enrichWithLlm(pages, rules, (req) => llm.completeJson(req), { documentId: d.id, fileName: d.fileName });
+        const r = await enrichWithLlm(pages, rules, (req) => withinBudget(llm.completeJson(req), llmDeadline - performance.now()), { documentId: d.id, fileName: d.fileName });
         llmMs += performance.now() - tl0;
         if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
         usedLlm ||= r.used;
@@ -344,33 +400,48 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
     const ts0 = performance.now();
     const requirements = combineRequirements(perDoc, requirementsFromListing(tender));
     const company = await loadCompany(deps, input.orgId);
-    const result = scoreTender({
-      requirements, profile: company.profile, pastContracts: company.pastContracts, vaultDocs: company.vault,
-      tender: { endAt: tender.endAt, state: tender.state, emdAmount: tender.emdAmount, title: tender.title, category: tender.category, items: tender.items }, weights: company.weights, now,
-      overrides: overridesOf(previous),
-    });
     const checklist = buildChecklist(requirements, company.profile);
-    const summary = withPrefix(documentCheckPrefix(ordered, tender.bidNumber), result.summary);
+    const prefix = documentCheckPrefix(ordered, tender.bidNumber);
+    // Overrides are read under the lifecycle lock, right before the write, from the latest DONE
+    // analysis (a failed attempt has no factors, FR-029): an override saved while this run was going
+    // is carried over, and one arriving now waits for this commit and then sees the newer analysis.
+    const finished = await deps.db.transaction(async (tx) => {
+      await lockAnalyses(tx, input.orgId, tender.id);
+      const previous = await latestDoneIn(tx, tender.id, input.orgId);
+      const result = scoreTender({
+        requirements, profile: company.profile, pastContracts: company.pastContracts, vaultDocs: company.vault,
+        tender: { endAt: tender.endAt, state: tender.state, emdAmount: tender.emdAmount, title: tender.title, category: tender.category, items: tender.items }, weights: company.weights, now,
+        overrides: overridesOf(previous),
+      });
+      const [done] = await tx.update(analyses).set({
+        status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
+        score: result.score, confidence: result.confidence, verdict: result.verdict, summary: withPrefix(prefix, result.summary), error: null, stale: false,
+        updatedAt: deps.clock.now(),
+      }).where(ours).returning();
+      return done ?? null;
+    });
+    if (!finished) {
+      deps.logger.warn('analyse: run finished after it was marked timed out; result discarded', { tenderId: tender.id, analysisId: row.id });
+      throw supersededError();
+    }
     const scoreMs = performance.now() - ts0;
-    const [done] = await deps.db.update(analyses).set({
-      status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
-      score: result.score, confidence: result.confidence, verdict: result.verdict, summary, error: null, stale: false,
-      updatedAt: deps.clock.now(),
-    }).where(eq(analyses.id, row.id)).returning();
     // NFR-001: stage timings (ms) so slow stages are visible without a profiler.
     const timing = {
       extract_ms: Math.round(extractMs), llm_ms: Math.round(llmMs), score_ms: Math.round(scoreMs),
       total_ms: Math.round(performance.now() - t0), pages: pageTotal, docs: ordered.length,
     };
-    deps.logger.info('analyse: done', { tenderId: tender.id, analysisId: row.id, method: done.method, ...timing });
+    deps.logger.info('analyse: done', { tenderId: tender.id, analysisId: row.id, method: finished.method, ...timing });
     await logActivity(deps.db, {
       orgId: input.orgId, userId: input.userId, action: 'tender.analysed', entityType: 'tender', entityId: tender.id,
-      meta: { analysisId: row.id, score: result.score, verdict: result.verdict, method: done.method, bidNumber: tender.bidNumber, ...timing },
+      meta: { analysisId: row.id, score: finished.score, verdict: finished.verdict, method: finished.method, bidNumber: tender.bidNumber, ...timing },
     });
-    return { analysis: done, documents: ordered };
+    return { analysis: finished, documents: ordered };
   } catch (e) {
+    if (e instanceof HttpError && e.code === 'analysis_superseded') throw e;
     deps.logger.error('analyse: failed', { tenderId: tender.id, error: (e as Error).message });
-    await deps.db.update(analyses).set({ status: 'failed', error: (e as Error).message.slice(0, 500), updatedAt: deps.clock.now() }).where(eq(analyses.id, row.id));
+    const marked = await deps.db.update(analyses).set({ status: 'failed', error: (e as Error).message.slice(0, 500), updatedAt: deps.clock.now() })
+      .where(ours).returning({ id: analyses.id });
+    if (!marked.length) throw supersededError();
     throw new HttpError(500, 'analysis_failed', 'The analysis failed. Please try again; if it keeps failing, upload a cleaner PDF.');
   }
 }
@@ -381,23 +452,35 @@ export async function overrideFactor(
   deps: AppDeps,
   input: { orgId: string; userId: string; userName: string; analysisId: string } & OverrideFactorInput,
 ): Promise<AnalysisRow> {
-  const [a] = await deps.db.select().from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId)));
-  if (!a) throw notFound('Analysis');
-  if (a.status !== 'done') throw new HttpError(409, 'conflict', 'Only a completed analysis can be overridden');
-  const factor = a.factors.find((f) => f.key === input.factorKey);
-  if (!factor) throw new HttpError(404, 'not_found', `Factor "${input.factorKey}" is not part of this analysis`);
-  const from = effectiveStatus(factor);
-  const at = deps.clock.now().toISOString();
-  const factors: ScoreFactor[] = a.factors.map((f) => {
-    if (f.key !== input.factorKey) return f;
-    const { overridden: _drop, ...rest } = f;
-    return input.status === f.status ? rest : { ...rest, overridden: { status: input.status, reason: input.reason, by: input.userName, at } };
+  const [found] = await deps.db.select({ tenderId: analyses.tenderId }).from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId)));
+  if (!found) throw notFound('Analysis');
+  // Under the lifecycle lock so a run finishing now either sees this override or has already
+  // committed its newer analysis, in which case this one is refused rather than silently lost (FR-029).
+  const { a, factor, from, r, updated } = await deps.db.transaction(async (tx) => {
+    await lockAnalyses(tx, input.orgId, found.tenderId);
+    const [a] = await tx.select().from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId)));
+    if (!a) throw notFound('Analysis');
+    if (a.status !== 'done') throw new HttpError(409, 'conflict', 'Only a completed analysis can be overridden');
+    const factor = a.factors.find((f) => f.key === input.factorKey);
+    if (!factor) throw new HttpError(404, 'not_found', `Factor "${input.factorKey}" is not part of this analysis`);
+    const [newer] = await tx.select({ id: analyses.id }).from(analyses).where(and(
+      eq(analyses.orgId, input.orgId), eq(analyses.tenderId, a.tenderId), eq(analyses.status, 'done'), gt(analyses.createdAt, a.createdAt),
+    )).limit(1);
+    if (newer) throw new HttpError(409, 'conflict', 'A newer analysis has replaced this one. Reload and apply the override again.');
+    const from = effectiveStatus(factor);
+    const at = deps.clock.now().toISOString();
+    const factors: ScoreFactor[] = a.factors.map((f) => {
+      if (f.key !== input.factorKey) return f;
+      const { overridden: _drop, ...rest } = f;
+      return input.status === f.status ? rest : { ...rest, overridden: { status: input.status, reason: input.reason, by: input.userName, at } };
+    });
+    const r = computeScore(factors);
+    const prefix = matchCheckPrefix(a.summary) ?? '';
+    const [updated] = await tx.update(analyses).set({
+      factors, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: withPrefix(prefix, r.summary), updatedAt: deps.clock.now(),
+    }).where(eq(analyses.id, a.id)).returning();
+    return { a, factor, from, r, updated };
   });
-  const r = computeScore(factors);
-  const prefix = matchCheckPrefix(a.summary) ?? '';
-  const [updated] = await deps.db.update(analyses).set({
-    factors, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: withPrefix(prefix, r.summary), updatedAt: deps.clock.now(),
-  }).where(eq(analyses.id, a.id)).returning();
   await logActivity(deps.db, {
     orgId: input.orgId, userId: input.userId, action: 'analysis.factor_overridden', entityType: 'tender', entityId: a.tenderId,
     meta: { analysisId: a.id, factorKey: input.factorKey, label: factor.label, from, to: input.status, reason: input.reason, score: r.score, verdict: r.verdict },

@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { activityLog, analyses, companyProfiles, pastContracts, tenderDocuments, tenders, vaultDocuments } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { createApp } from '../src/app';
+import { analyseTender } from '../src/services/analyse';
 import type { LlmClient } from '../src/deps';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -508,12 +509,38 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     };
     return { llm, release };
   }
-  /** App whose analysis fails mid-run with `message` (LLM fails, then the warning log throws). */
-  const failingApp = (message: string) => createApp({
-    ...ctx.deps,
-    llm: { model: 'down', complete: async () => { throw new Error(message); }, completeJson: async () => { throw new Error(message); } },
-    logger: { ...ctx.deps.logger, warn: () => { throw new Error(message); } },
+  /**
+   * DB whose company-profile read fails with `message`: a real dependency failing mid-run, after the
+   * `running` row exists (loadCompany runs between the LLM stage and the final write).
+   */
+  const failingDb = (message: string): typeof ctx.db => new Proxy(ctx.db, {
+    get(target, prop) {
+      const v = Reflect.get(target, prop, target);
+      if (prop !== 'select') return typeof v === 'function' ? v.bind(target) : v;
+      return (...args: unknown[]) => {
+        const q = (target.select as (...a: unknown[]) => any)(...args);
+        return new Proxy(q, {
+          get(qt, p) {
+            if (p === 'from') return (table: unknown, ...rest: unknown[]) => { if (table === companyProfiles) throw new Error(message); return qt.from(table, ...rest); };
+            const f = Reflect.get(qt, p, qt);
+            return typeof f === 'function' ? f.bind(qt) : f;
+          },
+        });
+      };
+    },
   });
+  const failingApp = (message: string, llm: LlmClient | null = ctx.deps.llm) => createApp({ ...ctx.deps, llm, db: failingDb(message) });
+  /** Waits until the org's run for `id` has inserted its `running` row. */
+  async function runningRow(id: string) {
+    for (let i = 0; i < 200; i++) {
+      const r = (await rowsOf(id)).find((x) => x.status === 'running');
+      if (r) return r;
+      await new Promise((res) => setTimeout(res, 10));
+    }
+    throw new Error('analysis never started');
+  }
+  const analysedFor = async (analysisId: string) => (await ctx.db.select().from(activityLog).where(eq(activityLog.action, 'tender.analysed')))
+    .filter((a) => (a.meta as { analysisId?: string } | null)?.analysisId === analysisId);
 
   it('two concurrent POSTs: one 201, the other 409 analysis_running; a single analysis row (US3 #14)', async () => {
     const t = await readyTender('race');
@@ -578,7 +605,7 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     expect(ov.body.verdict).toBe('go');
 
     ctx.clock.advance(1000); // the fixed clock would give every row the same created_at
-    const failed = await POST(failingApp('LLM provider down'), t.id);
+    const failed = await POST(failingApp('database unavailable'), t.id);
     expect(failed.status).toBe(500);
     expect(failed.body.error.code).toBe('analysis_failed');
 
@@ -586,7 +613,7 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     expect(got.status).toBe(200);
     expect(got.body).toMatchObject({ id: first.body.id, status: 'done', verdict: 'go' });
     expect(got.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'JV partner brings 6 years' });
-    expect(got.body.lastAttempt).toEqual({ status: 'failed', error: 'LLM provider down', at: ctx.clock.now().toISOString() });
+    expect(got.body.lastAttempt).toEqual({ status: 'failed', error: 'database unavailable', at: ctx.clock.now().toISOString() });
 
     // Re-analysing after the failure carries the override from the last DONE analysis, not the failed row.
     ctx.clock.advance(1000);
@@ -605,6 +632,112 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     const got = await GET(t.id);
     expect(got.status).toBe(200);
     expect(got.body).toMatchObject({ status: 'failed', error: 'boom', lastAttempt: { status: 'failed', error: 'boom' } });
+  });
+
+  it('B1: a late finisher after its row timed out does not flip the timed-out row or the replacement, and is not logged', async () => {
+    const t = await readyTender('late');
+    const { llm, release } = slowLlm();
+    const pending = POST(createApp({ ...ctx.deps, llm }), t.id);
+    const stuck = await runningRow(t.id);
+    await ctx.db.update(analyses).set({ createdAt: new Date(ctx.clock.now().getTime() - 121_000) }).where(eq(analyses.id, stuck.id));
+    ctx.clock.advance(1000);
+    const replacement = await POST(ctx.app, t.id);
+    expect(replacement.status).toBe(201);
+    const [before] = await ctx.db.select().from(analyses).where(eq(analyses.id, replacement.body.id));
+
+    ctx.clock.advance(1000);
+    release();
+    const late = await pending;
+    expect(late.status).toBe(409);
+    expect(late.body.error.code).toBe('analysis_superseded');
+    const [old] = await ctx.db.select().from(analyses).where(eq(analyses.id, stuck.id));
+    expect(old).toMatchObject({ status: 'failed', error: 'timed out', factors: [], score: null });
+    const [after] = await ctx.db.select().from(analyses).where(eq(analyses.id, replacement.body.id));
+    expect(after).toEqual(before);
+    expect(await analysedFor(stuck.id)).toHaveLength(0);
+    expect(await analysedFor(replacement.body.id)).toHaveLength(1);
+    expect((await GET(t.id)).body).toMatchObject({ id: replacement.body.id, status: 'done' });
+  });
+
+  it('B1: a late run that then fails does not overwrite the "timed out" error', async () => {
+    const t = await readyTender('latefail');
+    const { llm, release } = slowLlm();
+    const pending = POST(failingApp('database unavailable', llm), t.id);
+    const stuck = await runningRow(t.id);
+    // A newer request marks it timed out (and would start its own run).
+    await ctx.db.update(analyses).set({ status: 'failed', error: 'timed out' }).where(eq(analyses.id, stuck.id));
+    release();
+    const late = await pending;
+    expect(late.status).toBe(409);
+    expect(late.body.error.code).toBe('analysis_superseded');
+    const [old] = await ctx.db.select().from(analyses).where(eq(analyses.id, stuck.id));
+    expect(old).toMatchObject({ status: 'failed', error: 'timed out' });
+  });
+
+  it('the LLM stage has a time budget: when it runs out the run finishes rules-only instead of hanging (FR-028)', async () => {
+    const t = await readyTender('budget');
+    const hung: LlmClient = {
+      model: 'hung',
+      complete: () => new Promise(() => {}),
+      completeJson: () => new Promise(() => {}),
+    };
+    const r = await analyseTender({ ...ctx.deps, llm: hung }, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: t.id, viewer: {} }, { llmBudgetMs: 50 });
+    expect(r.analysis).toMatchObject({ status: 'done', method: 'rules' });
+  });
+
+  it('B2: an override saved while a re-analysis is running is carried into the new result', async () => {
+    const t = await readyTender('ovrace', 'nogo-experience');
+    const first = await POST(ctx.app, t.id);
+    expect(first.body.verdict).toBe('no_go');
+    ctx.clock.advance(1000);
+    const { llm, release } = slowLlm();
+    const pending = POST(createApp({ ...ctx.deps, llm }), t.id);
+    await runningRow(t.id);
+    const ov = await request(ctx.app, 'POST', `/analyses/${first.body.id}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'experience', status: 'pass', reason: 'JV partner signed during the run' } });
+    expect(ov.status).toBe(200);
+    release();
+    const again = await pending;
+    expect(again.status).toBe(201);
+    expect(again.body.id).not.toBe(first.body.id);
+    expect(again.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'JV partner signed during the run' });
+    expect(again.body.verdict).toBe('go');
+    const [row] = await ctx.db.select().from(analyses).where(eq(analyses.id, again.body.id));
+    expect(row.verdict).toBe('go');
+    // Overriding the replaced analysis now is refused instead of being silently lost.
+    const stale = await request(ctx.app, 'POST', `/analyses/${first.body.id}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'emd', status: 'fail', reason: 'Too late' } });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('conflict');
+  });
+
+  it('S3: a first-ever analysis that timed out is reported as failed, not in progress', async () => {
+    const t = await readyTender('firsttimeout');
+    const now = ctx.clock.now().getTime();
+    await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId: t.id, status: 'running', createdAt: new Date(now - 121_000), updatedAt: new Date(now - 121_000) });
+    const got = await GET(t.id);
+    expect(got.status).toBe(200);
+    expect(got.body).toMatchObject({ status: 'failed', error: 'timed out', lastAttempt: { status: 'failed', error: 'timed out' } });
+  });
+
+  it('lastAttempt is per org: another org never sees this org\'s running or failed attempts', async () => {
+    const t = await readyTender('attemptiso');
+    const other = await signup(ctx.app, { orgName: 'Isolated Attempts Co' });
+    const otherGet = () => request(ctx.app, 'GET', `/tenders/${t.id}/analysis`, { cookie: other.cookie });
+    const now = ctx.clock.now();
+    await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId: t.id, status: 'running', createdAt: now, updatedAt: now });
+    expect((await otherGet()).status).toBe(404);
+    expect((await GET(t.id)).body.lastAttempt).toMatchObject({ status: 'running' });
+
+    await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: other.cookie, form: { file: pdfFile('go-it-services') } });
+    const mine = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: other.cookie });
+    expect(mine.status).toBe(201);
+    const seen = await otherGet();
+    expect(seen.body).toMatchObject({ id: mine.body.id, orgId: other.me.org.id, status: 'done' });
+    expect(seen.body.lastAttempt).toBeUndefined();
+
+    ctx.clock.advance(1000);
+    await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId: t.id, status: 'failed', error: 'secret failure', createdAt: ctx.clock.now(), updatedAt: ctx.clock.now() });
+    expect((await otherGet()).body.lastAttempt).toBeUndefined();
+    expect((await GET(t.id)).body.orgId).toBe(roles.orgId);
   });
 });
 

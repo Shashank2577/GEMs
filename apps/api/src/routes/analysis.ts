@@ -6,7 +6,7 @@
  *   POST /tenders/:id/fetch-documents                 download from GeM              analyst+
  *   GET  /tenders/:id/documents/:docId/download       stream (?inline=1)             viewer+
  *   DELETE /tenders/:id/documents/:docId              remove own upload (204)        analyst+
- *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis; 409 analysis_running  analyst+
+ *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis; 409 analysis_running / analysis_superseded  analyst+
  *   GET  /tenders/:id/analysis                        latest done Analysis (+lastAttempt) or 404  viewer+
  *   POST /analyses/:id/override                       {factorKey,status,reason}      bid_manager+
  *   GET  /scoring-weights                             {weights, defaults, custom}    viewer+
@@ -23,7 +23,7 @@ import { TENDER_DOC_TOO_LARGE, TENDER_DOC_UPLOAD_MAX_BYTES, bodyLimit } from '..
 import { rateLimit } from '../middleware/rate-limit';
 import {
   analyseTender, fetchGemDocuments, getTender, getTenderDocument, lastAttemptOf, latestAnalysis, latestDoneAnalysis, listTenderDocuments, overrideFactor,
-  removeTenderDocument, saveWeights, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
+  removeTenderDocument, saveWeights, shownAnalysisDto, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
 } from '../services/analyse';
 import type { AppEnv } from '../types';
 
@@ -113,7 +113,8 @@ analysisRoutes.get('/tenders/:id/analysis', requireAuth, async (c) => {
   const shown = done ?? latest;
   const docs = await listTenderDocuments(c.var.deps, tenderId, orgId(c));
   const lastAttempt = lastAttemptOf(latest, shown, c.var.deps.clock.now());
-  return c.json({ ...toAnalysisDto(shown, docs), ...(lastAttempt ? { lastAttempt } : {}) });
+  // A first-ever run that timed out is reported as failed, not "in progress" forever.
+  return c.json({ ...shownAnalysisDto(shown, lastAttempt, docs), ...(lastAttempt ? { lastAttempt } : {}) });
 });
 
 analysisRoutes.post('/analyses/:id/override', requireRole('bid_manager'), async (c) => {

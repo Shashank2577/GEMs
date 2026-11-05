@@ -126,6 +126,18 @@ export function failedAttemptCopy(a: Pick<AnalysisDto, 'status' | 'lastAttempt' 
   return `The last re-analysis failed: ${reason}. Showing the previous result from ${relativeTime(a.updatedAt, now)}.`;
 }
 
+/**
+ * What the Analysis tab shows: the result, a failed first attempt ("Try again"), or "in progress".
+ * `lastAttempt` wins over a `running`/`pending` row: a first-ever run that timed out (S3, FR-028) is
+ * failed, never "in progress" forever, even if an older API still reports the row as running.
+ */
+export function analysisPanelState(a: Pick<AnalysisDto, 'status' | 'error' | 'lastAttempt'>): { kind: 'result' } | { kind: 'in_progress' } | { kind: 'failed'; error: string | null } {
+  if (a.status === 'done') return { kind: 'result' };
+  if (a.lastAttempt?.status === 'failed') return { kind: 'failed', error: a.lastAttempt.error ?? a.error ?? null };
+  if (a.status === 'failed') return { kind: 'failed', error: a.error ?? null };
+  return { kind: 'in_progress' };
+}
+
 /** The "Check documents: … is for GEM/…." prefix the API puts on an analysis summary, if any. */
 export function documentCheckPrefix(summary: string | null | undefined): string | null {
   return matchCheckPrefix(summary);
