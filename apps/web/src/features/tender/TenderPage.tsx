@@ -19,6 +19,7 @@ import { HistoryTab } from './HistoryTab';
 import { RequirementsTab } from './RequirementsTab';
 import { TenderHero } from './TenderHero';
 import { useAnalyse, useAnalysis, useDismiss, useStartBid, useTender, useTenderDocuments } from './api';
+import { staleReasonCopy } from './labels';
 
 const TABS = ['analysis', 'requirements', 'documents', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -119,7 +120,7 @@ export default function TenderPage() {
               <TriangleAlert className="size-5 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
               <div className="min-w-0 flex-1 text-sm">
                 <div className="font-semibold">Re-analysis needed</div>
-                <div className="text-muted-foreground">A corrigendum changed this bid after it was analysed. The score below may be outdated.</div>
+                <div className="text-muted-foreground">{staleReasonCopy(analysis?.staleReason)}</div>
               </div>
               <RoleGate min="analyst"><Button size="sm" variant="secondary" onClick={runAnalyse}><RefreshCw /> Re-analyse now</Button></RoleGate>
             </div>
