@@ -22,6 +22,7 @@ Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by
 | POST | /auth/accept-invite | `{token,name?,password?}` | `Me` |
 | PATCH | /me | `{name?,phone?}` | `Me` |
 | GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` | prefs |
+| POST | /me/notifications/test | – (session only; 1/min per user → 429 `rate_limited` + Retry-After) | `{inApp:'sent',email,whatsapp}`, email/whatsapp each `sent\|skipped\|failed\|off` (002/FR-034) |
 | GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name}` | list / `{token}` shown once |
 | GET | /org/members | – | `[{userId,name,email,role,joinedAt}]` + pending invites |
 | POST (M) | /org/invitations | `{email,role}` | `{id, inviteUrl}` |

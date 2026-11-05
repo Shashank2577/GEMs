@@ -168,11 +168,11 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T064 [P] [US4] API tests: prefs default when no row, full-object PUT round-trip, preferences isolated per org for a two-org user, viewer can edit own prefs in `apps/api/test/prefs.test.ts` FR-031 (#34)
-- [ ] T065 [P] [US4] Account section: when clearing the mobile while WhatsApp alerts are on, show the inline warning "WhatsApp alerts will stop until you add a mobile number." before saving in `apps/web/src/features/settings/sections/AccountSection.tsx` FR-032 (#35)
-- [ ] T066 [US4] Add `POST /api/me/notifications/test` (1/min per user; in-app row "Test alert from TenderPilot"; email/WhatsApp attempted only when enabled; returns per-channel `sent|skipped|failed|off`) with API test using log adapters in `apps/api/src/routes/notifications.ts`, `apps/api/test/prefs.test.ts` FR-034 NFR-007 (#36)
-- [ ] T067 [P] [US4] "Send a test alert" button in Notifications section with per-channel outcome toast in `apps/web/src/features/settings/sections/NotificationsSection.tsx`, `apps/web/src/features/settings/api.ts` FR-034 (#37)
-- [ ] T068 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in qa/evidence/002/US4/ — defaults, WhatsApp without number error, save + reload persistence, profile edit and invalid mobile, `@mobile` layout, axe on account + notifications in `e2e/002-platform/US4-account-prefs.e2e.ts`, `qa/evidence/002/US4/VERDICT.md` FR-030..FR-034 (#38)
+- [x] T064 [P] [US4] API tests: prefs default when no row, full-object PUT round-trip, preferences isolated per org for a two-org user, viewer can edit own prefs in `apps/api/test/prefs.test.ts` FR-031 (#34)
+- [x] T065 [P] [US4] Account section: when clearing the mobile while WhatsApp alerts are on, show the inline warning "WhatsApp alerts will stop until you add a mobile number." before saving in `apps/web/src/features/settings/sections/AccountSection.tsx` FR-032 (#35)
+- [x] T066 [US4] Add `POST /api/me/notifications/test` (1/min per user; in-app row "Test alert from TenderPilot"; email/WhatsApp attempted only when enabled; returns per-channel `sent|skipped|failed|off`) with API test using log adapters in `apps/api/src/routes/notifications.ts`, `apps/api/test/prefs.test.ts` FR-034 NFR-007 (#36)
+- [x] T067 [P] [US4] "Send a test alert" button in Notifications section with per-channel outcome toast in `apps/web/src/features/settings/sections/NotificationsSection.tsx`, `apps/web/src/features/settings/api.ts` FR-034 (#37)
+- [x] T068 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in qa/evidence/002/US4/ — defaults, WhatsApp without number error, save + reload persistence, profile edit and invalid mobile, `@mobile` layout, axe on account + notifications in `e2e/002-platform/US4-account-prefs.e2e.ts`, `qa/evidence/002/US4/VERDICT.md` FR-030..FR-034 (#38)
 
 **Checkpoint**: US4 independently functional
 

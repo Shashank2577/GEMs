@@ -11,7 +11,7 @@ import {
   API_TOKEN_PREFIX, PASSWORD_RESET_TTL_MINUTES, acceptInviteInputSchema, changePasswordInputSchema, createApiTokenInputSchema,
   forgotPasswordInputSchema, loginInputSchema, notificationPrefsSchema, passwordSchema, resetPasswordInputSchema,
   signupInputSchema, switchOrgInputSchema, updateMeInputSchema,
-  type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
+  DEFAULT_NOTIFICATION_PREFS, type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
 } from '@tp/core/contracts/auth';
 import { requireAuth, requireSession, orgId, userId } from '../middleware/auth';
 import { logActivity } from '../lib/activity';
@@ -29,7 +29,7 @@ export const authRoutes = new Hono<AppEnv>();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const DEFAULT_PREFS: NotificationPrefs = { inApp: true, email: true, whatsapp: false, frequency: 'instant', expiryReminders: true };
+const DEFAULT_PREFS: NotificationPrefs = DEFAULT_NOTIFICATION_PREFS;
 
 async function uniqueSlug(db: Db, name: string): Promise<string> {
   const base = slugify(name);
