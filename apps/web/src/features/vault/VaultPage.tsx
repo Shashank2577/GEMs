@@ -14,12 +14,11 @@ import { DOC_CATEGORIES, DOC_TYPES, docTypeInfo, type DocCategory, type DocStatu
 import {
   Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, ResponsiveTable, Segmented, Select, Skeleton, StatTile, toast, type Column,
 } from '@/components/ui';
-import { ApiError } from '@/lib/api';
 import { RoleGate, useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { useLocalStorage } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { useVault, useVaultDoc, useVaultSummary, type VaultFilters } from './api';
+import { DOC_NOT_FOUND_MESSAGE, isStaleDocLink, useVault, useVaultDoc, useVaultSummary, type VaultFilters } from './api';
 import { DocTypeIcon, ExpiryBadge, STATUS_LABEL } from './doc-ui';
 import { DocumentDrawer } from './DocumentDrawer';
 import { checkVaultFile } from './file-check';
@@ -156,8 +155,8 @@ export default function VaultPage() {
   const setDoc = (id: string | null) => setParam('doc', id);
   // FR-040: a stale `?doc=<id>` (deleted document, old reminder link) gets a visible message and is dropped from the URL.
   useEffect(() => {
-    if (docId && !inList && single.error instanceof ApiError && single.error.status === 404) {
-      toast.error('That document could not be found. It may have been deleted.', { id: 'vault-doc-not-found' });
+    if (isStaleDocLink(docId, !!inList, single.error)) {
+      toast.error(DOC_NOT_FOUND_MESSAGE, { id: 'vault-doc-not-found' });
       setParam('doc', null);
     }
   }, [docId, inList, single.error, setParam]);
