@@ -251,13 +251,18 @@ test('US2-5 [video]: dragging the blocked Preparing card (Dell desktops) to Read
 
 test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=ready answers 409 conflict / not_analysed', async ({ page, browser }) => {
   await demoOwner(page);
-  const demoCards = await listWs(page.request);
-  // A second org starts a bid on a tender it never analysed.
+  // A second org starts a bid on a tender it never analysed. Demo tenders are invisible to orgs that never loaded the
+  // demo (008/FR-016), so orgB loads the demo itself and picks a demo tender that has neither a workspace nor an
+  // analysis for it (plan index 30 — see PIPELINE / EXTRA_ANALYSES in packages/db/src/demo.ts).
   const orgB = await pwRequest.newContext({ baseURL: test.info().project.use.baseURL });
   try {
     const ub = uniqueUser('orgb');
     expect((await orgB.post('/api/auth/signup', { data: ub })).status()).toBe(201);
-    const tenderId = demoCards.items[0].tender.id;
+    await seedDemo(orgB);
+    const bidNo = `GEM/2026/B/${6_400_000 + 30 * 7919 + 1_337}`; // demoBidNumber(30)
+    const feed = await (await orgB.get('/api/tenders?pageSize=100')).json();
+    const tenderId = (feed.items as { id: string; bidNumber: string }[]).find((t) => t.bidNumber === bidNo)?.id;
+    expect(tenderId, `demo tender ${bidNo} visible to orgB`).toBeTruthy();
     const created = await orgB.post(`/api/tenders/${tenderId}/workspace`);
     expect(created.status(), await created.text()).toBe(201);
     const ws = await created.json();
@@ -272,7 +277,8 @@ test('US2-6: workspace whose tender has no completed analysis -> PATCH stage=rea
     const ctx = await browser.newContext({ storageState: await orgB.storageState(), baseURL: test.info().project.use.baseURL, viewport: { width: 1440, height: 900 } });
     const p = await ctx.newPage();
     await p.goto('/pipeline');
-    const card = colCards(p, 'identified').first();
+    // The card of the un-analysed workspace (orgB's demo workspaces are all analysed).
+    const card = col(p, 'identified').locator(`li:has(a[href="/workspaces/${ws.id}"])`);
     await expect(card).toBeVisible();
     await moveViaMenu(p, card, /^Ready to submit/);
     await expect(p.getByText('Can’t move to Ready to submit yet')).toBeVisible();

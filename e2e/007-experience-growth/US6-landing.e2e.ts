@@ -43,6 +43,10 @@ const topOf = async (page: Page, sel: string) => page.locator(sel).first().evalu
 
 test('US6-1 signed-in users never see /, /login, /signup — they are redirected to /dashboard or a safe ?next=', async ({ page }) => {
   await signupViaApi(page); // owner session cookie on this context
+  // A brand-new org's first /dashboard visit redirects once to /onboarding (007/FR-013); mark the org as already
+  // onboarded so these cases observe the landing redirect itself (-> /dashboard).
+  const onb = await page.request.patch('/api/org', { data: { onboardingState: { company: true } } });
+  expect(onb.status(), await onb.text()).toBe(200);
   const trace: Record<string, string> = {};
   const cases: [string, RegExp, string][] = [
     ['/', /\/dashboard$/, 'plain /'],
