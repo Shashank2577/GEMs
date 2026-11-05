@@ -181,7 +181,8 @@ export function WatchlistBuilder({ open, onOpenChange, editing, initial }: {
         const f = (e.details as { fields: Record<string, string> }).fields;
         setErrors({ name: f.name ?? '', keywords: f.criteria ?? f['criteria.keywords'] ?? '', maxLakh: f['criteria.maxValue'] ?? '', hsnCodes: Object.entries(f).find(([k]) => k.startsWith('criteria.hsnCodes'))?.[1] ?? '' });
       }
-      if (e instanceof ApiError && e.code === 'watchlist_limit') setFormError(e.message);
+      // The limit message is shown inline in the form; a toast would only repeat it.
+      if (e instanceof ApiError && e.code === 'watchlist_limit') { setFormError(e.message); return; }
       toast.error(e instanceof Error ? e.message : 'Could not save the watchlist');
     }
   };

@@ -23,6 +23,14 @@ const laptop: MatchableTender = {
 };
 
 describe('keywordRegex', () => {
+  it('reuses one compiled, stateless regex per keyword (hot path when scanning 50k tenders)', () => {
+    const re = keywordRegex('patient monitor');
+    expect(keywordRegex('patient monitor')).toBe(re);
+    expect(re.global).toBe(false);
+    expect(re.test('Patient-Monitor, 5 para')).toBe(true);
+    expect(re.test('Patient monitors')).toBe(true); // no lastIndex carry-over between calls
+  });
+
   it('matches whole words, case-insensitive, with simple plurals', () => {
     expect(keywordRegex('laptop').test('LAPTOPS for schools')).toBe(true);
     expect(keywordRegex('cctv').test('CCTV Camera (V2)')).toBe(true);

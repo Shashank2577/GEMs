@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { analyses, bidWorkspaces, ingestionRuns, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
 import type { NormalizedTender } from '@tp/core/gem/parse';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
-import { runIngestion } from '../src/services/ingest';
+import { byPreviewOrder, escapeLike, phraseLike, type Candidate } from '../src/routes/watchlists';
+import { matchAndNotify, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z');
@@ -399,7 +400,7 @@ describe('watchlists: silent back-fill, pause, limit, volume (T025, T030, T031)'
     }
   });
 
-  it('caps an org at 50 watchlists with 409 watchlist_limit — paused ones count (FR-027)', async () => {
+  it('caps an org at 50 watchlists with 409 watchlist_limit — paused ones count, other orgs unaffected (FR-027)', async () => {
     const org = await signup(ctx.app, { orgName: 'Fifty Lists Ltd' });
     const orgId = org.me.org.id;
     await ctx.db.insert(watchlists).values(Array.from({ length: 49 }, (_, i) => ({
@@ -410,9 +411,12 @@ describe('watchlists: silent back-fill, pause, limit, volume (T025, T030, T031)'
     expect(fiftieth.status).toBe(201);
     const over = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: body('Number 51') });
     expect(over.status).toBe(409);
-    expect(over.body.error).toMatchObject({ code: 'watchlist_limit', message: 'You can have up to 50 watchlists — pause or delete one first.' });
+    expect(over.body.error).toMatchObject({ code: 'watchlist_limit', message: 'You can have up to 50 watchlists — delete one first.' });
     expect((await get('/watchlists', org)).body.total).toBe(50);
-    // Other orgs are unaffected; deleting one frees a slot.
+    // The limit is per org: another org can still create.
+    const second = await signup(ctx.app, { orgName: 'Second Lists Ltd' });
+    expect((await request(ctx.app, 'POST', '/watchlists', { cookie: second.cookie, json: body('Their first') })).status).toBe(201);
+    // Deleting one frees a slot.
     expect((await request(ctx.app, 'DELETE', `/watchlists/${fiftieth.body.id}`, { cookie: org.cookie })).status).toBe(200);
     expect((await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: body('Number 50 again') })).status).toBe(201);
   });
@@ -426,15 +430,22 @@ describe('watchlists: silent back-fill, pause, limit, volume (T025, T030, T031)'
       category: 'Flux capacitor spares — 100% A\\B grade', ministry: 'Ministry of Temporal Affairs', department: 'Department of Clocks',
       state: 'Kerala', endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/88${i}`, contentHash: `flux-${i}`,
     }));
+    // Hyphenated phrase: only the `%flux%capacitor%` phrase pre-filter lets the matcher see this one.
+    rows.push({ ...rows[0], bidNumber: `${prefix}99999`, title: 'Flux-capacitor module (hyphenated)', items: [{ name: 'Flux-capacitor module', quantity: 1 }],
+      category: 'Flux-capacitor spares — 100% A\\B grade', sourceUrl: `${GEM}/bid/8899999`, contentHash: 'flux-hyphen' });
     try {
-      for (let i = 0; i < N; i += 1000) await ctx.db.insert(tenders).values(rows.slice(i, i + 1000));
+      for (let i = 0; i < rows.length; i += 1000) await ctx.db.insert(tenders).values(rows.slice(i, i + 1000));
       const criteria = { keywords: ['flux capacitor'], categories: ['100% A\\B grade'], ministries: ['temporal affairs'], states: ['kerala'] };
       const t0 = Date.now();
       const p = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria } });
       const previewMs = Date.now() - t0;
       expect(p.status).toBe(200);
-      expect(p.body.count).toBe(N);
+      expect(p.body.count).toBe(N + 1);
       expect(p.body.sample).toHaveLength(5);
+      // Pinpoint the hyphenated one: it is found, and its own preview has exactly it.
+      const hyphen = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { keywords: ['flux capacitor module'], categories: ['flux-capacitor'] } } });
+      expect(hyphen.body.count).toBe(1);
+      expect(hyphen.body.sample[0].title).toBe('Flux-capacitor module (hyphenated)');
       expect(previewMs).toBeLessThan(10_000); // generous CI bound; NFR-003 is measured separately
       // LIKE wildcards in criteria are literal: "_" must not match the space.
       const literal = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { ministries: ['temporal_affairs'] } } });
@@ -443,10 +454,54 @@ describe('watchlists: silent back-fill, pause, limit, volume (T025, T030, T031)'
       const org = await signup(ctx.app, { orgName: 'Flux Volume Corp' });
       const w = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Flux capacitors', criteria } });
       expect(w.status).toBe(201);
-      expect(w.body).toMatchObject({ matchCount: N, openCount: N });
+      expect(w.body).toMatchObject({ matchCount: N + 1, openCount: N + 1 });
       expect(await countNotifications(org.me.org.id)).toBe(0);
     } finally {
       await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
     }
   }, 180_000);
+});
+
+describe('watchlist SQL helpers and batched matching', () => {
+  it('escapes LIKE wildcards and the escape character; phrases allow any separator', () => {
+    expect(escapeLike('100%')).toBe('100\\%');
+    expect(escapeLike('a_b')).toBe('a\\_b');
+    expect(escapeLike('A\\B')).toBe('A\\\\B');
+    expect(escapeLike('plain text')).toBe('plain text');
+    expect(phraseLike('flux capacitor')).toBe('%flux%capacitor%');
+    expect(phraseLike('  patient   monitor ')).toBe('%patient%monitor%');
+    expect(phraseLike('50% off_cut\\x')).toBe('%50\\%%off\\_cut\\\\x%');
+  });
+
+  it('orders preview candidates deterministically, by id when everything else ties', () => {
+    const at = new Date('2026-11-10T00:00:00Z');
+    const c = (id: string, relevance = 0.5, endAt: Date | null = at): Candidate => ({ id, relevance, reasons: [], endAt, createdAt: at });
+    const sorted = [c('b'), c('c'), c('a'), c('z', 0.9), c('y', 0.5, new Date('2026-11-09T00:00:00Z'))].sort(byPreviewOrder);
+    expect(sorted.map((x) => x.id)).toEqual(['z', 'y', 'a', 'b', 'c']);
+  });
+
+  it('matchAndNotify inserts more than one batch of matches once, then nothing on a re-run (FR-023, FR-040)', async () => {
+    const org = await signup(ctx.app, { orgName: 'Batch Match Pvt Ltd' });
+    const w = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Gyroscopes', criteria: { keywords: ['gyroscope'] } } });
+    expect(w.body.matchCount).toBe(0);
+    const prefix = 'GEM/2099/B/66';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const values = Array.from({ length: 1100 }, (_, i) => ({
+      bidNumber: `${prefix}${String(i).padStart(5, '0')}`, title: `Gyroscope assembly ${i}`, endAt: end, status: 'open' as const,
+      sourceUrl: `${GEM}/bid/66${i}`, contentHash: `gyro-${i}`,
+    }));
+    try {
+      const ids = (await ctx.db.insert(tenders).values(values).returning({ id: tenders.id })).map((r) => r.id);
+      const first = await matchAndNotify(ctx.deps, ids, ctx.clock.now(), { orgId: org.me.org.id });
+      expect(first.matchesCreated).toBe(1100);
+      expect(first.notificationsCreated).toBeGreaterThanOrEqual(1100); // one per tender per channel for the owner
+      const again = await matchAndNotify(ctx.deps, ids, ctx.clock.now(), { orgId: org.me.org.id });
+      expect(again).toEqual({ matchesCreated: 0, notificationsCreated: 0 });
+      const stored = (await get('/watchlists', org)).body.items[0];
+      expect(stored.matchCount).toBe(1100);
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      await ctx.db.delete(notifications).where(eq(notifications.orgId, org.me.org.id));
+    }
+  });
 });
