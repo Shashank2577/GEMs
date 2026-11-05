@@ -167,6 +167,32 @@ describe('parseAwardResult (T092; 006/FR-085) — scrape_ra_schedule table heuri
     expect(parseAwardResult('<table><tr><th>Rank</th><th>Name</th></tr><tr><td>L1</td><td>Alpha Co</td></tr></table>')).toBeNull();
   });
 
+  it('maps columns from the header words (S.No | Seller | Price | Rank), not by position', () => {
+    const r = parseAwardResult('<table><tr><th>S.No</th><th>Seller</th><th>Price</th><th>Rank</th></tr><tr><td>1</td><td>B Co</td><td>200</td><td>2</td></tr><tr><td>2</td><td>A Co</td><td>100</td><td>1</td></tr></table>');
+    expect(r).toMatchObject({ l1Price: 100, l1Seller: 'A Co' });
+    expect(r!.bidders).toEqual([{ rank: 2, name: 'B Co', price: 200 }, { rank: 1, name: 'A Co', price: 100 }]);
+  });
+
+  it('rejects absurd amounts and strips Rs only as a prefix or suffix', () => {
+    const t = (price: string) => parseAwardResult(`<table><tr><th>Name</th><th>Price</th></tr><tr><td>Alpha Co</td><td>${price}</td></tr></table>`);
+    expect(t('99999999999999')).toBeNull();
+    expect(t('1e5')).toBeNull();
+    expect(t('Rs. 1,50,000')).toMatchObject({ l1Price: 150_000 });
+    expect(t('150000 INR')).toMatchObject({ l1Price: 150_000 });
+    expect(t('15Rs0')).toBeNull();
+  });
+
+  it.each([['td', 'th'], ['th', 'td']] as const)('is linear on a hostile 512 KB header row of <%s> cells (second row <%s>)', (a, b) => {
+    const tail = `</tr><tr><${b}>A Co</${b}><${b}>5</${b}></tr></table>`;
+    const N = MAX_RESULT_HTML;
+    for (const filler of [`<${a}>x</${a}>`.repeat((N - 100) / 10), `<${a}>`.repeat((N - 100) / 4)]) {
+      const input = `<table><tr><${b}>Price</${b}>` + filler + tail;
+      const t0 = performance.now();
+      parseAwardResult(input);
+      expect(performance.now() - t0).toBeLessThan(200);
+    }
+  });
+
   it('returns null when there is no price table (other tables, plain text, empty input)', () => {
     expect(parseAwardResult('')).toBeNull();
     expect(parseAwardResult('<p>Rank 1: Alpha 100</p>')).toBeNull();

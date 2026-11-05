@@ -44,12 +44,16 @@ listed here with its licence.
    Licence text: https://opensource.org/license/mit
 
 3. GEM-SCRAPER — https://github.com/IshanMaheshwari-777/GEM-SCRAPER
-   Licence: none published (no licence file); used with the repository owner's approval.
+   Licence: none. The upstream repository has no licence file, so no licence is claimed or granted here; the
+   heuristics were ported with the repository owner's approval (docs/delivery/TEAM_PLAYBOOK.md reference-scrapers
+   list; specs/006-apply-packet-assist/plan.md, T092).
    Used in: packages/core/src/gem/award.ts (parseAwardResult — TypeScript port of the table heuristics of
    scrape_ra_schedule() in scraper.py: financial-table header keywords, rank / seller / last-numeric-cell price
    column rules, trophy/winner row marker, trailing portal-tag stripping), spec 006 T092. The fixture
    packages/core/test/fixtures/gem/ra-result.html is synthetic, built to that structure (the reference
    ra_page_dump.html is a GeM home page without an evaluation table).
+   Differs from upstream: the rank cell is never used as the price, amount cells are never used as seller
+   names, rows without a price are skipped, and the first winner-marked row is taken (upstream: the last).
 
 4. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
    Licence: MIT License

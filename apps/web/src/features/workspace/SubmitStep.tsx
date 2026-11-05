@@ -235,13 +235,33 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
   const [notes, setNotes] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   // FR-085: null = nothing suggested yet; 'none' = the picked page has no price table; otherwise the seller that was pre-filled.
-  const [suggestion, setSuggestion] = useState<null | 'none' | { seller: string }>(null);
+  const [suggestion, setSuggestion] = useState<null | 'none' | 'unreadable' | { seller: string }>(null);
+  // What the last suggestion put into the form, so a re-suggest replaces it and a miss clears it (never touching user edits).
+  const prefilled = useRef<{ l1: string; line: string | null } | null>(null);
+  const NOTE_PREFIX = 'L1 seller (from GeM result): ';
+  const clearPrefill = () => {
+    const p = prefilled.current;
+    prefilled.current = null;
+    if (!p) return;
+    setL1((v) => (v === p.l1 ? '' : v));
+    if (p.line) setNotes((n) => n.split('\n').filter((l) => l !== p.line).join('\n'));
+  };
   const suggestFrom = async (file: File) => {
     // Parsed in the browser only; the page is never uploaded. Reads at most what the parser would look at.
-    const parsed = parseAwardResult(await file.slice(0, MAX_RESULT_HTML).text());
+    let text: string;
+    try { text = await file.slice(0, MAX_RESULT_HTML).text(); } catch { clearPrefill(); setSuggestion('unreadable'); return; }
+    const parsed = parseAwardResult(text);
+    clearPrefill();
     if (!parsed) { setSuggestion('none'); return; }
-    setL1(String(Math.round(parsed.l1Price)));
-    if (parsed.l1Seller) setNotes((n) => (n ? `${n}\n` : '').concat(`L1 seller (from GeM result): ${parsed.l1Seller}`).slice(0, 1000));
+    const l1Text = String(Math.round(parsed.l1Price));
+    const line = parsed.l1Seller ? `${NOTE_PREFIX}${parsed.l1Seller}` : null;
+    setL1(l1Text);
+    // Replace (not append) the seller-note line.
+    setNotes((n) => {
+      const kept = n.split('\n').filter((l) => !l.startsWith(NOTE_PREFIX)).join('\n');
+      return (line ? (kept ? `${kept}\n` : '') + line : kept).slice(0, 1000);
+    });
+    prefilled.current = { l1: l1Text, line };
     setSuggestion({ seller: parsed.l1Seller });
   };
   const openBlockers = data.readiness.blockers;
@@ -332,8 +352,9 @@ function SubmissionCard({ data, submitted }: { data: WorkspaceDetail; submitted:
                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void suggestFrom(f); }} />
               <Button type="button" size="sm" variant="secondary" onClick={() => fileRef.current?.click()}><FileSearch /> Suggest from GeM result</Button>
               <p className="mt-1 text-xs text-muted-foreground">Pick the public GeM result page you saved as HTML. It is read in your browser only.</p>
+              {suggestion === 'unreadable' && <p role="status" className="mt-1.5 rounded-md border border-danger/20 bg-danger-soft px-2 py-1.5 text-xs text-[hsl(350_74%_38%)] dark:text-danger">Could not read that file.</p>}
               {suggestion === 'none' && <p role="status" className="mt-1.5 rounded-md border border-danger/20 bg-danger-soft px-2 py-1.5 text-xs text-[hsl(350_74%_38%)] dark:text-danger">No price table found in this page.</p>}
-              {suggestion && suggestion !== 'none' && <p role="status" className="mt-1.5 rounded-md border border-info/20 bg-info-soft px-2 py-1.5 text-xs text-[hsl(205_85%_30%)] dark:text-info">Pre-filled the L1 price{suggestion.seller ? ` and seller (${suggestion.seller})` : ''} — check them before saving.</p>}
+              {typeof suggestion === 'object' && suggestion && <p role="status" className="mt-1.5 rounded-md border border-info/20 bg-info-soft px-2 py-1.5 text-xs text-[hsl(205_85%_30%)] dark:text-info">Pre-filled the L1 price{suggestion.seller ? ` and seller (${suggestion.seller})` : ''} — check them before saving.</p>}
             </div>
             <Segmented value={result} onChange={setResult} aria-label="Result" options={[{ value: 'won', label: 'Won', icon: <Trophy /> }, { value: 'lost', label: 'Lost', icon: <XCircle /> }]} />
             <Field label="L1 price (₹)" hint={l1 && !l1Bad ? formatINR(parse(l1)) : 'The lowest price disclosed by GeM'} error={l1Bad ? 'Enter a number' : undefined}>
