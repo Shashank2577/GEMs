@@ -16,6 +16,9 @@ every context opened by `inviteAs()` after each test, pass or fail.
 | `signupViaApi`, `uniqueUser`, `loginViaUi`, `seedDemo`, `mockGem` | Account setup, demo seed (`POST /api/demo/seed`) and mock-gem control (all specs) |
 | `evidence(page, spec, story, name)` | Full-page screenshot to `qa/evidence/<spec>/<story>/<name>.png` |
 | `evidence007(page, story, name)` | 007 shortcut: `qa/evidence/007/<US1…US7>/<name>.png` (`evidence005` is the 005 equivalent) |
+| `resetGem`, `publishOnGem(request, count)`, `gemCorrigendum(request, bidNumber, {days?})`, `gemFail(request, mode)` | 003. Mock-GeM admin wrappers (`/__admin/*`): restore fixtures + outage off, publish new bids, extend a bid's end date, simulate an outage (`down`/`html`/`off`) |
+| `syncNow(request, data?)` | 003. `POST /api/ingestion/run`; waits out the manual-sync cooldown (429 `sync_cooldown`, `details.retryAt`) and retries; returns the response |
+| `evidence003(page, story, name)` | 003 shortcut: `qa/evidence/003/<US1…US6>/<name>.png` |
 | `inviteAs(request, role)` | 007. Invites a new member (`bid_manager`, `analyst` or `viewer`) into the org of an Owner/Bid Manager session and accepts the invite. Returns `{user, role, api, storageState, newContext(browser), newPage(browser)}` for role-gated checks |
 | `a11y(page, name, opts?)` (also `a11y(page, spec, story, name)`) | axe WCAG 2.1 A/AA audit. Saves `<name>-<project>.axe.json` next to the evidence (spec and story default to the test file path, e.g. `e2e/007-…/US1-…` gives `007`/`US1`) and fails on any serious or critical violation. `checkA11y` is the same check without an evidence file |
 | `noHorizontalOverflow(page)` | Asserts `scrollWidth <= innerWidth` (SC-004) and returns the metrics |

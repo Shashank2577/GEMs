@@ -6,7 +6,8 @@ constitution (.cairn/workflow/memory/constitution.md) requires every external re
 listed here with its licence.
 
 1. india-government-tenders-scraper — https://github.com/erenmyeager15/india-government-tenders-scraper
-   Licence: Apache License 2.0
+   Copyright (c) erenmyeager15 and contributors
+   Licence: Apache License 2.0 (this product's use is a modified adaptation; changes are listed below)
    Used in: packages/core/src/gem/client.ts (BidPlus /all-bids → /all-bids-data request shape and CSRF
    bootstrap), packages/core/src/gem/parse.ts (field names and the bid-type → document-route mapping),
    packages/core/src/gem/normalize.ts (Solr response unwrapping approach), packages/core/src/vault/status.ts
@@ -55,6 +56,28 @@ listed here with its licence.
    same markup (spec 007, T004/T032).
    Licence text: https://opensource.org/license/mit
 
+   MIT License
+
+   Copyright (c) 2026 Aarush Jain
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
 3. GEM-SCRAPER — https://github.com/IshanMaheshwari-777/GEM-SCRAPER
    Licence: none. The upstream repository has no licence file, so no licence is claimed or granted here; the
    heuristics were ported with THIS project's owner's approval (not the upstream author's;
@@ -72,14 +95,22 @@ listed here with its licence.
    Licence: MIT License
    Used in: CONVENTIONS.md and .aisdlc/ (review and QA process templates only; no runtime code).
 
-Other reference repositories in the owner's reference set (Giridar33/gem-tender-tracker,
-PranavTamada/Tender_Scraper, Mujahid-Alam/gem-tender-pdf-extractor,
-Giri-Aayush/gem, rounittxx/gem-bid-scraper) were consulted for portal behaviour but no code or text from
-them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.
+Referenced for ideas only (no licence, no code copied)
+-----------------------------------------------------
+These repositories in the owner's reference set were consulted for portal behaviour and coverage checklists.
+No code or text from them has been copied into this repository as of 2026-11-05. Add an entry above before
+copying from any of them.
 
-Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
-copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for our own label table
-(spec 004, packages/core/src/analyse/rules.ts; asserted in packages/core/test/analyse/corpus.test.ts).
+- Giridar33/gem-tender-tracker — https://github.com/Giridar33/gem-tender-tracker
+- PranavTamada/Tender_Scraper — https://github.com/PranavTamada/Tender_Scraper
+- IshanMaheshwari-777/GEM-SCRAPER — ideas only except the table heuristics ported under item 3 above
+  (no licence; owner-approved exception recorded there)
+- Mujahid-Alam/gem-tender-pdf-extractor — https://github.com/Mujahid-Alam/gem-tender-pdf-extractor. No
+  licence: used for ideas only. Its page-1 field list (gem3.py) serves only as a coverage checklist for our
+  own label table (spec 004, packages/core/src/analyse/rules.ts; asserted in
+  packages/core/test/analyse/corpus.test.ts).
+- Giri-Aayush/gem — https://github.com/Giri-Aayush/gem
+- rounittxx/gem-bid-scraper — https://github.com/rounittxx/gem-bid-scraper
 
 Test fixtures packages/core/test/fixtures/bids/real-*.pdf embed subsets of GNU FreeSans
 (https://www.gnu.org/software/freefont/), GPLv3 with the font exception, which permits embedding the
