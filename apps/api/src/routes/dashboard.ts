@@ -7,18 +7,20 @@
  * global table read is `tenders` (public GeM data), always joined through the org's matches/workspaces.
  * "Today" and the 14-day trend use IST calendar days.
  */
-import { and, count, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   activityLog, analyses, bidWorkspaces, companyProfiles, invitations, memberships, tenderMatches, tenders, users, vaultDocuments,
   watchlists, type Db,
 } from '@tp/db';
 import type {
-  DashboardActivity, DashboardExpiringDoc, DashboardMatch, DashboardResponse, DashboardStage, DashboardTenderRef, DashboardVerdict, SetupStep,
+  DashboardActivity, DashboardExpiringDoc, DashboardMatch, DashboardResponse, DashboardStage, DashboardTenderRef, DashboardVerdict,
+  DecisionItem, MyWorkItem, SetupStep,
 } from '@tp/core/contracts/experience';
 import { docStatus, istDate } from '@tp/core/vault/status';
 import { visibleTenderSource } from '../lib/tender-scope';
-import { orgId, requireAuth } from '../middleware/auth';
+import { orgId, requireAuth, userId } from '../middleware/auth';
+import { latestAnalyses, readinessFor, vaultRows } from '../services/packet';
 import type { AppEnv } from '../types';
 
 export const dashboardRoutes = new Hono<AppEnv>();
@@ -27,6 +29,8 @@ const DAY = 86_400_000;
 const IST_OFFSET = 330 * 60_000;
 const STAGES: DashboardStage[] = ['identified', 'analysing', 'go', 'preparing', 'ready', 'submitted', 'won', 'lost', 'dropped'];
 const CLOSED_STAGES: DashboardStage[] = ['won', 'lost', 'dropped'];
+/** Cap of both persona lists (FR-070). */
+const MY_WORK_LIMIT = 5;
 
 /** UTC instant of IST midnight for the day containing `now`, shifted by `days`. */
 export function istMidnight(now: Date, days = 0): Date {
@@ -88,6 +92,7 @@ async function enrichActivity(db: Db, org: string, items: Omit<DashboardActivity
 dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
   const { db, clock } = c.var.deps;
   const org = orgId(c);
+  const me = userId(c);
   const now = clock.now();
   const today = istMidnight(now);
   const yesterday = istMidnight(now, -1);
@@ -107,7 +112,7 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
 
   const [
     [matchCounts], trendRows, pipelineRows, verdictRows, [closingCounts], closingRows, recentRows, expiringRows,
-    activityRows, [profile], [setupCounts], [openTenders],
+    activityRows, [profile], [setupCounts], [openTenders], myWorkRows, decisionRows,
   ] = await Promise.all([
     db.select({
       today: sql<number>`count(distinct ${tenderMatches.tenderId}) filter (where ${tenderMatches.createdAt} >= ${today})`,
@@ -181,6 +186,31 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
     }).from(sql`(select 1) as one`),
 
     db.select({ n: count() }).from(tenders).where(and(scope, eq(tenders.status, 'open'), sql`(${tenders.endAt} is null or ${tenders.endAt} >= ${now})`)),
+
+    // FR-070 "My bids": active workspaces the caller owns or is assigned to — due soonest first, undated last.
+    db.select({
+      w: bidWorkspaces, bidNumber: tenders.bidNumber, title: tenders.title, endAt: tenders.endAt,
+    }).from(bidWorkspaces).innerJoin(tenders, eq(tenders.id, bidWorkspaces.tenderId))
+      .where(and(
+        eq(bidWorkspaces.orgId, org), notInArray(bidWorkspaces.stage, CLOSED_STAGES),
+        or(eq(bidWorkspaces.ownerId, me), sql`${bidWorkspaces.assigneeIds} @> ${JSON.stringify([me])}::jsonb`),
+      ))
+      .orderBy(sql`${bidWorkspaces.dueAt} asc nulls last`, sql`${tenders.endAt} asc nulls last`, bidWorkspaces.id)
+      .limit(MY_WORK_LIMIT),
+
+    // FR-070 "Awaiting your decision": `analysing` workspaces whose LATEST analysis is done, longest-waiting first.
+    db.execute(sql`
+      select w.id as "workspaceId", w.tender_id as "tenderId", t.bid_number as "bidNumber", t.title, t.end_at as "endAt", a.score, a.verdict
+      from ${bidWorkspaces} w
+      join ${tenders} t on t.id = w.tender_id
+      join lateral (
+        select x.status, x.score, x.verdict from ${analyses} x
+        where x.org_id = w.org_id and x.tender_id = w.tender_id
+        order by x.created_at desc limit 1
+      ) a on a.status = 'done'
+      where w.org_id = ${org} and w.stage = 'analysing'
+      order by w.updated_at asc, w.id
+      limit ${MY_WORK_LIMIT}`),
   ]);
 
   // Pipeline
@@ -255,6 +285,21 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
   const demo = !!c.var.org.onboardingState?.demo;
   const setupComplete = setup.filter((s) => !(demo && s.key === 'team')).every((s) => s.done);
 
+  // Persona widgets (FR-070). Readiness reuses the workspace helper so the % matches the pipeline cards.
+  let myWork: MyWorkItem[] = [];
+  if (myWorkRows.length) {
+    const [latest, docs] = await Promise.all([latestAnalyses(c.var.deps, org, myWorkRows.map((r) => r.w.tenderId)), vaultRows(c.var.deps, org)]);
+    myWork = myWorkRows.map(({ w, bidNumber, title, endAt }) => {
+      const rd = readinessFor(w, latest.get(w.tenderId) ?? null, docs, now);
+      return {
+        workspaceId: w.id, tenderId: w.tenderId, bidNumber, title, stage: w.stage, dueAt: iso(w.dueAt), endAt: iso(endAt),
+        readiness: { percent: rd.percent, blockers: rd.blockers.length, analysed: rd.analysed },
+      };
+    });
+  }
+  const awaitingDecision: DecisionItem[] = rowsOf<{ workspaceId: string; tenderId: string; bidNumber: string; title: string; endAt: Date | string | null; score: number | null; verdict: DashboardVerdict | null }>(decisionRows)
+    .map((r) => ({ workspaceId: r.workspaceId, tenderId: r.tenderId, bidNumber: r.bidNumber, title: r.title, score: r.score, verdict: r.verdict, endAt: iso(r.endAt) }));
+
   const body: DashboardResponse = {
     generatedAt: now.toISOString(),
     tiles: {
@@ -283,6 +328,8 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
     setup,
     setupComplete,
     demo,
+    myWork,
+    awaitingDecision,
   };
   return c.json(body);
 });

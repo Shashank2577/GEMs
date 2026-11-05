@@ -1,7 +1,7 @@
 /** Dashboard aggregates (T070; US6 independent test: numbers on seeded data, moving a card updates stage + activity). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
-import { activityLog, bidWorkspaces, organizations, tenderMatches, tenders, vaultDocuments, watchlists } from '@tp/db';
+import { activityLog, analyses, bidWorkspaces, organizations, tenderMatches, tenders, vaultDocuments, watchlists } from '@tp/db';
 import type { DashboardResponse } from '@tp/core/contracts/experience';
 import { istMidnight } from '../src/routes/dashboard';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
@@ -267,5 +267,170 @@ describe('GET /api/dashboard — setupComplete and the team step', () => {
     const d2 = await dash(solo.cookie);
     expect(d2.setup.find((s) => s.key === 'team')!.done).toBe(true);
     expect(d2.setupComplete).toBe(true);
+  });
+});
+
+/**
+ * Persona widgets (T058; 007/US5, FR-070, NFR-005): `myWork` (owner or assignee, active stages only, `dueAt` nulls
+ * last then `endAt`, ≤ 5, readiness) and `awaitingDecision` (stage `analysing` with a done analysis, oldest first, ≤ 5).
+ */
+describe('GET /api/dashboard — persona widgets (myWork, awaitingDecision)', () => {
+  let seq = 0;
+  const DAYMS = 86_400_000;
+  const tender = async (endAt: Date | null, title?: string) => {
+    seq += 1;
+    const [t] = await ctx.db.insert(tenders).values({
+      bidNumber: `GEM/2026/B/92000${seq}`, title: title ?? `Persona tender ${seq}`, sourceUrl: 'https://bidplus.gem.gov.in/all-bids',
+      contentHash: `persona-${seq}`, status: 'open', endAt,
+    }).returning();
+    return t!;
+  };
+  const analysis = async (orgId: string, tenderId: string, over: Partial<typeof analyses.$inferInsert> = {}) => {
+    const [a] = await ctx.db.insert(analyses).values({ orgId, tenderId, status: 'done', score: 82, verdict: 'go', ...over }).returning();
+    return a!;
+  };
+  const days = (n: number) => new Date(NOW.getTime() + n * DAYMS);
+
+  it('is empty for a member with nothing assigned and when nothing awaits a decision', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Persona Empty Org');
+    for (const who of [o.owner, o.bidManager, o.analyst, o.viewer]) {
+      const d = await dash(who.cookie);
+      expect(d.myWork).toEqual([]);
+      expect(d.awaitingDecision).toEqual([]);
+    }
+  });
+
+  it('myWork lists owner-or-assignee workspaces only, active stages only, dueAt nulls last then endAt, max 5', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Persona MyWork Org');
+    const orgId = o.orgId;
+    const me = o.analyst.me.user.id, other = o.bidManager.me.user.id;
+    const mk = async (stage: typeof bidWorkspaces.$inferInsert['stage'], endDays: number | null, w: Partial<typeof bidWorkspaces.$inferInsert> = {}) => {
+      const t = await tender(endDays == null ? null : days(endDays));
+      const [ws] = await ctx.db.insert(bidWorkspaces).values({ orgId, tenderId: t.id, stage, ...w }).returning();
+      return { t, ws: ws! };
+    };
+    const a = await mk('preparing', 9, { ownerId: me, dueAt: days(3) });
+    const b = await mk('go', 5, { assigneeIds: [other, me], dueAt: days(1) });
+    const c = await mk('identified', 4, { ownerId: me }); // no dueAt → after dated ones, by endAt
+    const d2 = await mk('submitted', 2, { assigneeIds: [me] }); // no dueAt, earlier endAt than c
+    const e = await mk('analysing', null, { ownerId: me }); // no dueAt, no endAt → last
+    await mk('won', 1, { ownerId: me, dueAt: days(0) });        // closed stages excluded
+    await mk('lost', 1, { assigneeIds: [me] });
+    await mk('dropped', 1, { ownerId: me });
+    await mk('preparing', 1, { ownerId: other, assigneeIds: [other], dueAt: days(0) }); // someone else's
+    const g = await mk('go', 6, { ownerId: me, dueAt: days(20) }); // sixth active item: `e` (no dates) is cut by the cap of 5
+    const r = await dash(o.analyst.cookie);
+    expect(e.ws.id).toBeTruthy();
+    expect(r.myWork!.map((x) => x.workspaceId)).toEqual([b.ws.id, a.ws.id, g.ws.id, d2.ws.id, c.ws.id]);
+    expect(r.myWork).toHaveLength(5);
+    expect(r.myWork!.every((x) => !['won', 'lost', 'dropped'].includes(x.stage))).toBe(true);
+    expect(r.myWork![0]).toMatchObject({ tenderId: b.t.id, bidNumber: b.t.bidNumber, stage: 'go', dueAt: days(1).toISOString(), endAt: days(5).toISOString() });
+
+    // Without the 20-day item the order is fully determined: due ↑, then endAt ↑ with nulls last (cap not reached).
+    const o2 = await seedOrgWithRoles(ctx.app, 'Persona MyWork Order Org');
+    const me2 = o2.bidManager.me.user.id;
+    const mk2 = async (stage: typeof bidWorkspaces.$inferInsert['stage'], endDays: number | null, w: Partial<typeof bidWorkspaces.$inferInsert>) => {
+      const t = await tender(endDays == null ? null : days(endDays));
+      const [ws] = await ctx.db.insert(bidWorkspaces).values({ orgId: o2.orgId, tenderId: t.id, stage, ...w }).returning();
+      return ws!.id;
+    };
+    const w1 = await mk2('preparing', 9, { ownerId: me2, dueAt: days(3) });
+    const w2 = await mk2('go', 5, { assigneeIds: [me2], dueAt: days(1) });
+    const w3 = await mk2('identified', 4, { ownerId: me2 });
+    const w4 = await mk2('submitted', 2, { assigneeIds: [me2] });
+    const w5 = await mk2('analysing', null, { ownerId: me2 });
+    const ordered = await dash(o2.bidManager.cookie);
+    expect(ordered.myWork!.map((x) => x.workspaceId)).toEqual([w2, w1, w4, w3, w5]);
+    expect(ordered.myWork![4]).toMatchObject({ dueAt: null, endAt: null });
+    // The owner of the org is neither owner nor assignee on any of them.
+    expect((await dash(o2.owner.cookie)).myWork).toEqual([]);
+  });
+
+  it('myWork carries readiness: honest 0 % / analysed:false until the tender has a finished analysis', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Persona Readiness Org');
+    const me = o.analyst.me.user.id;
+    const t1 = await tender(days(5)), t2 = await tender(days(6));
+    await ctx.db.insert(bidWorkspaces).values([
+      { orgId: o.orgId, tenderId: t1.id, stage: 'preparing', ownerId: me, dueAt: days(1) },
+      { orgId: o.orgId, tenderId: t2.id, stage: 'preparing', ownerId: me, dueAt: days(2) },
+    ]);
+    await analysis(o.orgId, t1.id);
+    const r = await dash(o.analyst.cookie);
+    const [first, second] = r.myWork!;
+    expect(first!.tenderId).toBe(t1.id);
+    expect(first!.readiness).toMatchObject({ analysed: true, blockers: 0 });
+    expect(first!.readiness.percent).toBeGreaterThanOrEqual(0);
+    expect(second!.readiness).toEqual({ percent: 0, blockers: 0, analysed: false });
+  });
+
+  it('awaitingDecision: analysing + done analysis only, oldest first, with score/verdict, max 5', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Persona Decisions Org');
+    const orgId = o.orgId;
+    const mk = async (stage: typeof bidWorkspaces.$inferInsert['stage'], updatedAt: Date, a?: Partial<typeof analyses.$inferInsert> | null) => {
+      const t = await tender(days(10));
+      const [ws] = await ctx.db.insert(bidWorkspaces).values({ orgId, tenderId: t.id, stage, updatedAt }).returning();
+      if (a !== null) await analysis(orgId, t.id, a);
+      return { t, id: ws!.id };
+    };
+    const newest = await mk('analysing', days(-1), { score: 55, verdict: 'review' });
+    const oldest = await mk('analysing', days(-9), { score: 91, verdict: 'go' });
+    const middle = await mk('analysing', days(-4), { score: 20, verdict: 'no_go' });
+    await mk('analysing', days(-8), null);                                 // no analysis
+    await mk('analysing', days(-7), { status: 'running', score: null, verdict: null }); // not done
+    await mk('analysing', days(-6), { status: 'failed', score: null, verdict: null });
+    await mk('go', days(-10), { score: 90, verdict: 'go' });               // already decided
+    await mk('identified', days(-10), { score: 90, verdict: 'go' });
+    const extra = [await mk('analysing', days(-3)), await mk('analysing', days(-2)), await mk('analysing', days(-1.5))]; // 6 eligible in total
+    const r = await dash(o.owner.cookie);
+    expect(r.awaitingDecision).toHaveLength(5);
+    expect(r.awaitingDecision!.map((x) => x.workspaceId)).toEqual([oldest.id, middle.id, extra[0]!.id, extra[1]!.id, extra[2]!.id]);
+    expect(r.awaitingDecision![0]).toMatchObject({ tenderId: oldest.t.id, bidNumber: oldest.t.bidNumber, title: oldest.t.title, score: 91, verdict: 'go', endAt: days(10).toISOString() });
+    expect(r.awaitingDecision![1]).toMatchObject({ score: 20, verdict: 'no_go' });
+    expect(r.awaitingDecision!.some((x) => x.workspaceId === newest.id)).toBe(false); // sixth, cut by the cap
+    // Same list for every role (the UI gates the buttons, not the data).
+    expect((await dash(o.viewer.cookie)).awaitingDecision!.map((x) => x.workspaceId)).toEqual(r.awaitingDecision!.map((x) => x.workspaceId));
+  });
+
+  it('uses the latest analysis for score and verdict', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Persona Latest Org');
+    const t = await tender(days(4));
+    await ctx.db.insert(bidWorkspaces).values({ orgId: o.orgId, tenderId: t.id, stage: 'analysing' });
+    await analysis(o.orgId, t.id, { score: 30, verdict: 'no_go', createdAt: days(-5) });
+    await analysis(o.orgId, t.id, { score: 77, verdict: 'go', createdAt: days(-1) });
+    const r = await dash(o.owner.cookie);
+    expect(r.awaitingDecision).toHaveLength(1);
+    expect(r.awaitingDecision![0]).toMatchObject({ score: 77, verdict: 'go' });
+  });
+
+  it('is tenant-isolated: another org sees neither list, even for the same tender and user ids', async () => {
+    const a = await seedOrgWithRoles(ctx.app, 'Persona Org A');
+    const b = await seedOrgWithRoles(ctx.app, 'Persona Org B');
+    const t = await tender(days(3));
+    await ctx.db.insert(bidWorkspaces).values({ orgId: a.orgId, tenderId: t.id, stage: 'analysing', ownerId: a.analyst.me.user.id, assigneeIds: [a.analyst.me.user.id, b.analyst.me.user.id] });
+    await analysis(a.orgId, t.id);
+    expect((await dash(a.analyst.cookie)).myWork).toHaveLength(1);
+    expect((await dash(a.owner.cookie)).awaitingDecision).toHaveLength(1);
+    for (const who of [b.owner, b.bidManager, b.analyst, b.viewer]) {
+      const d = await dash(who.cookie);
+      expect(d.myWork).toEqual([]);
+      expect(d.awaitingDecision).toEqual([]);
+    }
+    // Org B has a done analysis for the same tender but no workspace → still nothing; and org A's analysis does not leak a score into B's workspace.
+    await analysis(b.orgId, t.id, { score: 11, verdict: 'no_go' });
+    await ctx.db.insert(bidWorkspaces).values({ orgId: b.orgId, tenderId: t.id, stage: 'analysing', ownerId: b.analyst.me.user.id });
+    const bd = await dash(b.analyst.cookie);
+    expect(bd.awaitingDecision![0]).toMatchObject({ score: 11, verdict: 'no_go' });
+    expect(bd.myWork![0]!.readiness.analysed).toBe(true);
+    expect((await dash(a.owner.cookie)).awaitingDecision![0]).toMatchObject({ score: 82, verdict: 'go' });
+  });
+
+  it('works on the demo dataset: owner sees demo bids in both lists', async () => {
+    const o = await signup(ctx.app, { orgName: 'Persona Demo Org' });
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: o.cookie })).status).toBe(201);
+    const d = await dash(o.cookie);
+    expect(d.myWork!.length).toBeGreaterThan(0);
+    expect(d.myWork!.length).toBeLessThanOrEqual(5);
+    expect(d.awaitingDecision!.length).toBeGreaterThan(0);
+    expect(d.awaitingDecision!.every((x) => x.score != null && x.verdict != null)).toBe(true);
   });
 });

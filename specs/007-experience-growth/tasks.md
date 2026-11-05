@@ -180,14 +180,14 @@ task is sized at ≤ 1 day.
 
 ### Tests for User Story 5
 
-- [ ] T058 [P] [US5] API tests: `myWork` (owner or assignee, active stages only, `dueAt` nulls last then `endAt`, ≤ 5, readiness fields) and `awaitingDecision` (stage `analysing` with a done analysis, oldest first, ≤ 5), both empty for another org's members, in `apps/api/test/dashboard.test.ts` FR-070, NFR-005 (#334)
+- [x] T058 [P] [US5] API tests: `myWork` (owner or assignee, active stages only, `dueAt` nulls last then `endAt`, ≤ 5, readiness fields) and `awaitingDecision` (stage `analysing` with a done analysis, oldest first, ≤ 5), both empty for another org's members, in `apps/api/test/dashboard.test.ts` FR-070, NFR-005 (#334)
 
 ### Implementation for User Story 5
 
-- [ ] T059 [US5] Add the `myWork` and `awaitingDecision` queries to the dashboard `Promise.all` (join `bid_workspaces` → `tenders`, latest done analysis, readiness via the existing readiness helper or the `WorkspaceCard` builder) in `apps/api/src/routes/dashboard.ts` FR-070 (#335)
-- [ ] T060 [P] [US5] "My bids" card (stage badge, "Due <date>" red when overdue, readiness bar, empty text "Nothing assigned to you — bids you own or are assigned to will appear here.") placed after the KPI tiles for analyst/bid_manager and below the first row for owners, hidden for viewers, in new `apps/web/src/features/dashboard/MyBidsCard.tsx` and `apps/web/src/features/dashboard/DashboardPage.tsx` FR-071 (#336)
-- [ ] T061 [P] [US5] "Awaiting your decision" card (score ring, verdict, closes-in; "Go" and "Drop" with confirmation for bid_manager+, read-only for analysts, hidden for viewers) reusing `useMoveCard()` from `apps/web/src/features/pipeline/api.ts`, in new `apps/web/src/features/dashboard/DecisionsCard.tsx` FR-072 (#337)
-- [ ] T062 [US5] Role-gated CTAs: hide "Create a watchlist" for viewers (show "Ask an Owner or Bid Manager to set up watchlists."), hide "Finish setting up" for analysts/viewers (show Go / No-Go), in `apps/web/src/features/dashboard/DashboardPage.tsx` FR-073 (#338)
+- [x] T059 [US5] Add the `myWork` and `awaitingDecision` queries to the dashboard `Promise.all` (join `bid_workspaces` → `tenders`, latest done analysis, readiness via the existing readiness helper or the `WorkspaceCard` builder) in `apps/api/src/routes/dashboard.ts` FR-070 (#335)
+- [x] T060 [P] [US5] "My bids" card (stage badge, "Due <date>" red when overdue, readiness bar, empty text "Nothing assigned to you — bids you own or are assigned to will appear here.") placed after the KPI tiles for analyst/bid_manager and below the first row for owners, hidden for viewers, in new `apps/web/src/features/dashboard/MyBidsCard.tsx` and `apps/web/src/features/dashboard/DashboardPage.tsx` FR-071 (#336)
+- [x] T061 [P] [US5] "Awaiting your decision" card (score ring, verdict, closes-in; "Go" and "Drop" with confirmation for bid_manager+, read-only for analysts, hidden for viewers) reusing `useMoveCard()` from `apps/web/src/features/pipeline/api.ts`, in new `apps/web/src/features/dashboard/DecisionsCard.tsx` FR-072 (#337)
+- [x] T062 [US5] Role-gated CTAs: hide "Create a watchlist" for viewers (show "Ask an Owner or Bid Manager to set up watchlists."), hide "Finish setting up" for analysts/viewers (show Go / No-Go), in `apps/web/src/features/dashboard/DashboardPage.tsx` FR-073 (#338)
 - [ ] T063 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in `qa/evidence/007/US5/` — `e2e/007-experience-growth/US5-persona-widgets.e2e.ts` logging in as Owner, Bid Manager, Analyst and Viewer (via `inviteAs`) on the demo org, covering US5-1…US5-6 including `@mobile` one-tap Go, and `qa/evidence/007/US5/VERDICT.md` FR-070…FR-073 (#339)
 
 **Checkpoint**: Dashboard adapts per persona
