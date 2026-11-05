@@ -17,6 +17,8 @@ import { createRequire } from 'node:module';
 import { analyses, createNodeDb, tenders, type ChecklistItem } from '../../packages/db/src/index';
 const { PDFDocument, StandardFonts } = createRequire(import.meta.url)('../../apps/api/node_modules/pdf-lib') as typeof import('../../apps/api/node_modules/pdf-lib');
 
+const { eq } = createRequire(import.meta.url)('../../packages/db/node_modules/drizzle-orm') as typeof import('../../packages/db/node_modules/drizzle-orm');
+
 export const E2E_PORT = Number(process.env.E2E_PORT || 8788);
 export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 export const E2E_DB_URL = process.env.E2E_DATABASE_URL || 'postgres://tp:tp@localhost:5433/tenderpilot_e2e';
@@ -77,7 +79,7 @@ export async function newApi(state?: StorageState): Promise<APIRequestContext> {
   return pwRequest.newContext({ baseURL: E2E_BASE_URL, storageState: state, timezoneId: 'Asia/Kolkata' } as never);
 }
 
-async function upload(api: APIRequestContext, name: string, fields: Record<string, string>, pages = 1): Promise<string> {
+export async function upload(api: APIRequestContext, name: string, fields: Record<string, string>, pages = 1): Promise<string> {
   const res = await api.post('/api/vault', {
     multipart: { file: { name: `${name}.pdf`, mimeType: 'application/pdf', buffer: await pdfBytes(name.toUpperCase(), pages) }, ...fields },
   });
@@ -192,3 +194,10 @@ export async function signInAs(context: BrowserContext, fx: ApplyFixture, role: 
 }
 
 export { expect };
+
+
+/** Replace the checklist of the fixture's analysis (direct DB write; there is no public API for it). */
+export async function setChecklist(fx: ApplyFixture, checklist: ChecklistItem[]) {
+  const { db, close } = await createNodeDb(E2E_DB_URL);
+  try { await db.update(analyses).set({ checklist }).where(eq(analyses.id, fx.analysisId)); } finally { await close(); }
+}
