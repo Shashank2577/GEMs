@@ -71,10 +71,10 @@ export function ExpiryTimeline({ summary, loading, onOpen }: { summary?: VaultSu
             </div>
           </div>
           {/* Phone: compact list */}
-          <ul className="grid gap-1.5 sm:hidden">
+          <ul className="grid min-w-0 grid-cols-1 gap-1.5 sm:hidden">
             {items.slice(0, 5).map((i) => (
-              <li key={i.id}>
-                <button type="button" onClick={() => onOpen(i.id)} className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-muted focus-ring">
+              <li key={i.id} className="min-w-0">
+                <button type="button" onClick={() => onOpen(i.id)} className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-muted focus-ring">
                   <DocTypeIcon type={i.type} size="sm" />
                   <span className="min-w-0 flex-1 truncate text-sm">{i.title}</span>
                   <span className={cn('shrink-0 text-xs font-medium tabular', i.status === 'expired' ? 'text-danger' : i.daysToExpiry <= 7 ? 'text-danger' : i.status === 'expiring' ? 'text-warning' : 'text-muted-foreground')}>

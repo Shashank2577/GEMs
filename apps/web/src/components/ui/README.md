@@ -22,7 +22,7 @@ Spacing follows an 8px grid (`gap-2/4/6/8`, page padding is set by the AppShell 
 | checkbox | `Checkbox`, `Switch` |
 | badge | `Badge` (tone: neutral·primary·accent·success·warning·danger·info·outline·solid; size sm·md·lg; `dot`) |
 | card | `Card` (`interactive`), `CardHeader/Title/Description/Content/Footer` |
-| dialog | `Dialog*` (size sm·md·lg·xl), `Sheet*` (side right·left·bottom·top; `SheetHeader/Body/Footer`), `ConfirmDialog` |
+| dialog | `Dialog*` (size sm·md·lg·xl), `Sheet*` (side right·left·bottom·top; `SheetHeader/Body/Footer`), `ConfirmDialog` (`cancelLabel`, focuses cancel first) |
 | tabs | `Tabs`, `TabsList` (variant underline·pill), `TabsTrigger`, `TabsContent` |
 | menu | `DropdownMenu*`, `Popover*`, `Tooltip` (`content` prop) + `TooltipProvider` (mounted in App) |
 | table | `Table*` primitives, `ResponsiveTable` (table ≥ md, stacked cards on phones; `columns[].primary/hideOnMobile`) |

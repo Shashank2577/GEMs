@@ -68,7 +68,8 @@ export const profileInputSchema = z.object({
   tradeName: optText(),
   gstin: optId(validateGstin),
   pan: optId(validatePan),
-  cin: optId(validateCin),
+  // Explicit wrapper so the CIN year bound always uses the real clock here (validateCin(raw, now), FR-015).
+  cin: optId((v) => validateCin(v)),
   udyamNumber: optId(validateUdyam),
   mseCategory: z.preprocess(blankToNull, z.enum(MSE_CATEGORIES).nullable().optional()),
   mseSocialCategory: z.preprocess(blankToNull, z.enum(MSE_SOCIAL_CATEGORIES).nullable().optional()),
@@ -100,6 +101,11 @@ export const profileInputSchema = z.object({
   oemAuthorizations: listOf(oemAuthorizationSchema, 100),
   certifications: listOf(z.string().trim().min(1).max(120), 50),
   maxEmdCapacity: z.preprocess(blankToNull, z.coerce.number().int().nonnegative().nullable().optional()),
+  /**
+   * Optimistic concurrency (FR-014): the `updatedAt` the client last loaded (null = no profile saved yet).
+   * Not a profile field — the API compares it with the stored `updated_at` and answers 409 on mismatch.
+   */
+  expectedUpdatedAt: z.string().datetime({ offset: true, message: 'Use an ISO timestamp' }).nullable().optional(),
 }).superRefine((p, ctx) => {
   if (p.gstin && p.pan && !validateGstin(p.gstin) && !validatePan(p.pan) && p.gstin.slice(2, 12) !== p.pan) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['gstin'], message: `This GSTIN belongs to PAN ${p.gstin.slice(2, 12)}, not ${p.pan}` });
@@ -233,6 +239,11 @@ export interface VaultDocumentDto {
   fileName: string; mimeType: string; sizeBytes: number; pageCount: number | null;
   uploadedBy: { id: string; name: string } | null; createdAt: string; updatedAt: string;
   status: DocStatus; daysToExpiry: number | null;
+  /**
+   * Next reminder to be sent (FR-053): `days` = threshold before expiry (30/7/1) or 0 for the post-expiry notice,
+   * `date` = IST calendar day it goes out. null = no expiry date or all reminders sent.
+   */
+  nextReminder: { days: number; date: string } | null;
   /** Relative API path for download (`?inline=1` for preview). */
   downloadUrl: string;
 }

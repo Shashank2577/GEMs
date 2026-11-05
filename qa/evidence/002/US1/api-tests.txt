@@ -1,0 +1,64 @@
+# API suite: TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test pnpm --filter @tp/api exec vitest run
+
+ RUN  v2.1.9 /home/user/GEMs/apps/api
+
+ ✓ test/auth.test.ts (22 tests) 1657ms
+ ✓ test/analyse.test.ts (16 tests) 970ms
+ ✓ test/identify.test.ts (17 tests) 1014ms
+ ✓ test/vault.test.ts (20 tests) 739ms
+ ✓ test/ingest.test.ts (9 tests) 855ms
+ ✓ test/workspace.test.ts (20 tests) 740ms
+ ✓ test/rate-limit.test.ts (16 tests) 2450ms
+   ✓ login rate limiting > a successful login resets the email counter 370ms
+   ✓ login rate limiting > 30 failures from one IP block that IP for every email, other IPs are unaffected 587ms
+ ✓ test/password-reset.test.ts (10 tests) 924ms
+ ✓ test/packet.test.ts (10 tests) 776ms
+ ✓ test/sessions.test.ts (8 tests) 716ms
+ ✓ test/dashboard.test.ts (7 tests) 504ms
+ ✓ test/demo.test.ts (8 tests) 706ms
+ ✓ test/foundation.test.ts (10 tests) 116ms
+ ✓ test/assist.test.ts (6 tests) 578ms
+
+ Test Files  14 passed (14)
+      Tests  179 passed (179)
+   Start at  03:05:33
+   Duration  22.90s (transform 795ms, setup 0ms, collect 7.75s, tests 12.75s, environment 2ms, prepare 718ms)
+
+
+# Verbose: reset / sessions / rate-limit / auth
+ ✓ test/rate-limit.test.ts > rate-limit lib > hit counts atomically within a window, check reports limited + Retry-After, reset clears
+ ✓ test/rate-limit.test.ts > rate-limit lib > a window that has elapsed starts over at 1
+ ✓ test/rate-limit.test.ts > rate-limit lib > rateLimited() builds a 429 with Retry-After and minutes in the message
+ ✓ test/rate-limit.test.ts > rate-limit lib > hit reports `over` only past the limit; release gives one attempt back
+ ✓ test/rate-limit.test.ts > rate-limit lib > clientIp only reads headers of the trusted proxy (TRUST_PROXY)
+ ✓ test/rate-limit.test.ts > rate-limit lib > pruneAuthState drops dead windows and old used/expired reset links
+ ✓ test/rate-limit.test.ts > login rate limiting > the 11th attempt within 15 minutes is 429 even with the right password; opens again after the window
+ ✓ test/rate-limit.test.ts > login rate limiting > a successful login resets the email counter 411ms
+ ✓ test/rate-limit.test.ts > login rate limiting > a parallel burst cannot exceed the cap: of 20 concurrent wrong passwords at most 10 get 401
+ ✓ test/rate-limit.test.ts > login rate limiting > a successful login does not consume the IP budget
+ ✓ test/rate-limit.test.ts > login rate limiting > unknown emails are counted the same way (no account enumeration)
+ ✓ test/rate-limit.test.ts > login rate limiting > 30 failures from one IP block that IP for every email, other IPs are unaffected 580ms
+ ✓ test/rate-limit.test.ts > accept-invite (existing user) and change-password share the limits > existing-user accept-invite: 11th attempt is 429; success resets the counter
+ ✓ test/rate-limit.test.ts > accept-invite (existing user) and change-password share the limits > new-user accept-invite is not counted
+ ✓ test/rate-limit.test.ts > accept-invite (existing user) and change-password share the limits > POST /me/password: 11th attempt is 429
+ ✓ test/rate-limit.test.ts > accept-invite (existing user) and change-password share the limits > auth_attempts never stores secrets
+ ✓ test/password-reset.test.ts > POST /api/auth/forgot-password > always returns 200 {ok:true}; only existing users get an email with a 60-minute link
+ ✓ test/password-reset.test.ts > POST /api/auth/forgot-password > stores only the token hash with a 60-minute expiry
+ ✓ test/password-reset.test.ts > POST /api/auth/forgot-password > validates the email (400) and rate-limits to 3 per email per hour (429, also for unknown emails)
+ ✓ test/password-reset.test.ts > POST /api/auth/forgot-password > limits requests per client IP (20 per hour) across emails
+ ✓ test/password-reset.test.ts > POST /api/auth/forgot-password > the account lookup and email happen in the background (same foreground work for unknown emails)
+ ✓ test/password-reset.test.ts > POST /api/auth/reset-password > sets the password, signs out every session, consumes the link and signs the user in
+ ✓ test/password-reset.test.ts > POST /api/auth/reset-password > expired, unknown and superseded links are 400 reset_invalid
+ ✓ test/password-reset.test.ts > POST /api/auth/reset-password > a too-short password is a validation error and does not consume the link
+ ✓ test/password-reset.test.ts > POST /api/auth/reset-password > a successful reset lifts a sign-in lockout for that email
+ ✓ test/password-reset.test.ts > POST /api/auth/reset-password > never stores the password or token in plain text
+ ✓ test/sessions.test.ts > session metadata > records user agent and last_seen_at at sign-in and refreshes last_seen_at at most every 5 minutes
+ ✓ test/sessions.test.ts > GET /api/me/sessions > lists the caller’s active sessions with device summary and current flag (current first)
+ ✓ test/sessions.test.ts > GET /api/me/sessions > does not list expired sessions
+ ✓ test/sessions.test.ts > GET /api/me/sessions > is session-only: API tokens get 403, signed-out gets 401
+ ✓ test/sessions.test.ts > DELETE /api/me/sessions/:id > revokes one of your sessions: that device’s next request is 401
+ ✓ test/sessions.test.ts > DELETE /api/me/sessions/:id > another user’s session or a malformed id is 404 and nothing is deleted
+ ✓ test/sessions.test.ts > DELETE /api/me/sessions/:id > revoking the current session signs you out and clears the cookie
+ ✓ test/sessions.test.ts > POST /api/me/sessions/revoke-others > signs out every other session of the caller only
+ Test Files  3 passed (3)
+      Tests  34 passed (34)

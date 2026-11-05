@@ -1,4 +1,5 @@
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 /** Error envelope from the API: `{ error: { code, message, details? } }`. */
 export class ApiError extends Error {
@@ -110,7 +111,46 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong'): s
   return fallback;
 }
 
-export const queryClient = new QueryClient({
+/** Query key of `GET /auth/me` (re-exported by `lib/auth`). `null` data = signed out. */
+export const ME_KEY = ['auth', 'me'] as const;
+
+export const SESSION_ENDED_MESSAGE = 'Your session ended. Please sign in again.';
+
+let sessionEndPending = false;
+
+const isMeQuery = (key: readonly unknown[]) => key[0] === ME_KEY[0] && key[1] === ME_KEY[1];
+
+/**
+ * Drop every cached query except `ME_KEY`, then set `ME_KEY` to `me` (null = signed out).
+ * Unlike `queryClient.clear()`, this keeps the `ME_KEY` query that AuthProvider observes, so the new value
+ * reaches `useMe()` immediately (RequireAuth redirects, the shell shows the new user/org).
+ */
+export function resetSessionCache<T>(me: T | null): void {
+  queryClient.removeQueries({ predicate: (q) => !isMeQuery(q.queryKey) });
+  queryClient.setQueryData(ME_KEY, me);
+}
+
+/**
+ * 002/FR-013: a 401 from any query or mutation while signed in means the session expired or was revoked.
+ * Clear every cached query, mark the user signed out (RequireAuth then redirects to `/login?next=<current>`)
+ * and show one toast. Auth forms opt out with `meta: { authFlow: true }`; the `/auth/me` probe never throws 401.
+ */
+export function handleSessionEnd(err: unknown, meta?: Record<string, unknown>): boolean {
+  if (!(err instanceof ApiError) || err.status !== 401 || meta?.authFlow) return false;
+  if (sessionEndPending || !queryClient.getQueryData(ME_KEY)) return false;
+  sessionEndPending = true;
+  // Defer so the cache is not cleared while it is notifying about this very error.
+  setTimeout(() => {
+    resetSessionCache(null);
+    toast.error(SESSION_ENDED_MESSAGE, { id: 'session-ended' });
+    sessionEndPending = false;
+  }, 0);
+  return true;
+}
+
+export const queryClient: QueryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: (err, query) => { handleSessionEnd(err, query.meta); } }),
+  mutationCache: new MutationCache({ onError: (err, _vars, _ctx, mutation) => { handleSessionEnd(err, mutation.meta); } }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

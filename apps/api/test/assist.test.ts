@@ -53,6 +53,7 @@ describe('GET /assist/:workspaceId', () => {
     expect(r.status).toBe(200);
     expect(r.body.tender).toEqual({ bidNumber: 'GEM/2026/B/700001', title: 'Supply of Laptops batch 1' });
     expect(r.body.noFinancials).toBe(true);
+    expect(r.body.readiness.analysed).toBe(true); // 006/FR-009
     const keys = r.body.fields.map((f: any) => f.key);
     expect(keys).not.toEqual(expect.arrayContaining(['price']));
     for (const k of keys) expect(k).not.toMatch(/price|rate|amount|value|otp|captcha|dsc|sign|submit|password/);

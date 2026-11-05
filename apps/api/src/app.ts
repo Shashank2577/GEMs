@@ -18,6 +18,7 @@ import { notificationsRoutes } from './routes/notifications';
 import { orgRoutes } from './routes/org';
 import { packetsRoutes } from './routes/packets';
 import { profileRoutes } from './routes/profile';
+import { sessionsRoutes } from './routes/sessions';
 import { tendersRoutes } from './routes/tenders';
 import { vaultRoutes } from './routes/vault';
 import { watchlistsRoutes } from './routes/watchlists';
@@ -30,6 +31,7 @@ export type { AppDeps } from './deps';
 /** All area routers, mounted at /api in this order. */
 export const routers = {
   auth: authRoutes,
+  sessions: sessionsRoutes,
   org: orgRoutes,
   tenders: tendersRoutes,
   watchlists: watchlistsRoutes,

@@ -59,7 +59,7 @@ async function loadWorkspace(id: string) {
   const meta = $('ws-meta');
   const mk = (label: string, value: string) => { const s = document.createElement('span'); s.innerHTML = `${label} <b></b>`; s.querySelector('b')!.textContent = value; meta.append(s); };
   mk('Bid', p.tender.bidNumber);
-  mk('Readiness', `${p.readiness.percent}%`);
+  mk('Readiness', p.readiness.analysed ? `${p.readiness.percent}%` : 'Not analysed'); // 006/FR-009
   const open = document.createElement('a'); open.href = p.workspaceUrl; open.target = '_blank'; open.textContent = 'Open workspace ↗'; meta.append(open);
   const docs = $('docs'); docs.replaceChildren();
   for (const d of p.documents) {

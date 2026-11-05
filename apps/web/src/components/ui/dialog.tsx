@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type HTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, useRef, type ComponentPropsWithoutRef, type ElementRef, type HTMLAttributes, type ReactNode } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { X } from 'lucide-react';
@@ -110,14 +110,16 @@ export const SheetDescription = DialogDescription;
 
 /** Simple confirm dialog for destructive actions. */
 export function ConfirmDialog({
-  open, onOpenChange, title, description, confirmLabel = 'Confirm', tone = 'danger', loading, onConfirm, children,
+  open, onOpenChange, title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'danger', loading, onConfirm, children,
 }: {
   open: boolean; onOpenChange: (o: boolean) => void; title: ReactNode; description?: ReactNode;
-  confirmLabel?: string; tone?: 'danger' | 'primary'; loading?: boolean; onConfirm: () => void; children?: ReactNode;
+  confirmLabel?: string; cancelLabel?: string; tone?: 'danger' | 'primary'; loading?: boolean; onConfirm: () => void; children?: ReactNode;
 }) {
+  // Initial focus goes to the safe (cancel) button, never the destructive one.
+  const cancelRef = useRef<HTMLButtonElement>(null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="sm">
+      <DialogContent size="sm" onOpenAutoFocus={(e) => { e.preventDefault(); cancelRef.current?.focus(); }}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
@@ -125,7 +127,7 @@ export function ConfirmDialog({
         {children}
         <DialogFooter>
           <DialogClose asChild>
-            <button className="inline-flex h-9 items-center justify-center rounded-lg border bg-card px-4 text-sm font-medium hover:bg-muted focus-ring">Cancel</button>
+            <button ref={cancelRef} className="inline-flex h-9 items-center justify-center rounded-lg border bg-card px-4 text-sm font-medium hover:bg-muted focus-ring">{cancelLabel}</button>
           </DialogClose>
           <button
             onClick={onConfirm}
