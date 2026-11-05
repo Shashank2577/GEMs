@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { withPlanOffers } from './vite/jsonld';
 import { cloudflareHeadersFile, spaCspFor } from '../../packages/core/src/security/headers';
 
 const apiTarget = process.env.API_PROXY ?? 'http://localhost:8787';
@@ -25,8 +26,13 @@ function securityHeadersFile(): Plugin {
   };
 }
 
+/** 007/FR-086: the JSON-LD offers in index.html come from PLANS at build time (hash for the CSP is computed after this). */
+function planOffersJsonLd(): Plugin {
+  return { name: 'tp-jsonld-plans', transformIndexHtml: { order: 'pre', handler: withPlanOffers } };
+}
+
 export default defineConfig({
-  plugins: [react(), securityHeadersFile()],
+  plugins: [react(), planOffersJsonLd(), securityHeadersFile()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: { port: 5173, proxy: { '/api': { target: apiTarget, changeOrigin: true } } },
   preview: { port: 4173, proxy: { '/api': { target: apiTarget, changeOrigin: true } } },

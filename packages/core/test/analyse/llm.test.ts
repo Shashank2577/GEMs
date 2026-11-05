@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildLlmPrompt, enrichWithLlm, LLM_MAX_CONFIDENCE, mergeRequirements, parseLlmRequirements } from '../../src/analyse/llm';
+import { buildLlmPrompt, enrichWithLlm, LLM_MAX_CONFIDENCE, mergeRequirements, parseLlmRequirements, promptChars } from '../../src/analyse/llm';
 import type { Requirement } from '../../src/analyse/types';
 
 const rule = (key: string, value: Requirement['value'], numeric: number | null = null, confidence = 0.95): Requirement => ({
@@ -54,7 +54,25 @@ describe('LLM extractor (T043)', () => {
     expect(ok.requirements).toHaveLength(2);
     expect(fake).toHaveBeenCalledOnce();
     const bad = await enrichWithLlm(['text'], rules, async () => { throw new Error('rate limited'); });
-    expect(bad).toEqual({ requirements: rules, used: false, error: 'rate limited' });
+    expect(bad).toEqual({ requirements: rules, used: false, error: 'rate limited', inputChars: expect.any(Number) });
     expect((await enrichWithLlm(['text'], rules, null)).used).toBe(false);
+  });
+});
+
+// ───────────── 008/FR-031: per-analysis character budget ─────────────
+
+describe('LLM prompt character cap (008/FR-031)', () => {
+  const page = 'x'.repeat(10_000);
+  it('includes at most maxChars of document text', () => {
+    const capped = buildLlmPrompt([page, page, page], [], 5_000);
+    expect(capped.prompt).toContain('x'.repeat(5_000));
+    expect(capped.prompt).not.toContain('x'.repeat(5_001));
+    expect(capped.prompt.match(/=== Page \d+ ===/g)).toEqual(['=== Page 1 ===']);
+  });
+  it('never exceeds the 60k per-document default and reports the characters sent', async () => {
+    const r = await enrichWithLlm([page.repeat(10)], [], async () => ({ requirements: [] }), {}, { maxChars: 1_000_000 });
+    expect(r.inputChars).toBe(promptChars(buildLlmPrompt([page.repeat(10)])));
+    expect(r.inputChars).toBeLessThan(65_000);
+    expect((await enrichWithLlm(['text'], [], null)).inputChars).toBe(0);
   });
 });

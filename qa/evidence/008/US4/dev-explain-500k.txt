@@ -1,0 +1,310 @@
+-- ============================================================================================================
+-- Rework after QA round 1 (PR #515, finding 1 = scenario 4c; finding 2 = 4d) — captured 2026-11-05 ~06:14Z on the
+-- 500k scratch fixture (tenderpilot_test_us4_500k: 500,000 tenders / 30,000 open, ANALYZEd), PostgreSQL 16.15.
+-- Unlike the hand-written sections further down, the SQL below is captured from the running GET /api/tenders route
+-- (drizzle logger) and EXPLAINed with its real bind values.
+--
+-- BEFORE (index tenders_open_state_idx ON (state) WHERE status='open'; QA explain-state.txt, reproduced here):
+--   page  ?state=Maharashtra → Index Scan using tenders_open_created_idx, Filter state/coalesce, 201 rows removed
+--   count / ministry / category facet → BitmapAnd(tenders_open_closing_idx [30,000], tenders_state_idx [59,404,
+--     NON-partial]) → 18–34 ms each. tenders_open_state_idx was never chosen.
+--   Why: the planner estimates "still open" (coalesce(end_at,'infinity') >= $now) at the default 1/3 — PostgreSQL
+--   ignores expression statistics of PARTIAL indexes (selfuncs.c examine_variable) — so it believed a BitmapAnd with
+--   the closing index cut the heap visits 3×, and that walking tenders_open_created_idx was cheaper than a sort.
+--
+-- FIX: migration 0015 rebuilds tenders_open_state_idx as
+--   CREATE INDEX tenders_open_state_idx ON public.tenders USING btree (state, created_at DESC, COALESCE(end_at, 'infinity'::timestamp with time zone)) WHERE (status = 'open'::text)
+--   so `state = $1` AND the "still open" expression are both Index Conds and the rows come out in the default sort
+--   order (no sort, LIMIT stops after 26 entries); count/facets become one Bitmap Index Scan with both conditions.
+--   The feed also writes `status = 'open'` as a literal (the partial indexes' exact predicate, provable under a
+--   generic plan), and the total + facets without their own filter now share ONE GROUPING SETS query (finding 2).
+
+-- GET /api/tenders?state=Maharashtra: 10 SQL statements per request (auth + rate limit 3, tenders 3, page decoration 4); EXPLAIN (ANALYZE, COSTS OFF) of each tenders query, SQL captured from the running route
+-- page
+Limit (actual rows=25 loops=1)
+  ->  Incremental Sort (actual rows=25 loops=1)
+        Sort Key: tenders.created_at DESC, tenders.end_at, tenders.bid_number DESC
+        Presorted Key: tenders.created_at
+        Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+        ->  Nested Loop Anti Join (actual rows=26 loops=1)
+              ->  Index Scan using tenders_open_state_idx on tenders (actual rows=26 loops=1)
+                    Index Cond: ((state = 'Maharashtra'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.57+00'::timestamp with time zone))
+                    Filter: ((source <> 'demo'::text) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+              ->  Index Scan using tender_matches_uq on tender_matches m (actual rows=0 loops=26)
+                    Index Cond: ((org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid) AND (tender_id = tenders.id))
+                    Filter: dismissed
+Planning Time: 0.476 ms
+Execution Time: 0.485 ms
+-- total + facets (GROUPING SETS)
+Incremental Sort (actual rows=39 loops=1)
+  Sort Key: x.g, x.rn
+  Presorted Key: x.g
+  Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+  ->  Subquery Scan on x (actual rows=39 loops=1)
+        Filter: (x.rn <= '61'::bigint)
+        ->  WindowAgg (actual rows=39 loops=1)
+              ->  Sort (actual rows=39 loops=1)
+                    Sort Key: (GROUPING(tenders.ministry, tenders.category)), ((COALESCE(tenders.ministry, tenders.category) IS NULL)), (count(*)) DESC, (COALESCE(tenders.ministry, tenders.category))
+                    Sort Method: quicksort  Memory: 28kB
+                    ->  MixedAggregate (actual rows=39 loops=1)
+                          Hash Key: tenders.ministry
+                          Hash Key: tenders.category
+                          Group Key: ()
+                          Batches: 1  Memory Usage: 32kB
+                          ->  Nested Loop Anti Join (actual rows=3563 loops=1)
+                                Join Filter: (m.tender_id = tenders.id)
+                                ->  Bitmap Heap Scan on tenders (actual rows=3563 loops=1)
+                                      Recheck Cond: ((state = 'Maharashtra'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.57+00'::timestamp with time zone) AND (status = 'open'::text))
+                                      Filter: ((source <> 'demo'::text) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+                                      Heap Blocks: exact=3108
+                                      ->  Bitmap Index Scan on tenders_open_state_idx (actual rows=3563 loops=1)
+                                            Index Cond: ((state = 'Maharashtra'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.57+00'::timestamp with time zone))
+                                ->  Materialize (actual rows=0 loops=3563)
+                                      ->  Bitmap Heap Scan on tender_matches m (actual rows=0 loops=1)
+                                            Recheck Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+                                            Filter: dismissed
+                                            ->  Bitmap Index Scan on tender_matches_org_idx (actual rows=0 loops=1)
+                                                  Index Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+Planning Time: 0.378 ms
+Execution Time: 9.415 ms
+-- own facet (state; leaves its own filter out)
+Limit (actual rows=23 loops=1)
+  ->  Sort (actual rows=23 loops=1)
+        Sort Key: (count(*)) DESC, tenders.state
+        Sort Method: quicksort  Memory: 26kB
+        ->  HashAggregate (actual rows=23 loops=1)
+              Group Key: tenders.state
+              Batches: 1  Memory Usage: 24kB
+              ->  Nested Loop Anti Join (actual rows=30000 loops=1)
+                    Join Filter: (m.tender_id = tenders.id)
+                    ->  Index Scan using tenders_open_created_idx on tenders (actual rows=30000 loops=1)
+                          Filter: ((state IS NOT NULL) AND (source <> 'demo'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.57+00'::timestamp with time zone) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+                    ->  Materialize (actual rows=0 loops=30000)
+                          ->  Bitmap Heap Scan on tender_matches m (actual rows=0 loops=1)
+                                Recheck Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+                                Filter: dismissed
+                                ->  Bitmap Index Scan on tender_matches_org_idx (actual rows=0 loops=1)
+                                      Index Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+Planning Time: 0.325 ms
+Execution Time: 37.419 ms
+
+-- GET /api/tenders?state=Goa: 10 SQL statements per request (auth + rate limit 3, tenders 3, page decoration 4); EXPLAIN (ANALYZE, COSTS OFF) of each tenders query, SQL captured from the running route
+-- page
+Limit (actual rows=25 loops=1)
+  ->  Incremental Sort (actual rows=25 loops=1)
+        Sort Key: tenders.created_at DESC, tenders.end_at, tenders.bid_number DESC
+        Presorted Key: tenders.created_at
+        Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+        ->  Nested Loop Anti Join (actual rows=26 loops=1)
+              Join Filter: (m.tender_id = tenders.id)
+              ->  Index Scan using tenders_open_state_idx on tenders (actual rows=26 loops=1)
+                    Index Cond: ((state = 'Goa'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.721+00'::timestamp with time zone))
+                    Filter: ((source <> 'demo'::text) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+              ->  Materialize (actual rows=0 loops=26)
+                    ->  Bitmap Heap Scan on tender_matches m (actual rows=0 loops=1)
+                          Recheck Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+                          Filter: dismissed
+                          ->  Bitmap Index Scan on tender_matches_org_idx (actual rows=0 loops=1)
+                                Index Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+Planning Time: 0.205 ms
+Execution Time: 0.100 ms
+-- total + facets (GROUPING SETS)
+Incremental Sort (actual rows=39 loops=1)
+  Sort Key: x.g, x.rn
+  Presorted Key: x.g
+  Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+  ->  Subquery Scan on x (actual rows=39 loops=1)
+        Filter: (x.rn <= '61'::bigint)
+        ->  WindowAgg (actual rows=39 loops=1)
+              ->  Sort (actual rows=39 loops=1)
+                    Sort Key: (GROUPING(tenders.ministry, tenders.category)), ((COALESCE(tenders.ministry, tenders.category) IS NULL)), (count(*)) DESC, (COALESCE(tenders.ministry, tenders.category))
+                    Sort Method: quicksort  Memory: 28kB
+                    ->  MixedAggregate (actual rows=39 loops=1)
+                          Hash Key: tenders.ministry
+                          Hash Key: tenders.category
+                          Group Key: ()
+                          Batches: 1  Memory Usage: 32kB
+                          ->  Nested Loop Anti Join (actual rows=298 loops=1)
+                                Join Filter: (m.tender_id = tenders.id)
+                                ->  Bitmap Heap Scan on tenders (actual rows=298 loops=1)
+                                      Recheck Cond: ((state = 'Goa'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.721+00'::timestamp with time zone) AND (status = 'open'::text))
+                                      Filter: ((source <> 'demo'::text) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+                                      Heap Blocks: exact=298
+                                      ->  Bitmap Index Scan on tenders_open_state_idx (actual rows=298 loops=1)
+                                            Index Cond: ((state = 'Goa'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.721+00'::timestamp with time zone))
+                                ->  Materialize (actual rows=0 loops=298)
+                                      ->  Bitmap Heap Scan on tender_matches m (actual rows=0 loops=1)
+                                            Recheck Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+                                            Filter: dismissed
+                                            ->  Bitmap Index Scan on tender_matches_org_idx (actual rows=0 loops=1)
+                                                  Index Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+Planning Time: 0.201 ms
+Execution Time: 0.714 ms
+-- own facet (state; leaves its own filter out)
+Limit (actual rows=23 loops=1)
+  ->  Sort (actual rows=23 loops=1)
+        Sort Key: (count(*)) DESC, tenders.state
+        Sort Method: quicksort  Memory: 26kB
+        ->  HashAggregate (actual rows=23 loops=1)
+              Group Key: tenders.state
+              Batches: 1  Memory Usage: 24kB
+              ->  Nested Loop Anti Join (actual rows=30000 loops=1)
+                    Join Filter: (m.tender_id = tenders.id)
+                    ->  Index Scan using tenders_open_created_idx on tenders (actual rows=30000 loops=1)
+                          Filter: ((state IS NOT NULL) AND (source <> 'demo'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.721+00'::timestamp with time zone) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+                    ->  Materialize (actual rows=0 loops=30000)
+                          ->  Bitmap Heap Scan on tender_matches m (actual rows=0 loops=1)
+                                Recheck Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+                                Filter: dismissed
+                                ->  Bitmap Index Scan on tender_matches_org_idx (actual rows=0 loops=1)
+                                      Index Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+Planning Time: 0.204 ms
+Execution Time: 25.090 ms
+
+-- GET /api/tenders: 9 SQL statements per request (auth + rate limit 3, tenders 2, page decoration 4); EXPLAIN (ANALYZE, COSTS OFF) of each tenders query, SQL captured from the running route
+-- page
+Limit (actual rows=25 loops=1)
+  ->  Incremental Sort (actual rows=25 loops=1)
+        Sort Key: tenders.created_at DESC, tenders.end_at, tenders.bid_number DESC
+        Presorted Key: tenders.created_at
+        Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+        ->  Nested Loop Anti Join (actual rows=26 loops=1)
+              ->  Index Scan using tenders_open_created_idx on tenders (actual rows=26 loops=1)
+                    Filter: ((source <> 'demo'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.826+00'::timestamp with time zone) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+              ->  Index Scan using tender_matches_uq on tender_matches m (actual rows=0 loops=26)
+                    Index Cond: ((org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid) AND (tender_id = tenders.id))
+                    Filter: dismissed
+Planning Time: 0.196 ms
+Execution Time: 0.105 ms
+-- total + facets (GROUPING SETS)
+Incremental Sort (actual rows=62 loops=1)
+  Sort Key: x.g, x.rn
+  Presorted Key: x.g
+  Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+  ->  Subquery Scan on x (actual rows=62 loops=1)
+        Filter: (x.rn <= '61'::bigint)
+        ->  WindowAgg (actual rows=62 loops=1)
+              ->  Sort (actual rows=62 loops=1)
+                    Sort Key: (GROUPING(tenders.state, tenders.ministry, tenders.category)), ((COALESCE(tenders.state, tenders.ministry, tenders.category) IS NULL)), (count(*)) DESC, (COALESCE(tenders.state, tenders.ministry, tenders.category))
+                    Sort Method: quicksort  Memory: 29kB
+                    ->  MixedAggregate (actual rows=62 loops=1)
+                          Hash Key: tenders.state
+                          Hash Key: tenders.ministry
+                          Hash Key: tenders.category
+                          Group Key: ()
+                          Batches: 1  Memory Usage: 48kB
+                          ->  Nested Loop Anti Join (actual rows=30000 loops=1)
+                                Join Filter: (m.tender_id = tenders.id)
+                                ->  Index Scan using tenders_open_created_idx on tenders (actual rows=30000 loops=1)
+                                      Filter: ((source <> 'demo'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= '2026-11-05 06:14:12.826+00'::timestamp with time zone) AND (COALESCE((raw ->> 'demo'::text), ''::text) <> 'true'::text) AND (content_hash <> ('demo-'::text || bid_number)))
+                                ->  Materialize (actual rows=0 loops=30000)
+                                      ->  Bitmap Heap Scan on tender_matches m (actual rows=0 loops=1)
+                                            Recheck Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+                                            Filter: dismissed
+                                            ->  Bitmap Index Scan on tender_matches_org_idx (actual rows=0 loops=1)
+                                                  Index Cond: (org_id = '67b1d425-149c-413c-a188-6d15c271d4d6'::uuid)
+Planning Time: 0.198 ms
+Execution Time: 27.285 ms
+
+-- ============================================================================================================
+-- Earlier captures (before the rework; the ?state=Maharashtra section below is superseded by the one above)
+
+-- 500k fixture: hand-written equivalents of the GET /api/tenders page query (same WHERE/ORDER as routes/tenders.ts) and the dispatcher select (services/alerts.ts#pendingNotificationsQuery)
+ tenders | open  
+---------+-------
+  500036 | 30036
+(1 row)
+
+ notifications | pending 
+---------------+---------
+       1000000 |     500
+(1 row)
+
+-- default sort (newest first)
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: created_at DESC, end_at, bid_number DESC
+         Presorted Key: created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB
+         ->  Index Scan using tenders_open_created_idx on tenders (actual rows=38 loops=1)
+               Filter: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.309 ms
+ Execution Time: 0.105 ms
+(9 rows)
+
+-- ?sort=endAt  (re-captured 2026-11-05 after review S5: migration 0014 tenders_open_closing_idx on
+-- coalesce(end_at, 'infinity') WHERE status='open'; same 500k fixture with 5,000 of the 30,000 open tenders
+-- given a past end_at, i.e. expired but not yet flipped to closed. The "still open" filter is now the Index Cond,
+-- so expired rows are never read; before, it was a Filter on tenders_open_end_idx.)
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: (COALESCE(end_at, 'infinity'::timestamp with time zone)), created_at DESC
+         Presorted Key: (COALESCE(end_at, 'infinity'::timestamp with time zone))
+         Full-sort Groups: 1  Sort Method: top-N heapsort  Average Memory: 28kB  Peak Memory: 28kB
+         Pre-sorted Groups: 1  Sort Method: top-N heapsort  Average Memory: 28kB  Peak Memory: 28kB
+         ->  Index Scan using tenders_open_closing_idx on tenders (actual rows=209 loops=1)
+               Index Cond: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.891 ms
+ Execution Time: 1.196 ms
+(10 rows)
+
+
+-- ?state=Maharashtra
+                                                         QUERY PLAN                                                          
+-----------------------------------------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: created_at DESC, end_at, bid_number DESC
+         Presorted Key: created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 28kB  Peak Memory: 28kB
+         ->  Index Scan using tenders_open_created_idx on tenders (actual rows=26 loops=1)
+               Filter: ((state = 'Maharashtra'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now()))
+               Rows Removed by Filter: 188
+ Planning Time: 0.099 ms
+ Execution Time: 0.140 ms
+(10 rows)
+
+-- ?minValue=500000&sort=value
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: estimated_value DESC NULLS LAST, end_at
+         Presorted Key: estimated_value
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB
+         ->  Index Scan using tenders_open_value_idx on tenders (actual rows=45 loops=1)
+               Index Cond: (estimated_value >= 500000)
+               Filter: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.118 ms
+ Execution Time: 0.141 ms
+(10 rows)
+
+-- dispatcher select (1,000,000 notifications, 500 pending)
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
+ Limit (actual rows=500 loops=1)
+   ->  Nested Loop (actual rows=500 loops=1)
+         ->  Nested Loop (actual rows=500 loops=1)
+               ->  Index Scan using notifications_pending_idx on notifications n (actual rows=500 loops=1)
+               ->  Memoize (actual rows=1 loops=500)
+                     Cache Key: n.user_id
+                     Cache Mode: logical
+                     Hits: 499  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                     ->  Index Only Scan using users_pkey on users u (actual rows=1 loops=1)
+                           Index Cond: (id = n.user_id)
+                           Heap Fetches: 1
+         ->  Memoize (actual rows=1 loops=500)
+               Cache Key: n.org_id
+               Cache Mode: logical
+               Hits: 499  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+               ->  Index Only Scan using organizations_pkey on organizations o (actual rows=1 loops=1)
+                     Index Cond: (id = n.org_id)
+                     Heap Fetches: 1
+ Planning Time: 0.537 ms
+ Execution Time: 1.867 ms
+(20 rows)
+

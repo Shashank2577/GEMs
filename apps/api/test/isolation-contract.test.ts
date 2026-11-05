@@ -242,7 +242,9 @@ async function snapshotOrgA(): Promise<string> {
   const tables = (res as unknown as { rows: { table_name: string }[] }).rows.map((r) => r.table_name);
   const out: Record<string, unknown[]> = {};
   for (const t of tables) {
-    const rows = await ctx.db.execute(sql.raw(`select * from "${t}" where org_id = '${A.org.orgId}' order by 1`));
+    // Order by the whole row: `order by 1` is org_id in some tables (memberships, notification_prefs), which left
+    // the order to the heap and made the before/after comparison flaky under load.
+    const rows = await ctx.db.execute(sql.raw(`select * from "${t}" as r where org_id = '${A.org.orgId}' order by r::text`));
     out[t] = (rows as unknown as { rows: unknown[] }).rows;
   }
   const org = await ctx.db.execute(sql.raw(`select * from organizations where id = '${A.org.orgId}'`));

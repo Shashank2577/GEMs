@@ -162,7 +162,7 @@ Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/
 | 402 | `plan_expired` | the trial or plan has ended (writes only) | – |
 | 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
 | 413 | `packet_too_large` | packet would exceed 40 MB or 40 items | – |
-| 422 | `document_too_long` | tender document over 300 pages | – |
+| 422 | `document_too_long` | tender document over 300 pages (refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning) | – |
 | 422 | `scanned_document` | tender document has no extractable text | – |
 | 429 | `rate_limited` | a rate-limit rule is over its limit; header `Retry-After: <s>` | `{rule, retryAfter}` |
 | 429 | `sync_cooldown` | manual "Sync now" within the cooldown | `{retryAt}` |

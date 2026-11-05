@@ -1,0 +1,12 @@
+# sc8-document-too-long — project desktop — 2026-11-05T07:23:21.836Z
+### 300-page upload (boundary)
+> POST /api/tenders/:id/documents
+< 201
+{"id":"2481b721-8c58-4167-950f-a271881f9d5f","tenderId":"cf2ca5c6-cff3-4470-a7e5-e983faec6cae","orgId":"08adbfb0-622a-4578-97d0-25bbe872bc23","kind":"bid","fileName":"exactly-300-pages.pdf","sizeBytes":78744,"pageCount":150,"totalPages":300,"sourceUrl":null,"hasText":true,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T07:23:22.215Z","warnings":[{"code":"pages_truncated","analysed":150,"total":300}]}
+
+### 301-page upload
+> POST /api/tenders/:id/documents (301 pages)
+< 422
+{"error":{"code":"document_too_long","message":"This document has 301 pages. TenderPilot accepts documents of up to 300 pages and reads the first 150 — upload the bid document and ATC separately.","details":{"pages":301,"maxPages":300}}}
+
+documents stored for the tender after both attempts: 1 (only the 300-page file)

@@ -3,14 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>TenderPilot — GeM tender co-pilot</title>
-    <meta name="description" content="Win more GeM bids, with a co-pilot that never takes the wheel. Discover, qualify and prepare Government e-Marketplace tenders." />
+    <title>TenderPilot — GeM tender co-pilot for Indian sellers</title>
+    <meta name="description" content="Win more GeM bids, with a co-pilot that never takes the wheel. Discover, qualify and prepare Government e-Marketplace tenders — you type the price and submit on GeM." />
+    <link rel="canonical" href="https://tenderpilot.in/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TenderPilot" />
+    <meta property="og:url" content="https://tenderpilot.in/" />
+    <meta property="og:title" content="TenderPilot — GeM tender co-pilot for Indian sellers" />
+    <meta property="og:description" content="Win more GeM bids, with a co-pilot that never takes the wheel. Discover, qualify and prepare tenders; you type the price and submit on GeM." />
+    <meta property="og:image" content="https://tenderpilot.in/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="TenderPilot — Win more GeM bids. A co-pilot that never takes the wheel." />
+    <meta property="og:locale" content="en_IN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TenderPilot — GeM tender co-pilot for Indian sellers" />
+    <meta name="twitter:description" content="Win more GeM bids, with a co-pilot that never takes the wheel." />
+    <meta name="twitter:image" content="https://tenderpilot.in/og.png" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"TenderPilot","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://tenderpilot.in/","description":"GeM tender co-pilot for Indian sellers: discover, qualify and prepare Government e-Marketplace bids. The seller types the price and submits on GeM.","inLanguage":"en-IN","offers":[{"@type":"Offer","name":"Starter","price":"2999","priceCurrency":"INR","url":"https://tenderpilot.in/signup?plan=starter"},{"@type":"Offer","name":"Pro","price":"7999","priceCurrency":"INR","url":"https://tenderpilot.in/signup?plan=pro"}]}
+    </script>
     <meta name="theme-color" content="#0b0d1f" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
     <script>
       // Apply theme before paint to avoid a flash.
       (function () {
@@ -23,6 +39,14 @@
     </script>
   </head>
   <body>
+    <div id="lp-shell" class="absolute inset-x-0 top-0 z-[60] min-h-dvh overflow-x-hidden bg-background text-foreground">
+      <!-- Static hero shell (007/NFR-003): paints from HTML+CSS alone so LCP does not wait on the JS bundle. It mirrors the
+           hero's left column and the 64px nav bar in apps/web/src/features/landing/LandingPage.tsx (landing.test.tsx keeps the
+           copy in sync). React's createRoot replaces it on mount; the script below drops it on every other route. -->
+      <div class="h-[65px]" aria-hidden="true"></div>
+      <main><section class="relative"><div class="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-24"><div><a href="#control" class="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs backdrop-blur hover:text-foreground focus-ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-success"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg> Account-safe: never auto-submits on GeM <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></a><h1 class="mt-6 text-[40px] font-semibold leading-[1.05] tracking-tight sm:text-6xl">Win more GeM bids. <span class="text-gradient">Spend minutes, not nights,</span> on each one.</h1><p class="mt-6 max-w-xl text-lg text-muted-foreground">TenderPilot watches BidPlus for the bids you can win, checks your eligibility against every clause, and assembles the exact document packet GeM asks for. You keep the price, OTP and DSC.</p><div class="mt-8 flex flex-col gap-3 sm:flex-row"><a class="relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 focus-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 [box-shadow:inset_0_1px_0_0_hsl(0_0%_100%/0.14),0_1px_2px_0_hsl(var(--shadow)/0.12)] h-11 px-5 text-[15px]" href="/signup">Start free trial <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></a><a href="#how" class="relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 focus-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:size-4 [&_svg]:shrink-0 border bg-card text-foreground shadow-xs hover:bg-muted h-11 px-5 text-[15px]">See how it works</a></div><ul class="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-muted-foreground"><li class="inline-flex items-center gap-1.5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-success"><path d="M20 6 9 17l-5-5"></path></svg>14-day free trial</li><li class="inline-flex items-center gap-1.5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-success"><path d="M20 6 9 17l-5-5"></path></svg>No card needed</li><li class="inline-flex items-center gap-1.5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-success"><path d="M20 6 9 17l-5-5"></path></svg>Set up in 5 minutes</li></ul></div><div class="hidden lg:block lg:min-h-[556px]" aria-hidden="true"></div></div></section></main>
+    </div>
+    <script>if (location.pathname !== '/') { var s = document.getElementById('lp-shell'); if (s) s.remove(); }</script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
