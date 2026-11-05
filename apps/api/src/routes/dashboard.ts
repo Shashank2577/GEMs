@@ -17,6 +17,7 @@ import type {
   DashboardActivity, DashboardExpiringDoc, DashboardMatch, DashboardResponse, DashboardStage, DashboardTenderRef, DashboardVerdict, SetupStep,
 } from '@tp/core/contracts/experience';
 import { docStatus, istDate } from '@tp/core/vault/status';
+import { visibleTenderSource } from '../lib/tender-scope';
 import { orgId, requireAuth } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
@@ -100,7 +101,9 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
     exists (select 1 from ${tenderMatches} m where m.tender_id = ${tenders.id} and m.org_id = ${org} and m.dismissed = false)
     or exists (select 1 from ${bidWorkspaces} w where w.tender_id = ${tenders.id} and w.org_id = ${org} and w.stage not in ('won','lost','dropped'))
   )`;
-  const closingWhere = and(eq(tenders.status, 'open'), isNotNull(tenders.endAt), gte(tenders.endAt, now), lte(tenders.endAt, weekEnd), relevant);
+  // Demo tenders only for orgs that loaded the demo (008/FR-016).
+  const scope = visibleTenderSource(c.var.org);
+  const closingWhere = and(scope, eq(tenders.status, 'open'), isNotNull(tenders.endAt), gte(tenders.endAt, now), lte(tenders.endAt, weekEnd), relevant);
 
   const [
     [matchCounts], trendRows, pipelineRows, verdictRows, [closingCounts], closingRows, recentRows, expiringRows,
@@ -177,7 +180,7 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
       analysesWeek: sql<number>`(select count(*)::int from ${analyses} where ${analyses.orgId} = ${org} and ${analyses.status} = 'done' and ${analyses.createdAt} >= ${new Date(now.getTime() - 7 * DAY)})`,
     }).from(sql`(select 1) as one`),
 
-    db.select({ n: count() }).from(tenders).where(and(eq(tenders.status, 'open'), sql`(${tenders.endAt} is null or ${tenders.endAt} >= ${now})`)),
+    db.select({ n: count() }).from(tenders).where(and(scope, eq(tenders.status, 'open'), sql`(${tenders.endAt} is null or ${tenders.endAt} >= ${now})`)),
   ]);
 
   // Pipeline

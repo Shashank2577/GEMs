@@ -1,0 +1,10 @@
+# sc6-preview-paused — project mobile — 2026-11-05T04:32:17.831Z
+statuses: 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 429
+### call 31
+> POST /api/watchlists/preview
+< 429
+< retry-after: 42
+< ratelimit-remaining: 569
+< content-type: application/json
+{"error":{"code":"rate_limited","message":"Too many requests. Try again in 42 seconds.","details":{"rule":"watchlist.preview.user","retryAfter":42}}}
+

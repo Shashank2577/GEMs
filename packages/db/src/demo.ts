@@ -11,7 +11,10 @@
  *
  * Idempotent: running it again for the same org never duplicates rows (natural keys / existence checks), and a
  * profile the org already filled in is never overwritten. Tender dates are refreshed on every run.
- * Demo tenders carry `raw.demo = true` so they can be told apart from ingested ones.
+ * Demo tenders are stored with `source = 'demo'` (and `raw.demo = true`), unique by `(source, bid_number)`, so they
+ * never collide with ingested GeM rows. Read paths show them only to orgs with `onboarding_state.demo = true`
+ * (apps/api/src/lib/tender-scope.ts) and watchlist matching skips them; their matches are created here, for the
+ * seeding org only (008/FR-016).
  */
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -368,10 +371,10 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
   const now = opts.now ?? new Date();
   const { orgId, userId } = opts;
 
-  // Tenders (global) — upsert by (source, bid number), refreshing dates so the demo always looks current.
+  // Demo tenders (source 'demo', shared by demo orgs) — upsert by (source, bid number), refreshing dates so the demo always looks current.
   const plan = planTenders(now);
   const tenderRows = plan.map((t) => ({
-    source: 'gem',
+    source: 'demo',
     bidNumber: t.bidNumber,
     gemBidId: String(8_100_000 + t.idx * 37),
     bidType: (t.item.bidType ?? 'bid') as 'bid' | 'ra' | 'service',
