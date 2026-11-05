@@ -2,7 +2,7 @@
  * Anthropic Messages API client over plain fetch (works on Workers and Node).
  * LLMs only extract/enrich/explain — they never decide a verdict (Constitution III).
  */
-import type { LlmClient, LlmRequest, LlmResult } from '../deps';
+import type { LlmCallOptions, LlmClient, LlmRequest, LlmResult } from '../deps';
 
 export class LlmError extends Error {
   constructor(message: string, readonly status?: number, readonly body?: string) { super(message); this.name = 'LlmError'; }
@@ -83,9 +83,10 @@ export function createAnthropicClient(opts: AnthropicOptions): LlmClient {
   return {
     model: opts.model,
     complete,
-    async completeJson<T = unknown>(req: LlmRequest): Promise<T> {
+    async completeJson<T = unknown>(req: LlmRequest, callOpts?: LlmCallOptions): Promise<T> {
       const system = [req.system, 'Respond with a single valid JSON value only. No prose, no markdown fences.'].filter(Boolean).join('\n\n');
       const r = await complete({ ...req, system });
+      callOpts?.onUsage?.({ model: r.model, usage: r.usage });
       return parseJsonLoose<T>(r.text);
     },
   };

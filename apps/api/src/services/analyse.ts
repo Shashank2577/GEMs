@@ -19,13 +19,14 @@ import { PdfTextError, extractPages, isPdf, joinPages, looksScanned, splitPages 
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
-  MAX_TENDER_DOC_BYTES, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
+  MAX_TENDER_DOC_BYTES, type AnalysisDto, type AnalysisWarning, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
   type TenderDocumentWarning,
 } from '@tp/core/contracts/analyse';
 import { GemClient, GemError } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, forbidden, notFound } from '../lib/errors';
+import { assertWithinPlan, meteredCompleteJson, reserveAnalysisQuota } from '../lib/plan';
 import { markStale } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
@@ -64,7 +65,7 @@ export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
     id: a.id, orgId: a.orgId, tenderId: a.tenderId, status: a.status, method: a.method,
     requirements: a.requirements, factors: a.factors, checklist: a.checklist,
     score: a.score, confidence: a.confidence, verdict: a.verdict, summary: a.summary, error: a.error, stale: a.stale,
-    staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [],
+    staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [], warnings: a.warnings ?? [],
     createdBy: a.createdBy, createdAt: iso(a.createdAt), updatedAt: iso(a.updatedAt),
     ...(docs ? { documents: docs.map((d) => ({ id: d.id, fileName: d.fileName, kind: d.kind, pageCount: d.pageCount })) } : {}),
   };
@@ -231,6 +232,7 @@ function overridesOf(a: AnalysisRow | null): Record<string, FactorOverride> {
 
 export async function analyseTender(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
   const tender = await getTender(deps, input.tenderId);
+  await assertWithinPlan(deps, input.orgId, 'analysesPerMonth'); // fail fast, before any GeM download (re-checked under lock)
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
     try {
@@ -244,9 +246,15 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
   }
   const previous = await latestAnalysis(deps, tender.id, input.orgId);
   const now = deps.clock.now();
-  const [row] = await deps.db.insert(analyses).values({
-    orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
-  }).returning();
+  // 008/FR-036/FR-037: quota check and insert serialised per org (row lock), so concurrent requests cannot overshoot.
+  const { row, llmAllowed } = await deps.db.transaction(async (tx) => {
+    const quota = await reserveAnalysisQuota(deps, tx, input.orgId);
+    const [inserted] = await tx.insert(analyses).values({
+      orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
+    }).returning();
+    return { row: inserted!, llmAllowed: quota.llmAllowed };
+  });
+  const warnings: AnalysisWarning[] = deps.llm && !llmAllowed ? [{ code: 'llm_quota_reached' }] : [];
 
   try {
     const ordered = [...docs].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
@@ -257,9 +265,9 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
       if (!pages.length) continue;
       const meta = { documentId: d.id, fileName: d.fileName, estimatedValue: tender.estimatedValue };
       const rules = extractRequirementsRules(pages, meta);
-      if (deps.llm) {
-        const llm = deps.llm;
-        const r = await enrichWithLlm(pages, rules, (req) => llm.completeJson(req), { documentId: d.id, fileName: d.fileName });
+      if (deps.llm && llmAllowed) {
+        const completeJson = meteredCompleteJson(deps, { orgId: input.orgId, analysisId: row.id, kind: 'extract' });
+        const r = await enrichWithLlm(pages, rules, (req) => completeJson(req), { documentId: d.id, fileName: d.fileName });
         if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
         usedLlm ||= r.used;
         perDoc.push(r.requirements);
@@ -276,7 +284,7 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
     const [done] = await deps.db.update(analyses).set({
       status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
       score: result.score, confidence: result.confidence, verdict: result.verdict, summary: result.summary, error: null, stale: false,
-      updatedAt: deps.clock.now(),
+      warnings, updatedAt: deps.clock.now(),
     }).where(eq(analyses.id, row.id)).returning();
     await logActivity(deps.db, {
       orgId: input.orgId, userId: input.userId, action: 'tender.analysed', entityType: 'tender', entityId: tender.id,

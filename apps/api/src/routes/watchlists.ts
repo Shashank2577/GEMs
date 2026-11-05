@@ -13,6 +13,7 @@ import { uuidSchema } from '@tp/core/contracts/common';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
+import { assertWithinPlan } from '../lib/plan';
 import { notFound, validationError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
@@ -141,6 +142,7 @@ watchlistsRoutes.post('/watchlists', requireRole('analyst'), async (c) => {
   const body = await parseJson(c, watchlistCreateSchema);
   requireCriteria(body.criteria);
   const org = orgId(c);
+  await assertWithinPlan(deps, org, 'watchlists'); // 008/FR-036
   const now = deps.clock.now();
   const [w] = await deps.db.insert(watchlists).values({
     orgId: org, name: body.name, criteria: body.criteria as WatchlistCriteria, active: body.active ?? true,

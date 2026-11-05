@@ -8,7 +8,9 @@ import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { injectDeps, noStore } from './middleware/request';
+import { requireActivePlan } from './middleware/plan';
 import { originCheck } from './middleware/security';
+import { adminRoutes } from './routes/admin';
 import { analysisRoutes } from './routes/analysis';
 import { assistRoutes } from './routes/assist';
 import { authRoutes } from './routes/auth';
@@ -46,6 +48,7 @@ export const routers = {
   assist: assistRoutes,
   dashboard: dashboardRoutes,
   demo: demoRoutes,
+  admin: adminRoutes,
 } as const;
 
 export function createApp(deps: AppDeps) {
@@ -57,6 +60,7 @@ export function createApp(deps: AppDeps) {
   api.use('*', injectDeps(deps));
   api.use('*', noStore);
   api.use('*', originCheck); // 002/FR-028: before any handler
+  api.use('*', requireActivePlan); // 008/FR-038: expired trial → read-only (402 plan_expired)
 
   api.get('/health', async (c) => {
     let db = false;

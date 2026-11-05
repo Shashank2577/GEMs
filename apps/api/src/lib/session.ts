@@ -67,6 +67,7 @@ export async function loadUser(db: Db, userId: string): Promise<AuthUser | null>
 const orgCols = {
   id: organizations.id, name: organizations.name, slug: organizations.slug, plan: organizations.plan,
   onboardingState: organizations.onboardingState, scoringWeights: organizations.scoringWeights,
+  trialEndsAt: organizations.trialEndsAt,
 };
 
 /** Membership + org for (user, org); null when not a member. */

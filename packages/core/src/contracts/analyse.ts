@@ -71,6 +71,15 @@ export interface TenderDocumentDto {
 /** POST /tenders/:id/documents response (201). */
 export interface UploadTenderDocumentResponse extends TenderDocumentDto { warnings: TenderDocumentWarning[] }
 
+/**
+ * Analysis caveats (008/FR-031, FR-037). The web renders them:
+ * `llm_budget_exhausted` → "AI review covered {covered} of {total} documents; the rest were checked by rules only."
+ * `llm_quota_reached` → "Monthly AI review limit reached — this analysis used rules only."
+ */
+export type AnalysisWarning =
+  | { code: 'llm_budget_exhausted'; covered: number; total: number }
+  | { code: 'llm_quota_reached' };
+
 export type AnalysisStatus = 'pending' | 'running' | 'done' | 'failed';
 export type Verdict = 'go' | 'review' | 'no_go';
 
@@ -93,6 +102,8 @@ export interface AnalysisDto {
   staleAt: string | null;
   /** Analysis notes, e.g. pages not read by AI (FR-051). */
   notes: string[];
+  /** Machine-readable caveats (008/FR-031); empty when the analysis ran in full. */
+  warnings: AnalysisWarning[];
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;

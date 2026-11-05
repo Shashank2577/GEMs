@@ -12,6 +12,7 @@ import {
 } from '@tp/core/contracts/auth';
 import { ROLE_LABELS } from '@tp/core/contracts/common';
 import { logActivity } from '../lib/activity';
+import { assertWithinPlan, usageFor } from '../lib/plan';
 import { randomToken, sha256Hex } from '../lib/crypto';
 import { HttpError, conflict, forbidden, notFound } from '../lib/errors';
 import { parseJson, parseQuery } from '../lib/validate';
@@ -78,6 +79,9 @@ function memberIdParam(id: string) {
 
 orgRoutes.get('/org', requireAuth, (c) => c.json(c.var.org));
 
+/** 008/FR-039: plan, trial end, this IST month's usage and the plan's limits (any member). */
+orgRoutes.get('/org/usage', requireAuth, async (c) => c.json(await usageFor(c.var.deps, orgId(c))));
+
 orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
   const body = await parseJson(c, updateOrgInputSchema);
   const { db } = c.var.deps;
@@ -89,6 +93,7 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
   const [org] = await db.update(organizations).set(patch).where(eq(organizations.id, orgId(c))).returning({
     id: organizations.id, name: organizations.name, slug: organizations.slug, plan: organizations.plan,
     onboardingState: organizations.onboardingState, scoringWeights: organizations.scoringWeights,
+    trialEndsAt: organizations.trialEndsAt,
   });
   // Onboarding ticks are too chatty for the activity feed; log meaningful changes only.
   if (body.name !== undefined || body.scoringWeights !== undefined) {
@@ -137,6 +142,11 @@ orgRoutes.post('/org/invitations', requireRole('bid_manager'), async (c) => {
     const msg = `${body.email} is already a member of this organization`;
     throw conflict(msg, { fields: { email: msg } });
   }
+
+  // 008/FR-036: seats = members + pending invitations. Re-inviting a pending email replaces its invitation (no new seat).
+  const [pendingSame] = await db.select({ id: invitations.id }).from(invitations)
+    .where(and(eq(invitations.orgId, oid), eq(invitations.email, body.email), isNull(invitations.acceptedAt), gt(invitations.expiresAt, clock.now())));
+  await assertWithinPlan(c.var.deps, oid, 'seats', pendingSame ? 0 : 1);
 
   // Re-inviting replaces any pending invitation for the same email.
   await db.delete(invitations).where(and(eq(invitations.orgId, oid), eq(invitations.email, body.email), isNull(invitations.acceptedAt)));

@@ -26,6 +26,8 @@ export interface RuntimeEnv {
   TRUST_PROXY?: string;
   /** "development" | "production" | "test" */
   NODE_ENV?: string;
+  /** Operator token for /api/admin/* (008/FR-042). Unset → admin routes answer 404. */
+  ADMIN_TOKEN?: string;
 }
 
 export interface AppConfig {
@@ -39,6 +41,8 @@ export interface AppConfig {
   llmModel: string;
   /** Proxy whose client-IP header is trusted for rate limiting (002/FR-010). */
   trustProxy: TrustProxy;
+  /** Null when ADMIN_TOKEN is unset. */
+  adminToken: string | null;
 }
 
 export type TrustProxy = 'cloudflare' | 'xff' | 'none';
@@ -67,6 +71,7 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     mailFrom: env.MAIL_FROM || 'TenderPilot <alerts@tenderpilot.in>',
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
+    adminToken: env.ADMIN_TOKEN || null,
   };
 }
 

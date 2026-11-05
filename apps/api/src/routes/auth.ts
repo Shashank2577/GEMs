@@ -19,6 +19,7 @@ import { getDummyHash, hashPassword, randomToken, sha256Hex, verifyPassword } fr
 import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/errors';
 import { buildMe } from '../lib/me';
 import { defer } from '../lib/defer';
+import { trialEndsAtFor } from '@tp/core/contracts/plans';
 import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reset } from '../lib/rate-limit';
 import { clearSessionCookie, firstMembership, loadMembership, loadUser, rememberOrg, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
@@ -69,7 +70,9 @@ authRoutes.post('/auth/signup', async (c) => {
   try {
     ids = await db.transaction(async (tx) => {
       const [u] = await tx.insert(users).values({ email: body.email, name: body.name, passwordHash }).returning({ id: users.id });
-      const [o] = await tx.insert(organizations).values({ name: body.orgName, slug }).returning({ id: organizations.id });
+      // 008/FR-035: the free trial ends 14 days after sign-up.
+      const [o] = await tx.insert(organizations).values({ name: body.orgName, slug, trialEndsAt: trialEndsAtFor(c.var.deps.clock.now()) })
+        .returning({ id: organizations.id });
       await tx.insert(memberships).values({ orgId: o.id, userId: u.id, role: 'owner' });
       await tx.insert(notificationPrefs).values({ orgId: o.id, userId: u.id, ...DEFAULT_PREFS });
       return { userId: u.id, orgId: o.id };

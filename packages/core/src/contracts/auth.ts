@@ -108,6 +108,8 @@ export interface MeOrg {
   id: string; name: string; slug: string; plan: string;
   onboardingState: Record<string, boolean>;
   scoringWeights?: Record<string, number> | null;
+  /** ISO end of the free trial (008/FR-035); null for paid plans. */
+  trialEndsAt?: string | null;
 }
 export interface Me {
   user: MeUser;

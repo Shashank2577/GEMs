@@ -1,0 +1,146 @@
+008/US5 developer API examples — local Node stack (apps/api/src/node.ts) on :8792, DB tenderpilot_e2e_us5,
+captured 2026-11-05T04:27:42.999Z. Responses trimmed only by pretty-printing; tokens redacted.
+
+### GET /api/org/usage (any member) — trial org, 5 Nov 2026
+GET /api/org/usage  (cookie: tp_session=…)
+→ 200
+{
+  "plan": "trial",
+  "trialEndsAt": "2026-11-19T04:27:29.223Z",
+  "period": {
+    "start": "2026-10-31T18:30:00.000Z",
+    "end": "2026-11-30T18:30:00.000Z"
+  },
+  "usage": {
+    "seats": 1,
+    "watchlists": 2,
+    "analysesThisMonth": 7,
+    "llmAnalysesThisMonth": 7,
+    "vaultBytes": 125829120,
+    "packetsThisMonth": 0,
+    "llmTokensThisMonth": {
+      "input": 127750,
+      "output": 6580
+    }
+  },
+  "limits": {
+    "seats": 10,
+    "watchlists": null,
+    "analysesPerMonth": 10,
+    "llmAnalysesPerMonth": 10,
+    "vaultBytes": 1073741824,
+    "packetsPerMonth": 10,
+    "whatsapp": true
+  }
+}
+
+### 402 plan_limit_reached — 11th analysis this IST month on a trial (no analyses row is written)
+POST /api/tenders/5d7b5b3a-2c5a-45c4-a7eb-375ed10c2399/analyse  (cookie: tp_session=…)
+→ 402
+{
+  "error": {
+    "code": "plan_limit_reached",
+    "message": "Your Free trial includes 10 analyses a month. You've used 10. Talk to us to upgrade, or wait until 1 Dec.",
+    "details": {
+      "limit": "analysesPerMonth",
+      "used": 10,
+      "max": 10,
+      "plan": "trial",
+      "resetsAt": "2026-11-30T18:30:00.000Z"
+    }
+  }
+}
+
+(analyses rows for the org after the 402: 10)
+
+### POST /api/admin/orgs/:id/plan — wrong token → 404 (same as an unknown route)
+POST /api/admin/orgs/5e6c3376-5b8f-47d6-a5e6-fcb5ebbef731/plan
+authorization: Bearer <wrong token>
+{"plan":"starter","note":"Invoice INV-0012"}
+→ 404
+{
+  "error": {
+    "code": "not_found",
+    "message": "No API route for POST /api/admin/orgs/5e6c3376-5b8f-47d6-a5e6-fcb5ebbef731/plan"
+  }
+}
+
+### POST /api/admin/orgs/:id/plan — no token → 404
+POST /api/admin/orgs/5e6c3376-5b8f-47d6-a5e6-fcb5ebbef731/plan
+{"plan":"starter","note":"Invoice INV-0012"}
+→ 404
+{
+  "error": {
+    "code": "not_found",
+    "message": "No API route for POST /api/admin/orgs/5e6c3376-5b8f-47d6-a5e6-fcb5ebbef731/plan"
+  }
+}
+
+### POST /api/admin/orgs/:id/plan — good token → 200
+POST /api/admin/orgs/5e6c3376-5b8f-47d6-a5e6-fcb5ebbef731/plan
+authorization: Bearer <ADMIN_TOKEN>
+{"plan":"starter","note":"Invoice INV-0012"}
+→ 200
+{
+  "org": {
+    "id": "5e6c3376-5b8f-47d6-a5e6-fcb5ebbef731",
+    "plan": "starter",
+    "trialEndsAt": null
+  },
+  "subscriptionId": "0f9ccaeb-b0b6-4a02-8157-4206b8bde2c7"
+}
+
+### Activity after the flip (GET /api/activity?entityType=organization, first item)
+{
+  "id": "0041dd7f-2e1e-4762-9c7c-d6eeaf3eaa8a",
+  "action": "org.plan_changed",
+  "entityType": "organization",
+  "entityId": "5e6c3376-5b8f-47d6-a5e6-fcb5ebbef731",
+  "meta": {
+    "to": "starter",
+    "from": "trial",
+    "note": "Invoice INV-0012",
+    "trialEndsAt": null
+  },
+  "createdAt": "2026-11-05T04:27:29.634Z",
+  "user": null
+}
+
+### 402 plan_limit_reached — Starter org, 3 seats used (1 member + 2 pending invitations)
+POST /api/org/invitations  (cookie: tp_session=…)
+{"email":"kiran@nairtraders.example.in","role":"viewer"}
+→ 402
+{
+  "error": {
+    "code": "plan_limit_reached",
+    "message": "Your Starter plan includes 3 seats (members and pending invitations). You're using 3. Talk to us to upgrade, or remove a member or invitation.",
+    "details": {
+      "limit": "seats",
+      "used": 3,
+      "max": 3,
+      "plan": "starter"
+    }
+  }
+}
+
+### 402 plan_expired — any write after the trial ended
+POST /api/watchlists  (cookie: tp_session=…)
+{"name":"Laptops","criteria":{"keywords":["laptop"],"excludeKeywords":[],"categories":[],"hsnCodes":[],"states":[],"ministries":[]}}
+→ 402
+{
+  "error": {
+    "code": "plan_expired",
+    "message": "Your free trial ended on 4 Nov 2026. Your data is safe and read-only — talk to us to choose a plan.",
+    "details": {
+      "plan": "trial",
+      "trialEndsAt": "2026-11-04T04:27:37.637Z"
+    }
+  }
+}
+
+### Reads still work on the expired trial
+GET /api/tenders?pageSize=1 → 200
+
+(desktop: "Send invitation" on the expired trial opened the dialog; POST /api/org/invitations requests sent by the browser: 0)
+
+(mobile: "Send invitation" on the expired trial opened the dialog; POST /api/org/invitations requests sent by the browser: 0)

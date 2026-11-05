@@ -102,6 +102,8 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/workspaces/:id/packets', min: 'analyst' },
   // ── experience ──
   { method: 'POST', path: '/api/demo/seed', min: 'bid_manager' },
+  // ── operator (008/FR-042): Bearer ADMIN_TOKEN, never a member session; 404 without it (plan.test.ts) ──
+  { method: 'POST', path: '/api/admin/orgs/:id/plan', min: 'public' },
 ];
 
 const ROLES: Role[] = ['viewer', 'analyst', 'bid_manager', 'owner'];

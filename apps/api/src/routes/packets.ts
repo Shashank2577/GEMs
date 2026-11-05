@@ -16,6 +16,7 @@ import { annexureTemplates, bidWorkspaces, packets } from '@tp/db';
 import { annexureTemplateInputSchema, packetBuildSchema } from '@tp/core/contracts/apply';
 import { normalizeTemplateKey, unknownPlaceholderMessage, unknownPlaceholders, type TemplateKey } from '@tp/core/packet/templates';
 import { logActivity } from '../lib/activity';
+import { assertWithinPlan } from '../lib/plan';
 import { HttpError, notFound } from '../lib/errors';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
@@ -120,6 +121,7 @@ packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), async (c) 
   const org = orgId(c);
   const w = await getWorkspace(deps, org, c.req.param('id'));
   const body = await parseJson(c, packetBuildSchema);
+  await assertWithinPlan(deps, org, 'packetsPerMonth'); // 008/FR-036
   const p = await buildWorkspacePacket(deps, org, userId(c), w, body.items);
   await logActivity(deps.db, {
     orgId: org, userId: userId(c), action: p.status === 'ready' ? 'workspace.packet_built' : 'workspace.packet_failed', entityType: 'workspace', entityId: w.id,

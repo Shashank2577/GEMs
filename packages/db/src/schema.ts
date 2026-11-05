@@ -31,6 +31,8 @@ export const organizations = pgTable('organizations', {
   plan: text('plan').notNull().default('trial'), // trial | starter | pro | enterprise
   onboardingState: jsonb('onboarding_state').$type<Record<string, boolean>>().notNull().default({}),
   scoringWeights: jsonb('scoring_weights').$type<Record<string, number>>(),
+  /** End of the free trial (008/FR-035): created + 14 days at sign-up; null for paid plans and pre-trial seeds. */
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => ({ slugUq: uniqueIndex('org_slug_uq').on(t.slug) }));
 
@@ -389,10 +391,17 @@ export const analyses = pgTable('analyses', {
   staleReason: text('stale_reason').$type<StaleReason>(),
   staleAt: timestamp('stale_at', { withTimezone: true }),
   notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
+  /** Machine-readable caveats rendered by the web (008/FR-031: `llm_budget_exhausted`, `llm_quota_reached`). */
+  warnings: jsonb('warnings').$type<AnalysisWarning[]>().notNull().default([]),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({ orgTenderIdx: index('analyses_org_tender_idx').on(t.orgId, t.tenderId) }));
+
+/** 008/FR-031/FR-037 analysis warnings. `covered`/`total` count documents read by the LLM vs all documents. */
+export type AnalysisWarning =
+  | { code: 'llm_budget_exhausted'; covered: number; total: number }
+  | { code: 'llm_quota_reached' };
 
 // ───────────── Apply: workspace & packet ─────────────
 
@@ -490,3 +499,30 @@ export const activityLog = pgTable('activity_log', {
   meta: jsonb('meta').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: createdAt(),
 }, (t) => ({ orgIdx: index('activity_org_idx').on(t.orgId, t.createdAt) }));
+
+// ───────────── Plans & metering (spec 008 US5) ─────────────
+
+/** Plan changes made by TenderPilot staff via `POST /api/admin/orgs/:id/plan` (008/FR-042). */
+export const subscriptions = pgTable('subscriptions', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  plan: text('plan').notNull(), // trial | starter | pro | enterprise
+  status: text('status').$type<'active' | 'cancelled'>().notNull().default('active'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  note: text('note'),
+  createdBy: text('created_by'),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('subscriptions_org_idx').on(t.orgId, t.createdAt.desc()) }));
+
+/** One row per LLM call (008/FR-039): tokens as reported by the provider. */
+export const llmUsage = pgTable('llm_usage', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  analysisId: uuid('analysis_id').references(() => analyses.id, { onDelete: 'set null' }),
+  kind: text('kind').$type<'extract' | 'assist'>().notNull(),
+  model: text('model').notNull(),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('llm_usage_org_idx').on(t.orgId, t.createdAt) }));

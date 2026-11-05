@@ -24,3 +24,8 @@ export const unauthorized = (message = 'Please sign in to continue') => new Http
 export const forbidden = (message = 'You do not have permission to do that') => new HttpError(403, 'forbidden', message);
 export const notFound = (what = 'Resource') => new HttpError(404, 'not_found', `${what} not found`);
 export const conflict = (message: string, details?: unknown) => new HttpError(409, 'conflict', message, details);
+
+// ───────────── Ops / plan errors (008/FR-018, FR-021, FR-040) ─────────────
+
+/** 402 — plan limits (`plan_limit_reached`, `plan_expired`). */
+export const paymentRequired = (code: string, message: string, details?: unknown) => new HttpError(402, code, message, details);
