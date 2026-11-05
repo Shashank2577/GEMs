@@ -1,0 +1,3 @@
+detail keys with isDemo: True True
+nested tender: False
+org without demo: total 0 []

@@ -43,7 +43,7 @@ task is sized at ≤ 1 day.
 - [x] T002 [P] E2E scaffold for this spec: create `e2e/007-experience-growth/` and add helpers `evidence007(page, story, name)` (writes `qa/evidence/007/<story>/`), `inviteAs(request, role)` (returns a logged-in context for bid_manager/analyst/viewer), `atPhone(page)` (375×812), `noHorizontalOverflow(page)` (asserts `scrollWidth ≤ innerWidth`) and `seedDemoAndGetWorkspaces(request)` in `e2e/support/fixtures.ts` NFR-007, FR-094 (#299)
 - [x] T003 [P] Add `@axe-core/playwright` (exact version) to root `package.json` devDependencies and an `a11y(page, name)` helper in `e2e/support/fixtures.ts` running tags `wcag2a, wcag2aa, wcag21a, wcag21aa`, failing on serious/critical and saving JSON next to the evidence FR-094, NFR-004 (#300)
 - [x] T004 [P] Create or append root `NOTICE` with the attribution for `arush15june/gem-search` (MIT, © arush15june) covering the bid-result parser ported to `packages/core/src/gem/award.ts` NFR-009 (#301)
-- [ ] T005 [P] Document the new/changed contracts (`myWork`, `awaitingDecision`, `DELETE /demo`, onboarding key whitelist, `bid_workspaces_org_stage_idx`) in `specs/001-gem-tender-copilot/contracts/api.md` § Dashboard & demo and `specs/001-gem-tender-copilot/data-model.md` FR-048, FR-065, FR-070 (#302)
+- [x] T005 [P] Document the new/changed contracts (`myWork`, `awaitingDecision`, `DELETE /demo`, onboarding key whitelist, `bid_workspaces_org_stage_idx`) in `specs/001-gem-tender-copilot/contracts/api.md` § Dashboard & demo and `specs/001-gem-tender-copilot/data-model.md` FR-048, FR-065, FR-070 (#302)
 
 ---
 
@@ -141,7 +141,7 @@ task is sized at ≤ 1 day.
 - [x] T045 [US3] Tick resilience: `tick()` retries once after 1 s and then shows the toast "Couldn’t save your progress — your data is saved, but setup may restart at this step" without blocking navigation, in `apps/web/src/features/onboarding/OnboardingPage.tsx` FR-050 (#324)
 - [x] T046 [US3] Pre-mark key-document cards already in the vault (query `GET /vault?type=gst|pan|udyam` via `apps/web/src/features/vault/api.ts`) showing the vault title and counting them in "N uploaded", in `apps/web/src/features/onboarding/OnboardingPage.tsx` FR-051 (#325)
 - [x] T047 [US3] Log `onboarding.completed` with `meta.durationSec = now − organizations.created_at` when `completed` flips from false/absent to true in `PATCH /org` (`apps/api/src/routes/org.ts`), add the sentence "finished setting up TenderPilot" to `apps/web/src/features/dashboard/activity.ts`, and an API test in `apps/api/test/foundation.test.ts` FR-052, SC-001 (#326)
-- [ ] T048 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in `qa/evidence/007/US3/` — `e2e/007-experience-growth/US3-onboarding.e2e.ts` covering US3-1…US3-17 (UI sign-up, each step's validation and save, live preview, 21 MB rejection with a generated buffer, resume after reload, skip → checklist, Analyst "You’re all set", timed run < 90 s, `@mobile` 375 px sticky footer) and `qa/evidence/007/US3/VERDICT.md` FR-040…FR-052, SC-001 (#327)
+- [x] T048 [US3] QA: Playwright E2E for US3 with evidence (screenshots, video, trace) in `qa/evidence/007/US3/` — `e2e/007-experience-growth/US3-guided-onboarding.e2e.ts` covering US3-1…US3-17 (UI sign-up, each step's validation and save, live preview, 21 MB rejection with a generated buffer, resume after reload, skip → checklist, Analyst "You’re all set", timed run < 90 s, `@mobile` 375 px sticky footer) and `qa/evidence/007/US3/VERDICT.md` FR-040…FR-052, SC-001 (#327)
 
 **Checkpoint**: User Stories 1–3 work independently
 
@@ -166,7 +166,7 @@ task is sized at ≤ 1 day.
 - [x] T054 [US4] `DELETE /demo` (bid_manager+) calling `removeDemo`, setting `onboardingState.demo = false`, logging `demo.removed`, returning `DemoRemoveResponse` in `apps/api/src/routes/demo.ts`; `useRemoveDemo()` in `apps/web/src/features/dashboard/api.ts` FR-065 (#330)
 - [x] T055 [US4] Demo banner on the dashboard when `demo` ("You’re exploring sample data for Aarav Technologies Pvt Ltd." + "Remove demo data" for bid_manager+, confirmation dialog "Remove all demo data? Your own watchlists, documents and bids stay.", toast "Demo data removed") in new `apps/web/src/features/dashboard/DemoBanner.tsx` and `apps/web/src/features/dashboard/DashboardPage.tsx` FR-066 (#331)
 - [x] T056 [P] [US4] "Sample" badge for demo tenders: expose `isDemo` (from `raw.demo`) on tender DTOs in `packages/core/src/contracts/identify.ts` and `apps/api/src/routes/tenders.ts`, render it in `apps/web/src/features/feed/{TenderCard,TenderTable}.tsx` and `apps/web/src/features/tender/TenderPage.tsx` FR-067 (#332)
-- [ ] T057 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in `qa/evidence/007/US4/` — `e2e/007-experience-growth/US4-demo.e2e.ts` covering US4-1…US4-14 (seed from the dashboard banner, badge without reload, PDF download header, second seed 200, Sample badge, removal keeps user rows, Viewer has no buttons) and `qa/evidence/007/US4/VERDICT.md` FR-060…FR-067, SC-007 (#333)
+- [x] T057 [US4] QA: Playwright E2E for US4 with evidence (screenshots, video, trace) in `qa/evidence/007/US4/` — `e2e/007-experience-growth/US4-demo.e2e.ts` covering US4-1…US4-14 (seed from the dashboard banner, badge without reload, PDF download header, second seed 200, Sample badge, removal keeps user rows, Viewer has no buttons) and `qa/evidence/007/US4/VERDICT.md` FR-060…FR-067, SC-007 (#333)
 
 **Checkpoint**: Demo lifecycle complete
 
@@ -188,7 +188,7 @@ task is sized at ≤ 1 day.
 - [x] T060 [P] [US5] "My bids" card (stage badge, "Due <date>" red when overdue, readiness bar, empty text "Nothing assigned to you — bids you own or are assigned to will appear here.") placed after the KPI tiles for analyst/bid_manager and below the first row for owners, hidden for viewers, in new `apps/web/src/features/dashboard/MyBidsCard.tsx` and `apps/web/src/features/dashboard/DashboardPage.tsx` FR-071 (#336)
 - [x] T061 [P] [US5] "Awaiting your decision" card (score ring, verdict, closes-in; "Go" and "Drop" with confirmation for bid_manager+, read-only for analysts, hidden for viewers) reusing `useMoveCard()` from `apps/web/src/features/pipeline/api.ts`, in new `apps/web/src/features/dashboard/DecisionsCard.tsx` FR-072 (#337)
 - [x] T062 [US5] Role-gated CTAs: hide "Create a watchlist" for viewers (show "Ask an Owner or Bid Manager to set up watchlists."), hide "Finish setting up" for analysts/viewers (show Go / No-Go), in `apps/web/src/features/dashboard/DashboardPage.tsx` FR-073 (#338)
-- [ ] T063 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in `qa/evidence/007/US5/` — `e2e/007-experience-growth/US5-persona-widgets.e2e.ts` logging in as Owner, Bid Manager, Analyst and Viewer (via `inviteAs`) on the demo org, covering US5-1…US5-6 including `@mobile` one-tap Go, and `qa/evidence/007/US5/VERDICT.md` FR-070…FR-073 (#339)
+- [x] T063 [US5] QA: Playwright E2E for US5 with evidence (screenshots, video, trace) in `qa/evidence/007/US5/` — `e2e/007-experience-growth/US5-persona-widgets.e2e.ts` logging in as Owner, Bid Manager, Analyst and Viewer (via `inviteAs`) on the demo org, covering US5-1…US5-6 including `@mobile` one-tap Go, and `qa/evidence/007/US5/VERDICT.md` FR-070…FR-073 (#339)
 
 **Checkpoint**: Dashboard adapts per persona
 
@@ -213,7 +213,7 @@ task is sized at ≤ 1 day.
 - [x] T069 [P] [US6] `apps/web/public/robots.txt` (allow `/`, disallow app routes and `/api/`) and `apps/web/public/sitemap.xml` (`/`, `/signup`, `/login`); verify both are served by the Worker static assets and Node server FR-087 (#343)
 - [x] T070 [US6] Plan CTAs link to `/signup?plan=starter|pro`; `SignupPage` shows "You’re starting a 14-day free trial of Pro — no card needed." for known plans and ignores unknown values, in `apps/web/src/features/landing/LandingPage.tsx`, `apps/web/src/features/auth/SignupPage.tsx` FR-085 (#344)
 - [x] T071 [US6] Lighthouse check for `/` (mobile emulation, 3 runs, median) with thresholds Perf ≥ 85, A11y ≥ 95, BP ≥ 90, SEO ≥ 90 and median LCP < 2.5 s, CLS < 0.1, writing the report to `qa/evidence/007/US6/lighthouse/` via new `scripts/lighthouse-landing.mjs` (uses `lighthouse` dev dependency, exact version) NFR-003, SC-006 (#345)
-- [ ] T072 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in `qa/evidence/007/US6/` — `e2e/007-experience-growth/US6-landing.e2e.ts` covering US6-1…US6-12 (signed-out/signed-in redirects incl. `?next=//evil.com`, anchors, `@mobile` menu, pricing texts, keyboard FAQ/tabs, reduced motion via `page.emulateMedia`, head meta, robots/sitemap, `?plan=`) and `qa/evidence/007/US6/VERDICT.md` FR-080…FR-087 (#346)
+- [x] T072 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in `qa/evidence/007/US6/` — `e2e/007-experience-growth/US6-landing.e2e.ts` covering US6-1…US6-12 (signed-out/signed-in redirects incl. `?next=//evil.com`, anchors, `@mobile` menu, pricing texts, keyboard FAQ/tabs, reduced motion via `page.emulateMedia`, head meta, robots/sitemap, `?plan=`) and `qa/evidence/007/US6/VERDICT.md` FR-080…FR-087 (#346)
 
 **Checkpoint**: Landing ready for launch traffic
 
@@ -227,15 +227,15 @@ task is sized at ≤ 1 day.
 
 ### Tests for User Story 7
 
-- [ ] T073 [US7] Accessibility & responsiveness sweep: for landing, login, signup, onboarding, dashboard, tenders, pipeline, vault, profile, settings, notifications at 375×812 and 1440×900 in light and dark, run `a11y()` and `noHorizontalOverflow()`, and check 24×24 px minimum targets for buttons/links (44×44 in the tab bar), in `e2e/007-experience-growth/US7-a11y-responsive.e2e.ts` FR-094, NFR-004, SC-003, SC-004 (#347)
+- [x] T073 [US7] Accessibility & responsiveness sweep: for landing, login, signup, onboarding, dashboard, tenders, pipeline, vault, profile, settings, notifications at 375×812 and 1440×900 in light and dark, run `a11y()` and `noHorizontalOverflow()`, and check 24×24 px minimum targets for buttons/links (44×44 in the tab bar), in `e2e/007-experience-growth/US7-a11y-responsive.e2e.ts` FR-094, NFR-004, SC-003, SC-004 (#347)
 
 ### Implementation for User Story 7
 
 - [x] T074 [US7] Built cross-page standards: tab bar/sidebar, skip link, focus management, command palette (T009); theme pre-paint, error boundary, 404, splash (T010); state primitives (T011); reduced motion in onboarding/landing; chart text alternatives (T020) in `apps/web/src/components/layout/`, `apps/web/src/components/ui/`, `apps/web/src/app/` FR-090…FR-093
-- [ ] T075 [US7] Fix violations found by T073 (time-boxed to 1 day; create follow-up tasks for anything larger), starting with likely hits: drag-handle and chip target sizes in `apps/web/src/features/pipeline/PipelinePage.tsx`, muted-text contrast on tinted cards in `apps/web/src/index.css`, icon-only buttons without names in `apps/web/src/components/layout/AppShell.tsx` NFR-004 (#348)
-- [ ] T076 [P] [US7] Web app manifest `apps/web/public/manifest.webmanifest` (name/short_name "TenderPilot", `start_url /dashboard`, `display standalone`, theme/background colours, 192/512 and maskable icons in `apps/web/public/icons/`) linked from `apps/web/index.html` with `apple-touch-icon` FR-095 (#349)
-- [ ] T077 [P] [US7] `useOnline()` hook in `apps/web/src/lib/hooks.ts` and an `OfflineBanner` ("You’re offline — showing the last loaded data", `role="status"`) in `apps/web/src/components/layout/AppShell.tsx`; set TanStack Query `networkMode: 'online'` for mutations so offline mutations fail fast with an error toast, in `apps/web/src/main.tsx` FR-096 (#350)
-- [ ] T078 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in `qa/evidence/007/US7/` — run T073 plus US7-1…US7-11 (tab bar/More sheet, sidebar collapse, skip link + focus, theme persistence without flash, chunk-error and render-error boundaries via `page.route`, 404, chart `role="img"`, manifest fetch, offline via `context.setOffline(true)`), axe JSON in `qa/evidence/007/US7/axe/` and `qa/evidence/007/US7/VERDICT.md` FR-090…FR-096, SC-003, SC-004 (#351)
+- [x] T075 [US7] Fix violations found by T073 (time-boxed to 1 day; create follow-up tasks for anything larger), starting with likely hits: drag-handle and chip target sizes in `apps/web/src/features/pipeline/PipelinePage.tsx`, muted-text contrast on tinted cards in `apps/web/src/index.css`, icon-only buttons without names in `apps/web/src/components/layout/AppShell.tsx` NFR-004 (#348)
+- [x] T076 [P] [US7] Web app manifest `apps/web/public/manifest.webmanifest` (name/short_name "TenderPilot", `start_url /dashboard`, `display standalone`, theme/background colours, 192/512 and maskable icons in `apps/web/public/icons/`) linked from `apps/web/index.html` with `apple-touch-icon` FR-095 (#349)
+- [x] T077 [P] [US7] `useOnline()` hook in `apps/web/src/lib/hooks.ts` and an `OfflineBanner` ("You’re offline — showing the last loaded data", `role="status"`) in `apps/web/src/components/layout/AppShell.tsx`; set TanStack Query `networkMode: 'always'` for mutations (fail fast with an error toast; `'online'` would pause offline mutations), in `apps/web/src/main.tsx` FR-096 (#350)
+- [x] T078 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in `qa/evidence/007/US7/` — run T073 (`e2e/007-experience-growth/US7-experience-qa.e2e.ts` + `US7-a11y-responsive.e2e.ts`) plus US7-1…US7-11 (tab bar/More sheet, sidebar collapse, skip link + focus, theme persistence without flash, chunk-error and render-error boundaries via `page.route`, 404, chart `role="img"`, manifest fetch, offline via `context.setOffline(true)`), axe JSON in `qa/evidence/007/US7/axe/` and `qa/evidence/007/US7/VERDICT.md` FR-090…FR-096, SC-003, SC-004 (#351)
 
 **Checkpoint**: All user stories independently functional and verified
 
@@ -243,9 +243,9 @@ task is sized at ≤ 1 day.
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T079 [P] Update `e2e/README.md` with the 007 helpers (`evidence007`, `inviteAs`, `a11y`, `noHorizontalOverflow`) and mark 001 T081's US6/US7 E2E items as delivered by 007 in `specs/001-gem-tender-copilot/tasks.md` NFR-007 (#352)
-- [ ] T080 Run `/cairn-analyze` across `specs/007-experience-growth/{spec,plan,tasks}.md` and fix inconsistencies; cairn review of each PR against Constitution I and IV first (ai-sdlc review conventions in `CONVENTIONS.md`), recording findings in the PR NFR-007 (#353)
-- [ ] T081 QA roll-up: `qa/evidence/007/README.md` linking each story's `VERDICT.md`, video, trace and screenshots, and the SC-001…SC-008 measurements NFR-007 (#354)
+- [x] T079 [P] Update `e2e/README.md` with the 007 helpers (`evidence007`, `inviteAs`, `a11y`, `noHorizontalOverflow`) and mark 001 T081's US6/US7 E2E items as delivered by 007 in `specs/001-gem-tender-copilot/tasks.md` NFR-007 (#352)
+- [x] T080 Run `/cairn-analyze` across `specs/007-experience-growth/{spec,plan,tasks}.md` and fix inconsistencies; cairn review of each PR against Constitution I and IV first (ai-sdlc review conventions in `CONVENTIONS.md`), recording findings in the PR NFR-007 (#353)
+- [x] T081 QA roll-up: `qa/evidence/007/README.md` linking each story's `VERDICT.md`, video, trace and screenshots, and the SC-001…SC-008 measurements NFR-007 (#354)
 
 ---
 
