@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, signupViaApi, evidence, collectRunArtifacts } from '../support/fixtures';
+import { test, expect, signupViaApi, evidence, collectRunArtifacts, a11y } from '../support/fixtures';
 import { getProfile, putProfile, istDate, joinOrgAs, uploadPdf, addContract, activityActions } from './support';
 
 const S = '005', U = 'US5';
@@ -464,5 +464,35 @@ test.describe('US5 OEM authorisations', () => {
     await page.getByRole('button', { name: 'Save profile' }).click();
     await expect(page.getByText('Profile saved')).toBeVisible();
     expect((await getProfile(page)).profile.oemAuthorizations[0].validTill).toBe(expiry);
+  });
+});
+
+test.describe('US5 accessibility (axe)', () => {
+  const setup = async (page: Page) => {
+    await signupViaApi(page);
+    await uploadPdf(page, { type: 'oem_authorization', title: 'Dell MAF', expiryDate: istDate(90) });
+    await addContract(page, { ...BASE, startDate: '2025-01-10', endDate: '2025-06-30' });
+    await page.goto('/profile');
+    await experience(page).getByText('1 contract').waitFor();
+    await oemSection(page).getByRole('button', { name: 'Add OEM authorisation' }).click();
+  };
+
+  test('Experience + OEM sections and the contract dialog: no serious/critical axe violations @mobile', async ({ page }, info) => {
+    await setup(page);
+    // Mobile cards: ResponsiveTable nests the actions button inside a role=button card (nested-interactive) -> tracked
+    // separately below as a known issue outside this story's criteria; every other rule still runs on mobile.
+    const disableRules = info.project.name === 'mobile' ? ['nested-interactive'] : [];
+    await a11y(page, 'profile-experience-oem', { include: ['section#sec-experience', 'section#sec-oem'], disableRules });
+    await experience(page).getByRole('button', { name: 'Add contract' }).first().click();
+    await expect(contractDialog(page)).toBeVisible();
+    await a11y(page, 'contract-dialog', { include: ['[role=dialog]'] });
+  });
+
+  // KNOWN ISSUE (filed as a bug): passes while the violation exists; once fixed it flips and test.fail() will report it.
+  test('KNOWN ISSUE mobile contract cards: nested-interactive (card role=button contains the actions button) @mobile', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile', 'cards only render on phones');
+    test.fail();
+    await setup(page);
+    await a11y(page, 'mobile-cards-nested-interactive', { include: ['section#sec-experience'] });
   });
 });
