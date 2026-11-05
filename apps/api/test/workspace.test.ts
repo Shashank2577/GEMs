@@ -396,6 +396,13 @@ describe('mapping & readiness edge cases (T028; 006/FR-013, FR-016, FR-017, FR-0
     expect(auto.body.readiness.canMarkReady).toBe(true);
   });
 
+  it('409 nothing_to_override for an expiring (covered, not yet expired) item (006/FR-027)', async () => {
+    expect(item(await detail(), 'oem_authorization')).toMatchObject({ state: 'expiring' });
+    const r = await request(ctx.app, 'POST', `/workspaces/${id}/overrides`, { cookie: org.bidManager.cookie, json: { itemId: 'oem_authorization', reason: 'Not actually needed' } });
+    expect(r.status).toBe(409);
+    expect(r.body.error).toMatchObject({ code: 'nothing_to_override', message: 'Only a missing or expired item can be overridden.' });
+  });
+
   it('rejects unknown checklist items with the exact message; viewers cannot map', async () => {
     const r = await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.analyst.cookie, json: { nope: null } });
     expect(r.status).toBe(400);

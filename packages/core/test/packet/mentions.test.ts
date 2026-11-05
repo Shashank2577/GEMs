@@ -28,6 +28,12 @@ describe('parseMentions', () => {
   it('prefers the full-name match when a first name is shared', () => {
     expect(parseMentions('@Anil Rao please review', M)).toEqual(['anil2']);
   });
+  it('keeps only the longest full-name match at a position', () => {
+    const members = [{ id: 'anil', name: 'Anil' }, { id: 'anilk', name: 'Anil Kumar' }];
+    expect(parseMentions('@Anil Kumar please look', members)).toEqual(['anilk']);
+    expect(parseMentions('@Anil please look', members)).toEqual(['anil']);
+    expect(parseMentions('@Anil Kumar and @Anil', members).sort()).toEqual(['anil', 'anilk']);
+  });
   it('notifies nobody for an ambiguous first name', () => {
     expect(parseMentions('@Anil can you look?', M)).toEqual([]);
   });

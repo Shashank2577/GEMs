@@ -291,6 +291,7 @@ workspacesRoutes.delete('/workspaces/:id/comments/:commentId', requireAuth, asyn
   if (!row) throw notFound('Comment');
   if (row.userId !== userId(c) && !roleAtLeast(c.var.role, 'bid_manager')) throw forbidden('Only the author or a Bid Manager can delete a comment.');
   await deps.db.delete(comments).where(and(eq(comments.orgId, org), eq(comments.id, row.id)));
+  await touch(deps, org, w.id, {});
   await log(c, w, 'workspace.comment_deleted', { commentId: row.id, authorId: row.userId });
   return c.body(null, 204);
 });
