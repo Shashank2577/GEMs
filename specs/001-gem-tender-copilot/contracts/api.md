@@ -10,26 +10,59 @@ Money is integer rupees. Dates are ISO-8601 strings; the UI renders IST.
 
 Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by the area's module).
 
-## Platform — owner: API foundation (`apps/api/src/routes/auth.ts`, `routes/org.ts`)
+## Platform — owner: API foundation (`apps/api/src/routes/auth.ts`, `routes/org.ts`, `routes/sessions.ts`)
+
+"S" = session (cookie) only; an `Authorization: Bearer tp_…` token gets 403 `forbidden`.
 
 | Method | Path | Body / Query | Returns |
 |---|---|---|---|
-| POST | /auth/signup | `{name,email,password(≥8),orgName}` | `Me` (sets cookie) |
-| POST | /auth/login | `{email,password}` | `Me` |
+| POST | /auth/signup | `{name,email,password(≥8),orgName}` | `Me` (sets cookie), 201 |
+| POST | /auth/login | `{email,password}` | `Me`; 401 `invalid_credentials`; 429 `rate_limited` (FR-010) |
 | POST | /auth/logout | – | `{ok:true}` |
 | GET | /auth/me | – | `Me = {user:{id,name,email,phone}, org:{id,name,slug,plan,onboardingState}, role, orgs:[{id,name,role}]}` (401 if none) |
-| POST | /auth/switch-org | `{orgId}` | `Me` |
-| POST | /auth/accept-invite | `{token,name?,password?}` | `Me` |
+| POST (S) | /auth/switch-org | `{orgId}` | `Me`; 404 `not_found` for an org the user is not in |
+| POST | /auth/forgot-password | `{email}` | `{ok:true}` always (no account enumeration); 429 `rate_limited` per email (3/h) and per IP (20/h) (FR-011) |
+| POST | /auth/reset-password | `{token,password(≥8)}` | `{ok:true}`, signs out every session of the user; 400 `reset_invalid` (unknown, used or expired link, 1 h); 429 `rate_limited` (FR-011) |
+| GET | /auth/invite/:token | – (no auth) | `InvitePreview = {orgName,email,role,invitedBy,expiresAt,existingUser}`; 404 `invite_invalid` (FR-019) |
+| POST | /auth/accept-invite | `{token,name?,password?}` (signed in: neither; existing account: `password`; new account: `name`+`password`) | `Me`; 404 `invite_invalid`; 401 `invalid_credentials` (wrong password for an existing account); 403 `invite_email_mismatch` when the signed-in user's email is not the invited one (FR-018); 429 `rate_limited` |
 | PATCH | /me | `{name?,phone?}` | `Me` |
-| GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` | prefs |
-| POST | /me/notifications/test | – (session only; 1/min per user → 429 `rate_limited` + Retry-After) | `{inApp:'sent',email,whatsapp}`, email/whatsapp each `sent\|skipped\|failed\|off` (002/FR-034) |
-| GET/POST/DELETE | /me/api-tokens[/:id] | POST `{name, expiresInDays?: 30\|90\|365\|null}` (default 90, null = never) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens (002/FR-037) |
-| GET | /org/members | – | `[{userId,name,email,role,joinedAt}]` + pending invites |
-| POST (M) | /org/invitations | `{email,role}` | `{id, inviteUrl}` |
-| PATCH/DELETE (O) | /org/members/:userId | `{role}` | member |
+| POST (S) | /me/password | `{currentPassword,newPassword}` | `{ok:true}`, other sessions are signed out; 400 `invalid_credentials`; 429 `rate_limited` |
+| GET | /me/sessions | – | `{items:[{id,current,userAgent,device,createdAt,lastSeenAt}], total}` (S) |
+| POST (S) | /me/sessions/revoke-others | – | `{revoked}` (count) |
+| DELETE (S) | /me/sessions/:id | – | `{ok:true}`; 404 for another user's session |
+| GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` (PUT needs the full object, per org) | prefs |
+| POST (S) | /me/notifications/test | – (1/min per user → 429 `rate_limited` + `Retry-After`) | `{inApp:'sent',email,whatsapp,skipReasons?}`, email/whatsapp each `sent\|skipped\|failed\|off`; `skipReasons` (only when something was skipped) maps a channel to `not_configured\|no_phone` (002/FR-034) |
+| GET/POST/DELETE | /me/api-tokens[/:id] | POST (S) `{name, expiresInDays?: 30\|90\|365\|null}` (default 90, null = never) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens per org (002/FR-037) |
+| GET | /org | – | org |
+| GET | /org/members | – | `{items:[{userId,name,email,phone,role,joinedAt}], total, invitations:[{id,email,role,createdAt,expiresAt,invitedBy}]}` (pending = unexpired, unaccepted) |
+| POST (M) | /org/invitations | `{email,role}` | `{id,email,role,inviteUrl,expiresAt}`, 201; replaces a pending invite for the same email; 409 `conflict` if already a member; 403 `forbidden` when a non-owner invites an owner |
+| POST (M) | /org/invitations/:id/resend | – | as above, 201: new token and 7-day expiry, also revives an expired invite; `invitedBy` becomes the resender; 404 for other orgs' or accepted invites |
+| DELETE (M) | /org/invitations/:id | – | `{ok:true}`; 404 as above |
+| PATCH/DELETE (O) | /org/members/:userId | `{role}` | member; 409 `last_owner` when it would leave no owner (FR-021) |
+| DELETE (S) | /org/members/me | – | `{ok:true,nextOrgId}`: leave the active org (FR-027); 409 `last_owner` |
 | PATCH (M) | /org | `{name?, onboardingState?, scoringWeights?}` | org |
-| GET | /activity | `entityType?, entityId?` | `{items:[{id,user:{id,name},action,entityType,entityId,meta,createdAt}]}` |
+| GET | /activity | `entityType?, entityId?, userId?, page?, pageSize?` | `{items:[{id,user:{id,name}\|null,action,entityType,entityId,meta,createdAt}], total}`; `user` is null when the actor no longer exists; newest first, paginated by `page`/`pageSize` |
 | GET | /health | – | `{ok, db, version}` (no auth) |
+
+### Platform error codes
+
+Besides the generic `validation_error` (400, `details.fields`), `unauthorized` (401), `forbidden` (403), `not_found` (404)
+and `conflict` (409):
+
+| Code | Status | When |
+|---|---|---|
+| `rate_limited` | 429 | Too many credential attempts (login, accept-invite, change password: 10 failures per email and 30 per IP per 15 min), password-reset requests (3 per email, 20 per IP per hour), or a second test alert within a minute. Sends `Retry-After` (seconds); `details.retryAfter` repeats it. The per-IP limits apply only when the client IP is known (`TRUST_PROXY`). |
+| `invalid_credentials` | 401 / 400 | 401 for a wrong email/password at login and a wrong password on accept-invite (existing account); 400 for a wrong current password on `/me/password` (field error). |
+| `invite_invalid` | 404 | Invitation link unknown, already used or expired. |
+| `invite_email_mismatch` | 403 | A signed-in user accepts an invitation addressed to another email. |
+| `reset_invalid` | 400 | Password-reset link unknown, already used or expired. Counted against the IP's `login_ip` budget. |
+| `bad_origin` | 403 | A cookie-authenticated write whose `Origin` differs from `APP_URL` (or `Sec-Fetch-Site: cross-site` without `Origin`). Bearer-token requests are exempt (FR-028). |
+| `token_limit` | 409 | The user already has 10 active API tokens in this org (FR-037). |
+| `last_owner` | 409 | Demoting, removing or leaving as the only Owner (FR-021, FR-027). |
+| `no_organization` | 403 | The user is not (or no longer) a member of the organization the request acts on, e.g. creating a token after being removed. |
+
+Security headers on every response (FR-050): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (`SAMEORIGIN`
+for inline document previews), `Referrer-Policy: no-referrer`, `Strict-Transport-Security` on https, and a CSP for the SPA.
 
 ## Identify — owner: Identify module (`routes/tenders.ts`, `routes/watchlists.ts`, `routes/ingestion.ts`, `routes/notifications.ts`)
 
