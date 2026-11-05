@@ -28,7 +28,7 @@ export function PageChip({ tenderId, req, className }: { tenderId: string; req?:
   const label = `p. ${req.source.page}`;
   const cls = cn('inline-flex h-5 items-center gap-1 rounded-md border bg-card px-1.5 text-2xs font-medium text-muted-foreground tabular', className);
   return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className={cn(cls, 'hover:border-primary/40 hover:text-primary focus-ring')} aria-label={`Open ${req.source.fileName ?? 'document'} at page ${req.source.page}`}>
+    <a href={href} target="_blank" rel="noreferrer" className={cn(cls, 'hover:border-primary/40 hover:text-primary focus-ring')} aria-label={`${label}: Open ${req.source.fileName ?? 'document'} at page ${req.source.page}`}>
       {label}<ExternalLink className="size-2.5" aria-hidden />
     </a>
   ) : <span className={cls}>{label}</span>;
@@ -250,7 +250,7 @@ function FactorRow({
           )}
           {quote && (
             <div className="mt-2">
-              <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 rounded text-xs font-medium text-primary hover:underline focus-ring">
+              <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 rounded text-xs font-medium text-primary-ink hover:underline focus-ring">
                 <Quote className="size-3" aria-hidden /> {open ? 'Hide evidence' : 'Show evidence'}
                 <ChevronDown className={cn('size-3 transition-transform', open && 'rotate-180')} aria-hidden />
               </button>

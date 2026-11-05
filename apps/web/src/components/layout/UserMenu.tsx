@@ -20,9 +20,9 @@ export function UserMenu({ compact, className }: { compact?: boolean; className?
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn('flex items-center gap-2 rounded-full focus-ring', !compact && 'rounded-lg p-1 pr-2 hover:bg-muted', className)}
-        aria-label="Account menu"
       >
         <Avatar name={me.user.name} size="sm" />
+        <span className="sr-only">Account menu</span>
         {!compact && <span className="hidden max-w-[8rem] truncate text-sm font-medium lg:block">{me.user.name.split(' ')[0]}</span>}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

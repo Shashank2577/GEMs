@@ -7,9 +7,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { toast } from '@/components/ui/toaster';
 import { errorMessage } from '@/lib/api';
 
-function OrgChip({ name, className }: { name: string; className?: string }) {
+function OrgChip({ name, className, decorative }: { name: string; className?: string; decorative?: boolean }) {
   return (
-    <span className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm', className)}>
+    <span aria-hidden={decorative || undefined} className={cn('flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm', className)}>
       {initials(name, true)}
     </span>
   );
@@ -23,15 +23,16 @@ export function OrgSwitcher({ collapsed, className }: { collapsed?: boolean; cla
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn('group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring', collapsed && 'justify-center', className)}
-        aria-label={`Organization: ${me.org.name}. Switch organization`}
+        aria-label={collapsed ? `Organization: ${me.org.name}. Switch organization` : undefined}
       >
-        <OrgChip name={me.org.name} />
+        <OrgChip name={me.org.name} decorative={!collapsed} />
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold leading-tight">{me.org.name}</span>
+              <span className="block truncate text-[13px] font-semibold leading-tight"><span className="sr-only">Organization: </span>{me.org.name}</span>
               <span className="block truncate text-2xs capitalize text-muted-foreground">{me.org.plan} plan · {ROLE_LABEL[me.role]}</span>
             </span>
+            <span className="sr-only">. Switch organization</span>
             <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           </>
         )}

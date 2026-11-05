@@ -82,7 +82,7 @@ function SidebarContent({ collapsed, onNavigate, onToggle }: { collapsed?: boole
         <ul className="grid gap-0.5">
           {visible(NAV_MAIN).map((i) => <li key={i.to}><SideLink item={i} collapsed={collapsed} onNavigate={onNavigate} /></li>)}
         </ul>
-        {!collapsed && <p className="mb-1.5 mt-6 px-2.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/80">Organization</p>}
+        {!collapsed && <p className="mb-1.5 mt-6 px-2.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Organization</p>}
         {collapsed && <div className="mx-auto my-4 h-px w-6 bg-border" />}
         <ul className="grid gap-0.5">
           {visible(NAV_ORG).map((i) => <li key={i.to}><SideLink item={i} collapsed={collapsed} onNavigate={onNavigate} /></li>)}
@@ -122,7 +122,7 @@ function MobileTabBar({ onMore }: { onMore: () => void }) {
       <ul className="grid grid-cols-5">
         {MOBILE_TABS.map((t) => (
           <li key={t.to}>
-            <NavLink to={t.to} className={({ isActive }) => cn('flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring', isActive ? 'text-primary' : 'text-muted-foreground')}>
+            <NavLink to={t.to} className={({ isActive }) => cn('flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring', isActive ? 'text-primary-ink' : 'text-muted-foreground')}>
               {({ isActive }) => (
                 <>
                   <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-primary-soft')}>
