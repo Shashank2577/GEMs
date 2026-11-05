@@ -60,7 +60,7 @@ describe('profileCompleteness — golden weights (spec 005 US2)', () => {
     oemAuthorizations: [
       { oem: 'CP PLUS', validTill: '2027-04-19', documentId: '00000000-0000-4000-8000-000000000001' },
       { oem: 'Dell Technologies', validTill: '2026-10-31', documentId: '00000000-0000-4000-8000-000000000002' },
-      { oem: 'D-Link India', documentId: '00000000-0000-4000-8000-000000000003' },
+      { oem: 'D-Link India' }, // unlinked in the demo seed
     ],
   };
   const demoDocs = [
@@ -96,15 +96,16 @@ describe('profileCompleteness — golden weights (spec 005 US2)', () => {
       .toMatchObject({ severity: 'warning', message: 'Add turnover for 2024-25, 2023-24 so the 3-year average is accurate.' });
     expect(r.percent).toBe(31); // (26 + 4) / 98
   });
-  it('demo-like profile with 5 contracts → 96% with the 3 warnings of scenario 10', () => {
+  it('demo-like profile with 5 contracts → 96% with the 3 warnings of scenario 10, then the D-Link link info', () => {
     const r = profileCompleteness(demo, [1, 2, 3, 4, 5], demoDocs, GOLDEN_NOW);
     expect(r.percent).toBe(96);
     expect(r.issues.map((i) => i.message)).toEqual([
       'Add turnover for 2025-26 so the 3-year average is accurate.',
       'OEM authorisation from Dell Technologies has expired — request a fresh one.',
       '"OEM authorisation – Dell Technologies (desktops & servers)" in the vault has expired — upload the renewed copy.',
+      'Link the D-Link India authorisation letter from the vault so packets can attach it.',
     ]);
-    expect(r.issues.every((i) => i.severity === 'warning')).toBe(true);
+    expect(r.issues.map((i) => i.severity)).toEqual(['warning', 'warning', 'warning', 'info']);
   });
 });
 

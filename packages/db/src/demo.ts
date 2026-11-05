@@ -437,8 +437,9 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
     updatedAt: now,
   };
   const [existingProfile] = await db.select({ legalName: companyProfiles.legalName }).from(companyProfiles).where(eq(companyProfiles.orgId, orgId));
+  const seededProfile = !existingProfile || !existingProfile.legalName.trim();
   if (!existingProfile) await db.insert(companyProfiles).values(profile);
-  else if (!existingProfile.legalName.trim()) await db.update(companyProfiles).set(profile).where(eq(companyProfiles.orgId, orgId));
+  else if (seededProfile) await db.update(companyProfiles).set(profile).where(eq(companyProfiles.orgId, orgId));
 
   // Past contracts (natural key: GeM contract number).
   const pcs = [
@@ -471,6 +472,17 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
       financialYear: d.fy ?? null, tags: [...(d.tags ?? []), DEMO_MARK], blobKey, fileName, mimeType: 'application/pdf',
       sizeBytes: pdf.byteLength, pageCount: 1, uploadedBy: userId, createdAt: new Date(now.getTime() - (20 - docN) * DAY), updatedAt: now,
     });
+  }
+
+  // Link the seeded OEM rows to their vault letters (spec 005 FR-020); D-Link India stays unlinked on purpose.
+  if (seededProfile) {
+    const oemDocs = await db.select({ id: vaultDocuments.id, title: vaultDocuments.title }).from(vaultDocuments)
+      .where(and(eq(vaultDocuments.orgId, orgId), eq(vaultDocuments.type, 'oem_authorization')));
+    const oemAuthorizations = profile.oemAuthorizations.map((o) => {
+      const doc = oemDocs.find((d) => d.title.startsWith(`OEM authorisation – ${o.oem} (`));
+      return doc ? { ...o, documentId: doc.id } : o;
+    });
+    await db.update(companyProfiles).set({ oemAuthorizations }).where(eq(companyProfiles.orgId, orgId));
   }
 
   // Watchlists (natural key: name within org).

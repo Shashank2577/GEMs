@@ -41,6 +41,17 @@ describe('POST /api/demo/seed', () => {
     const profile = await request(ctx.app, 'GET', '/profile', { cookie: org.viewer.cookie });
     expect(profile.body.profile).toMatchObject({ legalName: DEMO_COMPANY.legalName, gstin: DEMO_COMPANY.gstin, mseCategory: 'micro', miiClass: 'class_1' });
     expect(profile.body.profile.financials).toHaveLength(3);
+    // OEM rows are linked to their seeded vault letters, except D-Link India (spec 005 US2 scenario 10).
+    const oemDocs = await ctx.db.select({ id: vaultDocuments.id, title: vaultDocuments.title }).from(vaultDocuments).where(eq(vaultDocuments.orgId, org.orgId));
+    const docId = (t: string) => oemDocs.find((d) => d.title.startsWith(t))!.id;
+    expect(profile.body.profile.oemAuthorizations.map((o: { oem: string; documentId?: string | null }) => [o.oem, o.documentId ?? null])).toEqual([
+      ['CP PLUS', docId('OEM authorisation – CP PLUS')],
+      ['Dell Technologies', docId('OEM authorisation – Dell Technologies')],
+      ['D-Link India', null],
+    ]);
+    expect(profile.body.completeness).toBe(96);
+    expect(profile.body.issues.filter((i: { severity: string }) => i.severity === 'info').map((i: { message: string }) => i.message))
+      .toEqual(['Link the D-Link India authorisation letter from the vault so packets can attach it.']);
 
     // Every pipeline stage except "dropped" is represented.
     const stages = await ctx.db.selectDistinct({ s: bidWorkspaces.stage }).from(bidWorkspaces).where(eq(bidWorkspaces.orgId, org.orgId));

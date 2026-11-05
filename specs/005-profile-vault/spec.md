@@ -171,7 +171,9 @@ certificate to the vault and return: it becomes **32%**; add FY 2025-26, 2024-25
 10. **Given** the demo org on 2026-11-05, **When** `/profile` opens, **Then** completeness is **96%**, the heading is
     "Almost there" and the suggestions are: "Add turnover for 2025-26 so the 3-year average is accurate.", "OEM
     authorisation from Dell Technologies has expired — request a fresh one." and ""OEM authorisation – Dell Technologies
-    (desktops & servers)" in the vault has expired — upload the renewed copy.".
+    (desktops & servers)" in the vault has expired — upload the renewed copy.", followed by one info suggestion "Link the
+    D-Link India authorisation letter from the vault so packets can attach it." (the demo's CP PLUS and Dell rows are linked
+    to their vault letters; info suggestions do not change the 96%).
 11. *(gap — FR-020)* **Given** an OEM authorisation in the profile valid till today + 20 days, **Then** an info suggestion
     "OEM authorisation from <OEM> expires in 20 days — ask for a renewed MAF." appears (no score change); and for an OEM
     row with no linked vault document, an info suggestion "Link the <OEM> authorisation letter from the vault so packets can
