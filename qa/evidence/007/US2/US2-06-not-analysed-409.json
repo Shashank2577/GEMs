@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "conflict",
+    "message": "Analyse the tender before marking the bid ready to submit.",
+    "details": {
+      "blockers": [],
+      "reason": "not_analysed"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "5e9e6270-a029-4dc5-8fba-b778b0769f34",
+  "action": "workspace.stage_changed",
+  "entityType": "workspace",
+  "entityId": "859d27dc-ba52-4f74-8a58-51263e24a2d3",
+  "meta": {
+    "to": "analysing",
+    "from": "identified",
+    "toLabel": "Analysing",
+    "tenderId": "70fb3117-4a3f-4f35-a4e5-ba55b5c20f02",
+    "fromLabel": "Identified"
+  },
+  "createdAt": "2026-11-05T04:19:26.578Z",
+  "user": {
+    "id": "cc2146fe-d9b4-489b-b817-97e0dec6e708",
+    "name": "QA analyst mw31drau9"
+  },
+  "target": {
+    "label": "Interactive Flat Panel 75\" 4K with OPS module",
+    "href": "/workspaces/859d27dc-ba52-4f74-8a58-51263e24a2d3"
+  }
+}
