@@ -1,0 +1,9 @@
+# sc3-health-never — project desktop — 2026-11-05T05:55:30.783Z
+### Health on an empty ingestion_runs table
+> GET /api/health
+< 200  (13 ms)
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: 73d1d589-0742-45a5-9683-afd0d2a2137a
+{"ok":true,"db":true,"version":"0.1.0","ingestion":{"lastSuccessAt":null,"ageMinutes":null,"lastStatus":null,"state":"never"},"alerts":{"pendingOlderThan30m":0},"reasons":[]}
+

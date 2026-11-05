@@ -140,7 +140,7 @@ export function PastContracts() {
   ];
 
   return (
-    <div className="grid gap-3">
+    <div className="grid grid-cols-1 gap-3">
       {list.isLoading ? <SkeletonList rows={3} /> : list.isError ? <ErrorState compact error={list.error} onRetry={() => list.refetch()} /> : items.length === 0 ? (
         <EmptyState compact icon={Briefcase} title="No past contracts yet"
           body="Add completed orders with their values — they’re matched against each bid’s experience criteria."

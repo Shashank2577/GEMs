@@ -1,0 +1,34 @@
+{
+  "names": [
+    "Eligibility score 96 of 100, Go",
+    "Eligibility score 96 of 100, Go",
+    "Eligibility score 82 of 100, No-Go",
+    "Eligibility score 100 of 100, Go",
+    "Eligibility score 100 of 100, Go",
+    "Eligibility score 100 of 100, Go",
+    "Eligibility score 94 of 100, Go",
+    "Eligibility score 92 of 100, Go",
+    "Go/No-Go verdicts, 20 analysed: Go 17, Review 0, No-Go 3",
+    "Eligibility score 100 of 100, Go",
+    "Eligibility score 80 of 100, No-Go",
+    "New matches over the last 14 days: 23 in total"
+  ],
+  "dashboardKeys": [
+    "generatedAt",
+    "tiles",
+    "stats",
+    "closingSoon",
+    "pipeline",
+    "pipelineValue",
+    "verdicts",
+    "matchesByDay",
+    "recentMatches",
+    "expiringDocuments",
+    "activity",
+    "setup",
+    "setupComplete",
+    "demo",
+    "myWork",
+    "awaitingDecision"
+  ]
+}

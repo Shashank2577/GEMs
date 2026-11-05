@@ -1,0 +1,22 @@
+Headings in docs/runbook.md on this branch:
+## Launch checklist
+### Release gate: spec 002 auth hardening (008/FR-023)
+### Before running migration 0010 (demo data-fix, 008/FR-016)
+### Abuse and isolation controls in place (008/US3)
+## Monitors
+## First 10 minutes
+### `db_unreachable`
+### `ingestion_stale`
+### `alerts_backlog`
+### 5xx spike
+### GeM 403/429
+### Escalation
+## Monitor configuration and fire-drill record
+
+Sections named by scenario 10:
+PRESENT  Monitors
+PRESENT  First 10 minutes
+ABSENT   Deploy & rollback
+ABSENT   Restore drill
+ABSENT   Secrets
+ABSENT   Offboarding

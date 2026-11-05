@@ -94,6 +94,7 @@ export function useRunReminders() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.post<{ documents: number; notifications: number }>('/vault/reminders/run'),
+    meta: { handlesNetworkError: true }, // call site toasts its own failure (incl. offline) — skip the global offline toast
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: vaultKeys.all });
       qc.invalidateQueries({ queryKey: notificationKeys.all });

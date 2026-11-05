@@ -31,7 +31,7 @@ export function Field({ label, hint, error, required, labelAside, className, id,
   const errId = `${controlId}-err`;
   const describedBy = [error ? errId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;
   return (
-    <div className={cn('grid gap-1.5', className)}>
+    <div className={cn('grid min-w-0 grid-cols-1 gap-1.5', className)}>
       {(label || labelAside) && (
         <div className="flex items-center justify-between gap-2">
           {label && (

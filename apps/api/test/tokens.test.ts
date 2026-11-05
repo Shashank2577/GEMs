@@ -189,7 +189,7 @@ describe('006/FR-074 assertWritable (unit)', () => {
     for (const scope of ['read', 'bogus', 'null']) {
       const r = await call(method, 'token', scope);
       expect(r.status, `${method} token/${scope}`).toBe(403);
-      expect((await r.json()).error.code).toBe('read_only_token');
+      expect(((await r.json()) as { error: { code: string } }).error.code).toBe('read_only_token');
     }
     expect((await call(method, 'token', 'full')).status).toBe(200);
     expect((await call(method, 'session', 'null')).status).toBe(200); // cookie sessions are never affected

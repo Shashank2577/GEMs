@@ -522,7 +522,10 @@ export const comments = pgTable('comments', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
   createdAt: createdAt(),
-});
+}, (t) => ({
+  /** Comment thread per workspace (006/NFR-001). */
+  wsIdx: index('comments_ws_idx').on(t.workspaceId),
+}));
 
 export const annexureTemplates = pgTable('annexure_templates', {
   id: id(),
@@ -532,7 +535,10 @@ export const annexureTemplates = pgTable('annexure_templates', {
   body: text('body').notNull(), // {{placeholders}}
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (t) => ({
+  /** One override per (org, key) (006/FR-036). System templates (org_id NULL) are code, not rows. */
+  orgKeyUq: uniqueIndex('annexure_templates_org_key_uq').on(t.orgId, t.key),
+}));
 
 export interface PacketItem {
   kind: 'cover' | 'annexure' | 'vault' | 'tender_doc';
@@ -573,6 +579,10 @@ export const notifications = pgTable('notifications', {
   dedupeKey: text('dedupe_key'),
   status: text('status').$type<'pending' | 'sent' | 'failed' | 'skipped' | 'read'>().notNull().default('pending'),
   error: text('error'),
+  /** Delivery attempts made so far (email / WhatsApp); FR-047 retries transient failures up to 3. */
+  attempts: integer('attempts').notNull().default(0),
+  /** Earliest time the dispatcher may (re)try this row; also the claim lease while a dispatcher holds it. */
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
   sentAt: timestamp('sent_at', { withTimezone: true }),
   readAt: timestamp('read_at', { withTimezone: true }),
   createdAt: createdAt(),
