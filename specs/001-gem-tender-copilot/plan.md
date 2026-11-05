@@ -16,7 +16,8 @@ R2 stores files.
 
 **Language/Version**: TypeScript 5.x, Node 22 (local/CI), Cloudflare Workers runtime (prod)
 **Primary Dependencies**:
-- API: Hono 4, Drizzle ORM, zod, `@neondatabase/serverless` (prod) / `pg` (local), `unpdf` (PDF text),
+- API: Hono 4, Drizzle ORM, zod, `pg` (one driver: Node locally/CI, and on Workers through the Hyperdrive binding —
+  spec 008 FR-075, ADR-0002), `unpdf` (PDF text),
   `pdf-lib` (packet/annexures), WebCrypto PBKDF2 for passwords.
 - Web: React 18, Vite 5, React Router 6, TanStack Query 5, Tailwind CSS 3 with a token-based design
   system (CSS variables, light/dark), Radix UI primitives, lucide-react icons, Recharts, sonner
@@ -68,7 +69,7 @@ packages/
     src/assist/     # extension fill allow-list + field mapping
     src/contracts/  # zod DTOs shared by API and web
     test/fixtures/  # recorded BidPlus JSON, sample bid PDFs
-  db/              # drizzle schema, migrations (SQL), db factory (pg | neon), seed/demo data
+  db/              # drizzle schema, migrations (SQL), db factory (`createNodeDb`, pg), seed/demo data
 apps/
   api/             # Hono app: routes/, services/, middleware/, adapters/ (blob, llm, mail, whatsapp)
     src/app.ts      # createApp(deps)
@@ -119,4 +120,4 @@ wrangler.toml      # one Worker: API at /api/*, SPA via static assets, cron, R2 
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| Two DB drivers | Neon in Workers, `pg` locally | Neon serverless driver cannot target a local Postgres without a proxy in CI |
+| — | (none) | The former "Two DB drivers" row is gone: Workers use `pg` over Hyperdrive since spec 008 FR-075. |

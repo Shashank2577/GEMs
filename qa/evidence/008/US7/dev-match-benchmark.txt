@@ -1,0 +1,36 @@
+$ pnpm --filter @tp/core exec vitest run test/match/matcher.test.ts --reporter=verbose
+ RUN  v2.1.9 /home/user/GEMs-us7/packages/core
+stdout | test/match/matcher.test.ts > compileCriteria (008/FR-074, US7 scenario 4) > benchmark: 1,000 watchlists × 500 tenders, compiled once per run, finish in < 5 s
+{"benchmark":"match 1000 watchlists x 500 tenders","pairs":500000,"hits":178671,"ms":569}
+ ✓ test/match/matcher.test.ts > matchTender with malformed stored items > treats a non-array items value (jsonb object / scalar) as no items instead of throwing
+ ✓ test/match/matcher.test.ts > keywordRegex > reuses one compiled, stateless regex per keyword (hot path when scanning 50k tenders)
+ ✓ test/match/matcher.test.ts > keywordRegex > matches whole words, case-insensitive, with simple plurals
+ ✓ test/match/matcher.test.ts > matchTender > acceptance #1: laptop in Maharashtra matches with reasons
+ ✓ test/match/matcher.test.ts > matchTender > keywords are OR-ed and also searched in items, category and buyer
+ ✓ test/match/matcher.test.ts > matchTender > title hits rank higher than item-only hits
+ ✓ test/match/matcher.test.ts > matchTender > exclude keywords veto
+ ✓ test/match/matcher.test.ts > matchTender > states, ministries (ministry/department/organisation), categories
+ ✓ test/match/matcher.test.ts > matchTender > HSN prefix matching works both ways
+ ✓ test/match/matcher.test.ts > matchTender > value range; unknown value passes with a flag
+ ✓ test/match/matcher.test.ts > matchTender > minDaysToClose and bid types
+ ✓ test/match/matcher.test.ts > matchTender > never matches closed/expired bids or empty criteria
+ ✓ test/match/matcher.test.ts > matchWatchlists over fixtures > finds the expected tenders per watchlist
+ ✓ test/match/matcher.test.ts > compileCriteria (008/FR-074, US7 scenario 4) > gives exactly the same results as matching the raw criteria
+ ✓ test/match/matcher.test.ts > compileCriteria (008/FR-074, US7 scenario 4) > a compiled watchlist is reused as is: its regexes are built once and are stateless (no g flag)
+ ✓ test/match/matcher.test.ts > compileCriteria (008/FR-074, US7 scenario 4) > benchmark: 1,000 watchlists × 500 tenders, compiled once per run, finish in < 5 s 571ms
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  08:59:38
+   Duration  1.27s (transform 133ms, setup 0ms, collect 178ms, tests 851ms, environment 1ms, prepare 46ms)
+
+$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run test/match-batch.test.ts --reporter=verbose
+ RUN  v2.1.9 /home/user/GEMs-us7/apps/api
+ ✓ test/match-batch.test.ts > batched matching (US7 scenario 4) > MATCH_INSERT_BATCH is 500
+stdout | test/match-batch.test.ts > batched matching (US7 scenario 4) > 1,000 watchlists × 500 tenders: < 5 s, 10,000 matches, every INSERT carries ≤ 500 rows
+{"watchlists":1000,"tenders":500,"matchesCreated":10000,"insertStatements":20,"maxRowsPerStatement":500,"ms":939}
+ ✓ test/match-batch.test.ts > batched matching (US7 scenario 4) > 1,000 watchlists × 500 tenders: < 5 s, 10,000 matches, every INSERT carries ≤ 500 rows 1692ms
+ ✓ test/match-batch.test.ts > batched matching (US7 scenario 4) > insertMatchesBatched splits 1,201 rows into 500 + 500 + 201
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  08:59:40
+   Duration  4.12s (transform 943ms, setup 0ms, collect 1.73s, tests 2.12s, environment 0ms, prepare 74ms)

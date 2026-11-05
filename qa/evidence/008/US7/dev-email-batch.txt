@@ -1,0 +1,10 @@
+$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run test/email-batch.test.ts --reporter=verbose
+ RUN  v2.1.9 /home/user/GEMs-us7/apps/api
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > limits are 100 per call
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > 120 queued emails → exactly 2 calls to /emails/batch (100 + 20); every row sent
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > a failed batch call affects only its rows (permanent 4xx → failed, 429 → retried later); the next batch is still sent
+ ✓ test/email-batch.test.ts > Resend batch sending (US7 scenario 6) > sendMany maps the provider ids back in order
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  08:59:44
+   Duration  2.62s (transform 970ms, setup 0ms, collect 1.99s, tests 381ms, environment 0ms, prepare 52ms)

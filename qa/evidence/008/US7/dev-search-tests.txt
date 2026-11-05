@@ -1,0 +1,60 @@
+$ TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us7 pnpm --filter @tp/api exec vitest run test/identify.test.ts test/perf-indexes.test.ts --reporter=verbose  (search semantics + CI-sized EXPLAIN)
+ RUN  v2.1.9 /home/user/GEMs-us7/apps/api
+ ✓ test/identify.test.ts > GET /tenders > lists open tenders with facets, newest first by default
+ ✓ test/identify.test.ts > GET /tenders > facets from the shared GROUPING SETS query equal one GROUP BY per facet (count desc, value asc, non-null)
+ ✓ test/identify.test.ts > GET /tenders > paginates without overlap
+ ✓ test/identify.test.ts > GET /tenders > filters by state (multi), ministry, category, free text, value, closing window, bid type
+ ✓ test/identify.test.ts > GET /tenders > 008/FR-073 full-text search: multi-word, quoted phrase, -exclusion, or, prefix words, item names, bid-number prefix and digits
+ ✓ test/identify.test.ts > GET /tenders > status selector: closed / awarded / cancelled / all (FR-036)
+ ✓ test/identify.test.ts > GET /tenders > status=closed also lists open-status tenders whose deadline has passed (FR-036)
+ ✓ test/identify.test.ts > GET /tenders > rejects bad query values with 400
+ ✓ test/identify.test.ts > GET /tenders > shows matches with watchlist names + reasons, isNew, and filters matched / watchlist / unseen
+ ✓ test/identify.test.ts > GET /tenders > joins latest analysis verdict + workspace stage and filters/sorts by them
+ ✓ test/identify.test.ts > GET /tenders/:id, seen, dismiss > returns detail with events, documents and matches; 404 for unknown / malformed ids
+ ✓ test/identify.test.ts > GET /tenders/:id, seen, dismiss > seen clears "new" for the org and reads the related notification
+ ✓ test/identify.test.ts > GET /tenders/:id, seen, dismiss > dismiss hides a matched tender, undo brings it back; unmatched tenders cannot be dismissed
+ ✓ test/identify.test.ts > GET /tenders/:id, seen, dismiss > requires auth
+ ✓ test/identify.test.ts > watchlists > previews counts and samples live without saving
+ ✓ test/identify.test.ts > watchlists > enforces roles: viewer cannot create; analyst can create, edit, pause, delete
+ ✓ test/identify.test.ts > watchlists > validates criteria
+ ✓ test/identify.test.ts > watchlists > isolates orgs
+ ✓ test/identify.test.ts > ingestion routes > only bid managers+ can run a sync; everyone sees health
+ ✓ test/identify.test.ts > manual sync cooldown (008/FR-026, supersedes 003 FR-013) > rejects a manual sync within 10 min of a finished manual run with 429 sync_cooldown and retryAt, without calling GeM
+ ✓ test/identify.test.ts > manual sync cooldown (008/FR-026, supersedes 003 FR-013) > honours MANUAL_SYNC_COOLDOWN_MIN
+ ✓ test/identify.test.ts > notifications > lists in-app alerts with delivery status, unread filter, read and read-all — per user
+ ✓ test/identify.test.ts > end-to-end: new bid published on GeM → matched → alert > a newly published Maharashtra laptop bid shows up as new in the feed with an alert
+ ✓ test/identify.test.ts > watchlists: silent back-fill, pause, limit, volume (T025, T030, T031) > creating, editing criteria and resuming a watchlist create zero notifications (FR-025)
+ ✓ test/identify.test.ts > watchlists: silent back-fill, pause, limit, volume (T025, T030, T031) > a paused watchlist gets no matches from a later ingestion (FR-025)
+ ✓ test/identify.test.ts > watchlists: silent back-fill, pause, limit, volume (T025, T030, T031) > caps an org at 50 watchlists with 409 watchlist_limit — paused ones count, other orgs unaffected (FR-027)
+ ✓ test/identify.test.ts > watchlists: silent back-fill, pause, limit, volume (T025, T030, T031) > preview and back-fill find every match beyond 5,000 candidates, with escaped category/ministry pre-filters (FR-028) 3537ms
+ ✓ test/identify.test.ts > watchlist SQL helpers and batched matching > escapes LIKE wildcards and the escape character; phrases allow any separator
+ ✓ test/identify.test.ts > watchlist SQL helpers and batched matching > orders preview candidates deterministically, by id when everything else ties
+ ✓ test/identify.test.ts > watchlist SQL helpers and batched matching > matchAndNotify inserts more than one batch of matches once, then nothing on a re-run (FR-023, FR-040) 753ms
+ ✓ test/identify.test.ts > watchlist SQL helpers and batched matching > matchAndNotify dedupes repeated tender ids: one match, the watchlist name once in the alert
+ ✓ test/identify.test.ts > watchlist SQL helpers and batched matching > 008/FR-073: the full-text keyword pre-filter keeps every tender the matcher would match (plurals, separators, items, buyer, punctuation)
+ ✓ test/identify.test.ts > watchlist SQL helpers and batched matching > preview tolerates a tender whose items jsonb is not an array (no 500)
+ ✓ test/identify.test.ts > notifications ?kind validation (003/FR-049) > rejects an unknown kind with 400 and accepts a real one
+ ✓ test/identify.test.ts > one-click email unsubscribe (003/FR-048) > dispatched alert emails carry List-Unsubscribe + List-Unsubscribe-Post for the recipient and org
+ ✓ test/identify.test.ts > one-click email unsubscribe (003/FR-048) > GET only shows a confirmation form (link scanners change nothing); its POST unsubscribes and confirms in HTML
+ ✓ test/identify.test.ts > one-click email unsubscribe (003/FR-048) > the confirmation POST from a signed-in browser (Origin: null under no-referrer, or APP_URL) is not blocked by the origin check, and ignores the cookie
+ ✓ test/identify.test.ts > one-click email unsubscribe (003/FR-048) > RFC 8058 one-click POST turns email off without signing in and skips already-queued emails
+ ✓ test/identify.test.ts > one-click email unsubscribe (003/FR-048) > the token is bound to its org, and stops working once the user leaves that org
+ ✓ test/identify.test.ts > one-click email unsubscribe (003/FR-048) > a tampered, truncated, foreign-scope or missing token is 400 invalid_token and changes nothing
+ ✓ test/perf-indexes.test.ts > bulk fixture (T071) > has ~6 % open tenders with skewed states and some unknown values
+ ✓ test/perf-indexes.test.ts > feed uses the open-tender partial indexes (FR-027, US4 scenario 4) > /tenders → tenders_open_created_idx; no query of the request scans tenders sequentially
+ ✓ test/perf-indexes.test.ts > feed uses the open-tender partial indexes (FR-027, US4 scenario 4) > /tenders?sort=endAt → tenders_open_closing_idx; no query of the request scans tenders sequentially
+ ✓ test/perf-indexes.test.ts > feed uses the open-tender partial indexes (FR-027, US4 scenario 4) > /tenders?minValue=500000&sort=value → tenders_open_value_idx; no query of the request scans tenders sequentially
+ ✓ test/perf-indexes.test.ts > feed uses the open-tender partial indexes (FR-027, US4 scenario 4) > /tenders?state=Maharashtra → tenders_open_state_idx; no query of the request scans tenders sequentially
+ ✓ test/perf-indexes.test.ts > feed uses the open-tender partial indexes (FR-027, US4 scenario 4) > /tenders?state=Maharashtra&ministry=Ministry%20of%20Defence&sort=endAt → an open-tender partial index; no query of the request scans tenders sequentially
+ ✓ test/perf-indexes.test.ts > feed uses the open-tender partial indexes (FR-027, US4 scenario 4) > the page query answers in < 300 ms (EXPLAIN ANALYZE, CI-sized fixture)
+ ✓ test/perf-indexes.test.ts > full-text search uses tenders_search_gin (008/FR-073, US7 scenario 3) > q=solar street light&status=all: the page and the total/facets queries read tenders_search_gin, never a Seq Scan on tenders
+ ✓ test/perf-indexes.test.ts > full-text search uses tenders_search_gin (008/FR-073, US7 scenario 3) > q=solar street light (open feed): index-backed — the GIN or, on this small fixture, an open-tender partial index
+ ✓ test/perf-indexes.test.ts > full-text search uses tenders_search_gin (008/FR-073, US7 scenario 3) > q=GEM/BULK/B/12 (bid-number shape) uses tenders_bid_number_prefix_idx, status=all included
+ ✓ test/perf-indexes.test.ts > dispatcher select uses notifications_pending_idx (FR-029, US4 scenario 5) > EXPLAIN ANALYZE on 1,00,000 rows with 500 pending
+ ✓ test/perf-indexes.test.ts > list queries read tenderListColumns only (FR-028, US4 scenario 6) > feed
+ ✓ test/perf-indexes.test.ts > list queries read tenderListColumns only (FR-028, US4 scenario 6) > watchlist preview — open, not yet closed, keyset pages of at most 2,000 lean rows
+ ✓ test/perf-indexes.test.ts > list queries read tenderListColumns only (FR-028, US4 scenario 6) > dashboard
+ Test Files  2 passed (2)
+      Tests  54 passed (54)
+   Start at  08:59:51
+   Duration  17.14s (transform 1.12s, setup 0ms, collect 2.83s, tests 13.82s, environment 0ms, prepare 131ms)
