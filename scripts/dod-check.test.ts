@@ -117,6 +117,49 @@ describe('dod rules (scenario 6)', () => {
     expect(checkVerdict(t)[1]).toMatchObject({ ok: true, message: 'all 2 acceptance criteria met' });
   });
 
+  describe('unverifiable rows (FR-004)', () => {
+    const table = (cell: string, evidence: string) =>
+      `| # | Criterion | Verdict | Evidence |\n|---|---|---|---|\n| 1 | a | met | x |\n| 2 | b | ${cell} | ${evidence} |`;
+    const reason = 'needs production Neon to measure p95; tracked in #492';
+
+    it('passes with a reason and an open tracking issue, and lists the row', () => {
+      const r = checkVerdict(table('unverifiable', reason), new Set([492]))[1];
+      expect(r.ok).toBe(true);
+      expect(r.message).toContain('1 of 2 acceptance criteria met; 1 unverifiable with an open tracking issue');
+      expect(r.message).toContain('tracked by #492');
+    });
+
+    it('fails when the tracking issue is closed (not in the open set)', () => {
+      const r = checkVerdict(table('**unverifiable**', reason), new Set([1]))[1];
+      expect(r).toMatchObject({ ok: false });
+      expect(r.message).toContain('#492 is not open');
+    });
+
+    it('fails without an issue reference', () => {
+      expect(checkVerdict(table('unverifiable', 'needs production Neon to measure p95'), new Set([492]))[1].ok).toBe(false);
+    });
+
+    it('fails with an issue reference but no reason', () => {
+      expect(checkVerdict(table('unverifiable', '#492'), new Set([492]))[1].ok).toBe(false);
+    });
+
+    it('accepts a referenced row when issue state is unknown (local run) and says so', () => {
+      const r = checkVerdict(table('unverifiable', reason), null)[1];
+      expect(r.ok).toBe(true);
+      expect(r.message).toContain('issue state not checked');
+    });
+
+    it('still fails "not met" even when an issue is referenced', () => {
+      expect(checkVerdict(table('not met', reason), new Set([492]))[1].ok).toBe(false);
+    });
+
+    it('threads openIssues through evaluate()', () => {
+      const v = APPROVED.replace('| artifact uploaded | met |', `| artifact uploaded | unverifiable | ${reason} |`);
+      expect(evaluate(input({ readVerdict: () => v, openIssues: new Set([492]) })).results.find((x) => x.rule === 'criteria-met')?.ok).toBe(true);
+      expect(evaluate(input({ readVerdict: () => v, openIssues: new Set<number>() })).results.find((x) => x.rule === 'criteria-met')?.ok).toBe(false);
+    });
+  });
+
   it('fails criteria-met without a criteria table', () => {
     expect(checkVerdict('Verdict: approved')[1].ok).toBe(false);
   });

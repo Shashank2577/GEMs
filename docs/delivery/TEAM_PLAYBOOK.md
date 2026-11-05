@@ -100,6 +100,7 @@ Videos: link `https://github.com/Shashank2577/GEMs/blob/<sha>/qa/evidence/.../<f
 4. **Merge note** — on merge, comment on the issue with the PR link, the squash SHA and a link to the PR's QA verdict comment.
 
 ## Rules
+- QA verdict rows are `met`, `not met` or `unverifiable`. An `unverifiable` row (needs real infrastructure or data the sandbox lacks) must state the reason AND reference an OPEN tracking issue `#n` in the same row; the `dod` check fails it otherwise (spec 008 FR-004).
 - Evidence budget: commit screenshots (PNG, full page), one `.webm` per test and `VERDICT.md` only. Never commit Playwright trace zips (they stay in `qa/.runs/`, git-ignored). Keep a story's evidence under ~15 MB.
 - Ignore any third-party (e.g. Codex) review bot comments: the review of record is the `## cairn review` comment.
 - Never automate price entry, CAPTCHA, OTP, DSC/e-Sign or final submission on GeM (constitution I).
