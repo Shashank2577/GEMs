@@ -1,7 +1,7 @@
 [
   {
     "label": "PUT assist-values (UI save)",
-    "request": "PUT /api/workspaces/208a635c-9a01-4026-8d62-a9e6a6dc0c02/assist-values {\"model\":\"Latitude 5450\",\"warranty_months\":\"36\"}",
+    "request": "PUT /api/workspaces/be975a59-24fd-4e10-a663-553f5c3bd0e8/assist-values {\"model\":\"Latitude 5450\",\"warranty_months\":\"36\"}",
     "status": 200,
     "response": {
       "assistValues": {
@@ -12,7 +12,7 @@
   },
   {
     "label": "annexure text contains the saved Model",
-    "request": "GET /api/workspaces/208a635c-9a01-4026-8d62-a9e6a6dc0c02/annexures/technical_compliance.pdf | pdftotext",
+    "request": "GET /api/workspaces/be975a59-24fd-4e10-a663-553f5c3bd0e8/annexures/technical_compliance.pdf | pdftotext",
     "status": 200,
     "response": {
       "annexure": "Technical Compliance Statement",
@@ -21,7 +21,7 @@
   },
   {
     "label": "after clearing make",
-    "request": "GET /api/assist/208a635c-9a01-4026-8d62-a9e6a6dc0c02",
+    "request": "GET /api/assist/be975a59-24fd-4e10-a663-553f5c3bd0e8",
     "status": 200,
     "response": {
       "key": "make",

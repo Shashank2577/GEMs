@@ -5,15 +5,15 @@
     "status": 200,
     "response": {
       "user": {
-        "id": "80e17428-f884-413b-8b38-54326a748d0c",
-        "name": "QA analyst mw34vna41",
-        "email": "analyst.mw34vna41@example.in",
+        "id": "691b441a-8b73-4a9e-b7d4-ed04ea78f2d9",
+        "name": "QA analyst mw35kw8l1",
+        "email": "analyst.mw35kw8l1@example.in",
         "phone": null
       },
       "org": {
-        "id": "2fc8c82b-ef3f-40ce-b2c3-c3bba84471e4",
-        "name": "Sharma Infotech mw34vna41",
-        "slug": "sharma-infotech-mw34vna41",
+        "id": "1a935d02-f938-470d-9f3f-3a384733798f",
+        "name": "Sharma Infotech mw35kw8l1",
+        "slug": "sharma-infotech-mw35kw8l1",
         "plan": "trial",
         "onboardingState": {},
         "scoringWeights": null
@@ -21,9 +21,9 @@
       "role": "analyst",
       "orgs": [
         {
-          "id": "2fc8c82b-ef3f-40ce-b2c3-c3bba84471e4",
-          "name": "Sharma Infotech mw34vna41",
-          "slug": "sharma-infotech-mw34vna41",
+          "id": "1a935d02-f938-470d-9f3f-3a384733798f",
+          "name": "Sharma Infotech mw35kw8l1",
+          "slug": "sharma-infotech-mw35kw8l1",
           "role": "analyst"
         }
       ]
@@ -47,7 +47,7 @@
   },
   {
     "label": "PUT assist-values",
-    "request": "PUT /api/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473/assist-values",
+    "request": "PUT /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/assist-values",
     "status": 403,
     "response": {
       "error": {
@@ -58,7 +58,7 @@
   },
   {
     "label": "POST comments",
-    "request": "POST /api/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473/comments",
+    "request": "POST /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/comments",
     "status": 403,
     "response": {
       "error": {
@@ -69,7 +69,7 @@
   },
   {
     "label": "PATCH workspace",
-    "request": "PATCH /api/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473",
+    "request": "PATCH /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9",
     "status": 403,
     "response": {
       "error": {
@@ -80,7 +80,7 @@
   },
   {
     "label": "POST packets",
-    "request": "POST /api/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473/packets",
+    "request": "POST /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/packets",
     "status": 403,
     "response": {
       "error": {
@@ -91,7 +91,7 @@
   },
   {
     "label": "POST submitted",
-    "request": "POST /api/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473/submitted",
+    "request": "POST /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/submitted",
     "status": 403,
     "response": {
       "error": {

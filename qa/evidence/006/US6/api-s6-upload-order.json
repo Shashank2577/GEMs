@@ -1,7 +1,7 @@
 [
   {
     "label": "before build",
-    "request": "GET /api/assist/1468b2cc-8126-44ca-8cb7-e32ac066a1ed",
+    "request": "GET /api/assist/e6e5db67-c9a9-4400-a042-6913f45d4093",
     "status": 200,
     "response": [
       {
@@ -32,56 +32,56 @@
   },
   {
     "label": "after build",
-    "request": "GET /api/assist/1468b2cc-8126-44ca-8cb7-e32ac066a1ed",
+    "request": "GET /api/assist/e6e5db67-c9a9-4400-a042-6913f45d4093",
     "status": 200,
     "response": [
       {
         "kind": "packet",
         "title": "Technical bid packet (merged PDF)",
         "fileName": "GEM_2026_B_700001_technical_packet.pdf",
-        "url": "http://localhost:8788/api/packets/38d50fe8-c9b1-4f40-be33-90d1f9c3e8c5/download",
+        "url": "http://localhost:8788/api/packets/392f503d-9718-4118-b5dd-c3dee5bfb3f6/download",
         "pages": 11
       },
       {
         "kind": "vault",
         "title": "GST registration certificate",
         "fileName": "gst.pdf",
-        "url": "http://localhost:8788/api/vault/cbb92797-c2be-43c9-93ed-eae8bb1a3a1c/download",
+        "url": "http://localhost:8788/api/vault/13838e51-a83d-4e4f-b41e-37512ab4bc71/download",
         "pages": 1
       },
       {
         "kind": "vault",
         "title": "PAN card of the firm",
         "fileName": "pan.pdf",
-        "url": "http://localhost:8788/api/vault/11672d62-c3d5-48cb-afb8-d82152dda4c7/download",
+        "url": "http://localhost:8788/api/vault/85433032-8c2a-4f42-81fd-6ee86e2bb12b/download",
         "pages": 1
       },
       {
         "kind": "vault",
         "title": "Audited balance sheets — last 3 financial years",
         "fileName": "bs-2024.pdf",
-        "url": "http://localhost:8788/api/vault/1f87cb4a-696a-484d-b7fa-430279c77d5e/download",
+        "url": "http://localhost:8788/api/vault/70143de4-aed2-42e5-b5ff-ca43a820cc3e/download",
         "pages": 3
       },
       {
         "kind": "vault",
         "title": "OEM authorisation certificate (MAF) for this bid",
         "fileName": "maf.pdf",
-        "url": "http://localhost:8788/api/vault/4651f788-7f17-4e8e-bf1f-3b8998afe44d/download",
+        "url": "http://localhost:8788/api/vault/81e43941-73d3-4ce8-b293-02650d3ca4cb/download",
         "pages": 1
       },
       {
         "kind": "annexure",
         "title": "Undertaking regarding Non-Blacklisting / Non-Debarment",
         "fileName": "non_blacklisting.pdf",
-        "url": "http://localhost:8788/api/workspaces/1468b2cc-8126-44ca-8cb7-e32ac066a1ed/annexures/non_blacklisting.pdf?download=1",
+        "url": "http://localhost:8788/api/workspaces/e6e5db67-c9a9-4400-a042-6913f45d4093/annexures/non_blacklisting.pdf?download=1",
         "pages": 1
       },
       {
         "kind": "annexure",
         "title": "Self-Certificate of Local Content (Make in India)",
         "fileName": "mii_self_cert.pdf",
-        "url": "http://localhost:8788/api/workspaces/1468b2cc-8126-44ca-8cb7-e32ac066a1ed/annexures/mii_self_cert.pdf?download=1",
+        "url": "http://localhost:8788/api/workspaces/e6e5db67-c9a9-4400-a042-6913f45d4093/annexures/mii_self_cert.pdf?download=1",
         "pages": 1
       }
     ]

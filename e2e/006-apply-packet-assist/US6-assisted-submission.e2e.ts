@@ -189,15 +189,15 @@ test.describe('web + api', () => {
     await openSubmit(page, context, c);
     await expect(page.getByText('Non-financial fields only. Copy each one, or let the browser extension fill them on your click.')).toBeVisible();
     const groups = (await page.locator('div.text-2xs.font-semibold.uppercase').allInnerTexts()).map((s) => s.trim().toLowerCase());
-    expect(groups).toEqual(['product', 'offer', 'compliance', 'declarations']);
-    test.info().annotations.push({ type: 'observation', description: 'group heading reads "Declarations" (spec text: "Declaration")' });
+    expect(groups).toEqual(['product', 'offer', 'compliance', 'declaration']);
+    // spec scenario 3 heading text: "Declaration"
     const a = await assistOf(c);
     // Empty values read "Not set" in italics and their Copy button is disabled.
     for (const f of a.fields.filter((x: any) => x.source === 'empty')) {
       const row = valueRow(page, f.label);
       const dd = row.locator('dd');
       await expect(dd).toHaveText('Not set');
-      expect(await dd.evaluate((e) => getComputedStyle(e).fontStyle)).toBe('italic');
+      expect(await dd.locator('span').first().evaluate((e) => getComputedStyle(e).fontStyle)).toBe('italic');
       await expect(row.getByRole('button', { name: `Copy ${f.label}` })).toBeDisabled();
     }
     // Filled values have an enabled Copy button that copies exactly the value.

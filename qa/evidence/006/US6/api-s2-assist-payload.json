@@ -1,10 +1,10 @@
 [
   {
     "label": "GET /api/assist/{id}",
-    "request": "GET /api/assist/1f2bd035-53ba-45de-8a3d-eda34081c473",
+    "request": "GET /api/assist/8c9a5431-7ec8-459e-adb4-b20a4e0768c9",
     "status": 200,
     "response": {
-      "workspaceId": "1f2bd035-53ba-45de-8a3d-eda34081c473",
+      "workspaceId": "8c9a5431-7ec8-459e-adb4-b20a4e0768c9",
       "tender": {
         "bidNumber": "GEM/2026/B/700001",
         "title": "Supply of Laptops batch 1"
@@ -203,42 +203,42 @@
           "kind": "vault",
           "title": "GST registration certificate",
           "fileName": "gst.pdf",
-          "url": "http://localhost:8788/api/vault/39a2ac81-5cc5-45f1-9b31-1d8f82187a43/download",
+          "url": "http://localhost:8788/api/vault/9a820348-49ed-45ca-b7ae-3f679083b335/download",
           "pages": 1
         },
         {
           "kind": "vault",
           "title": "PAN card of the firm",
           "fileName": "pan.pdf",
-          "url": "http://localhost:8788/api/vault/01ea453f-dfb9-457d-bafd-377cf56b5a84/download",
+          "url": "http://localhost:8788/api/vault/c069fd53-e6e4-432b-af1c-731c09bac836/download",
           "pages": 1
         },
         {
           "kind": "vault",
           "title": "Audited balance sheets — last 3 financial years",
           "fileName": "bs-2024.pdf",
-          "url": "http://localhost:8788/api/vault/add1d635-c98f-4a02-b02b-a7ed98a864a7/download",
+          "url": "http://localhost:8788/api/vault/39d2ec60-caa1-4623-80da-b38a3c24c50e/download",
           "pages": 3
         },
         {
           "kind": "vault",
           "title": "OEM authorisation certificate (MAF) for this bid",
           "fileName": "maf.pdf",
-          "url": "http://localhost:8788/api/vault/1545d3d7-bc52-4e68-aedd-3fcd868f5a19/download",
+          "url": "http://localhost:8788/api/vault/b4929d8a-2ed4-4eed-85ea-982f63c64cfb/download",
           "pages": 1
         },
         {
           "kind": "annexure",
           "title": "Undertaking regarding Non-Blacklisting / Non-Debarment",
           "fileName": "non_blacklisting.pdf",
-          "url": "http://localhost:8788/api/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473/annexures/non_blacklisting.pdf?download=1",
+          "url": "http://localhost:8788/api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/annexures/non_blacklisting.pdf?download=1",
           "pages": 1
         },
         {
           "kind": "annexure",
           "title": "Self-Certificate of Local Content (Make in India)",
           "fileName": "mii_self_cert.pdf",
-          "url": "http://localhost:8788/api/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473/annexures/mii_self_cert.pdf?download=1",
+          "url": "http://localhost:8788/api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/annexures/mii_self_cert.pdf?download=1",
           "pages": 1
         }
       ],
@@ -271,7 +271,7 @@
         "blockers": 1,
         "analysed": true
       },
-      "workspaceUrl": "http://localhost:8788/workspaces/1f2bd035-53ba-45de-8a3d-eda34081c473"
+      "workspaceUrl": "http://localhost:8788/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9"
     }
   }
 ]
