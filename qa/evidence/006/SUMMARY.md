@@ -36,3 +36,11 @@ No price, CAPTCHA, OTP, DSC, e-Sign or final-submit automation in apps/extension
 - #537 needs-human: ratify or replace the unlicensed GEM-SCRAPER port exception
 - #538 Narrow read-only API tokens to the routes the extension needs
 - Observation from HARDEN QA: shared workspace header buttons fail axe label-content-name-mismatch on a full-page scan
+
+## Perf and model policy
+- Perf NFR-001: p95 87 ms against the 600 ms budget.
+- Every story was reviewed by cairn on Opus. Opus development escalations: US6 T078/T079.
+
+## Other notes for the human
+- Pre-existing failing 007 test `PATCH /org onboarding state ... durationSec` fails on main; not caused by 006.
+- A stray 627-byte file `/m` outside the repo was created by an agent; please delete it.
