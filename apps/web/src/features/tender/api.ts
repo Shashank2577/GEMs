@@ -4,6 +4,7 @@ import type { TenderDetail } from '@tp/core/contracts/identify';
 import type { AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto, UploadTenderDocumentResponse } from '@tp/core/contracts/analyse';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import { api, ApiError } from '@/lib/api';
+import { ANALYSIS_POLL_MS, isAnalysisRunning } from './labels';
 
 export const tenderKeys = {
   detail: (id: string) => ['tender', id] as const,
@@ -16,10 +17,14 @@ export function useTender(id: string) {
   return useQuery({ queryKey: tenderKeys.detail(id), queryFn: () => api.get<TenderDetail>(`/tenders/${id}`) });
 }
 
-/** Latest analysis for this org; `null` when none exists yet (404). */
+/**
+ * Latest done analysis for this org (+ `lastAttempt`); `null` when none exists yet (404).
+ * Polls every 3 s while another member's analysis is running (FR-029).
+ */
 export function useAnalysis(id: string) {
   return useQuery({
     queryKey: tenderKeys.analysis(id),
+    refetchInterval: (q) => (isAnalysisRunning(q.state.data) ? ANALYSIS_POLL_MS : false),
     queryFn: async () => {
       try {
         return await api.get<AnalysisDto>(`/tenders/${id}/analysis`);
@@ -62,8 +67,13 @@ export function useAnalyse(id: string) {
       qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
       qc.invalidateQueries({ queryKey: ['tenders'] });
     },
+    // 409 analysis_running → the refetch shows "Analysis in progress…" and polls; 500 → the failed-attempt warning.
+    onError: () => { qc.invalidateQueries({ queryKey: tenderKeys.analysis(id) }); },
   });
 }
+
+/** POST …/analyse answered 409: another analysis for this tender is running (FR-028). */
+export const isAnalysisRunningError = (e: unknown) => e instanceof ApiError && e.code === 'analysis_running';
 
 export function useUploadDocument(id: string) {
   const qc = useQueryClient();
@@ -108,8 +118,15 @@ export function useOverride(tenderId: string) {
       api.post<AnalysisDto>(`/analyses/${analysisId}/override`, body),
     onSuccess: (a) => {
       qc.setQueryData(tenderKeys.analysis(tenderId), a);
+      qc.invalidateQueries({ queryKey: tenderKeys.analysis(tenderId) });
       qc.invalidateQueries({ queryKey: tenderKeys.activity(tenderId) });
       qc.invalidateQueries({ queryKey: tenderKeys.detail(tenderId) });
+    },
+    // The analysis was replaced by a newer one: refetch so the retry targets the new id.
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409 && err.code === 'analysis_replaced') {
+        qc.invalidateQueries({ queryKey: tenderKeys.analysis(tenderId) });
+      }
     },
   });
 }

@@ -30,10 +30,12 @@ function Fact({ icon: Icon, label, help, children }: { icon: typeof Wallet; labe
 }
 
 export function TenderHero({
-  tender, analysis, analysing, onAnalyse, onStartBid, startingBid, onDismiss, dismissing,
+  tender, analysis, analysing, analyseDisabled = false, onAnalyse, onStartBid, startingBid, onDismiss, dismissing,
 }: {
   tender: TenderDetail; analysis: AnalysisDto | null; analysing: boolean; onAnalyse: () => void; onStartBid: () => void; startingBid: boolean;
   onDismiss: () => void; dismissing: boolean;
+  /** Another analysis for this tender is running (FR-028). */
+  analyseDisabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const buyer = [tender.ministry, tender.department, tender.organisation, tender.buyerOffice].filter((x, i, a) => x && a.indexOf(x) === i) as string[];
@@ -125,7 +127,7 @@ export function TenderHero({
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <RoleGate min="analyst">
-            <Button size="lg" onClick={onAnalyse} loading={analysing} disabled={closed && !done} className="sm:min-w-44">
+            <Button size="lg" onClick={onAnalyse} loading={analysing} disabled={(closed && !done) || analyseDisabled} className="sm:min-w-44">
               {!analysing && (done ? <RefreshCw /> : <Gauge />)} {done ? 'Re-analyse' : 'Analyse eligibility'}
             </Button>
             {tender.workspace ? (

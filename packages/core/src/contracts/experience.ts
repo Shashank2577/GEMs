@@ -66,6 +66,8 @@ export interface MyWorkItem {
   stage: DashboardStage;
   dueAt: string | null;
   endAt: string | null;
+  /** Packet readiness (007/FR-070); `analysed: false` (percent 0) while the tender has no finished analysis. */
+  readiness: { percent: number; blockers: number; analysed: boolean };
 }
 
 /** A bid waiting on a Go / No-go decision (FR-065). */

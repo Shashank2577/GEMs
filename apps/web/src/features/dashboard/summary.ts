@@ -3,6 +3,7 @@
  * Kept free of React so they can be unit-tested (summary.test.ts).
  */
 import type { DashboardResponse } from '@tp/core/contracts/experience';
+import type { Role } from '@/lib/types';
 import { pluralize } from '@/lib/format';
 
 /** Hour of the day (0–23) in IST. */
@@ -45,4 +46,14 @@ export function isEmptyOrg(d: Pick<DashboardResponse, 'demo' | 'tiles' | 'recent
 /** "HH:MM" in IST (24 h) — used by the stale-data banner. */
 export function istTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Kolkata' });
+}
+
+/**
+ * Role gating of the dashboard (007/FR-071…FR-073): the persona widgets are for analyst+ (viewers see neither),
+ * owners get them below the first row, and the "Finish setting up" card is a bid_manager+ job.
+ */
+export function roleGate(role: Role | null | undefined): { persona: boolean; ownerLayout: boolean; setupCard: boolean; decide: boolean } {
+  const rank = { viewer: 0, analyst: 1, bid_manager: 2, owner: 3 } as const;
+  const r = role ? rank[role] : -1;
+  return { persona: r >= rank.analyst, ownerLayout: role === 'owner', setupCard: r >= rank.bid_manager, decide: r >= rank.bid_manager };
 }

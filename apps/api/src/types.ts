@@ -23,6 +23,8 @@ export interface AppVariables {
   sessionId: string | null;
   /** api_tokens.id when authenticated by Bearer token, else null. */
   apiTokenId: string | null;
+  /** 006/FR-074: scope of the API token, null for cookie sessions. */
+  apiTokenScope: 'full' | 'read' | null;
   /**
    * Credentials resolved once by the global rate limiter (middleware/rate-limit.ts#ipLimit) so requireAuth does not
    * resolve them again. Unset when the request carried no credentials.

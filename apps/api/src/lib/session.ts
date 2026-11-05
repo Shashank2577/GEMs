@@ -22,6 +22,11 @@ export interface ResolvedAuth {
   kind: 'session' | 'token';
   sessionId: string | null;
   apiTokenId: string | null;
+  /**
+   * 006/FR-074: the token's scope when `kind === 'token'`, else null. Anything other than `'full'` is treated as
+   * read-only (fail closed), see middleware/auth.ts#assertWritable.
+   */
+  tokenScope: 'full' | 'read' | null;
 }
 
 /** True when the request reached us over https (directly, or per `x-forwarded-proto` from the proxy). */
@@ -120,7 +125,7 @@ export async function resolveAuth(c: Context<AppEnv>): Promise<ResolvedAuth | nu
     if (!t.lastUsedAt || now.getTime() - t.lastUsedAt.getTime() > 60_000) {
       await db.update(apiTokens).set({ lastUsedAt: now }).where(eq(apiTokens.id, t.id));
     }
-    return { user, org: m.org, role: m.role, kind: 'token', sessionId: null, apiTokenId: t.id };
+    return { user, org: m.org, role: m.role, kind: 'token', sessionId: null, apiTokenId: t.id, tokenScope: t.scope };
   }
 
   const token = getCookie(c, SESSION_COOKIE);
@@ -144,5 +149,5 @@ export async function resolveAuth(c: Context<AppEnv>): Promise<ResolvedAuth | nu
   if (!s.lastSeenAt || now.getTime() - s.lastSeenAt.getTime() >= SESSION_SEEN_INTERVAL_MS) patch.lastSeenAt = now;
   if (Object.keys(patch).length) await db.update(sessions).set(patch).where(eq(sessions.id, s.id));
 
-  return { user, org: m?.org ?? null, role: m?.role ?? null, kind: 'session', sessionId: s.id, apiTokenId: null };
+  return { user, org: m?.org ?? null, role: m?.role ?? null, kind: 'session', sessionId: s.id, apiTokenId: null, tokenScope: null };
 }

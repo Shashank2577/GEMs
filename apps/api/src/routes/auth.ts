@@ -358,7 +358,7 @@ authRoutes.put('/me/notification-prefs', requireAuth, async (c) => {
 
 const tokenSummary = (t: typeof apiTokens.$inferSelect): ApiTokenSummary => ({
   id: t.id, name: t.name, lastUsedAt: t.lastUsedAt?.toISOString() ?? null, createdAt: t.createdAt.toISOString(),
-  expiresAt: t.expiresAt?.toISOString() ?? null, hint: t.tokenHint,
+  expiresAt: t.expiresAt?.toISOString() ?? null, hint: t.tokenHint, scope: t.scope,
 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -369,7 +369,10 @@ authRoutes.get('/me/api-tokens', requireAuth, async (c) => {
   return c.json({ items: rows.map(tokenSummary), total: rows.length });
 });
 
-/** 002/FR-037: optional expiry (default 90 days), 4-char hint, at most API_TOKEN_LIMIT active tokens per user per org. */
+/**
+ * 002/FR-037: optional expiry (default 90 days), 4-char hint, at most API_TOKEN_LIMIT active tokens per user per org.
+ * 006/FR-074: optional `scope` (default `full`). Session-only, so a token holder can never mint a broader token.
+ */
 authRoutes.post('/me/api-tokens', requireSession, async (c) => {
   const body = await parseJson(c, createApiTokenInputSchema);
   const { db, clock } = c.var.deps;
@@ -391,11 +394,11 @@ authRoutes.post('/me/api-tokens', requireSession, async (c) => {
       .where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid), or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, now))));
     if (n >= API_TOKEN_LIMIT) throw new HttpError(409, 'token_limit', `You already have ${API_TOKEN_LIMIT} tokens. Revoke one first.`);
     const [inserted] = await tx.insert(apiTokens).values({
-      orgId: oid, userId: uid, name: body.name, tokenHash: await sha256Hex(token), tokenHint: token.slice(-4), expiresAt,
+      orgId: oid, userId: uid, name: body.name, tokenHash: await sha256Hex(token), tokenHint: token.slice(-4), expiresAt, scope: body.scope,
     }).returning();
     return inserted;
   });
-  await logActivity(db, { orgId: oid, userId: uid, action: 'api_token.created', entityType: 'api_token', entityId: row.id, meta: { name: body.name, expiresInDays: body.expiresInDays } });
+  await logActivity(db, { orgId: oid, userId: uid, action: 'api_token.created', entityType: 'api_token', entityId: row.id, meta: { name: body.name, expiresInDays: body.expiresInDays, scope: body.scope } });
   return c.json({ ...tokenSummary(row), token }, 201);
 });
 
