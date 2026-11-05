@@ -55,3 +55,44 @@ Watchlist-limit 409/plan-limit 402 live; US1 S4-S11 (blocked by #557); Neon late
 
 ### Verdict
 `qa:approved` — criteria 1-11 met; the T004 criterion "did not break US1-US5" holds as no-regression versus main, with the pre-existing red specs tracked in #557.
+
+
+---
+
+## Round 2 — existing 003 E2E specs repaired (issue #557) — APPROVED
+
+**Evidence commit:** [772e0ab361db48609ae2339ab804c5f919a154ed](https://github.com/Shashank2577/GEMs/commit/772e0ab361db48609ae2339ab804c5f919a154ed) (test code + evidence only; no product code touched). Private DBs `tp_e2e_r1..r8`, ports 9001-9008 / 4101-4108, dropped afterwards.
+
+### Repairs (TEST code only)
+| Problem (#557) | Fix |
+|---|---|
+| US1 S1: `getByRole('status')` hit the app-wide `offline-banner` (strict-mode violation) | `page.locator('#sync-cooldown-hint')` (same assertion text) |
+| US3 S1/S2/S3/S15 (+ every count check): `[aria-live="polite"]` resolved to the empty banner | `[aria-live="polite"]:not([data-testid="offline-banner"])` |
+| US1 S3-S11 waited out the 10-min cooldown (008/FR-026) | `ageRuns()` ages finished `ingestion_runs` by 10 min in SQL before later syncs and before the UI "Sync now" scenarios; S1 still asserts 429 `sync_cooldown` + `retryAt` + disabled button |
+| Directory run needed an empty `tenders` table | `resetIngestionData()` (new fixture; truncates tenders, ingestion_runs, notifications, watchlists on a `*e2e*` DB, then resets the mock GeM) in each spec's `beforeAll` (desktop project); `e2e/support/run-spec-dir.sh` runs the files back to back; README documents both |
+| US2 FR-020 scenario flaked on a fast run (30 previews/min limit) | clears `rate_limits` preview rows at the start of that scenario |
+
+No assertion was loosened and no test skipped or deleted (the 7 desktop "skipped" are the pre-existing `@mobile`-title guards, which run in the mobile project).
+
+### Results — each spec on its own fresh DB, desktop + mobile projects
+| Spec | Result |
+|---|---|
+| HARDEN-scaffold | 2 passed, 0 failed |
+| US1 | 15 passed (14 desktop + 1 mobile), 0 failed (was: S1 failed, 11 not run) |
+| US2 | 20 passed, 0 failed |
+| US3 | 28 passed, 4 skipped (desktop copies of @mobile tests), 0 failed (was: 4 failed) |
+| US4 | 30 passed, 1 skipped, 0 failed |
+| US5 | 19 passed, 2 skipped, 0 failed |
+| Whole directory, one DB (`run-spec-dir.sh`) | 114 passed, 7 skipped, 0 failed |
+
+Plain `playwright test e2e/003-identify-ingestion-alerts/` (one invocation): 113 passed, 1 failed (US4 S2 @mobile): Playwright runs all desktop tests, then all mobile, and the @mobile scenario needs the notification its own file's desktop run created, which US5's reset removed. Documented in e2e/README.md; use the runner script.
+
+Refreshed evidence for the previously red scenarios (US1 S1/S3, US3 S1/S2/S3/S15):
+![US1 S1 cooldown](https://raw.githubusercontent.com/Shashank2577/GEMs/772e0ab361db48609ae2339ab804c5f919a154ed/qa/evidence/003/US1/S1-S11-cooldown-popover-desktop.png) ![US3 S1 feed](https://raw.githubusercontent.com/Shashank2577/GEMs/772e0ab361db48609ae2339ab804c5f919a154ed/qa/evidence/003/US3/S1d-everything-loaded-desktop.png)
+[US1 S1 video](https://github.com/Shashank2577/GEMs/blob/772e0ab361db48609ae2339ab804c5f919a154ed/qa/evidence/003/US1/s1-fr-013-first-sync-pages-5-creates-36-tenders-immediate-re-desktop.webm) · [US1 S3 video](https://github.com/Shashank2577/GEMs/blob/772e0ab361db48609ae2339ab804c5f919a154ed/qa/evidence/003/US1/s3-second-sync-with-nothing-changed-creates-nothing-cooldown-desktop.webm) · [US3 S15 video](https://github.com/Shashank2577/GEMs/blob/772e0ab361db48609ae2339ab804c5f919a154ed/qa/evidence/003/US3/s15-status-selector-open-closed-awarded-all-list-bids-of-tha-desktop.webm)
+
+### New observation (product, not rejected)
+`sort=endAt` orders by `endAt asc, createdAt desc` with no unique final tie-break; bids sharing an end date and a batch `created_at` come back in heap order, which changed after a DELETE-based reset and made US3 S5 flaky until the reset used TRUNCATE. Suggest a `id` tie-break in `apps/api/src/routes/tenders.ts`.
+
+### Verdict
+`qa:approved` unchanged: criteria 1-11 met, and criterion 7 is now fully green (existing 003 suite 0 failed). #557 resolved.
