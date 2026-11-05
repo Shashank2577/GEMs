@@ -43,10 +43,14 @@ export const STALE_REASON_COPY: Record<StaleReason, string> = {
   corrigendum: 'A corrigendum changed this bid after it was analysed. The score below may be outdated.',
   document_added: 'A document was added since this analysis. Re-analyse to include it.',
   document_removed: 'A document was removed since this analysis. Re-analyse to update the score.',
-  profile_changed: 'Your company profile changed since this analysis. Re-analyse to update the score.',
-  vault_changed: 'Your document vault changed since this analysis. Re-analyse to update the score.',
-  weights_changed: 'Scoring weights changed since this analysis. Re-analyse to update the score.',
+  profile_changed: 'Your company profile changed since this analysis. Re-score to update the score.',
+  vault_changed: 'Your document vault changed since this analysis. Re-score to update the score.',
+  weights_changed: 'Scoring weights changed since this analysis. Re-score to update the score.',
 };
+
+/** Reasons a Re-score fixes (profile, vault, weights); a document change needs a full Re-analyse (FR-037). */
+export const RESCORE_REASONS: readonly StaleReason[] = ['profile_changed', 'vault_changed', 'weights_changed'];
+export const canRescoreFor = (reason: StaleReason | null | undefined) => !!reason && RESCORE_REASONS.includes(reason);
 
 export const staleReasonCopy = (reason: StaleReason | null | undefined) => STALE_REASON_COPY[reason ?? 'corrigendum'] ?? STALE_REASON_COPY.corrigendum;
 

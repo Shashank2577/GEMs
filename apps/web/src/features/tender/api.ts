@@ -131,6 +131,26 @@ export function useOverride(tenderId: string) {
   });
 }
 
+/** POST /analyses/:id/rescore — recompute with the current profile, vault and weights; no document re-read (FR-037). */
+export function useRescore(tenderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (analysisId: string) => api.post<AnalysisDto>(`/analyses/${analysisId}/rescore`),
+    // The response has the GET shape (lastAttempt + documents), so the cache is replaced, not wiped.
+    onSuccess: (a) => {
+      qc.setQueryData(tenderKeys.analysis(tenderId), a);
+      qc.invalidateQueries({ queryKey: tenderKeys.analysis(tenderId) });
+      qc.invalidateQueries({ queryKey: tenderKeys.activity(tenderId) });
+      qc.invalidateQueries({ queryKey: tenderKeys.detail(tenderId) });
+      qc.invalidateQueries({ queryKey: ['tenders'] });
+    },
+    // Replaced by a newer analysis / a run started: refetch so the page shows the current state.
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) qc.invalidateQueries({ queryKey: tenderKeys.analysis(tenderId) });
+    },
+  });
+}
+
 export function useStartBid(id: string) {
   const qc = useQueryClient();
   return useMutation({

@@ -487,6 +487,56 @@ export async function overrideFactor(
   return updated;
 }
 
+// ───────────── Re-score (FR-037) ─────────────
+
+/**
+ * Recomputes factors and checklist of a completed analysis from its stored requirements against the
+ * CURRENT profile, vault and weights, without re-reading documents. Overrides are kept, the stale flag
+ * is cleared. Same lifecycle lock as a run / an override, so it never interleaves with either.
+ */
+export async function rescoreAnalysis(
+  deps: AppDeps,
+  input: { orgId: string; userId: string; analysisId: string; viewer: TenderViewer },
+): Promise<AnalysisRow> {
+  const [found] = await deps.db.select({ tenderId: analyses.tenderId }).from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId)));
+  if (!found) throw notFound('Analysis');
+  const tender = await getTender(deps, found.tenderId, input.viewer);
+  const now = deps.clock.now();
+  const { a, updated } = await deps.db.transaction(async (tx) => {
+    await lockAnalyses(tx, input.orgId, tender.id);
+    const [a] = await tx.select().from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId)));
+    if (!a) throw notFound('Analysis');
+    if (a.status !== 'done') throw new HttpError(409, 'conflict', 'Only a completed analysis can be re-scored');
+    const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
+    const [running] = await tx.select({ id: analyses.id }).from(analyses).where(and(
+      eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'),
+      gt(analyses.createdAt, a.createdAt), gt(analyses.createdAt, cutoff),
+    )).limit(1);
+    if (running) throw new HttpError(409, 'analysis_running', 'An analysis is running for this tender. Wait for it to finish.');
+    const [newer] = await tx.select({ id: analyses.id }).from(analyses).where(and(
+      eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'done'), gt(analyses.createdAt, a.createdAt),
+    )).limit(1);
+    if (newer) throw new HttpError(409, 'analysis_replaced', 'A newer analysis has replaced this one. Reload to see it.');
+    const company = await loadCompany(deps, input.orgId);
+    const result = scoreTender({
+      requirements: a.requirements, profile: company.profile, pastContracts: company.pastContracts, vaultDocs: company.vault,
+      tender: { endAt: tender.endAt, state: tender.state, emdAmount: tender.emdAmount, title: tender.title, category: tender.category, items: tender.items },
+      weights: company.weights, now, overrides: overridesOf(a),
+    });
+    const prefix = matchCheckPrefix(a.summary) ?? '';
+    const [updated] = await tx.update(analyses).set({
+      factors: result.factors, checklist: buildChecklist(a.requirements, company.profile), score: result.score, confidence: result.confidence,
+      verdict: result.verdict, summary: withPrefix(prefix, result.summary), stale: false, staleReason: null, staleAt: null, updatedAt: now,
+    }).where(eq(analyses.id, a.id)).returning();
+    return { a, updated };
+  });
+  await logActivity(deps.db, {
+    orgId: input.orgId, userId: input.userId, action: 'analysis.rescored', entityType: 'tender', entityId: a.tenderId,
+    meta: { analysisId: a.id, from: a.score, score: updated.score, verdict: updated.verdict, reason: a.staleReason },
+  });
+  return updated;
+}
+
 // ───────────── Scoring weights ─────────────
 
 export function weightsResponse(stored: Record<string, number> | null | undefined): ScoringWeights {
@@ -499,5 +549,7 @@ export async function saveWeights(deps: AppDeps, input: { orgId: string; userId:
   const stored = Object.keys(clean).length ? resolveWeights(clean) : null;
   await deps.db.update(organizations).set({ scoringWeights: stored }).where(eq(organizations.id, input.orgId));
   await logActivity(deps.db, { orgId: input.orgId, userId: input.userId, action: 'org.scoring_weights_updated', entityType: 'organization', entityId: input.orgId, meta: { weights: stored } });
+  // Existing results were scored with the old weights (FR-043): flag them so the banner offers Re-score.
+  await markStale(deps.db, { orgId: input.orgId }, 'weights_changed', deps.clock.now());
   return weightsResponse(stored);
 }

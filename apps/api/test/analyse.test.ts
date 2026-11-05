@@ -279,6 +279,56 @@ describe('scoring weights', () => {
   });
 });
 
+describe('re-score (FR-037, FR-043)', () => {
+  let tenderId: string;
+  let analysisId: string;
+  beforeAll(async () => {
+    tenderId = (await insertTender('nogo-experience', { bidNumber: 'GEM/2026/B/8100001', contentHash: 'rs' })).id;
+    await request(ctx.app, 'POST', `/tenders/${tenderId}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('nogo-experience') } });
+    analysisId = (await request(ctx.app, 'POST', `/tenders/${tenderId}/analyse`, { cookie: roles.analyst.cookie })).body.id;
+    await request(ctx.app, 'POST', `/analyses/${analysisId}/override`, { cookie: roles.bidManager.cookie, json: { factorKey: 'experience', status: 'pass', reason: 'Consortium partner' } });
+  });
+
+  it('a weights change marks the analysis stale; re-score applies them, keeps overrides, clears stale, audits', async () => {
+    expect((await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.bidManager.cookie, json: { certificates: 50 } })).status).toBe(200);
+    const stale = await request(ctx.app, 'GET', `/tenders/${tenderId}/analysis`, { cookie: roles.viewer.cookie });
+    expect(stale.body).toMatchObject({ stale: true, staleReason: 'weights_changed' });
+    expect(stale.body.factors.find((f: any) => f.key === 'certificates').weight).not.toBe(50);
+
+    expect((await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.viewer.cookie })).status).toBe(403);
+    ctx.clock.advance(1000);
+    const r = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ id: analysisId, status: 'done', stale: false, staleReason: null, staleAt: null });
+    expect(r.body.documents).toHaveLength(1);
+    expect(r.body.factors.find((f: any) => f.key === 'certificates').weight).toBe(50);
+    expect(r.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'Consortium partner' });
+    expect(r.body.requirements).toEqual(stale.body.requirements);
+    const log = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, roles.orgId), eq(activityLog.action, 'analysis.rescored')));
+    expect(log).toHaveLength(1);
+    expect(log[0].meta).toMatchObject({ analysisId, score: r.body.score, reason: 'weights_changed' });
+    await request(ctx.app, 'PUT', '/scoring-weights', { cookie: roles.owner.cookie, json: {} });
+  });
+
+  it('refuses while a newer run is in progress or after a newer analysis replaced it; 404 for other orgs', async () => {
+    const [base] = await ctx.db.select().from(analyses).where(eq(analyses.id, analysisId));
+    const later = new Date(base.createdAt.getTime() + 1000);
+    const [running] = await ctx.db.insert(analyses).values({ orgId: roles.orgId, tenderId, status: 'running', method: 'rules', createdAt: later, updatedAt: later }).returning();
+    const busy = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(busy.status).toBe(409);
+    expect(busy.body.error.code).toBe('analysis_running');
+    // Only a done analysis can be re-scored.
+    const notDone = await request(ctx.app, 'POST', `/analyses/${running.id}/rescore`, { cookie: roles.analyst.cookie });
+    expect(notDone.status).toBe(409);
+    await ctx.db.update(analyses).set({ status: 'done' }).where(eq(analyses.id, running.id));
+    const replaced = await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: roles.analyst.cookie });
+    expect(replaced.status).toBe(409);
+    expect(replaced.body.error.code).toBe('analysis_replaced');
+    const other = await signup(ctx.app, { orgName: 'Rescore Other Co' });
+    expect((await request(ctx.app, 'POST', `/analyses/${analysisId}/rescore`, { cookie: other.cookie })).status).toBe(404);
+  });
+});
+
 describe('LLM enrichment (fake client)', () => {
   it('adds ATC items with method LLM and labels the analysis "rules+llm"; failures fall back to rules', async () => {
     const fake: LlmClient = {

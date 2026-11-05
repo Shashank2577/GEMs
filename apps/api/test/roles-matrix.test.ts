@@ -76,6 +76,7 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/tenders/:id/fetch-documents', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/analyse', min: 'analyst' },
   { method: 'POST', path: '/api/analyses/:id/override', min: 'bid_manager' },
+  { method: 'POST', path: '/api/analyses/:id/rescore', min: 'analyst' },
   { method: 'PUT', path: '/api/scoring-weights', min: 'bid_manager' },
   // ── profile & vault ──
   { method: 'PUT', path: '/api/profile', min: 'analyst' },
