@@ -90,7 +90,7 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 - [x] T031 [US1] Add `GET /api/me/sessions`, `DELETE /api/me/sessions/:id`, `POST /api/me/sessions/revoke-others` (session-only, own sessions only, 404 otherwise) with API tests in `apps/api/src/routes/auth.ts`, `packages/core/src/contracts/auth.ts`, `apps/api/test/sessions.test.ts` FR-012 FR-036 (#19)
 - [x] T032 [P] [US1] "Where you’re signed in" panel (browser/OS summary, "This device" badge, last active, per-row "Sign out", "Sign out of all other devices", confirm dialog) in `apps/web/src/features/settings/sections/SessionsPanel.tsx`, `apps/web/src/features/settings/sections/AccountSection.tsx`, `apps/web/src/features/settings/api.ts` FR-012 (#20)
 - [x] T033 [US1] Global session-end handling: `QueryCache`/`MutationCache` `onError` → on 401 while signed in clear cache, set `ME_KEY` null, single toast "Your session ended. Please sign in again." (RequireAuth redirects with `next`) in `apps/web/src/lib/api.ts`, `apps/web/src/lib/auth.tsx` FR-013 (#21)
-- [ ] T034 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in qa/evidence/002/US1/ — scenarios 1–13 (+14–17 once shipped) on desktop and `@mobile`, axe on `/login` and `/signup`, in `e2e/002-platform/US1-auth.e2e.ts`, `qa/evidence/002/US1/VERDICT.md` FR-001..FR-013 SC-001 (#22)
+- [x] T034 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in qa/evidence/002/US1/ — scenarios 1–13 (+14–17 once shipped) on desktop and `@mobile`, axe on `/login` and `/signup`, in `e2e/002-platform/US1-auth.e2e.ts`, `qa/evidence/002/US1/VERDICT.md` FR-001..FR-013 SC-001 (#22)
 
 **Checkpoint**: US1 independently functional and verified
 
