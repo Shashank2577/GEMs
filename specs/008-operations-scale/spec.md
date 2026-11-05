@@ -273,6 +273,10 @@ partial indexes; 20 concurrent `fetch-documents` calls against mock-gem show ≥
    **Then** the analysis makes **≤ 2** LLM calls in total with ≤ 90,000 input characters overall, finishes within 120 s
    wall-clock, and if the budget is exhausted the remaining documents are rules-only and the result shows the warning
    "AI review covered 2 of 5 documents; the rest were checked by rules only." *(gap)*.
+   *Amended 2026-11-05 by 004/US7 (FR-051, PR #560):* the caps are now 8 calls and 480,000 characters (automatic OCR
+   calls included), so the scenario uses a tender with **10** one-chunk documents: **≤ 8** LLM calls, ≤ 480,000
+   characters, < 120 s, and the warning reads "AI review covered **8 of 10** documents; the rest were checked by rules
+   only." (`e2e/008-operations-scale/US4-capacity.e2e.ts` sc7).
 8. **Given** a tender document with 301 pages, **When** it is uploaded or fetched, **Then** the API returns 422
    `document_too_long` "This document has 301 pages. TenderPilot accepts documents of up to 300 pages and reads the
    first 150 — upload the bid document and ATC separately." before any text is read, and no blob and no
@@ -620,7 +624,9 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   every document of the analysis is a scan the API returns 422 `scanned_document`.
 - **FR-031** *(gap)*: An analysis MUST make at most `MAX_LLM_CALLS_PER_ANALYSIS = 2` LLM calls, send at most
   `MAX_LLM_INPUT_CHARS = 90_000` characters in total (amended by 004/FR-051: 8 calls and 480,000 characters, so a long
-  document can be read in up to 4 chunks and an uncertain requirement escalated), set a 60 s per-call timeout and a 120 s overall budget; when a
+  document can be read in up to 4 chunks and an uncertain requirement escalated; the 8 calls include the analysis's
+  automatic OCR calls, ≤ 4 of them, each ≤ 90 s, 004/FR-052; ~5× the earlier worst-case cost per AI analysis — product
+  sign-off pending, see ADR-0008 amendment 2026-11-05), set a 60 s per-call timeout and a 120 s overall budget; when a
   budget is exhausted the remaining documents use rules only and the analysis carries a warning
   `llm_budget_exhausted` rendered as "AI review covered X of Y documents; the rest were checked by rules only."
   No LLM call starts or runs past `min(120 s budget, 2-minute running timeout) − 30 s` (`LLM_FINISH_RESERVE_MS`),
