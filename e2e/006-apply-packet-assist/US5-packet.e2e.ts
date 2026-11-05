@@ -151,7 +151,7 @@ async function linkTargets(bytes: Buffer, pageNo: number): Promise<number[]> {
     const a = annots.lookup(i, PDFDict);
     if (a.get(PDFName.of('Subtype'))?.toString() !== '/Link') continue;
     const dest = a.lookup(PDFName.of('Dest'), PDFArray);
-    const target = dest.get(0) as InstanceType<typeof PDFRef>;
+    const target = dest.get(0) as import('../../apps/api/node_modules/pdf-lib').PDFRef;
     out.push(pages.findIndex((p) => p.ref.toString() === target.toString()) + 1);
   }
   return out;

@@ -117,7 +117,7 @@ test('2 every item shows a ≤ 2-line reason (with page ref) and a Generated / v
     expect(r.lines, `${r.label}: ${r.reason}`).toBeLessThanOrEqual(2);
     expect(r.badges.length, `${r.label} badges`).toBeGreaterThan(0);
   }
-  const badgeOf = Object.fromEntries(info.map((r) => [r.label, r.badges[0] ?? '']));
+  const badgeOf: Record<string, string> = Object.fromEntries(info.map((r) => [r.label, r.badges[0] ?? '']));
   test.info().annotations.push({ type: 'rows', description: JSON.stringify(info) });
   // Deviation vs criterion text: the vault-type badge reads "GST" (DOC_TYPE_LABEL), not "GST certificate".
   expect(badgeOf['GST registration certificate']).toBe('GST');

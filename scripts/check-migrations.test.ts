@@ -83,6 +83,16 @@ describe('check-migrations', () => {
     });
   });
 
+  it('treats index drops/rebuilds (incl. CONCURRENTLY, tp:non-transactional) as additive: no data is lost', () => {
+    const sql = [
+      '-- tp:non-transactional',
+      'DROP INDEX CONCURRENTLY IF EXISTS "tenders_open_state_idx";--> statement-breakpoint',
+      'DROP INDEX "tenders_open_end_idx";',
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS "tenders_open_state_idx" ON "tenders" USING btree ("state","created_at");',
+    ].join('\n');
+    expect(rules(sql)).toEqual([]);
+  });
+
   it('does not flag the migrations already on main', () => {
     const dir = join(__dirname, '..', 'packages', 'db', 'migrations');
     for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql'))) {

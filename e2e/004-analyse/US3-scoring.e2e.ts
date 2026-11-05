@@ -181,7 +181,7 @@ test('4 Show evidence on "Similar work value": quote, p. 4 chip, file name, "· 
   await expect(open).toHaveAttribute('aria-expanded', 'true');
   const quote = row.locator('blockquote');
   await expect(quote).toBeVisible();
-  await expect(quote).toContainText(sw.source.quote.slice(0, 60));
+  await expect(quote).toContainText(sw.source.quote!.slice(0, 60));
   await expect(quote.getByRole('link', { name: /^p\. 4/ })).toBeVisible();
   await expect(quote.getByText('go-it-services.pdf', { exact: true })).toBeVisible();
   await expect(quote).toContainText('· Rule · 85% confidence');

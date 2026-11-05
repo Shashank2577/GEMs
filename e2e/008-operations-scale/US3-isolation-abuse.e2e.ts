@@ -86,7 +86,7 @@ async function twoOrgs(browser: Browser, baseURL: string) {
 }
 
 async function expectErr(res: Awaited<ReturnType<APIRequestContext['get']>>, status: number, code: string) {
-  const body = await res.json().catch(() => ({}));
+  const body: any = await res.json().catch(() => ({}));
   expect({ status: res.status(), code: body?.error?.code }, JSON.stringify(body)).toEqual({ status, code });
   return body;
 }
@@ -334,7 +334,7 @@ test.describe('sc6 preview spam', () => {
     expect(statuses.slice(0, 30).every((s) => s === 200)).toBe(true);
     expect(statuses[30]).toBe(429);
     await t.http('call 31', last429!, 'POST /api/watchlists/preview');
-    const body = await last429!.json();
+    const body: any = await last429!.json();
     expect(body.error).toMatchObject({ code: 'rate_limited', details: { rule: 'watchlist.preview.user' } });
     expect(last429!.headers()['retry-after']).toMatch(/^\d+$/);
     t.save();

@@ -76,7 +76,7 @@ class Transcript {
 }
 
 async function errorOf(res: Awaited<ReturnType<APIRequestContext['get']>>) {
-  const j = await res.json().catch(() => ({}));
+  const j: any = await res.json().catch(() => ({}));
   return { status: res.status(), code: j?.error?.code as string | undefined, message: j?.error?.message as string | undefined, details: j?.error?.details };
 }
 
