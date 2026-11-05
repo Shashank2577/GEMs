@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { APIRequestContext, Page } from '@playwright/test';
 import type { AnalysisDto, TenderDocKind, UploadTenderDocumentResponse } from '../../packages/core/src/contracts/analyse';
-import { expect, mockGem } from '../support/fixtures';
+import { expect, GEM_URL, mockGem } from '../support/fixtures';
 
 export { collectRunArtifacts, evidence, expect, mockGem, signupViaApi, test, uniqueUser } from '../support/fixtures';
 
@@ -37,11 +37,20 @@ export interface TargetTender { id: string; bidNumber: string; gemBidId: string 
  */
 export async function openTargetTender(page: Page, opts: { tab?: 'analysis' | 'requirements' | 'documents' | 'history'; minDaysOut?: number } = {}): Promise<TargetTender> {
   const minEnd = Date.now() + (opts.minDaysOut ?? 3) * 86_400_000;
+  // Only bids mock-gem actually serves: the demo seed (e.g. from the smoke spec) also creates source 'gem'
+  // tenders whose GeM bid ids mock-gem does not know, so fetching their documents would 404.
+  const known = async () => {
+    const res = await page.request.get(`${GEM_URL}/__admin/state`);
+    expect(res.ok(), await res.text()).toBeTruthy();
+    const { bids } = (await res.json()) as { bids: { id: string | number }[] };
+    return new Set(bids.map((b) => String(b.id)));
+  };
   const find = async (): Promise<TargetTender | undefined> => {
+    const ids = await known();
     const res = await page.request.get('/api/tenders', { params: { status: 'open', sort: 'endAt', pageSize: 100 } });
     expect(res.ok(), await res.text()).toBeTruthy();
     const { items } = (await res.json()) as { items: (TargetTender & { source: string })[] };
-    return items.find((t) => t.source === 'gem' && !!t.gemBidId && !!t.endAt && Date.parse(t.endAt) >= minEnd);
+    return items.find((t) => t.source === 'gem' && !!t.gemBidId && ids.has(String(t.gemBidId)) && !!t.endAt && Date.parse(t.endAt) >= minEnd);
   };
   let target = await find();
   if (!target) {

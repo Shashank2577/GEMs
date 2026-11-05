@@ -58,9 +58,12 @@ const usedTenders = new Set<string>();
 async function freshGemTender(r: APIRequestContext): Promise<Tender> {
   const minEnd = Date.now() + 3 * 86_400_000;
   const list = async () => {
+    // Only bids mock-gem serves: the demo seed (smoke spec) also creates source 'gem' tenders with unknown GeM ids.
+    const state = (await (await r.get(`${GEM_URL}/__admin/state`)).json()) as { bids: { id: string | number }[] };
+    const known = new Set(state.bids.map((b) => String(b.id)));
     const res = await r.get('/api/tenders', { params: { status: 'open', sort: 'endAt', pageSize: 100 } });
     expect(res.ok(), await res.text()).toBeTruthy();
-    return ((await res.json()) as { items: Tender[] }).items.filter((t) => t.source === 'gem' && !!t.gemBidId && !!t.endAt && Date.parse(t.endAt) >= minEnd && !usedTenders.has(t.id));
+    return ((await res.json()) as { items: Tender[] }).items.filter((t) => t.source === 'gem' && !!t.gemBidId && known.has(String(t.gemBidId)) && !!t.endAt && Date.parse(t.endAt) >= minEnd && !usedTenders.has(t.id));
   };
   for (let attempt = 0; attempt < 3; attempt++) {
     for (const t of await list()) {
