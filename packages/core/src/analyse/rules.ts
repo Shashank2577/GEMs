@@ -445,3 +445,27 @@ export function combineRequirements(lists: Requirement[][], fallback: Requiremen
   for (const r of fallback) if (!map.has(requirementId(r))) map.set(requirementId(r), r);
   return [...map.values()];
 }
+
+// ───────────── Bid-number detection (FR-010) ─────────────
+
+const BID_NO_RE = /GEM\s*\/\s*(\d{4})\s*\/\s*([A-Z])\s*\/\s*(\d+)/i;
+/** Characters of page 1 treated as header / footer when looking for the printed bid number. */
+const HEADER_CHARS = 800;
+const FOOTER_CHARS = 400;
+
+/** Normalise a GeM bid number ("gem / 2026 / b / 123" → "GEM/2026/B/123"); null if it is not one. */
+export function normalizeBidNumber(s: string | null | undefined): string | null {
+  const m = s ? BID_NO_RE.exec(s) : null;
+  return m ? `GEM/${m[1]}/${m[2].toUpperCase()}/${m[3]}` : null;
+}
+
+/**
+ * The GeM bid number printed on page 1 of a document (`GEM/\d{4}/[A-Z]/\d+`), looking at the page
+ * header first and the footer second, so a bid number quoted in the body (e.g. "previous bid …")
+ * is not mistaken for the document's own. Returns null when page 1 carries none (scans, ATCs).
+ */
+export function detectBidNumber(pages: string[]): string | null {
+  const first = pages[0] ?? '';
+  if (!first.trim()) return null;
+  return normalizeBidNumber(first.slice(0, HEADER_CHARS)) ?? normalizeBidNumber(first.slice(-FOOTER_CHARS));
+}

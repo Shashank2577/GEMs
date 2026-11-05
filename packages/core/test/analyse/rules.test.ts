@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { generateBidPdf, getSampleBidSpec, SAMPLE_BID_SPECS } from '../../src/analyse/sample-bid';
 import { extractPages, isPdf, joinPages, looksScanned, splitPages, PdfTextError } from '../../src/analyse/pdf-text';
 import {
-  combineRequirements, extractRequirementsRules, flattenText, parseGemDateTime, parseIndianAmount,
-  requirementsFromListing, splitDocumentList,
+  combineRequirements, detectBidNumber, extractRequirementsRules, flattenText, normalizeBidNumber, parseGemDateTime,
+  parseIndianAmount, requirementsFromListing, splitDocumentList,
 } from '../../src/analyse/rules';
 import type { Requirement } from '../../src/analyse/types';
 
@@ -180,5 +180,31 @@ describe('rules: robustness on raw text', () => {
     expect(req(all, 'emd')!.numeric).toBe(50_000);
     expect(req(all, 'estimated_value')).toMatchObject({ numeric: 1_000_000, confidence: 0.7 });
     expect(all.filter((r) => r.key === 'document').map((r) => r.value).sort()).toEqual(['Bidder Turnover', 'Experience Criteria']);
+  });
+});
+
+describe('detectBidNumber (FR-010)', () => {
+  it('finds the bid number printed on page 1 of every sample bid', () => {
+    for (const s of SAMPLE_BID_SPECS) expect(detectBidNumber(pagesByKey.get(s.key)!)).toBe(s.bidNumber);
+  });
+
+  it('prefers the page-1 header over a bid number quoted in the body', () => {
+    const body = 'x'.repeat(900);
+    const page1 = `Bid Number: GEM/2026/B/6133872 Dated: 01-11-2026 ${body} supersedes earlier bid GEM/2025/B/1111111 ${body}`;
+    expect(detectBidNumber([page1, 'GEM/2026/B/9999999'])).toBe('GEM/2026/B/6133872');
+  });
+
+  it('falls back to the page-1 footer and ignores later pages', () => {
+    const page1 = `${'Bid Details '.repeat(100)} GEM/2026/B/6140019 | Page 1`;
+    expect(detectBidNumber([page1])).toBe('GEM/2026/B/6140019');
+    expect(detectBidNumber(['Additional terms and conditions', 'Bid Number: GEM/2026/B/6140019'])).toBeNull();
+  });
+
+  it('tolerates spacing and case and returns null without text', () => {
+    expect(detectBidNumber(['Bid Number : gem / 2026 / r / 42 '])).toBe('GEM/2026/R/42');
+    expect(detectBidNumber([''])).toBeNull();
+    expect(detectBidNumber([])).toBeNull();
+    expect(normalizeBidNumber('GEM-2026-B-1')).toBeNull();
+    expect(normalizeBidNumber(null)).toBeNull();
   });
 });
