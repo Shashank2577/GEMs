@@ -90,15 +90,5 @@ export function dateIST(d: Date): string {
   return `${p(t.getUTCDate())}-${p(t.getUTCMonth() + 1)}-${t.getUTCFullYear()}`;
 }
 
-/** "12 Nov 2026, 3:00 PM IST" */
-export function dateTimeIST(d: Date | string | null | undefined): string {
-  if (!d) return '';
-  const date = new Date(d);
-  if (Number.isNaN(date.getTime())) return '';
-  const t = new Date(date.getTime() + 330 * 60_000);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  let h = t.getUTCHours();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${t.getUTCDate()} ${months[t.getUTCMonth()]} ${t.getUTCFullYear()}, ${h}:${String(t.getUTCMinutes()).padStart(2, '0')} ${ampm} IST`;
-}
+/** "12 Nov 2026, 3:00 PM IST" — lives in the neutral `time` module; re-exported for existing imports. */
+export { dateTimeIST } from '../time';

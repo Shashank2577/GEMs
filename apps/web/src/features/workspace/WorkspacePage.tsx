@@ -36,7 +36,7 @@ function stepStatus(d: WorkspaceDetail): Record<StepKey, { done: boolean; hint: 
   const required = d.annexures.filter((x) => x.required);
   return {
     qualify: { done: !!a && a.status === 'done', hint: a?.score != null ? `Score ${a.score}` : 'Not analysed' },
-    documents: { done: d.readiness.canMarkReady && !!a, hint: `${d.readiness.percent}% ready` },
+    documents: { done: d.readiness.canMarkReady && !!a, hint: !d.readiness.analysed ? 'Not analysed' : `${d.readiness.percent}% ready` }, // FR-009/FR-023
     annexures: { done: !!a && required.every((x) => !x.missing.length), hint: `${required.length} required` },
     packet: { done: d.packets.some((p) => p.status === 'ready'), hint: d.packets[0]?.pageCount ? `${d.packets[0].pageCount} pages` : 'Not built' },
     submit: { done: submitted, hint: submitted ? 'Submitted' : 'Human-only' },
