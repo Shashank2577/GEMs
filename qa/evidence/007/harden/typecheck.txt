@@ -1,0 +1,14 @@
+Scope: 6 of 7 workspace projects
+packages/core typecheck$ tsc --noEmit
+packages/core typecheck: Done
+apps/extension typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+packages/db typecheck$ tsc --noEmit
+tools/mock-gem typecheck$ tsc --noEmit
+apps/extension typecheck: Done
+tools/mock-gem typecheck: Done
+packages/db typecheck: Done
+apps/web typecheck: Done
+apps/api typecheck$ tsc --noEmit
+apps/api typecheck: Done
+exit=0

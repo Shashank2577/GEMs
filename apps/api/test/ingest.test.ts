@@ -2,9 +2,10 @@
  * T038 — ingestion idempotency, corrigenda, matching → notifications, dispatch & digests, failure modes.
  * Runs against the in-process mock BidPlus (tools/mock-gem) through deps.fetch.
  */
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, ingestionRuns, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
+import { analyses, ingestionRuns, notificationPrefs, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, users, watchlists } from '@tp/db';
+import type { NormalizedTender } from '@tp/core/gem/parse';
 import { toGemSolrDate } from '@tp/core/gem/normalize';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { createResendMailer } from '../src/adapters/mailer';
@@ -13,6 +14,8 @@ import { createMetaWhatsApp } from '../src/adapters/whatsapp';
 import { CLAIM_LEASE_MS, DISPATCH_BATCH, LEASE_SAFETY_MARGIN_MS, dispatchNotifications } from '../src/services/alerts';
 import type { AppDeps } from '../src/deps';
 import { IngestionBusyError, planPages, runIngestion } from '../src/services/ingest';
+import { gemCopyOutdated } from '../src/services/analyse';
+import { keepStaleOnCompletion } from '../src/services/staleness';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z'); // fixture reference = 10:00 IST
@@ -147,7 +150,10 @@ describe('runIngestion', () => {
 
   it('acceptance #4: a corrigendum updates the end date, records history and marks analyses stale', async () => {
     const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/6421001'));
-    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go' });
+    const analysedAt = new Date(ctx.clock.now().getTime() - 86_400_000);
+    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go', createdAt: analysedAt, updatedAt: analysedAt });
+    // A failed attempt has no result to invalidate: markStale leaves it alone (004/T074).
+    const [failed] = await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'failed', error: 'x', createdAt: new Date(0) }).returning();
     const r = await admin(`/__admin/corrigendum/${encodeURIComponent('GEM/2026/B/6421001')}`, { days: 7 });
     expect(r.status).toBe(200);
     ctx.clock.advance(30 * 60_000);
@@ -158,10 +164,12 @@ describe('runIngestion', () => {
     const events = await ctx.db.select().from(tenderEvents).where(and(eq(tenderEvents.tenderId, t.id), eq(tenderEvents.kind, 'corrigendum')));
     expect(events).toHaveLength(1);
     expect(events[0].changes).toEqual({ endAt: { from: t.endAt!.toISOString(), to: after.endAt!.toISOString() } });
-    const [a] = await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id));
+    const [a] = await ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, t.id), eq(analyses.status, 'done')));
     expect(a.stale).toBe(true);
     expect(a.staleReason).toBe('corrigendum'); // Re-score refuses it: a corrigendum needs a re-analysis (004/FR-037)
-    expect(a.staleAt).not.toBeNull();
+    expect(a.staleAt).toEqual(ctx.clock.now()); // via markStale (004/FR-043, T074): when the corrigendum was seen
+    expect(a.updatedAt).toEqual(analysedAt); // "Analysed <time>" is not moved
+    expect((await ctx.db.select().from(analyses).where(eq(analyses.id, failed.id)))[0]).toMatchObject({ stale: false, staleReason: null, staleAt: null });
     // Members who track it get an in-app heads-up; the match itself is not duplicated.
     expect(await count(notifications, and(eq(notifications.kind, 'deadline'), eq(notifications.orgId, team.orgId))!)).toBe(4);
     expect(await count(tenderMatches, eq(tenderMatches.tenderId, t.id))).toBe(1);
@@ -501,6 +509,66 @@ describe('format-drift guard (FR-014)', () => {
     expect(d.logs.filter((l) => l.level === 'error' && l.msg === 'ingestion.format_drift')).toHaveLength(1);
     const runs = await request(ctx.app, 'GET', '/ingestion/runs', { cookie: team.viewer.cookie });
     expect(runs.body.lastRun).toMatchObject({ status: 'failed', error: expect.stringMatching(/^GeM response format changed/) });
+  });
+});
+
+// Review B1: a run's corrigendum writes are stamped when they happen, not when the run started (which can be up to
+// the run budget earlier), because analyses and GeM copies created meanwhile carry their own write times.
+describe('corrigendum event and stale time are the time of the write (004/FR-045, FR-046)', () => {
+  const RUN_TAKES = 5 * 60_000;
+  /** A run whose listing request takes RUN_TAKES; `during` runs mid-request; GeM then returns `bid` with `change`. */
+  async function slowRun(bid: string, change: Partial<NormalizedTender>, during: () => Promise<void>) {
+    const [row] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, bid));
+    const t: NormalizedTender = {
+      source: 'gem', bidNumber: row.bidNumber, gemBidId: row.gemBidId, bidType: row.bidType, title: row.title, items: row.items,
+      category: row.category, quantity: row.quantity, ministry: row.ministry, department: row.department, organisation: row.organisation,
+      buyerOffice: row.buyerOffice, state: row.state, city: row.city, startAt: row.startAt, endAt: row.endAt, openingAt: row.openingAt,
+      emdAmount: row.emdAmount, estimatedValue: row.estimatedValue, epbgPercent: row.epbgPercent, hsnCodes: row.hsnCodes, status: row.status,
+      documentUrl: row.documentUrl, sourceUrl: row.sourceUrl, raw: row.raw ?? {}, contentHash: `${row.contentHash}:b1:${ctx.clock.now().getTime()}`,
+      ...change,
+    };
+    const client = {
+      fetchTenders: async () => {
+        ctx.clock.advance(RUN_TAKES);
+        await during();
+        ctx.clock.advance(1000); // the corrigendum is written after `during`
+        return { tenders: [t], rawCount: 1, numFound: 1 };
+      },
+    };
+    ctx.clock.advance(60_000);
+    const started = ctx.clock.now();
+    const run = await runIngestion(ctx.deps, { trigger: 'manual', pages: 1, client });
+    expect(run).toMatchObject({ status: 'success', tendersUpdated: 1 });
+    const [event] = await ctx.db.select().from(tenderEvents)
+      .where(and(eq(tenderEvents.tenderId, row.id), eq(tenderEvents.kind, 'corrigendum'))).orderBy(desc(tenderEvents.createdAt)).limit(1);
+    expect(event.createdAt).toEqual(new Date(started.getTime() + RUN_TAKES + 1000));
+    return { row, event };
+  }
+
+  it('an analysis that started after the run started but before the corrigendum was written completes stale (FR-045)', async () => {
+    let runningId = '';
+    const { row, event } = await slowRun('GEM/2026/B/6421010', { endAt: new Date('2026-12-24T09:30:00Z') }, async () => {
+      const [t] = await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/6421010'));
+      const [a] = await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'running', createdAt: ctx.clock.now(), updatedAt: ctx.clock.now() }).returning();
+      runningId = a.id;
+    });
+    expect(row.id).toBeTruthy();
+    // The run's own completion write (analyseTender) keeps a flag set at or after its created_at.
+    const [done] = await ctx.db.update(analyses).set({ status: 'done', ...keepStaleOnCompletion() }).where(eq(analyses.id, runningId)).returning();
+    expect(done).toMatchObject({ status: 'done', stale: true, staleReason: 'corrigendum', staleAt: event.createdAt });
+  });
+
+  it('a GeM copy fetched after the run started but before the documentUrl corrigendum was written is re-fetched (FR-046)', async () => {
+    const bid = 'GEM/2026/B/6421001';
+    const { row } = await slowRun(bid, { documentUrl: `${GEM}/showbidDocument/7421001-amended` }, async () => {
+      const [t] = await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, bid));
+      await ctx.db.insert(tenderDocuments).values({
+        tenderId: t.id, orgId: null, kind: 'bid', fileName: 'bid.pdf', blobKey: 'b1/bid.pdf', sizeBytes: 10, pageCount: 1, text: 'bid', createdAt: ctx.clock.now(),
+      });
+    });
+    const copies = await ctx.db.select().from(tenderDocuments).where(and(eq(tenderDocuments.tenderId, row.id), isNull(tenderDocuments.orgId)));
+    expect(copies).toHaveLength(1);
+    expect(await gemCopyOutdated(ctx.db, row.id, copies)).toBe(true);
   });
 });
 

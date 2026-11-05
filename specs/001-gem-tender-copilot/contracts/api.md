@@ -163,10 +163,37 @@ Token scope (006/FR-074): `POST /me/api-tokens` accepts `scope: "full" | "read"`
 
 ## Dashboard & demo — owner: Experience module (`routes/dashboard.ts`, `routes/demo.ts`)
 
+Types: `packages/core/src/contracts/experience.ts` (007). All Experience endpoints use the standard error envelope.
+
 | Method | Path | Notes |
 |---|---|---|
-| GET | /dashboard | `{tiles:{newMatchesToday, closingThisWeek, activeBids, emdAtStake, winRate, expiringDocs}, closingSoon[], pipeline:{[stage]:n}, verdicts:{go,review,no_go}, matchesByDay:[{date,count}], recentMatches[], activity[], setup:[{key,label,done,href}]}` |
-| POST (M) | /demo/seed | seeds demo company profile, vault docs, watchlists, matches, analyses and workspaces into the current org (idempotent) |
+| GET | /dashboard | viewer+. `DashboardResponse`: `{generatedAt, tiles:{newMatchesToday, closingThisWeek, activeBids, emdAtStake, winRate, expiringDocs}, stats, closingSoon[], pipeline:{[stage]:n}, pipelineValue:{[stage]:₹}, verdicts:{go,review,no_go}, matchesByDay:[{date,count}], recentMatches[], expiringDocuments[], activity[], setup:[{key,label,description,done,href}], setupComplete, demo, myWork?, awaitingDecision?}`. See the two persona lists below |
+| POST (M) | /demo/seed | bid_manager+. Seeds the demo company profile (never over a non-empty profile), vault docs (real one-page PDFs), watchlists, matches, analyses, workspaces and past contracts into the current org. Idempotent. `DemoSeedResponse` `{ok:true, created, tenders, watchlists, matches, analyses, workspaces, vaultDocuments, pastContracts}`: **201** when it created data, **200** with `created:false` on a repeat. Sets `onboardingState.demo = true` (via `jsonb_set` inside the seed transaction, so a concurrent onboarding save is not lost). Logs `demo.seeded` with `meta.watchlistIds` (the ids of the three demo watchlists — the removal's provenance record) |
+| DELETE (M) | /demo | bid_manager+ (viewer/analyst 403). Removes the demo rows of the current org in one transaction (comments, packets/annexures of demo workspaces, workspaces, analyses, matches, demo watchlists, demo notifications, activity with `meta.demo`, seeded past contracts and vault documents; blobs are deleted after commit and a blob failure is logged, not fatal). User-created rows are kept, including a user-created workspace on a real (non-demo) tender. Demo **tenders** are global and stay. Resets the company profile only while it still holds the demo company. Sets `onboardingState.demo = false` and logs `demo.removed` (not marked `meta.demo`, so it survives later removals) — both inside the transaction. Idempotent: a repeat answers all zeros and logs nothing. Seed and removal lock the same org row so they never interleave. Response `DemoRemoveResponse` `{ok:true, removed:{workspaces, analyses, matches, comments, notifications, activity, pastContracts, vaultDocuments, watchlists, profileReset}}` — `profileReset` is a boolean **inside** `removed` |
+
+### `GET /dashboard` — persona lists (007/FR-070)
+
+Both arrays hold at most 5 items (`MY_WORK_LIMIT`), are computed for the signed-in user, and are scoped to the active org (Constitution IV). They are optional in the type; the API always sends them (possibly `[]`). Role gating is a UI concern (viewers do not see the widgets); the API returns the lists to any role.
+
+- `myWork: MyWorkItem[]` — workspaces the caller **owns or is assigned to** (`owner_id = me` or `assignee_ids @> [me]`) whose stage is **not** `won`, `lost`, `dropped` **or `submitted`** (a submitted bid is no longer "to do"). Order: `dueAt` ascending, nulls last, then tender `endAt` ascending, then workspace id.
+  `MyWorkItem` = `{workspaceId, tenderId, bidNumber, title, stage, dueAt, endAt, readiness:{percent, blockers, analysed}}`. `readiness` comes from the same helper as the pipeline cards (`readinessFor`), so the percentage matches the card: `percent` 0–100, `blockers` = number of open blockers (mandatory checklist items missing/expired and not overridden), `analysed:false` (percent 0) while the tender has no finished analysis.
+- `awaitingDecision: DecisionItem[]` — workspaces in stage `analysing` whose **latest** analysis for the tender is `done`; oldest-waiting first (analysis `updated_at`, then workspace `created_at`, then id).
+  `DecisionItem` is **flat**: `{tenderId, workspaceId, bidNumber, title, score, verdict, endAt}` (`score` 0–100 or null, `verdict` `go|review|no_go` or null). There is no nested `analysis` object. `workspaceId` is typed `string | null`; the current query always sets it.
+  The web turns a decision into `PATCH /workspaces/:id {stage:'go'}` (one tap, no dialog) or `{stage:'dropped'}` (after a confirmation dialog). The API itself does not restrict that PATCH to bid_manager+ (analyst+ per the workspace contract).
+
+### `PATCH /org` — onboarding state (007/FR-048, FR-052)
+
+`updateOrgInputSchema.onboardingState` is `Record<string, boolean>` with a refinement (not a closed object), so unknown keys reach the refinement and are reported on the field:
+
+- Allowed keys (`ONBOARDING_KEYS`): `company`, `categories`, `watchlist`, `documents`, `skipped`, `completed`, `demo`. At most 16 keys per request. Values must be booleans.
+- Violations answer **400 `validation_error`** with `details.fields.onboardingState` = `"Unknown onboarding key: <first bad key>"` or `"At most 16 onboarding keys"`; nothing is written.
+- Valid keys are **merged** in SQL (`coalesce(onboarding_state,'{}') || patch`), never replaced, so concurrent PATCHes of different keys do not overwrite each other. Ticks are not written to the activity feed.
+- **`onboarding.completed` activity** (entityType `organization`, `meta:{durationSec}` = seconds from organisation creation to the flip): written exactly once, by the request whose conditional `UPDATE … WHERE completed is not true` flips `completed` to true (concurrent or repeat requests do not log again). This is how SC-001 is measured from data.
+- Other changes (`name`, `scoringWeights`) still log `org.updated` with `meta.fields`.
+
+### Tender DTOs — `isDemo` (007/FR-067)
+
+`TenderCore.isDemo: boolean` (in `packages/core/src/contracts/identify.ts`) is on every tender DTO (list items and detail). It is true when `tenders.source = 'demo'` or the stored payload carries `raw.demo === true` (the list query does not select `raw`, so `source` decides there). The web shows a "Sample" badge in the feed (card and table) and on the tender page. Demo tenders are visible only to orgs that loaded the demo (008/FR-016).
 
 ## Operator — owner: Ops (`routes/admin.ts`, spec 008 FR-042)
 
