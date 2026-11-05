@@ -214,7 +214,7 @@ task is sized at ≤ 1 day.
 - [x] T070 [US6] Web: **Renew** dialog (file, issue date default today, expiry pre-filled by `suggestExpiry`, number) calling `useReplaceVaultFile` with fields; toast "“<title>” renewed — valid till <date>" in new `apps/web/src/features/vault/RenewDialog.tsx`, `apps/web/src/features/vault/DocumentDrawer.tsx`, `apps/web/src/features/vault/api.ts` FR-064, FR-068 (#158)
 - [x] T071 [P] [US6] Web: "Versions" list in the drawer with Download per version (`useVaultVersions`) in `apps/web/src/features/vault/DocumentDrawer.tsx`, `apps/web/src/features/vault/api.ts` FR-066, FR-068 (#159)
 - [x] T072 [P] [US6] Web: duplicate prompt "This file is already in your vault as “<title>”." with **Open existing** / **Upload anyway** in `apps/web/src/features/vault/UploadDialog.tsx` FR-067 (#160)
-- [ ] T073 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in `qa/evidence/005/US6/` — renew flow, versions download, duplicate prompt both branches, viewer sees versions but no Renew; desktop + `@mobile`; spec `e2e/005-profile-vault/US6-renew-history.e2e.ts`; `VERDICT.md` FR-064…FR-068 (#161)
+- [x] T073 [US6] QA: Playwright E2E for US6 with evidence (screenshots, video, trace) in `qa/evidence/005/US6/` — renew flow, versions download, duplicate prompt both branches, viewer sees versions but no Renew; desktop + `@mobile`; spec `e2e/005-profile-vault/US6-renew-history.e2e.ts`; `VERDICT.md` FR-064…FR-068 (#161)
 
 **Checkpoint**: All user stories independently functional
 
