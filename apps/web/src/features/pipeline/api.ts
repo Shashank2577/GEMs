@@ -23,6 +23,7 @@ export function useMoveCard() {
   return useMutation({
     mutationFn: ({ id, stage, position }: { id: string; stage?: string; position?: number }) =>
       api.patch<WorkspaceDto>(`/workspaces/${id}`, moveBody({ stage, position })),
+    meta: { handlesNetworkError: true }, // call site toasts its own failure (incl. offline) — skip the global offline toast
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       qc.invalidateQueries({ queryKey: ['workspace', v.id] });
@@ -36,6 +37,7 @@ export function useRecordOutcome() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, outcome }: { id: string; outcome: OutcomeInput }) => api.patch<WorkspaceDto>(`/workspaces/${id}`, { outcome }),
+    meta: { handlesNetworkError: true }, // call site toasts its own failure (incl. offline) — skip the global offline toast
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       qc.invalidateQueries({ queryKey: ['workspace', v.id] });
