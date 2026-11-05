@@ -1,7 +1,7 @@
 /** Data hooks for the tender detail page (Identify: GET /tenders/:id; Analyse: documents, analysis, override). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TenderDetail } from '@tp/core/contracts/identify';
-import type { AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
+import type { AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto, UploadTenderDocumentResponse } from '@tp/core/contracts/analyse';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import { api, ApiError } from '@/lib/api';
 
@@ -68,12 +68,26 @@ export function useAnalyse(id: string) {
 export function useUploadDocument(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, kind }: { file: File; kind: TenderDocKind }) => api.upload<TenderDocumentDto>(`/tenders/${id}/documents`, file, { kind }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: tenderKeys.documents(id) });
-      qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
-    },
+    mutationFn: ({ file, kind }: { file: File; kind: TenderDocKind }) => api.upload<UploadTenderDocumentResponse>(`/tenders/${id}/documents`, file, { kind }),
+    // A new document marks the analysis stale (FR-044), so refresh it as well.
+    onSuccess: () => invalidateDocumentChange(qc, id),
   });
+}
+
+/** DELETE /tenders/:id/documents/:docId — remove one of the org's own uploads (FR-009). */
+export function useRemoveDocument(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (docId: string) => api.delete<void>(`/tenders/${id}/documents/${docId}`),
+    onSuccess: () => invalidateDocumentChange(qc, id),
+  });
+}
+
+function invalidateDocumentChange(qc: ReturnType<typeof useQueryClient>, id: string) {
+  qc.invalidateQueries({ queryKey: tenderKeys.documents(id) });
+  qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
+  qc.invalidateQueries({ queryKey: tenderKeys.analysis(id) });
+  qc.invalidateQueries({ queryKey: tenderKeys.detail(id), exact: true });
 }
 
 export function useFetchFromGem(id: string) {
