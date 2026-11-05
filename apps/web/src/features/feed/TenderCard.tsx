@@ -94,7 +94,7 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
           </div>
 
           <h3 id={`t-${t.id}-title`} className="mt-1.5 text-[15px] font-semibold leading-snug tracking-tight sm:text-base">
-            <Link to={href} onClick={open} className="rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring">
+            <Link to={href} onClick={open} className="block min-h-6 rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring">
               <span className="line-clamp-2">{t.title}</span>
             </Link>
           </h3>

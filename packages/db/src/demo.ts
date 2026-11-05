@@ -56,6 +56,8 @@ export interface SeedDemoResult {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+/** IST = UTC+05:30. */
+const IST_OFFSET_MS = 330 * 60_000;
 const DEMO_MARK = 'demo';
 /** Seeded watchlists are back-dated by exactly this much (created_at = seed time − 16 d, updated_at = seed time). */
 const DEMO_WATCHLIST_AGE_MS = 16 * DAY;
@@ -209,11 +211,11 @@ export function demoBidNumber(i: number): string {
   return `GEM/2026/B/${6_400_000 + i * 7919 + 1_337}`;
 }
 
-interface PlannedTender {
+export interface PlannedTender {
   idx: number; bidNumber: string; item: Item; buyer: Buyer; endAt: Date; startAt: Date; quantity: number; value: number; emd: number;
 }
 
-function planTenders(now: Date): PlannedTender[] {
+export function planTenders(now: Date): PlannedTender[] {
   return TENDER_PLAN.map(([ik, bk, hours], idx) => {
     const item = ITEMS[ik]!;
     const buyer = BUYERS[bk];
@@ -222,7 +224,16 @@ function planTenders(now: Date): PlannedTender[] {
     const value = roundTo(quantity * item.unitPrice * (0.9 + r * 0.25), 1000);
     // EMD is usually 2–3% of the estimated value; small bids often carry none.
     const emd = value < 500_000 ? 0 : roundTo(value * (r > 0.5 ? 0.03 : 0.02), 1000);
-    const endAt = new Date(now.getTime() + hours * HOUR);
+    // "Closing today" tenders (0 < hours < 24) must close inside the current IST day, whatever time the demo is loaded:
+    // +5 h / +9 h from an evening load would otherwise land after IST midnight and the dashboard's closingToday would be 0
+    // (US1-4, US1-6 failed in the evening). Scale the offset into what is left of the IST day (hours/12 of it, so the
+    // order of the two tenders is kept), never beyond the planned offset.
+    let offsetMs = hours * HOUR;
+    if (hours > 0 && hours < 24) {
+      const istDayEnd = Math.floor((now.getTime() + IST_OFFSET_MS) / DAY) * DAY - IST_OFFSET_MS + DAY;
+      offsetMs = Math.min(offsetMs, Math.floor(((istDayEnd - now.getTime()) * hours) / 12));
+    }
+    const endAt = new Date(now.getTime() + offsetMs);
     endAt.setUTCMinutes(hours < 24 && hours > 0 ? endAt.getUTCMinutes() : 30, 0, 0); // GeM bids close on the half hour (IST 15:00 etc.)
     const startAt = new Date(endAt.getTime() - (14 + Math.round(r * 10)) * DAY);
     return { idx, bidNumber: demoBidNumber(idx), item, buyer, endAt, startAt, quantity, value, emd };
