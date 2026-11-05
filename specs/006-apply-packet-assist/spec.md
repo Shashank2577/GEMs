@@ -81,6 +81,9 @@ owner/assignees and the internal due date. Any stage can be chosen from the drop
 while a mandatory checklist item is missing or expired and not overridden. Every change is written to the activity log;
 newly assigned people get an in-app notification.
 
+> **Spec amendment (#527):** "Any stage can be chosen" except the Go / No-Go decision: moving a bid **into `go` or `dropped`** is
+> Bid Manager+ (001 personas, 004 roles table); an Analyst gets 403 `forbidden` and the UI shows those targets disabled.
+
 **Why this priority**: The workspace is the container for every other Apply story; the stage guard is the single most
 important safety net against uploading an incomplete bid (a missing mandatory document is the commonest cause of
 technical disqualification on GeM).
@@ -584,6 +587,8 @@ anywhere and never used to fill GeM.
   labels Identified, Analysing, Go, Preparing, Ready to submit, Submitted, Won, Lost, Dropped (`STAGES`, `STAGE_LABELS`).
 - **FR-004**: `PATCH /api/workspaces/:id` (Analyst+) MUST accept only `stage, ownerId, assigneeIds (≤20, de-duplicated), dueAt
   (ISO with offset or null), position, outcome` (strict schema; unknown keys → 400) and return the updated `WorkspaceDto`.
+  *Spec amendment (#527):* a move **into `go` or `dropped`** (the Go / No-Go decision) additionally requires Bid Manager+ → **403** `forbidden`
+  "Only a Bid Manager or Owner can make the Go / No-Go decision."; every other stage move stays Analyst+.
 - **FR-005**: Moving to `ready` MUST be refused with **409** `not_ready` and `details.blockers` while any mandatory item is
   missing or expired and not overridden, and with **409** `conflict` (`details.reason = "not_analysed"`) when the tender has no
   analysis.

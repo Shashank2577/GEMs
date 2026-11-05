@@ -12,8 +12,8 @@ import {
   type DragEndEvent, type DragOverEvent, type DragStartEvent, type KeyboardCoordinateGetter, type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { AlertTriangle, Archive, Columns3, GripVertical, KanbanSquare, MessageSquare, Search, Table2, Trophy, XCircle } from 'lucide-react';
-import { PIPELINE_STAGES, STAGES, type StageName, type WorkspaceCard } from '@tp/core/contracts/apply';
+import { AlertTriangle, Archive, Columns3, GripVertical, KanbanSquare, Lock, MessageSquare, Search, Table2, Trophy, XCircle } from 'lucide-react';
+import { DECISION_FORBIDDEN_MESSAGE, DECISION_TOOLTIP, PIPELINE_STAGES, STAGES, canMoveToStage, isDecisionStage, type StageName, type WorkspaceCard } from '@tp/core/contracts/apply';
 import {
   Avatar, Badge, Button, ConfirmDialog, Countdown, EmptyState, ErrorState, Input, PageHeader, Progress, ResponsiveTable, ScoreRing, Segmented, Select,
   Skeleton, StageBadge, Tooltip, VerdictBadge, toast, type Column,
@@ -166,6 +166,7 @@ interface PendingMove { card: WorkspaceCard; from: StageName; to: StageName; pos
 
 function KanbanBoard({ items, canDrag, focusStage, stages }: { items: WorkspaceCard[]; canDrag: boolean; focusStage: StageName | null; stages: StageName[] }) {
   const navigate = useNavigate();
+  const { role } = useAuth();
   const move = useMoveCard();
   const [board, setBoard] = useState<Board>(() => buildBoard(items));
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
@@ -218,6 +219,8 @@ function KanbanBoard({ items, canDrag, focusStage, stages }: { items: WorkspaceC
   };
   /** Moves to Dropped need a confirmation (FR-031); the card stays put until confirmed. */
   const requestMove = (m: PendingMove) => {
+    // #527: Go / Dropped are the Bid Manager's call. Refuse gracefully (card goes back) before any request is sent.
+    if (!canMoveToStage(role, m.from, m.to)) { setBoard(m.revert); toast.error(DECISION_TOOLTIP, { description: DECISION_FORBIDDEN_MESSAGE }); return; }
     if (m.to === 'dropped' && m.from !== 'dropped') { setBoard(m.revert); setConfirmDrop(m); return; }
     commit(m);
   };
@@ -297,7 +300,7 @@ function KanbanBoard({ items, canDrag, focusStage, stages }: { items: WorkspaceC
       </nav>
       <div ref={scroller} className="scrollbar-thin -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 md:snap-none lg:-mx-8 lg:px-8">
         {stages.map((s) => (
-          <KanbanColumn key={s} stage={s} cards={board[s]} canDrag={canDrag} highlighted={focusStage === s} onMove={moveTo} />
+          <KanbanColumn key={s} stage={s} cards={board[s]} canDrag={canDrag} locked={canDrag && isDecisionStage(s) && !canMoveToStage(role, 'identified', s)} highlighted={focusStage === s} onMove={moveTo} />
         ))}
       </div>
       <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }}>
@@ -352,8 +355,8 @@ function explainMoveError(err: unknown, card: WorkspaceCard, to: StageName, open
   toast.error(`Couldn’t move “${card.tender.title.slice(0, 40)}…”`, { description: errorMessage(err) });
 }
 
-function KanbanColumn({ stage, cards, canDrag, highlighted, onMove }: {
-  stage: StageName; cards: WorkspaceCard[]; canDrag: boolean; highlighted: boolean; onMove: (card: WorkspaceCard, to: StageName) => void;
+function KanbanColumn({ stage, cards, canDrag, locked, highlighted, onMove }: {
+  stage: StageName; cards: WorkspaceCard[]; canDrag: boolean; locked: boolean; highlighted: boolean; onMove: (card: WorkspaceCard, to: StageName) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const emd = cards.reduce((a, c) => a + (c.tender.emdAmount ?? 0), 0);
@@ -366,6 +369,11 @@ function KanbanColumn({ stage, cards, canDrag, highlighted, onMove }: {
           <h2 className="flex items-center gap-2 text-[13px] font-semibold">
             <span className={cn('size-2 rounded-full', STAGE_DOT[stage])} aria-hidden />
             {STAGE_LABEL[stage as Stage]}
+            {locked && (
+              <Tooltip content={DECISION_TOOLTIP}>
+                <span tabIndex={0} role="img" aria-label={DECISION_TOOLTIP} data-testid={`locked-${stage}`} className="text-muted-foreground focus-ring rounded"><Lock className="size-3" aria-hidden /></span>
+              </Tooltip>
+            )}
             <span className="tabular rounded-full bg-muted px-1.5 text-2xs font-medium text-muted-foreground">{cards.length}</span>
           </h2>
           <p className="mt-0.5 truncate text-2xs text-muted-foreground">{STAGE_HINT[stage]}</p>
@@ -381,7 +389,7 @@ function KanbanColumn({ stage, cards, canDrag, highlighted, onMove }: {
           {cards.map((c) => <SortableCard key={c.id} card={c} disabled={!canDrag} onMove={onMove} />)}
           {cards.length === 0 && (
             <li className="flex flex-1 items-center justify-center rounded-lg border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-              {canDrag ? 'Drop a bid here' : 'No bids'}
+              {canDrag && !locked ? 'Drop a bid here' : 'No bids'}
             </li>
           )}
         </ol>

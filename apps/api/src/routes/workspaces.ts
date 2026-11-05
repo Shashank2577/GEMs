@@ -23,7 +23,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { bidWorkspaces, comments, gemResultHints, memberships, notifications } from '@tp/db';
 import {
-  DECISION_FORBIDDEN_MESSAGE, DECISION_STAGES, STAGES, STAGE_LABELS, assistValuesSchema, canTransition, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
+  DECISION_FORBIDDEN_MESSAGE, canMoveToStage, STAGES, STAGE_LABELS, assistValuesSchema, canTransition, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
   workspaceUpdateSchema, type StageName, type WorkspaceListResponse,
 } from '@tp/core/contracts/apply';
 import { validateAssistValues, isForbiddenKey } from '@tp/core/assist/allowlist';
@@ -197,7 +197,7 @@ workspacesRoutes.patch('/workspaces/:id', requireRole('analyst'), async (c) => {
   }
   if (stage && stage !== w.stage) {
     // #527 item 5: the Go / No-Go decision is Bid Manager+ on the server too, not only hidden in the UI.
-    if (DECISION_STAGES.includes(stage) && !roleAtLeast(c.var.role, 'bid_manager')) throw forbidden(DECISION_FORBIDDEN_MESSAGE);
+    if (!canMoveToStage(c.var.role, w.stage, stage)) throw forbidden(DECISION_FORBIDDEN_MESSAGE);
     if (stage === 'ready') {
       const { readiness } = await readinessOf(deps, org, w);
       if (!readiness.analysed) throw conflict('Analyse the tender before marking the bid ready to submit.', { blockers: [], reason: 'not_analysed' });

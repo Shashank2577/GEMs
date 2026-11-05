@@ -448,7 +448,7 @@ test('US2-12: /pipeline?stage=won -> Won column scrolled into view and outlined;
 
 test('US2-13 [video]: keyboard drag (Space, ->, ->, Space) lands two columns right with live-region announcements; Escape cancels', async ({ page, browser }) => {
   await demoOwner(page);
-  const analyst = await inviteAs(page.request, 'analyst');
+  const analyst = await inviteAs(page.request, 'bid_manager'); // Go / Dropped are the Bid Manager's call (#527)
   const ap = await analyst.newPage(browser);
   await openPipeline(ap);
   // Record every live-region message dnd-kit announces.
@@ -497,7 +497,7 @@ test('US2-13 [video]: keyboard drag (Space, ->, ->, Space) lands two columns rig
 
 test('US2-13 (literal): Space, ArrowRight, ArrowRight, Space on the first Identified card lands TWO columns right (Go)', async ({ page, browser }) => {
   await demoOwner(page);
-  const analyst = await inviteAs(page.request, 'analyst');
+  const analyst = await inviteAs(page.request, 'bid_manager'); // Go / Dropped are the Bid Manager's call (#527)
   const ap = await analyst.newPage(browser);
   await openPipeline(ap);
   const first = colCards(ap, 'identified').first();
@@ -604,7 +604,7 @@ test('US2-15 (search filter): Table view with a search that matches nothing -> "
 
 test('US2-16: card "Move to…" menu -> Go behaves like drag (same PATCH, toast, activity); keyboard-operable', async ({ page, browser }) => {
   await demoOwner(page);
-  const analyst = await inviteAs(page.request, 'analyst');
+  const analyst = await inviteAs(page.request, 'bid_manager'); // Go / Dropped are the Bid Manager's call (#527)
   const ap = await analyst.newPage(browser);
   await openPipeline(ap);
   const card = colCards(ap, 'identified').first();
@@ -683,7 +683,7 @@ test('US2-17 [video]: Won via menu -> "Record the result" dialog with GeM L1 hin
 
 test('US2-18: moving a bid to Dropped asks for confirmation; "Show dropped (1)" toggle adds a ninth Dropped column', async ({ page, browser }) => {
   await demoOwner(page);
-  const analyst = await inviteAs(page.request, 'analyst');
+  const analyst = await inviteAs(page.request, 'bid_manager'); // Go / Dropped are the Bid Manager's call (#527)
   const ap = await analyst.newPage(browser);
   await openPipeline(ap);
   await expect(ap.getByRole('button', { name: /Show dropped/ })).toHaveCount(0);
@@ -757,4 +757,112 @@ test('a11y (observational): axe on the pipeline board and table; violations are 
     await setup();
     try { await a11y(ap, name); } catch (e) { test.info().annotations.push({ type: 'a11y-observation', description: `${name}: ${String((e as Error).message).split('\n').slice(0, 30).join(' ').slice(0, 900)}` }); }
   }
+});
+
+
+// ───────────── #527: the Go / No-Go call is Bid Manager+ ─────────────
+
+const NO_GO_TIP = 'Only a Bid Manager can make the Go/No-Go call';
+const FIX_DIR = join('qa', 'evidence', 'fix-527');
+async function devShot(page: Page, name: string) {
+  mkdirSync(FIX_DIR, { recursive: true });
+  await page.screenshot({ path: join(FIX_DIR, `dev-${name}.png`), fullPage: true });
+}
+
+test('US2-13 (#527): an Analyst keyboard-dropping a card on Go is refused, the card goes back and no PATCH is sent; other columns still work', async ({ page, browser }) => {
+  await demoOwner(page);
+  const analyst = await inviteAs(page.request, 'analyst');
+  const ap = await analyst.newPage(browser);
+  await openPipeline(ap);
+  await expect(ap.getByTestId('locked-go')).toHaveAttribute('aria-label', NO_GO_TIP);
+  await expect(ap.getByTestId('locked-analysing')).toHaveCount(0);
+  const patches: string[] = [];
+  ap.on('request', (r) => { if (r.method() === 'PATCH') patches.push(r.url()); });
+  const first = colCards(ap, 'identified').first();
+  const title = (await first.locator('p.line-clamp-2').innerText()).trim();
+  await keyboardDrag(ap, handleOf(first), 2); // Identified -> Analysing -> Go
+  await expect(ap.getByText(NO_GO_TIP).first()).toBeVisible();
+  await expect(ap.getByText('Only a Bid Manager or Owner can make the Go / No-Go decision.')).toBeVisible();
+  await expect(cardByTitle(ap, 'identified', title)).toBeVisible();
+  await expect(colCards(ap, 'go')).toHaveCount(2);
+  expect(patches).toEqual([]);
+  await devShot(ap, 'analyst-kanban-go-locked-desktop');
+  // A non-decision move is untouched.
+  const patch = patchResp(ap);
+  await keyboardDrag(ap, handleOf(colCards(ap, 'identified').first()), 1);
+  expect((await patch).status()).toBe(200);
+});
+
+test('US2-16 (#527): the Analyst "Move to…" menu shows Go and Dropped disabled with the tooltip; the API answers 403 for them and 200 for the rest; Bid Manager gets 200', async ({ page, browser }) => {
+  await demoOwner(page);
+  const analyst = await inviteAs(page.request, 'analyst');
+  const bm = await inviteAs(page.request, 'bid_manager');
+  const ap = await analyst.newPage(browser);
+  await openPipeline(ap);
+  const card = colCards(ap, 'identified').first();
+  const id = (await card.locator('a[href^="/workspaces/"]').getAttribute('href'))!.split('/').pop()!;
+  await menuBtnOf(card).click();
+  for (const name of [/^Go/, /^Dropped/]) {
+    const item = ap.getByRole('menuitem', { name });
+    await expect(item).toHaveAttribute('aria-disabled', 'true');
+    await expect(item).toHaveAttribute('title', NO_GO_TIP);
+  }
+  await expect(ap.getByRole('menuitem', { name: /^Analysing/ })).not.toHaveAttribute('aria-disabled', 'true');
+  const patches: string[] = [];
+  ap.on('request', (r) => { if (r.method() === 'PATCH') patches.push(r.url()); });
+  await ap.getByRole('menuitem', { name: /^Go/ }).click({ force: true });
+  await ap.waitForTimeout(300);
+  expect(patches).toEqual([]);
+  await ap.getByRole('menuitem', { name: /^Go/ }).hover();
+  await devShot(ap, 'analyst-move-to-menu-disabled-desktop');
+  await ap.keyboard.press('Escape');
+  // API: analyst -> 403 forbidden; bid manager -> 200.
+  for (const stage of ['go', 'dropped']) {
+    const r = await analyst.api.patch(`/api/workspaces/${id}`, { data: { stage } });
+    expect(r.status()).toBe(403);
+    const b = await r.json();
+    expect(b.error.code).toBe('forbidden');
+    expect(b.error.message).toBe('Only a Bid Manager or Owner can make the Go / No-Go decision.');
+  }
+  expect((await analyst.api.patch(`/api/workspaces/${id}`, { data: { stage: 'analysing' } })).status()).toBe(200);
+  expect((await bm.api.patch(`/api/workspaces/${id}`, { data: { stage: 'go' } })).status()).toBe(200);
+  // ...and an Analyst may still move a bid OUT of Go.
+  expect((await analyst.api.patch(`/api/workspaces/${id}`, { data: { stage: 'preparing' } })).status()).toBe(200);
+});
+
+test('US2-16 (#527) @mobile: 375 px Analyst view keeps Go and Dropped disabled in the Move-to menu without horizontal overflow', async ({ page, browser }) => {
+  await demoOwner(page);
+  const analyst = await inviteAs(page.request, 'analyst');
+  const ap = await analyst.newPage(browser);
+  await atPhone(ap);
+  await ap.goto('/pipeline');
+  await expect(colCards(ap, 'identified').first()).toBeVisible();
+  await menuBtnOf(colCards(ap, 'identified').first()).click();
+  await expect(ap.getByRole('menuitem', { name: /^Go/ })).toHaveAttribute('aria-disabled', 'true');
+  await expect(ap.getByRole('menuitem', { name: /^Dropped/ })).toHaveAttribute('aria-disabled', 'true');
+  await noHorizontalOverflow(ap);
+  await devShot(ap, 'analyst-move-to-menu-disabled-375');
+});
+
+test('US2-18 (#527): an Analyst cannot Drop a bid (menu item disabled, API 403); the workspace stage menu disables Go and Dropped too', async ({ page, browser }) => {
+  await demoOwner(page);
+  const analyst = await inviteAs(page.request, 'analyst');
+  const ap = await analyst.newPage(browser);
+  await openPipeline(ap);
+  const card = colCards(ap, 'identified').first();
+  const id = (await card.locator('a[href^="/workspaces/"]').getAttribute('href'))!.split('/').pop()!;
+  await menuBtnOf(card).click();
+  await ap.getByRole('menuitem', { name: /^Dropped/ }).click({ force: true });
+  await expect(ap.getByRole('alertdialog').or(ap.getByRole('dialog')).filter({ hasText: 'Drop this bid?' })).toHaveCount(0);
+  await expect(colCards(ap, 'identified')).toHaveCount(3);
+  await ap.goto(`/workspaces/${id}`);
+  await ap.getByRole('button', { name: /Change stage/ }).click();
+  for (const name of [/Go/, /Dropped/]) {
+    const item = ap.getByRole('menuitem', { name }).first();
+    await expect(item).toHaveAttribute('aria-disabled', 'true');
+    await expect(item).toHaveAttribute('title', NO_GO_TIP);
+  }
+  await devShot(ap, 'analyst-workspace-stage-menu-disabled-desktop');
+  expect(((await analyst.api.get(`/api/workspaces/${id}`)).status())).toBe(200);
+  expect((await analyst.api.patch(`/api/workspaces/${id}`, { data: { stage: 'dropped' } })).status()).toBe(403);
 });

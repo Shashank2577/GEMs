@@ -1,5 +1,6 @@
 /** Pure helpers for the pipeline's non-drag moves and the "Record the result" dialog (007/FR-029…FR-031). */
-import { STAGES, STAGE_LABELS, canTransition, type OutcomeInput, type StageName } from '@tp/core/contracts/apply';
+import { DECISION_TOOLTIP, STAGES, STAGE_LABELS, canMoveToStage, canTransition, type OutcomeInput, type StageName } from '@tp/core/contracts/apply';
+import type { RoleName } from '@tp/core/contracts/common';
 
 export const DROP_CONFIRM_TITLE = 'Drop this bid?';
 export const DROP_CONFIRM_BODY = 'It leaves the active pipeline but keeps its history.';
@@ -7,11 +8,12 @@ export const VIEW_ONLY_NOTE = 'You have view-only access. Ask an Analyst, Bid Ma
 export const SEARCH_DEBOUNCE_MS = 300;
 export const NOTES_MAX = 2000;
 
-export interface MoveTarget { stage: StageName; label: string; disabled: boolean; hint?: string }
+export interface MoveTarget { stage: StageName; label: string; disabled: boolean; hint?: string; /** Tooltip explaining why the target is unavailable (Go/No-Go is Bid Manager+, #527). */ reason?: string }
 
 /** Every stage except the current one (Dropped included), in pipeline order; Won/Lost need a recorded submission. */
-export function moveTargets(from: StageName): MoveTarget[] {
+export function moveTargets(from: StageName, role?: RoleName | null): MoveTarget[] {
   return STAGES.filter((s) => s !== from).map((stage) => {
+    if (role !== undefined && !canMoveToStage(role, from, stage)) return { stage, label: STAGE_LABELS[stage], disabled: true, hint: 'Bid Manager', reason: DECISION_TOOLTIP };
     const ok = canTransition(from, stage).ok;
     return { stage, label: STAGE_LABELS[stage], disabled: !ok, ...(ok ? {} : { hint: 'After Submitted' }) };
   });

@@ -201,7 +201,11 @@ test.describe('web + api', () => {
     expect(l.status).toBe(409);
     expect(l.body.message).toBe('This bid already has an outcome recorded.');
     // Dropped -> 409 (second workspace, never submitted)
-    expect((await run('stage dropped', 'patch', `/api/workspaces/${c.ws2}`, { stage: 'dropped' })).status).toBe(200);
+    // Dropping is the Bid Manager's call (#527): the Analyst is refused, a Bid Manager may drop.
+    expect((await run('stage dropped (analyst)', 'patch', `/api/workspaces/${c.ws2}`, { stage: 'dropped' })).status).toBe(403);
+    const dropped = await call(c.fx, 'bid_manager', 'patch', `/api/workspaces/${c.ws2}`, { stage: 'dropped' });
+    t.add('stage dropped (bid_manager)', `PATCH /api/workspaces/${c.ws2} {"stage":"dropped"}`, dropped);
+    expect(dropped.status).toBe(200);
     const dr = await run('submit on dropped', 'post', `/api/workspaces/${c.ws2}/submitted`, {});
     expect(dr.status).toBe(409);
     expect(dr.body.message).toBe('This bid was dropped. Move it back to the pipeline first.');

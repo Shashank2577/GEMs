@@ -335,8 +335,16 @@ test('S13 Viewer sees no dropdown or edit controls anywhere', async ({ page, con
 
 test('S14 won/lost from Go -> 409 invalid_transition; allowed from Submitted', async () => {
   const api = await apiAs(fx, 'analyst');
-  const g = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: 'go' } });
+  // Moving INTO Go is the Bid Manager's call (#527): an Analyst is refused, a Bid Manager succeeds.
+  const bm = await apiAs(fx, 'bid_manager');
+  const refused = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: 'go' } });
+  expect(refused.status()).toBe(403);
+  expect(E(await refused.json())).toMatchObject({ code: 'forbidden', message: 'Only a Bid Manager or Owner can make the Go / No-Go decision.' });
+  const refusedDrop = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: 'dropped' } });
+  expect(refusedDrop.status()).toBe(403);
+  const g = await bm.patch(`/api/workspaces/${wsId}`, { data: { stage: 'go' } });
   expect(g.status()).toBe(200);
+  await bm.dispose();
   for (const to of ['won', 'lost']) {
     const r = await api.patch(`/api/workspaces/${wsId}`, { data: { stage: to } });
     expect(r.status()).toBe(409);
