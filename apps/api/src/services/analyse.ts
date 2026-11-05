@@ -44,6 +44,22 @@ export function bidNumberMismatch(d: Pick<DocRow, 'text'>, tenderBidNumber: stri
   return found && expected && found !== expected ? found : null;
 }
 
+/**
+ * "Check documents: a.pdf is for GEM/2026/B/1." prefix for the analysis summary when any analysed
+ * document's printed bid number differs from the tender's (FR-010, US2 #13); '' when all match.
+ */
+export function documentCheckPrefix(docs: Pick<DocRow, 'text' | 'fileName'>[], tenderBidNumber: string | null | undefined): string {
+  const wrong = docs.flatMap((d) => {
+    const found = bidNumberMismatch(d, tenderBidNumber);
+    return found ? [`${d.fileName} is for ${found}`] : [];
+  });
+  return wrong.length ? `Check documents: ${wrong.join('; ')}.` : '';
+}
+
+/** The "Check documents: …" prefix of a stored summary (kept when a factor override recomputes it). */
+const CHECK_PREFIX_RE = /^Check documents: .*GEM\/\d{4}\/[A-Z]\/\d+\.(?= |$)/;
+export const withPrefix = (prefix: string, summary: string) => (prefix ? `${prefix} ${summary}` : summary);
+
 /** `tenderBidNumber` enables `bidNumberFound`; without it the field is null. */
 export function toDocumentDto(d: DocRow, tenderBidNumber?: string | null): TenderDocumentDto {
   return {
@@ -273,9 +289,10 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
       overrides: overridesOf(previous),
     });
     const checklist = buildChecklist(requirements, company.profile);
+    const summary = withPrefix(documentCheckPrefix(ordered, tender.bidNumber), result.summary);
     const [done] = await deps.db.update(analyses).set({
       status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
-      score: result.score, confidence: result.confidence, verdict: result.verdict, summary: result.summary, error: null, stale: false,
+      score: result.score, confidence: result.confidence, verdict: result.verdict, summary, error: null, stale: false,
       updatedAt: deps.clock.now(),
     }).where(eq(analyses.id, row.id)).returning();
     await logActivity(deps.db, {
@@ -309,8 +326,9 @@ export async function overrideFactor(
     return input.status === f.status ? rest : { ...rest, overridden: { status: input.status, reason: input.reason, by: input.userName, at } };
   });
   const r = computeScore(factors);
+  const prefix = a.summary?.match(CHECK_PREFIX_RE)?.[0] ?? '';
   const [updated] = await deps.db.update(analyses).set({
-    factors, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: r.summary, updatedAt: deps.clock.now(),
+    factors, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: withPrefix(prefix, r.summary), updatedAt: deps.clock.now(),
   }).where(eq(analyses.id, a.id)).returning();
   await logActivity(deps.db, {
     orgId: input.orgId, userId: input.userId, action: 'analysis.factor_overridden', entityType: 'tender', entityId: a.tenderId,

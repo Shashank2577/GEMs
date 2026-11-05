@@ -4,7 +4,7 @@ import {
   FileBadge, FileCheck2, FileSpreadsheet, FileText, Flag, Handshake, Landmark, ReceiptText, ScrollText, ShieldCheck, Sparkles,
   Timer, Truck, type LucideIcon,
 } from 'lucide-react';
-import type { FactorStatus, Requirement, StaleReason, TenderDocKind } from '@tp/core/contracts/analyse';
+import type { AnalysisDto, FactorStatus, Requirement, StaleReason, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { formatDateIST, formatINR } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
@@ -76,18 +76,40 @@ export const REQ_GROUPS: { key: string; label: string; match: (r: Requirement) =
   { key: 'eligibility', label: 'Eligibility criteria', match: (r) => ['turnover_min', 'oem_turnover', 'experience_years', 'similar_work', 'past_performance', 'oem_auth', 'certificate', 'mii', 'undertaking'].includes(r.key) },
   { key: 'money', label: 'EMD, ePBG & exemptions', match: (r) => ['emd', 'epbg', 'epbg_duration', 'mse_exemption', 'startup_exemption', 'mse_purchase_preference', 'estimated_value'].includes(r.key) },
   { key: 'documents', label: 'Documents required from seller', match: (r) => r.key === 'document' },
+  // Everything else, including contract_period, bid_published_at and consignee_state (FR-019).
   { key: 'bid', label: 'Bid details', match: () => true },
 ];
+
+/** Keys whose value is a date without a meaningful time ("Dated: 01-11-2026"). */
+const DATE_ONLY_KEYS = new Set(['bid_published_at']);
 
 const MONEY_KEYS = new Set(['turnover_min', 'oem_turnover', 'similar_work', 'emd', 'estimated_value']);
 
 export function formatRequirementValue(r: Requirement): string {
   if (r.numeric != null && MONEY_KEYS.has(r.key)) return formatINR(r.numeric);
   if (typeof r.value === 'boolean') return r.value ? 'Yes' : 'No';
-  if (typeof r.value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(r.value)) return formatDateIST(r.value, { time: true });
+  if (typeof r.value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(r.value)) return formatDateIST(r.value, { time: !DATE_ONLY_KEYS.has(r.key) });
+  // "2 years" → "2 years (24 months)"; "1 year 6 months" already reads as months.
+  if (r.key === 'contract_period' && typeof r.value === 'string' && r.numeric != null && !/month/i.test(r.value)) {
+    return `${r.value} (${r.numeric} ${r.numeric === 1 ? 'month' : 'months'})`;
+  }
   if (r.value == null || r.value === '') return '—';
   if (r.key === 'undertaking' && r.value === 'non_blacklisting') return 'Required';
   return String(r.value);
+}
+
+/**
+ * Documents used by this analysis whose printed bid number is not the tender's (FR-010, US2 #13):
+ * listed documents flagged `bidNumberFound` that existed when the analysis ran.
+ */
+export function mismatchedDocuments(analysis: Pick<AnalysisDto, 'updatedAt'>, documents: TenderDocumentDto[] | undefined): TenderDocumentDto[] {
+  const at = Date.parse(analysis.updatedAt);
+  return (documents ?? []).filter((d) => d.bidNumberFound && !(Date.parse(d.createdAt) > at));
+}
+
+/** The "Check documents: … is for GEM/…." prefix the API puts on an analysis summary, if any. */
+export function documentCheckPrefix(summary: string | null | undefined): string | null {
+  return summary?.match(/^Check documents: .*GEM\/\d{4}\/[A-Z]\/\d+\.(?= |$)/)?.[0] ?? null;
 }
 
 export const CHANGE_LABEL: Record<string, string> = {
