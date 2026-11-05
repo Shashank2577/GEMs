@@ -52,8 +52,20 @@ PranavTamada/Tender_Scraper, IshanMaheshwari-777/GEM-SCRAPER, Mujahid-Alam/gem-t
      `cd packages/db && pnpm exec drizzle-kit generate`, `git add -A packages/db`, then drop/recreate your local test DB;
    - `pnpm-lock.yaml`: take main's and re-run `pnpm install`;
    - `apps/api/test/roles-matrix.test.ts`: add a `MATRIX` entry for every new mutating route.
-   Re-run the gate, push, then merge the PR with GitHub MCP `merge_pull_request` (method `squash`, message keeps the trailers).
-   If the API reports conflicts/behind, merge main again and retry. Then close the story and task issues (state `closed`,
+   Re-run the gate, push, then **wait for the required checks** before merging. `main` is branch-protected (spec 008
+   US1, `docs/runbook.md` § CI): every PR needs green `typecheck`, `unit`, `api`, `e2e`, `migrations-additive`, `dod` and
+   `ci-gate` on its head commit, and must be **up to date with `main`** (strict). Watch them with GitHub MCP
+   `pull_request_read` (method `get_check_runs`) or `actions_list`; on a red check read the job log (`get_job_logs`),
+   fix the cause on the branch and push (never skip or delete a test; an infra flake may be re-run with
+   `actions_run_trigger`). `dod` passes only when `qa/evidence/<NNN>/US<n>/VERDICT.md` is approved with every row `met`,
+   every PR commit carries the trailers (merge commits and main's commits are exempt), and the PR body has `Closes #n` or
+   `Part of #n` and no unticked `- [ ]` box (mark a deliberate deferral `- [~]` with the reason).
+   Note: GitHub does not run `pull_request` workflows while the PR has merge conflicts, so a conflicted PR shows no
+   checks at all — merge main first. Then merge the PR with GitHub MCP `merge_pull_request` (method `squash`, message
+   keeps the trailers). If the API reports conflicts/behind (main moved meanwhile), `git merge origin/main` again,
+   re-run the gate, push, wait for the checks again and retry — never force-push or rebase. Docs-only PRs (only
+   `specs/**`, `docs/**`, `*.md`) run just `typecheck`; the other checks report as skipped/passing and `ci-gate` and
+   `dod` still report, so they merge the same way. Then close the story and task issues (state `closed`,
    reason `completed`) with the merge note (the repo default branch is not `main`, so `Closes` keywords do not auto-close).
 8. Remove `status:*` progress labels on close. Move to the next story.
 
