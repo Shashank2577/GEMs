@@ -9,7 +9,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { request as pwRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { test, expect, evidence, collectRunArtifacts, mockGem, uniqueUser } from '../support/fixtures';
+import { test, expect, evidence, collectRunArtifacts, checkA11y, mockGem, uniqueUser } from '../support/fixtures';
 
 const SPEC = '003', STORY = 'US2';
 const BASE = `http://localhost:${process.env.E2E_PORT || 8788}`;
@@ -124,6 +124,15 @@ test.describe('US2 watchlists', () => {
     await expect(tpl.getByRole('button')).toHaveCount(6);
     for (const n of names) await expect(tpl.getByRole('button', { name: new RegExp(`^${n.replace(/[&]/g, '\\&')}`) })).toBeVisible();
     await shot(page, 'S1-empty-state-templates');
+    // T043: WCAG 2.1 A/AA (serious/critical) on /watchlists in light and dark.
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.evaluate((s) => { try { localStorage.setItem('tp-theme', s); } catch { /* ignore */ } }, scheme);
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.reload();
+      await expect(page.getByRole('heading', { name: 'Quick start' })).toBeVisible();
+      await expect(page.locator('html')).toHaveClass(scheme === 'dark' ? /dark/ : /^(?!.*dark)/);
+      await checkA11y(page);
+    }
   });
 
   test('S2: empty builder shows the prompt; keyword laptop + state Maharashtra -> 2 bids, 2 sample cards with reason badges', async ({ page }) => {

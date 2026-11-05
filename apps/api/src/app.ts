@@ -25,6 +25,7 @@ import { profileRoutes } from './routes/profile';
 import { sessionsRoutes } from './routes/sessions';
 import { tendersRoutes } from './routes/tenders';
 import { vaultRoutes } from './routes/vault';
+import { viewsRoutes } from './routes/views';
 import { watchlistsRoutes } from './routes/watchlists';
 import { workspacesRoutes } from './routes/workspaces';
 import type { AppEnv } from './types';
@@ -39,6 +40,7 @@ export const routers = {
   org: orgRoutes,
   tenders: tendersRoutes,
   watchlists: watchlistsRoutes,
+  views: viewsRoutes,
   ingestion: ingestionRoutes,
   notifications: notificationsRoutes,
   analysis: analysisRoutes,

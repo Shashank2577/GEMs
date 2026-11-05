@@ -349,6 +349,18 @@ export const watchlists = pgTable('watchlists', {
   updatedAt: updatedAt(),
 }, (t) => ({ orgIdx: index('watchlists_org_idx').on(t.orgId) }));
 
+/** Personal saved feed views (003/FR-035): URL-style params, scoped to (org, user). */
+export const savedViews = pgTable('saved_views', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  params: jsonb('params').$type<Record<string, string[]>>().notNull(),
+  position: integer('position').notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => ({ nameUq: uniqueIndex('saved_views_name_uq').on(t.orgId, t.userId, t.name) }));
+
 export const tenderMatches = pgTable('tender_matches', {
   id: id(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),

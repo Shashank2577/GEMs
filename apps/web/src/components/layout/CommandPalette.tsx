@@ -12,6 +12,11 @@ import { ShortcutsDialog } from './ShortcutsDialog';
 
 const isTyping = (e: KeyboardEvent) => isTypingTarget(e.target as HTMLElement | null);
 
+/** True when the current page exposes a search input that wants the `/` shortcut. */
+export function hasPageSearch() {
+  return !!document.querySelector('input[data-page-search]');
+}
+
 /**
  * Global ⌘K palette + "G then X" navigation shortcuts + "?" shortcuts dialog.
  * Open programmatically with `window.dispatchEvent(new CustomEvent('tp:open-command'))`.
@@ -28,7 +33,8 @@ export function CommandPalette() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setOpen((o) => !o); return; }
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === '/' ) { e.preventDefault(); setOpen(true); return; }
+      // A page that registers its own search box (data-page-search) owns `/`.
+      if (e.key === '/') { if (hasPageSearch()) return; e.preventDefault(); setOpen(true); return; }
       if (isHelpKey(e)) { e.preventDefault(); gAt = 0; openShortcuts(); return; }
       const k = e.key.toLowerCase();
       if (k === 'g') { gAt = Date.now(); return; }

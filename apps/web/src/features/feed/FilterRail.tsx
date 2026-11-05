@@ -4,7 +4,7 @@ import type { Facet } from '@tp/core/contracts/identify';
 import { Button, Checkbox, Input, Tooltip } from '@/components/ui';
 import { formatINR, formatNumberIN } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { BID_TYPE_OPTIONS, CLOSING_OPTIONS, VALUE_PRESETS, VERDICT_OPTIONS, type FeedFilters } from './filters';
+import { BID_TYPE_OPTIONS, CLOSING_OPTIONS, STATUS_OPTIONS, VALUE_PRESETS, VERDICT_OPTIONS, type FeedFilters } from './filters';
 
 type Patch = (p: Partial<FeedFilters>) => void;
 
@@ -16,7 +16,7 @@ function Group({ title, children, onClear, hint }: { title: string; children: Re
           {title}
           {hint}
         </h3>
-        {onClear && <button type="button" onClick={onClear} className="rounded text-2xs font-medium text-primary hover:underline focus-ring">Clear</button>}
+        {onClear && <button type="button" onClick={onClear} className="rounded text-2xs font-medium text-primary hover:underline dark:text-indigo-300 focus-ring">Clear</button>}
       </div>
       {children}
     </section>
@@ -71,7 +71,7 @@ export function FacetList({ facets, selected, onChange, label, searchable = true
         {q && !shown.length && <li className="px-1.5 py-1 text-xs text-muted-foreground">No match for “{q}”</li>}
       </ul>
       {!q && items.length > initial && (
-        <button type="button" onClick={() => setAll((x) => !x)} className="inline-flex w-fit items-center gap-1 rounded px-1.5 text-xs font-medium text-primary hover:underline focus-ring">
+        <button type="button" onClick={() => setAll((x) => !x)} className="inline-flex w-fit items-center gap-1 rounded px-1.5 text-xs font-medium text-primary hover:underline dark:text-indigo-300 focus-ring">
           {all ? 'Show less' : `Show all ${items.length}`}
           <ChevronDown className={cn('size-3 transition-transform', all && 'rotate-180')} />
         </button>
@@ -88,7 +88,7 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
       onClick={onClick}
       className={cn(
         'h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring',
-        on ? 'border-primary/30 bg-primary-soft text-primary' : 'bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+        on ? 'border-primary/30 bg-primary-soft text-primary dark:text-indigo-300' : 'bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground',
       )}
     >
       {children}
@@ -131,6 +131,14 @@ export function FilterRail({ filters, facets, onChange, onReset, className }: {
   const f = filters;
   return (
     <div className={cn('text-sm', className)}>
+      <Group title="Status" onClear={f.status !== 'open' ? () => onChange({ status: 'open' }) : undefined}>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Status">
+          {STATUS_OPTIONS.map((o) => (
+            <Pill key={o.value} on={f.status === o.value} onClick={() => onChange({ status: o.value })}>{o.label}</Pill>
+          ))}
+        </div>
+      </Group>
+
       <Group title="Closing within" onClear={f.closingWithin != null ? () => onChange({ closingWithin: null }) : undefined}>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Closing within">
           {CLOSING_OPTIONS.map((o) => {
