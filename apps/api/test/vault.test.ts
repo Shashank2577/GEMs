@@ -1302,3 +1302,93 @@ describe('vault renewal, versions and duplicates (T064)', () => {
     expect(new Uint8Array(await cur.res.arrayBuffer())).toEqual(oldBytes);
   });
 });
+
+/**
+ * T076 (#164; NFR-001, SC-005): tenant-isolation sweep. Every id-addressed vault / past-contract route, called by
+ * the Owner of another org (highest role, so only the org predicate can stop it), answers 404 not_found and
+ * leaves the victim's data untouched; list/summary/profile/reminder routes never reveal or touch it.
+ */
+describe('tenant isolation sweep — every vault and past-contract route (T076)', () => {
+  type Opts = Parameters<typeof request>[3];
+  let victim: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  let intruder: Awaited<ReturnType<typeof signup>>;
+  let docId: string;
+  let contractId: string;
+  let versionId: string;
+  let intruderDocId: string;
+
+  beforeAll(async () => {
+    victim = await seedOrgWithRoles(ctx.app, 'Victim Isolation Traders');
+    intruder = await signup(ctx.app, { orgName: 'Intruder Isolation Traders' });
+    // Due for a 7-day reminder at NOW, so a leaking reminder run would visibly touch it.
+    const up = await request(ctx.app, 'POST', '/vault', { cookie: victim.analyst.cookie, form: { file: file(await pdf(), 'iso.pdf'), type: 'iso', title: 'ISO 9001 victim', expiryDate: '2026-11-11' } });
+    expect(up.status, up.text).toBe(201);
+    docId = up.body.id;
+    // Renew once so the document has a previous version (US6).
+    const renew = await request(ctx.app, 'PUT', `/vault/${docId}/file`, { cookie: victim.analyst.cookie, form: { file: file(await pdf(3), 'iso-renewed.pdf') } });
+    expect(renew.status, renew.text).toBe(200);
+    const versions = await request(ctx.app, 'GET', `/vault/${docId}/versions`, { cookie: victim.viewer.cookie });
+    expect(versions.body.items).toHaveLength(1);
+    versionId = versions.body.items[0].id;
+    const own = await request(ctx.app, 'POST', '/vault', { cookie: intruder.cookie, form: { file: file(await pdf(4), 'mine.pdf'), type: 'other', title: 'Intruder doc' } });
+    expect(own.status, own.text).toBe(201);
+    intruderDocId = own.body.id;
+    const pc = await request(ctx.app, 'POST', '/past-contracts', { cookie: victim.analyst.cookie, json: { buyer: 'NIC', buyerType: 'central', title: 'Victim supply', value: 5_00_000, cracDocumentId: docId } });
+    expect(pc.status, pc.text).toBe(201);
+    contractId = pc.body.id;
+  });
+
+  const routes: [method: string, path: () => string, opts: () => Promise<Opts> | Opts, message: string][] = [
+    ['GET', () => `/vault/${docId}`, () => ({}), 'Document not found'],
+    ['PATCH', () => `/vault/${docId}`, () => ({ json: { title: 'Hijacked', expiryDate: '2030-01-01' } }), 'Document not found'],
+    ['PUT', () => `/vault/${docId}/file`, () => ({ form: { file: file(PNG, 'evil.png', 'image/png') } }), 'Document not found'],
+    ['DELETE', () => `/vault/${docId}`, () => ({}), 'Document not found'],
+    ['GET', () => `/vault/${docId}/download`, () => ({}), 'Document not found'],
+    ['GET', () => `/vault/${docId}/download?inline=1`, () => ({}), 'Document not found'],
+    ['GET', () => `/vault/${docId}/versions`, () => ({}), 'Document not found'],
+    ['GET', () => `/vault/${docId}/versions/${versionId}/download`, () => ({}), 'Document not found'],
+    ['GET', () => `/vault/${docId}/versions/${versionId}/download?inline=1`, () => ({}), 'Document not found'],
+    // The victim's version id under the intruder's own document: still not reachable.
+    ['GET', () => `/vault/${intruderDocId}/versions/${versionId}/download`, () => ({}), 'Version not found'],
+    ['PATCH', () => `/past-contracts/${contractId}`, () => ({ json: { value: 1 } }), 'Past contract not found'],
+    ['DELETE', () => `/past-contracts/${contractId}`, () => ({}), 'Past contract not found'],
+  ];
+
+  it.each(routes.map(([m, p, o, msg]) => ({ name: `${m} ${p.toString().match(/`(.*)`/)?.[1]}`, m, p, o, msg })))('$name → 404 for another org', async ({ m, p, o, msg }) => {
+    const r = await request(ctx.app, m, p(), { ...(await o()), cookie: intruder.cookie });
+    expect(r.status, r.text).toBe(404);
+    expect(r.body.error).toEqual({ code: 'not_found', message: msg });
+  });
+
+  it('list, summary, profile and reminder routes never reveal or touch the other org\'s data', async () => {
+    // The intruder sees exactly its own document.
+    const list = await request(ctx.app, 'GET', '/vault', { cookie: intruder.cookie });
+    expect(list.body.items.map((d: { id: string }) => d.id)).toEqual([intruderDocId]);
+    expect((await request(ctx.app, 'GET', `/vault?q=${encodeURIComponent('ISO 9001 victim')}`, { cookie: intruder.cookie })).body.total).toBe(0);
+    expect((await request(ctx.app, 'GET', '/vault/summary', { cookie: intruder.cookie })).body).toMatchObject({ total: 1, expiring: 0, nextExpiries: [] });
+    expect((await request(ctx.app, 'GET', '/past-contracts', { cookie: intruder.cookie })).body).toEqual({ items: [], total: 0 });
+    expect((await request(ctx.app, 'GET', '/profile', { cookie: intruder.cookie })).body.profile.legalName).toBe('');
+    const run = await request(ctx.app, 'POST', '/vault/reminders/run', { cookie: intruder.cookie });
+    expect(run.status).toBe(200);
+    expect(run.body).toEqual({ documents: 0, notifications: 0 });
+    // Cross-org references are refused as "not in your vault", not linked.
+    const pc = await request(ctx.app, 'POST', '/past-contracts', { cookie: intruder.cookie, json: { buyer: 'B', buyerType: 'central', title: 'T', value: 1000, cracDocumentId: docId } });
+    expect(pc.status).toBe(400);
+    const oem = await request(ctx.app, 'PUT', '/profile', { cookie: intruder.cookie, json: { oemAuthorizations: [{ oem: 'Dell', products: 'x', documentId: docId }] } });
+    expect(oem.status).toBe(400);
+  });
+
+  it('the victim\'s document, file, contract and reminder state are untouched', async () => {
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, docId));
+    expect(row).toMatchObject({ orgId: victim.orgId, title: 'ISO 9001 victim', expiryDate: '2026-11-11', fileName: 'iso-renewed.pdf', pageCount: 3, mimeType: 'application/pdf', lastReminderDays: null });
+    expect(await ctx.deps.blobs.head(row!.blobKey)).not.toBeNull();
+    const versions = await request(ctx.app, 'GET', `/vault/${docId}/versions`, { cookie: victim.viewer.cookie });
+    expect(versions.body.items).toEqual([expect.objectContaining({ id: versionId, fileName: 'iso.pdf' })]);
+    const old = await request(ctx.app, 'GET', `/vault/${docId}/versions/${versionId}/download`, { cookie: victim.viewer.cookie });
+    expect(old.status).toBe(200);
+    const pcs = await request(ctx.app, 'GET', '/past-contracts', { cookie: victim.viewer.cookie });
+    expect(pcs.body.items).toEqual([expect.objectContaining({ id: contractId, value: 5_00_000, cracDocumentId: docId })]);
+    const notes = await ctx.db.select().from(notifications).where(eq(notifications.orgId, victim.orgId));
+    expect(notes).toHaveLength(0);
+  });
+});

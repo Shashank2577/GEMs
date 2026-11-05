@@ -282,8 +282,9 @@ export default function ProfilePage() {
       {/* Phone/tablet: section pills + compact meter */}
       <div className="sticky top-14 z-10 -mx-4 mb-4 border-b bg-background/90 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:hidden">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => jump('identity')} className="flex shrink-0 items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3 text-xs font-semibold focus-ring" aria-label={`Profile ${percent}% complete`}>
-            <span className="scale-[0.42] -m-[22px]"><Ring value={percent} /></span>{percent}%
+          <button type="button" onClick={() => jump('identity')} className="flex shrink-0 items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3 text-xs font-semibold focus-ring">
+            {/* Name from content — the ring's img name "Profile N% complete" — not an aria-label that omits the visible "N%" (axe label-content-name-mismatch). */}
+            <span className="scale-[0.42] -m-[22px]"><Ring value={percent} /></span><span aria-hidden>{percent}%</span>
           </button>
           <nav aria-label="Profile sections" className="-mr-4 flex gap-1.5 overflow-x-auto pr-4 scrollbar-thin">
             {SECTIONS.map((s) => (
@@ -334,10 +335,10 @@ export default function ProfilePage() {
               <Field label="Incorporation date" error={errors.incorporationDate}>
                 <Input id="f-incorporationDate" type="date" value={txt('incorporationDate')} onChange={(e) => set('incorporationDate', e.target.value || null)} max={new Date().toISOString().slice(0, 10)} />
               </Field>
-              <Field label="GSTIN" error={errors.gstin} hint={gstOk ? <span className="text-success">✓ Valid · {gstStateName} · PAN {gstPan}</span> : '15 characters, e.g. 27AAPCS1234K1Z2'}>
+              <Field label="GSTIN" error={errors.gstin} hint={gstOk ? <span className="text-[hsl(158_72%_27%)] dark:text-success">✓ Valid · {gstStateName} · PAN {gstPan}</span> : '15 characters, e.g. 27AAPCS1234K1Z2'}>
                 <Input id="f-gstin" value={txt('gstin')} onChange={(e) => set('gstin', e.target.value.toUpperCase())} maxLength={15} className="font-mono uppercase tracking-wider" placeholder="27AAPCS1234K1Z2" autoComplete="off" spellCheck={false} />
               </Field>
-              <Field label="PAN" error={errors.pan} hint={panType && !errors.pan ? <span className="text-success">✓ {panType}</span> : '10 characters, e.g. AAPCS1234K'}>
+              <Field label="PAN" error={errors.pan} hint={panType && !errors.pan ? <span className="text-[hsl(158_72%_27%)] dark:text-success">✓ {panType}</span> : '10 characters, e.g. AAPCS1234K'}>
                 <Input id="f-pan" value={txt('pan')} onChange={(e) => set('pan', e.target.value.toUpperCase())} maxLength={10} className="font-mono uppercase tracking-wider" placeholder="AAPCS1234K" autoComplete="off" spellCheck={false} />
               </Field>
               <Field label="CIN" error={errors.cin} hint="Companies and LLPs only (LLPIN not required)">
@@ -381,7 +382,7 @@ export default function ProfilePage() {
                     <Field label="Owner category" error={errors.mseSocialCategory} hint="SC/ST and women-owned MSEs have reserved procurement targets">
                       <Select id="f-mseSocialCategory" value={draft.mseSocialCategory ?? 'general'} onValueChange={(v) => set('mseSocialCategory', v as Draft['mseSocialCategory'])} options={MSE_SOCIAL_CATEGORIES.map((c) => ({ value: c, label: c === 'sc_st' ? 'SC / ST' : c === 'women' ? 'Women-owned' : 'General' }))} />
                     </Field>
-                    {draft.mseCategory === 'medium' && <p className="flex items-start gap-2 text-xs text-warning sm:col-span-2"><Info className="mt-0.5 size-3.5 shrink-0" />Medium enterprises don’t get EMD exemption or MSE purchase preference.</p>}
+                    {draft.mseCategory === 'medium' && <p className="flex items-start gap-2 text-xs text-[hsl(32_90%_32%)] dark:text-warning sm:col-span-2"><Info className="mt-0.5 size-3.5 shrink-0" />Medium enterprises don’t get EMD exemption or MSE purchase preference.</p>}
                   </div>
                 )}
               </div>
