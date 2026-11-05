@@ -116,13 +116,13 @@ wrangler.toml      # one Worker: API at /api/*, SPA via static assets, cron, R2 
    `run_worker_first = ["/api/*"]`, cron `*/30 * * * *`, R2 binding `BLOBS`. Secrets (spec 008 FR-015; managed
    only via `wrangler secret put` for the Worker and GitHub encrypted secrets for CI; owner, location, rotation and
    blast radius in `docs/runbook.md` § Secrets): Worker — `DATABASE_URL` (Neon pooled `-pooler` host),
-   `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `SENTRY_DSN`, `ADMIN_TOKEN`;
+   `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `SENTRY_DSN`, `UNSUBSCRIBE_SECRET`, `ADMIN_TOKEN`;
    CI — `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STAGING_DATABASE_URL`, `PROD_DATABASE_URL`, `NEON_API_KEY`.
    Session tokens are random and stored hashed, so there is no session-signing secret.
 
-> Secrets check (008 T009, against `apps/api/src/env.ts`, `wrangler.toml` and `.dev.vars.example`): the Worker also reads
-> `UNSUBSCRIBE_SECRET` (HMAC key of one-click unsubscribe links; required together with `RESEND_API_KEY`, else alert
-> emails carry no `List-Unsubscribe` header) and `ADMIN_TOKEN` must be at least 32 characters or the operator endpoint stays
+> Secrets check (008 T009, against `apps/api/src/env.ts`, `wrangler.toml` and `.dev.vars.example`): `UNSUBSCRIBE_SECRET`
+> (HMAC key of one-click unsubscribe links; required together with `RESEND_API_KEY`, else alert
+> emails carry no `List-Unsubscribe` header) is read by the Worker, and `ADMIN_TOKEN` must be at least 32 characters or the operator endpoint stays
 > off. `SESSION_SECRET` is read nowhere.
 
 ## Complexity Tracking

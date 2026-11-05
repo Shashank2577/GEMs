@@ -2,6 +2,8 @@
 
 ## Launch checklist
 
+The spec 008 table (ARCH-01 to ARCH-13) and the pre-flip steps are appended at the end of this file: [Spec 008 launch checklist](#spec-008-launch-checklist-arch-01-to-arch-13).
+
 ### Release gate: spec 002 auth hardening (008/FR-023)
 
 No paid plan may be activated (no `POST /api/admin/orgs/:id/plan` to `starter`/`pro`, no invoice) until every MUST row
@@ -386,7 +388,7 @@ files only: `qa/evidence/008/US<n>/VERDICT.md`, ticked tasks in `specs/008-opera
 before each paid activation and update the table and the date.
 
 **Gate: no org may be moved to `starter` or `pro` (`POST /api/admin/orgs/:id/plan`, no invoice) until every P1 story has a QA
-verdict `qa:approved` on `main`.** Today US3, US4, US5 and US6 are approved; **US1 (CI gate, PR #475) and US2 (releases,
+verdict `qa:approved` on `main`.** Today US3, US4, US5, US6 and US7 (P2) are approved; **US1 (CI gate, PR #475) and US2 (releases,
 secrets, backups, security headers; PR #492, `needs-human`) are not merged, so the gate is closed.**
 
 | ARCH | Recommendation (level) | Spec 008 tasks | QA verdict | Status |
@@ -396,12 +398,12 @@ secrets, backups, security headers; PR #492, `needs-human`) are not merged, so t
 | 03 | Global GeM lease, 10-minute manual-sync cooldown, atomic single ingestion (MUST) | T059 to T066 (FR-024 to FR-026) | [US4](../qa/evidence/008/US4/VERDICT.md) `qa:approved` (round 2) | **met** |
 | 04 | Open-only partial feed indexes (MUST); full-text search column (SHOULD) | Indexes T067, T068, T070 (FR-027, FR-028); search T103 (FR-073) | US4 `qa:approved` (4e, p95 on production Neon, unverifiable); US7 `qa:approved` | **met** in CI-sized Postgres (500k tenders, p95 189 ms); production latency **unverified** until staging/Neon access |
 | 05 | Pending-notifications partial index (MUST) | T069 (FR-029) | US4 `qa:approved` | **met** |
-| 06 | Worker limits: `cpu_ms`, page, LLM and packet-size caps (MUST) | Caps T073 to T076 (FR-030 to FR-033); `[limits] cpu_ms` T030 (FR-009) | US4 `qa:approved` (8c, a real 301-page GeM document, unverifiable); US2 not merged | **partly met**: page, LLM budget and 40-item packet caps proven; `cpu_ms = 120000` waits for US2 (#492) |
+| 06 | Worker limits: `cpu_ms`, page, LLM and packet-size caps (MUST) | Caps T073 to T076 (FR-030 to FR-033); `[limits] cpu_ms` T030 (FR-009) | US4 `qa:approved` (8c, a real 301-page GeM document, unverifiable); US2 not merged | **partly met**: page, LLM budget and 40-item packet caps proven (the fetched-document page cap is covered by a unit test only; US4 criterion 8c is unverifiable); `cpu_ms = 120000` waits for US2 (#492) |
 | 07 | LLM metering + per-org quota (MUST); shared extraction cache (SHOULD) | T084, T085 (FR-037 to FR-039); T102 (FR-072) | [US5](../qa/evidence/008/US5/VERDICT.md) and US7 `qa:approved` | **met** |
 | 08 | Plan limits, trial expiry, 402 contract, usage endpoint (MUST) | T079 to T091 (FR-034 to FR-042) | US5 `qa:approved`, every scenario met | **met** |
 | 09 | Health with ingestion staleness + external monitor (MUST); Sentry (SHOULD) | T094 to T098 (FR-044 to FR-048); operator T099 (FR-047) | [US6](../qa/evidence/008/US6/VERDICT.md) `qa:approved`; criteria 10b (runbook sections owned by US2), 11 (monitor + fire drill) and 12 (SC-009) unverifiable | **partly met**: health v2, logs, Sentry and the runbook's monitor/first-10-minutes sections are proven; **the external uptime monitor and the staging fire drill (T099) are not configured**, so nobody is paged yet |
 | 10 | CI deploy pipeline with migrations, Neon retention, custom domain, security headers (MUST) | US1: T016 to T026 (FR-001 to FR-006); US2: T030 to T042 (FR-007 to FR-015) | none yet (US1 PR #475, US2 PR #492) | **unverified** |
-| 11 | Rate limiting for auth, uploads, preview, fetch-documents (MUST) | T049 to T056 (FR-017 to FR-022); auth rules are spec 002's (FR-010) | US3 `qa:approved`; [002/US1](../qa/evidence/002/US1/VERDICT.md) `qa:approved` | **met** |
+| 11 | Rate limiting for auth, uploads, preview, fetch-documents (MUST) | T049 to T056 (FR-017 to FR-022); auth rules are spec 002's (FR-010) | US3 `qa:approved`; [002/US1](../qa/evidence/002/US1/VERDICT.md) `qa:approved` | **met** (per-IP rules and `gem.fetch.org` proven by API tests only; the US3 verdict lists per-IP limits on a real proxy under "Not checked") |
 | 12 | Cross-tenant isolation sweep test (MUST) | T048 (FR-016), extending 002 T052 | US3 `qa:approved` | **met**; becomes a CI gate with US1 (#475) |
 | 13 | Matching efficiency (SHOULD) | T104, T105 (FR-074) | US7 `qa:approved` | **met** (not a gate) |
 

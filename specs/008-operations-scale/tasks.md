@@ -244,8 +244,8 @@ the expected rows/blobs.
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [x] T114 [P] Update `README.md` (Operations section: CI, deploy, environments, runbook link) and `wrangler.toml` header comment; remove stale `pnpm deploy` instructions FR-007, FR-048 (#371) *(README done; the `wrangler.toml` header and the `deploy` script are rewritten by US2 PR #492, so they are not touched here to avoid a conflict)*
-- [x] T115 [P] Run `/cairn-analyze` on spec 008 against 002/003/007 to confirm no duplicate ownership (cooldown, retries, plans file, isolation test) and record results in `specs/008-operations-scale/checklists/requirements.md` FR-023 (#372)
+- [~] T114 [P] Update `README.md` (Operations section: CI, deploy, environments, runbook link) and `wrangler.toml` header comment; remove stale `pnpm deploy` instructions FR-007, FR-048 (#371) *(README only; the `wrangler.toml` header, the root `deploy` script and `wiki/Runbook.md` wait for #492)*
+- [x] T115 [P] Run `/cairn-analyze` on spec 008 against 002/003/007 to confirm no duplicate ownership (cooldown, retries, plans file, isolation test) and record results in `specs/008-operations-scale/checklists/requirements.md` FR-023 (#372) *(manual equivalent of `/cairn-analyze`)*
 - [x] T116 Launch checklist in `docs/runbook.md` § Launch checklist: every MUST (ARCH-01…ARCH-13) mapped to its task and QA verdict; all P1 verdicts `approved` before the first plan flip to a paid plan FR-023, SC-001 (#373)
 
 ---

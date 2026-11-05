@@ -6,7 +6,7 @@ The executable source of truth is `packages/db/src/schema.ts` (Drizzle). Migrati
 | Entity | Table | Scope | Notes |
 |---|---|---|---|
 | User | `users` | global | email unique, PBKDF2 hash, phone for WhatsApp |
-| Organization | `organizations` | tenant | plan (`trial\|starter\|pro\|enterprise`), `trial_ends_at` (008/FR-035: created + 14 days at sign-up, cleared on a paid plan; null for pre-trial seeds), onboarding state, scoring weights. `onboarding_state` is jsonb of booleans, keys limited to `company, categories, watchlist, documents, skipped, completed, demo` (≤ 16; enforced by `PATCH /org`, 007/FR-048) and merged with `||`; `demo` marks an org that loaded the demo dataset |
+| Organization | `organizations` | tenant | plan (`trial\|starter\|pro\|enterprise`), `trial_ends_at` (008/FR-035: created + 14 days at sign-up; trial orgs that existed before migration 0022 got max(created + 14 d, migration + 7 d); null on paid plans; set or kept by `POST /admin/orgs/:id/plan` when moved to trial), onboarding state, scoring weights. `onboarding_state` is jsonb of booleans, keys limited to `company, categories, watchlist, documents, skipped, completed, demo` (≤ 16; enforced by `PATCH /org`, 007/FR-048) and merged with `||`; `demo` marks an org that loaded the demo dataset |
 | Membership | `memberships` | org | role: owner, bid_manager, analyst, viewer |
 | Invitation | `invitations` | org | hashed token, expiry |
 | Session / API token | `sessions`, `api_tokens` | user | hashed opaque tokens |
@@ -20,7 +20,7 @@ The executable source of truth is `packages/db/src/schema.ts` (Drizzle). Migrati
 | Tender document | `tender_documents` | global (org_id null) or org upload | extracted text, pages split by `\f`; `page_count` = pages read (capped at 150), `total_pages` = the PDF's real count (008/FR-030, null on older rows); shared extraction cache (008/FR-072) `requirements jsonb`, `extractor_version`, `extracted_at`, `extracted_method`, written and read **only** for GeM-fetched rows (`org_id` null) so no tenant's upload can feed another's analysis |
 | Ingestion run | `ingestion_runs` | global | health metrics, `listing_stop`; unique partial index `ingestion_runs_one_running_uq` on `((true)) WHERE status = 'running'` allows one running run cluster-wide (008/FR-025) |
 | GeM request lease | `gem_throttle` | global | one row `id='gem'`; `next_slot_at` moves forward by the minimum interval per request so all isolates share 1 request/s (008/FR-024) |
-| Rate-limit counter | `rate_limits` | global | PK `(key, window_start)`, `count`; `key` = `<rule>:<subject>`; one upsert per request, dead windows pruned by the scheduler; idx `rate_limits_window_idx` (008/FR-017). Credential limits use `auth_attempts` (002) |
+| Rate-limit counter | `rate_limits` | global | PK `(key, window_start)`, `count`; `key` = `<rule>:<subject>`; one upsert per applied rule, dead windows pruned by the scheduler; idx `rate_limits_window_idx` (008/FR-017). Credential limits use `auth_attempts` (002) |
 | Daily job claim | `job_runs` | global | PK `(job, day)` (IST day), `started_at`, `finished_at`, `summary`; the first scheduled tick of the day claims the housekeeping job, a failed run deletes its claim (008/FR-070) |
 | Watchlist | `watchlists` | org | `WatchlistCriteria` JSON |
 | Tender match | `tender_matches` | org | unique (org, tender, watchlist); reasons |
@@ -43,9 +43,9 @@ The executable source of truth is `packages/db/src/schema.ts` (Drizzle). Migrati
 - Vault status (derived): `expired` (expiry < today), `expiring` (≤ 30 days), `valid`.
 - Vault reminders: 30 → 7 → 1 → on expiry (0); `last_reminder_days` records the last threshold sent and resets when the expiry date changes (edit or renewal).
 
-## Indexes added by spec 008 (capacity, US4/US7)
+## Indexes added since 001 (002, 006, 008)
 
-Tender-feed indexes are partial on `status = 'open'` and built `CONCURRENTLY` (migrations marked `-- tp:non-transactional`,
+Open-feed indexes are partial on `status = 'open'`; the bid-number prefix and GIN indexes cover all rows. The tender indexes are built `CONCURRENTLY` (migrations marked `-- tp:non-transactional`,
 run statement by statement by `packages/db/src/migrate.ts`):
 
 | Index | Definition | Serves |
