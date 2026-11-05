@@ -23,10 +23,12 @@
     --primary: 243 75% 52%;
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 90% 96.5%;
+    /* Primary used as text/link colour (text-primary). Same as --primary in light; lighter in dark (WCAG AA ≥ 4.5:1). */
+    --primary-text: 243 75% 52%;
     --accent: 33 96% 50%;
     --accent-foreground: 26 90% 14%;
     --accent-soft: 40 100% 95%;
-    --success: 158 72% 34%;
+    --success: 158 72% 28%; /* ≥ 4.5:1 as text on success-soft and white on success (002/NFR-004) */
     --success-foreground: 0 0% 100%;
     --success-soft: 152 70% 95%;
     --warning: 34 92% 42%;
@@ -67,6 +69,7 @@
     --primary: 243 82% 66%;
     --primary-foreground: 0 0% 100%;
     --primary-soft: 243 45% 18%;
+    --primary-text: 243 90% 74%; /* ≥ 5:1 on background, card, muted and primary-soft (white-on-primary buttons keep --primary) */
     --accent: 36 98% 58%;
     --accent-foreground: 26 90% 10%;
     --accent-soft: 34 60% 15%;

@@ -11,6 +11,10 @@ Use Tailwind classes, never raw hex: `bg-background text-foreground`, `bg-card`,
 Charts: `hsl(var(--chart-1))` … `--chart-5`. Radius `rounded-lg` (10px) / `rounded-xl` cards. Shadows `shadow-xs|sm|md|lg|xl`.
 Helpers: `.focus-ring`, `.surface`, `.tabular` (tabular numbers), `.bg-grid`, `.text-gradient`, `.scrollbar-thin`, `.safe-bottom`.
 Spacing follows an 8px grid (`gap-2/4/6/8`, page padding is set by the AppShell — don't add outer padding in pages).
+Contrast (WCAG 2.1 AA, 002/NFR-004): `text-primary` maps to `--primary-text` (lighter than `--primary` in dark) so links and
+active labels stay ≥ 4.5:1; don't use opacity modifiers (`text-muted-foreground/80`) on small text. Toasts sit bottom-right
+from `md` up and top-center below it (clear of the phone tab bar and sticky form footers). Components with an `aria-label`
+must include their visible text at the start of it (label-in-name), e.g. the account menu "PS Account menu".
 
 ## Components
 | File | Exports |

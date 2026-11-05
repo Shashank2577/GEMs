@@ -234,7 +234,7 @@ function SetupCard({ d }: { d: DashboardResponse }) {
           <CardTitle>Finish setting up</CardTitle>
           <span className="tabular text-xs font-medium text-muted-foreground">{done}/{d.setup.length}</span>
         </div>
-        <Progress value={pct} className="mt-2" />
+        <Progress value={pct} className="mt-2" aria-label={`Setup ${done} of ${d.setup.length} done`} />
       </CardHeader>
       <CardContent className="flex-1">
         <ul className="flex flex-col gap-1">
