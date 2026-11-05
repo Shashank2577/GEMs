@@ -7,9 +7,9 @@
  * The plan is read from the database on every call (no caching beyond one request, FR-043); `enterprise` is never
  * limited. Monthly counters use the IST calendar month (`istMonthPeriod`).
  */
-import { and, count, countDistinct, eq, gt, gte, isNotNull, isNull, lt, ne, sum } from 'drizzle-orm';
+import { and, count, countDistinct, eq, gt, gte, isNotNull, isNull, lt, ne, notExists, sum } from 'drizzle-orm';
 import {
-  analyses, invitations, llmUsage, memberships, organizations, packets, vaultDocuments, vaultDocumentVersions, watchlists,
+  analyses, bidWorkspaces, invitations, tenders, llmUsage, memberships, organizations, packets, vaultDocuments, vaultDocumentVersions, watchlists,
   type Db,
 } from '@tp/db';
 import {
@@ -45,9 +45,10 @@ export async function usedOf(db: DbOrTx, orgId: string, limit: PlanLimitKey, now
       return num(r?.n);
     }
     case 'analysesPerMonth': {
-      // Failed analyses (our fault, not the user's) do not count.
+      // Failed analyses (our fault, not the user's) do not count; nor do the demo dataset's (007/FR-065: demo tenders).
       const [r] = await db.select({ n: count() }).from(analyses)
-        .where(and(eq(analyses.orgId, orgId), gte(analyses.createdAt, start), lt(analyses.createdAt, end), ne(analyses.status, 'failed')));
+        .where(and(eq(analyses.orgId, orgId), gte(analyses.createdAt, start), lt(analyses.createdAt, end), ne(analyses.status, 'failed'),
+          notExists(db.select({ x: tenders.id }).from(tenders).where(and(eq(tenders.id, analyses.tenderId), eq(tenders.source, 'demo'))))));
       return num(r?.n);
     }
     case 'llmAnalysesPerMonth': {
@@ -58,7 +59,10 @@ export async function usedOf(db: DbOrTx, orgId: string, limit: PlanLimitKey, now
     }
     case 'packetsPerMonth': {
       const [r] = await db.select({ n: count() }).from(packets)
-        .where(and(eq(packets.orgId, orgId), gte(packets.createdAt, start), lt(packets.createdAt, end), ne(packets.status, 'failed')));
+        .where(and(eq(packets.orgId, orgId), gte(packets.createdAt, start), lt(packets.createdAt, end), ne(packets.status, 'failed'),
+          // Packets of demo-tender workspaces (demo dataset) do not count.
+          notExists(db.select({ x: bidWorkspaces.id }).from(bidWorkspaces).innerJoin(tenders, eq(tenders.id, bidWorkspaces.tenderId))
+            .where(and(eq(bidWorkspaces.id, packets.workspaceId), eq(tenders.source, 'demo'))))));
       return num(r?.n);
     }
     case 'vaultBytes': {

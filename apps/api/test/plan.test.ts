@@ -312,6 +312,17 @@ describe('analyse quota (T084)', () => {
     const r = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: o.analyst.cookie });
     expect(r.status, r.text).toBe(201);
   });
+
+  it('the demo dataset does not use up the quota (its analyses and packets are on demo tenders, 007/FR-065)', async () => {
+    const o = await newOrg();
+    const seeded = await request(ctx.app, 'POST', '/demo/seed', { cookie: o.owner.cookie, json: {} });
+    expect(seeded.status, seeded.text).toBeLessThan(300);
+    const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(analyses).where(eq(analyses.orgId, o.orgId));
+    expect(n).toBeGreaterThan(0);
+    const u = await request(ctx.app, 'GET', '/org/usage', { cookie: o.viewer.cookie });
+    expect(u.body.usage.analysesThisMonth).toBe(0);
+    expect(u.body.usage.packetsThisMonth).toBe(0);
+  });
 });
 
 // ───────────── FR-037/FR-039: LLM metering ─────────────
