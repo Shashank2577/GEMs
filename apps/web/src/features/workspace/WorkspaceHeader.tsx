@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, CalendarClock, Check, ChevronDown, Copy, ExternalLink, UserPlus, Users } from 'lucide-react';
-import type { WorkspaceDetail, StageName } from '@tp/core/contracts/apply';
+import { canTransition, type WorkspaceDetail, type StageName } from '@tp/core/contracts/apply';
 import {
   Avatar, AvatarGroup, Badge, Button, Card, Countdown, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger, Input, Popover, PopoverContent, PopoverTrigger, ScoreRing, StageBadge, Tooltip, VerdictBadge, toast,
@@ -70,13 +70,18 @@ export function WorkspaceHeader({ data, onGoToStep }: { data: WorkspaceDetail; o
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuLabel>Move to stage</DropdownMenuLabel>
-                {STAGE_ORDER.map((s) => (
-                  <DropdownMenuItem key={s} disabled={update.isPending} onSelect={() => setStage(s)} className="justify-between">
+                {STAGE_ORDER.map((s) => {
+                  // FR-008: Won/Lost only after the bid was submitted on GeM (the API enforces it too).
+                  const blocked = s !== w.stage && !canTransition(w.stage, s).ok;
+                  return (
+                  <DropdownMenuItem key={s} disabled={update.isPending || blocked} onSelect={() => setStage(s)} className="justify-between">
                     <StageBadge stage={s as Stage} size="sm" />
+                    {blocked && <span className="text-2xs text-muted-foreground">Mark as submitted first</span>}
                     {s === 'ready' && data.readiness.blockers.length > 0 && <span className="text-2xs text-danger">{data.readiness.blockers.length} blocker{data.readiness.blockers.length === 1 ? '' : 's'}</span>}
                     {s === w.stage && <Check className="size-4 text-primary" aria-hidden />}
                   </DropdownMenuItem>
-                ))}
+                  );
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : <StageBadge stage={w.stage as Stage} />}

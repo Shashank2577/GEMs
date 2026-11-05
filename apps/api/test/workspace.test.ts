@@ -217,3 +217,53 @@ describe('POST /workspaces/:id/submitted & outcome', () => {
     expect(acts).toEqual(expect.arrayContaining(['workspace.created', 'workspace.stage_changed', 'workspace.item_overridden', 'workspace.mapping_changed', 'workspace.commented', 'workspace.submitted', 'workspace.outcome_recorded', 'workspace.assigned']));
   });
 });
+
+describe('PATCH /workspaces/:id — won/lost only after submission (T020; 006/FR-008)', () => {
+  let goId: string;
+  beforeAll(async () => {
+    const t = await seedTender(ctx, 4);
+    await seedAnalysis(ctx, s.org.orgId, t.id);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    expect(r.body.stage).toBe('go');
+    goId = r.body.id;
+  });
+
+  it('won from go → 409 invalid_transition, stage unchanged', async () => {
+    for (const json of [{ stage: 'won' }, { stage: 'lost' }, { outcome: { result: 'won' } }, { stage: 'preparing', outcome: { result: 'lost' } }]) {
+      const r = await request(ctx.app, 'PATCH', `/workspaces/${goId}`, { cookie: s.org.analyst.cookie, json });
+      expect(r.status).toBe(409);
+      expect(r.body.error.code).toBe('invalid_transition');
+      expect(r.body.error.message).toBe('Record the submission on GeM first — a bid can only be won or lost after it was submitted.');
+    }
+    const d = await request(ctx.app, 'GET', `/workspaces/${goId}`, { cookie: s.org.analyst.cookie });
+    expect(d.body.workspace).toMatchObject({ stage: 'go', outcome: null });
+  });
+
+  it('won from submitted → 200, and the result can be corrected to lost', async () => {
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${goId}`, { cookie: s.org.analyst.cookie, json: { stage: 'submitted' } })).status).toBe(200);
+    const won = await request(ctx.app, 'PATCH', `/workspaces/${goId}`, { cookie: s.org.analyst.cookie, json: { stage: 'won' } });
+    expect(won.status).toBe(200);
+    expect(won.body.stage).toBe('won');
+    const lost = await request(ctx.app, 'PATCH', `/workspaces/${goId}`, { cookie: s.org.analyst.cookie, json: { outcome: { result: 'lost' } } });
+    expect(lost.status).toBe(200);
+    expect(lost.body).toMatchObject({ stage: 'lost', outcome: { result: 'lost' } });
+  });
+});
+
+describe('readiness without an analysis (T021; 006/FR-009)', () => {
+  it('reports analysed:false and 0 % on the card and the detail', async () => {
+    const t = await seedTender(ctx, 3);
+    const c = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    expect(c.status).toBe(201);
+    expect(c.body.stage).toBe('identified');
+    const list = await request(ctx.app, 'GET', '/workspaces?stage=identified', { cookie: s.org.viewer.cookie });
+    const card = list.body.items.find((i: any) => i.id === c.body.id);
+    expect(card.analysis).toBeNull();
+    expect(card.readiness).toEqual({ percent: 0, total: 0, covered: 0, blockers: 0, analysed: false });
+    const d = await request(ctx.app, 'GET', `/workspaces/${c.body.id}`, { cookie: s.org.viewer.cookie });
+    expect(d.body.readiness).toMatchObject({ percent: 0, total: 0, covered: 0, blockers: [], analysed: false, canMarkReady: false });
+    // Analysed workspaces say so.
+    const other = await request(ctx.app, 'GET', `/workspaces/${wsId}`, { cookie: s.org.viewer.cookie });
+    expect(other.body.readiness.analysed).toBe(true);
+  });
+});

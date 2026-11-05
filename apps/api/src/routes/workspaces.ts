@@ -4,7 +4,7 @@
  *   POST  /tenders/:id/workspace          create-or-get (auto-maps vault docs from the latest analysis)   analyst+
  *   GET   /workspaces                     ?stage&mine&q → Kanban cards { items, total, byStage }        viewer+
  *   GET   /workspaces/:id                 WorkspaceDetail                                               viewer+
- *   PATCH /workspaces/:id                 stage/owner/assignees/due/position/outcome; `ready` guarded (409) analyst+
+ *   PATCH /workspaces/:id                 stage/owner/assignees/due/position/outcome; `ready` + won/lost guarded (409) analyst+
  *   PUT   /workspaces/:id/mapping         { itemId: docId | null | "auto" }                              analyst+
  *   POST  /workspaces/:id/overrides       { itemId, reason }                                            bid_manager+
  *   DELETE /workspaces/:id/overrides/:itemId                                                            bid_manager+
@@ -20,7 +20,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { bidWorkspaces, comments, memberships, notifications } from '@tp/db';
 import {
-  STAGES, STAGE_LABELS, assistValuesSchema, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
+  STAGES, STAGE_LABELS, assistValuesSchema, canTransition, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
   workspaceUpdateSchema, type StageName, type WorkspaceListResponse,
 } from '@tp/core/contracts/apply';
 import { validateAssistValues, isForbiddenKey } from '@tp/core/assist/allowlist';
@@ -143,6 +143,12 @@ workspacesRoutes.patch('/workspaces/:id', requireRole('analyst'), async (c) => {
   if (body.position !== undefined) set.position = body.position;
 
   let stage = body.stage;
+  // FR-008 (T020): won/lost — by stage or by outcome — only once the bid was submitted (or to correct a result).
+  for (const to of [stage, body.outcome?.result]) {
+    if (!to || to === w.stage) continue;
+    const check = canTransition(w.stage, to);
+    if (!check.ok) throw new HttpError(409, check.code, check.message, { from: w.stage, to });
+  }
   if (body.outcome !== undefined) {
     set.outcome = body.outcome ? { ...body.outcome, l1Price: body.outcome.l1Price ?? undefined, ourPrice: body.outcome.ourPrice ?? undefined, notes: body.outcome.notes ?? undefined, at: now.toISOString() } : null;
     if (body.outcome && !stage) stage = body.outcome.result;
