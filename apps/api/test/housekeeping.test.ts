@@ -139,6 +139,7 @@ describe('housekeeping on a fixed clock (US7 scenario 5)', () => {
     const report = await runScheduledJobs(deps(), { trigger: 'cron' });
     expect(report.find((r) => r.step === 'housekeeping')).toMatchObject({ ok: true });
     const line = logs.find((l) => l.msg === 'housekeeping finished');
+    console.log(JSON.stringify({ level: 'info', msg: line?.msg, ...line?.meta, ms: undefined })); // the JSON log line (ms omitted)
     expect(line?.meta).toMatchObject({
       job: 'housekeeping', day: '2026-11-06',
       // rateLimits: 0 — the earlier `rate-limit-cleanup` step (2 × the longest window) already removed the stale window.
