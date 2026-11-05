@@ -234,6 +234,12 @@ export const DEMO_WATCHLISTS: { name: string; criteria: WatchlistCriteria; match
 interface DemoDoc { type: DocType; title: string; number?: string; issuer?: string; issue?: number; expiry?: number | null; fy?: string; tags?: string[]; lines: string[] }
 
 /** `issue`/`expiry` are day offsets from now. */
+/** Seeded OEM vault letters, by the profile OEM row they back (D-Link India deliberately has none — spec 005 US2 scenario 10). */
+const DEMO_OEM_DOC_TITLES: Readonly<Record<string, string>> = {
+  'CP PLUS': 'OEM authorisation – CP PLUS (CCTV)',
+  'Dell Technologies': 'OEM authorisation – Dell Technologies (desktops & servers)',
+};
+
 function demoDocs(): DemoDoc[] {
   const c = DEMO_COMPANY;
   return [
@@ -246,8 +252,8 @@ function demoDocs(): DemoDoc[] {
     { type: 'balance_sheet', title: 'Audited balance sheet FY 2022-23', fy: '2022-23', issuer: 'Mehta & Kulkarni, Chartered Accountants', issue: -880, lines: ['Revenue from operations: Rs 1,82,30,000', 'Net worth: Rs 64,90,000'] },
     { type: 'ca_turnover_certificate', title: 'CA certificate – average turnover (last 3 FYs)', issuer: 'Mehta & Kulkarni, Chartered Accountants', issue: -340, expiry: 25, lines: ['Average annual turnover FY 2022-23 to 2024-25: Rs 2,48,93,333', 'UDIN: 25104567BKCDEF1234'] },
     { type: 'iso', title: 'ISO 9001:2015 quality management certificate', number: 'QMS/IN/24/8812', issuer: 'TUV India Pvt Ltd', issue: -1085, expiry: 10, tags: ['ISO 9001'], lines: ['Scope: Supply, installation and maintenance of IT hardware, CCTV and networking systems'] },
-    { type: 'oem_authorization', title: 'OEM authorisation – CP PLUS (CCTV)', issuer: 'Aditya Infotech Ltd (CP PLUS)', issue: -200, expiry: 165, tags: ['CP PLUS', 'CCTV'], lines: ['Authorised reseller and service partner for CP PLUS surveillance products, Maharashtra & Goa'] },
-    { type: 'oem_authorization', title: 'OEM authorisation – Dell Technologies (desktops & servers)', issuer: 'Dell International Services India', issue: -370, expiry: -5, tags: ['Dell', 'Desktops'], lines: ['Authorised channel partner for Dell commercial desktops, notebooks and PowerEdge servers'] },
+    { type: 'oem_authorization', title: DEMO_OEM_DOC_TITLES['CP PLUS']!, issuer: 'Aditya Infotech Ltd (CP PLUS)', issue: -200, expiry: 165, tags: ['CP PLUS', 'CCTV'], lines: ['Authorised reseller and service partner for CP PLUS surveillance products, Maharashtra & Goa'] },
+    { type: 'oem_authorization', title: DEMO_OEM_DOC_TITLES['Dell Technologies']!, issuer: 'Dell International Services India', issue: -370, expiry: -5, tags: ['Dell', 'Desktops'], lines: ['Authorised channel partner for Dell commercial desktops, notebooks and PowerEdge servers'] },
     { type: 'crac', title: 'CRAC – Pune Municipal Corporation CCTV (₹96 L)', issuer: 'Pune Municipal Corporation', issue: -420, tags: ['CCTV'], lines: ['Consignee receipt and acceptance certificate', 'Order value: Rs 96,40,000'] },
     { type: 'crac', title: 'CRAC – Central Railway desktop supply (₹58 L)', issuer: 'Central Railway, Mumbai Division', issue: -260, tags: ['Desktops'], lines: ['Consignee receipt and acceptance certificate', 'Order value: Rs 58,20,000'] },
     { type: 'mii_certificate', title: 'Make in India self-certificate (Class-I, 62% local content)', issuer: 'Aarav Technologies Pvt Ltd', issue: -90, lines: ['Local content: 62%', 'Class-I local supplier as per PPP-MII Order 2017'] },
@@ -471,6 +477,21 @@ export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoR
       financialYear: d.fy ?? null, tags: [...(d.tags ?? []), DEMO_MARK], blobKey, fileName, mimeType: 'application/pdf',
       sizeBytes: pdf.byteLength, pageCount: 1, uploadedBy: userId, createdAt: new Date(now.getTime() - (20 - docN) * DAY), updatedAt: now,
     });
+  }
+
+  // Link the demo OEM rows to their vault letters (spec 005 FR-020) whenever the stored rows are still the demo's,
+  // unlinked ones — so a seed that failed after the profile insert ends linked on retry. D-Link India stays unlinked.
+  const [stored] = await db.select({ oems: companyProfiles.oemAuthorizations }).from(companyProfiles).where(eq(companyProfiles.orgId, orgId));
+  const isDemoOems = !!stored && stored.oems.length === profile.oemAuthorizations.length
+    && stored.oems.every((o, i) => o.oem === profile.oemAuthorizations[i]!.oem && !o.documentId);
+  if (isDemoOems) {
+    const oemDocs = await db.select({ id: vaultDocuments.id, title: vaultDocuments.title }).from(vaultDocuments)
+      .where(and(eq(vaultDocuments.orgId, orgId), eq(vaultDocuments.type, 'oem_authorization')));
+    const oemAuthorizations = stored.oems.map((o) => {
+      const doc = oemDocs.find((d) => d.title === DEMO_OEM_DOC_TITLES[o.oem]);
+      return doc ? { ...o, documentId: doc.id } : o;
+    });
+    await db.update(companyProfiles).set({ oemAuthorizations }).where(eq(companyProfiles.orgId, orgId));
   }
 
   // Watchlists (natural key: name within org).

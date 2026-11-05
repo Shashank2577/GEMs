@@ -18,7 +18,7 @@ stay with a person.
 - **Architecture:** [[Architecture]]
 - **Running locally & deploying:** [[Runbook]]
 - **QA evidence:** [[QA Evidence]]
-- **Ticket board:** issues labelled per [[Delivery Process]]; Projects board "TenderPilot Delivery" is synced by `.github/workflows/project-board.yml`.
+- **Ticket board:** [TenderPilot Delivery](https://github.com/users/Shashank2577/projects/6) — synced from issue/PR labels by `.github/workflows/project-board.yml`.
 
 > This wiki is generated from the `wiki/` folder in the repository and published by `.github/workflows/wiki-sync.yml`.
 > Edit pages through pull requests, not in the GitHub UI (UI edits are overwritten on the next sync).

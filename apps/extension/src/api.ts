@@ -45,7 +45,7 @@ export interface WorkspaceCardLite {
 export const api = {
   me: (s: Settings) => call<{ user: { name: string }; org: { name: string } }>(s, '/auth/me'),
   workspaces: (s: Settings) => call<{ items: WorkspaceCardLite[] }>(s, '/workspaces?stage=go,preparing,ready,submitted'),
-  assist: (s: Settings, id: string) => call<AssistPayload & { stage: string; workspaceUrl: string; readiness: { percent: number; blockers: number } }>(s, `/assist/${id}`),
+  assist: (s: Settings, id: string) => call<AssistPayload & { stage: string; workspaceUrl: string; readiness: { percent: number; blockers: number; analysed: boolean } }>(s, `/assist/${id}`),
 };
 
 /** Ask Chrome for access to the API origin (optional host permission). */
