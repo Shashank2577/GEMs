@@ -261,6 +261,11 @@ export const ingestionRuns = pgTable('ingestion_runs', {
   tendersCreated: integer('tenders_created').notNull().default(0),
   tendersUpdated: integer('tenders_updated').notNull().default(0),
   matchesCreated: integer('matches_created').notNull().default(0),
+  /**
+   * Why the listing phase stopped (003/FR-011): `all_known` page reached, `end` of results, page `cap` used up,
+   * `explicit` page count fetched, or `error`. Null for runs that never got that far (or predate the column).
+   */
+  listingStop: text('listing_stop').$type<'all_known' | 'end' | 'cap' | 'explicit' | 'error'>(),
   error: text('error'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),

@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { diffTenders, isCorrigendum, parseBidPlusDoc, parseBidPlusResponse, type NormalizedTender } from '../../src/gem/parse';
+import {
+  assertPageShape, diffTenders, FORMAT_DRIFT_PREFIX, isCorrigendum, isFormatDriftError, parseBidPlusDoc, parseBidPlusResponse, type NormalizedTender,
+} from '../../src/gem/parse';
 
 const FIX = join(__dirname, '../fixtures/gem');
 const load = (f: string) => JSON.parse(readFileSync(join(FIX, f), 'utf8'));
@@ -124,5 +126,44 @@ describe('parseBidPlusDoc on recorded fixtures', () => {
     expect(changes.endAt).toEqual({ from: '2026-11-18T09:30:00.000Z', to: '2026-11-25T09:30:00.000Z' });
     expect(isCorrigendum(changes)).toBe(true);
     expect(isCorrigendum({ status: { from: 'open', to: 'closed' } })).toBe(false);
+  });
+});
+
+describe('format-drift guard (FR-014)', () => {
+  const ok = (n: number) => ({ b_bid_number: [`GEM/2026/B/${7000000 + n}`], b_category_name: ['Laptop'] });
+  const bad = (n: number) => ({ bidNo: [`GEM/2026/B/${8000000 + n}`], b_category_name: ['Laptop'] });
+
+  it('accepts recorded fixture pages and empty pages', () => {
+    for (const f of ['page-1.json', 'page-2.json', 'page-3.json', 'page-4.json', 'no-results.json']) {
+      expect(() => assertPageShape(parseBidPlusResponse(load(f)))).not.toThrow();
+    }
+    expect(() => assertPageShape({ docs: [] })).not.toThrow();
+  });
+
+  it('tolerates a minority of docs without a bid number (exactly 50 % is still ok)', () => {
+    expect(() => assertPageShape({ docs: [ok(1), ok(2), ok(3), bad(1)] })).not.toThrow();
+    expect(() => assertPageShape({ docs: [ok(1), bad(1)] })).not.toThrow();
+  });
+
+  it('fails when more than half of the docs lack b_bid_number, with the drift prefix', () => {
+    const docs = [ok(1), bad(1), bad(2)];
+    expect(() => assertPageShape({ docs })).toThrow(/^GeM response format changed: 2 of 3 listing docs lack b_bid_number$/);
+    expect(() => assertPageShape({ docs: [{ b_bid_number: [''] }, { b_bid_number: [] }] })).toThrow(FORMAT_DRIFT_PREFIX);
+    try { assertPageShape({ docs }); } catch (e) { expect(isFormatDriftError(e)).toBe(true); }
+  });
+
+  it('counts non-object docs as missing, against the raw length (parseBidPlusResponse runs the guard)', () => {
+    expect(() => assertPageShape({ docs: [ok(1), null, 'x', [1]] })).toThrow(/3 of 4 listing docs lack b_bid_number/);
+    const res = (docs: unknown[]) => ({ code: 200, response: { response: { numFound: docs.length, start: 0, docs } } });
+    // Filtering first would leave 1 of 1 valid doc and hide the drift.
+    expect(() => parseBidPlusResponse(res([ok(1), null, 42]))).toThrow(/^GeM response format changed: 2 of 3 listing docs/);
+    expect(() => parseBidPlusResponse(res([ok(1), ok(2), null]))).not.toThrow();
+    expect(parseBidPlusResponse(res([ok(1), ok(2), null])).docs).toHaveLength(2);
+  });
+
+  it('reports a response without response.response.docs as format drift', () => {
+    expect(() => parseBidPlusResponse({ code: 200, response: {} })).toThrow(/^GeM response format changed: /);
+    expect(() => parseBidPlusResponse({ code: 200, response: { response: { numFound: 3 } } })).toThrow(/response\.response\.docs missing/);
+    expect(isFormatDriftError(new Error('GeM listing failed: HTTP 503'))).toBe(false);
   });
 });
