@@ -6,6 +6,7 @@
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { AppDeps } from './deps';
+import { readOnlyTokenGuard } from './middleware/auth';
 import { bodyLimits } from './middleware/body-limit';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { ipLimit } from './middleware/rate-limit';
@@ -64,6 +65,8 @@ export function createApp(deps: AppDeps) {
   api.use('*', bodyLimits);
   // 008/FR-019 `api.ip` for requests without credentials (`api.user` is applied once authenticated, middleware/auth.ts).
   api.use('*', ipLimit);
+  // 006/FR-074: read-only API tokens may only GET (uses the credentials ipLimit resolved).
+  api.use('*', readOnlyTokenGuard);
 
   api.get('/health', async (c) => {
     let db = false;

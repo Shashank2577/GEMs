@@ -115,6 +115,11 @@ export const apiTokens = pgTable('api_tokens', {
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
   /** Null = never expires (002/FR-037). Expired tokens are rejected by resolveAuth. */
   expiresAt: timestamp('expires_at', { withTimezone: true }),
+  /**
+   * 006/FR-074: `'read'` = "Extension (read-only)" — refused (403) on every non-GET request (middleware/auth.ts).
+   * Fixed at creation; there is no route to change it. Existing rows default to `'full'`.
+   */
+  scope: text('scope').$type<'full' | 'read'>().notNull().default('full'),
   createdAt: createdAt(),
 }, (t) => ({
   tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash),

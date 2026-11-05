@@ -175,6 +175,25 @@ describe('role matrix: every mutating route × every role (FR-022)', () => {
   });
 });
 
+describe('006/FR-074 read-only API tokens: every mutating route', () => {
+  it('an owner\'s read-only token is 403 read_only_token on every MATRIX route (public ones too); nothing changes', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Read Only Matrix');
+    const created = await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: o.owner.cookie, json: { name: 'ro', scope: 'read' } });
+    expect(created.body.scope).toBe('read');
+    const token = created.body.token as string;
+    for (const e of MATRIX) {
+      const r = await request(ctx.app, e.method, concrete(e.path), opts(e, { bearer: token }));
+      expect(r.status, `${key(e)}: ${r.text}`).toBe(403);
+      expect(r.body.error, key(e)).toEqual({ code: 'read_only_token', message: 'This API token is read-only' });
+    }
+    // still a member (DELETE /org/members/me was refused), token still reads, org untouched
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { bearer: token });
+    expect(me.status).toBe(200);
+    expect(me.body.org).toMatchObject({ id: o.orgId, name: 'Read Only Matrix' });
+    expect((await request(ctx.app, 'GET', '/api/org/members', { cookie: o.owner.cookie })).body.items).toHaveLength(4);
+  });
+});
+
 describe('matrix completeness guard (SC-003)', () => {
   it('every mutating route registered on the app has exactly one matrix entry, and no entry is stale', () => {
     const registered = new Set<string>();
