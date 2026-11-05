@@ -15,9 +15,9 @@ describe('whatsappStopsWarning (002/FR-032, T065)', () => {
 });
 
 describe('testAlertToast (002/FR-034, T067)', () => {
-  it('lists the outcome per channel', () => {
+  it('lists the outcome per channel, in-app always first', () => {
     expect(testAlertToast({ inApp: 'sent', email: 'sent', whatsapp: 'skipped' }, true)).toEqual({
-      kind: 'warning', title: 'Test alert sent',
+      kind: 'warning', title: 'Test alert sent with warnings',
       lines: ['In-app sent', 'Email sent', 'WhatsApp not configured on this server'],
     });
     expect(testAlertToast({ inApp: 'sent', email: 'sent', whatsapp: 'off' }, false)).toEqual({
@@ -25,10 +25,11 @@ describe('testAlertToast (002/FR-034, T067)', () => {
     });
   });
   it('explains a missing mobile and provider failures', () => {
-    const t = testAlertToast({ inApp: 'off', email: 'failed', whatsapp: 'skipped' }, false);
-    expect(t).toEqual({ kind: 'warning', title: 'Test alert not delivered', lines: ['In-app is off', 'Email failed to send', 'WhatsApp needs a mobile number'] });
+    const t = testAlertToast({ inApp: 'sent', email: 'failed', whatsapp: 'skipped' }, false);
+    expect(t.kind).toBe('warning');
+    expect(t.lines).toEqual(['In-app sent', 'Email failed to send', 'WhatsApp needs a mobile number']);
   });
-  it('says so when every channel is off', () => {
-    expect(testAlertToast({ inApp: 'off', email: 'off', whatsapp: 'off' }, true).title).toBe('All alert channels are off');
+  it('is a plain success when email and WhatsApp are off', () => {
+    expect(testAlertToast({ inApp: 'sent', email: 'off', whatsapp: 'off' }, true)).toMatchObject({ kind: 'success', title: 'Test alert sent' });
   });
 });

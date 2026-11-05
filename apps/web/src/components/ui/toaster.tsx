@@ -11,6 +11,8 @@ export function Toaster() {
       closeButton
       richColors
       offset={16}
+      // Phones (≤600px in sonner): sit above the fixed mobile tab bar (h-14 + safe area) instead of covering it.
+      mobileOffset={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
       toastOptions={{
         classNames: {
           toast: 'group !rounded-xl !border !border-border !shadow-lg !font-sans',

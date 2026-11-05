@@ -5,6 +5,7 @@ import { toE164IndianMobile } from '@tp/core/vault/validators';
 import { Button, ErrorState, Field, Input, Segmented, SkeletonList, Switch, toast } from '@/components/ui';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { cn } from '@/lib/utils';
 import { usePrefs, useSavePrefs, useSendTestAlert, useUpdateMe } from '../api';
 import { testAlertToast } from '../notification-copy';
 import { displayMobile } from './AccountSection';
@@ -29,6 +30,7 @@ export default function NotificationsSection() {
   const save = useSavePrefs();
   const updateMe = useUpdateMe();
   const testAlert = useSendTestAlert();
+  const [testStatus, setTestStatus] = useState<{ kind: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [p, setP] = useState<NotificationPrefs | null>(null);
   const [phone, setPhone] = useState(displayMobile(me?.user.phone));
   const [phoneErr, setPhoneErr] = useState<string | null>(null);
@@ -57,13 +59,18 @@ export default function NotificationsSection() {
   const sendTest = () => {
     if (dirty) { toast.info('Save your changes first', { description: 'The test alert uses your saved preferences.' }); return; }
     testAlert.mutate(undefined, {
+      // Per-channel detail goes in the inline status line in the footer (left of / above the buttons) (a toast would cover the buttons
+      // and the mobile tab bar); the toast itself stays one short line.
       onSuccess: (r) => {
         const t = testAlertToast(r, !!me?.user.phone);
-        toast[t.kind](t.title, { description: t.lines.join(' · ') });
+        setTestStatus({ kind: t.kind, text: t.lines.join(' · ') });
+        toast[t.kind](t.title);
       },
       onError: (e) => {
         const retry = e instanceof ApiError && e.status === 429 ? Number((e.details as { retryAfter?: number } | undefined)?.retryAfter) : NaN;
-        toast.error(Number.isFinite(retry) ? `You can send one test alert a minute. Try again in ${retry} s.` : errorMessage(e));
+        const msg = Number.isFinite(retry) ? `You can send one test alert a minute. Try again in ${retry} s.` : errorMessage(e);
+        setTestStatus({ kind: 'error', text: msg });
+        toast.error(msg);
       },
     });
   };
@@ -71,6 +78,10 @@ export default function NotificationsSection() {
   return (
     <Panel title="Notifications" description="Choose how TenderPilot tells you about new matches, deadlines and expiring documents. These settings are personal."
       footer={<>
+        <p role="status" aria-live="polite" className={cn('basis-full text-xs empty:hidden sm:basis-0 sm:flex-1',
+          testStatus?.kind === 'error' ? 'text-danger' : testStatus?.kind === 'warning' ? 'text-[hsl(32_90%_32%)] dark:text-warning' : 'text-muted-foreground')}>
+          {testStatus && <>Test alert: {testStatus.text}</>}
+        </p>
         <Button variant="secondary" onClick={sendTest} loading={testAlert.isPending}><Send /> Send a test alert</Button>
         <Button onClick={submit} disabled={!dirty} loading={save.isPending || updateMe.isPending}>Save preferences</Button>
       </>}>

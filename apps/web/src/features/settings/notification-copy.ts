@@ -11,9 +11,9 @@ export function whatsappStopsWarning(opts: { storedPhone: string | null | undefi
   return opts.whatsappOn && !!opts.storedPhone && !opts.draftPhone.trim() ? WHATSAPP_STOPS_WARNING : null;
 }
 
-const CHANNEL_LABEL = { inApp: 'In-app', email: 'Email', whatsapp: 'WhatsApp' } as const;
+const CHANNEL_LABEL = { email: 'Email', whatsapp: 'WhatsApp' } as const;
 
-function line(channel: keyof TestAlertResult, outcome: TestAlertOutcome, hasPhone: boolean): string {
+function line(channel: 'email' | 'whatsapp', outcome: TestAlertOutcome, hasPhone: boolean): string {
   const label = CHANNEL_LABEL[channel];
   switch (outcome) {
     case 'sent': return `${label} sent`;
@@ -24,14 +24,13 @@ function line(channel: keyof TestAlertResult, outcome: TestAlertOutcome, hasPhon
   }
 }
 
-/** Per-channel outcome toast for "Send a test alert" (T067). */
+/**
+ * "Send a test alert" outcome (T067). The in-app row is always created; `lines` is the per-channel result shown
+ * in the inline status line under the Notifications footer, `title` is the short toast.
+ */
 export function testAlertToast(result: TestAlertResult, hasPhone: boolean): { kind: 'success' | 'warning'; title: string; lines: string[] } {
-  const channels = ['inApp', 'email', 'whatsapp'] as const;
-  const lines = channels.map((ch) => line(ch, result[ch], hasPhone));
-  const anySent = channels.some((ch) => result[ch] === 'sent');
-  const anyProblem = channels.some((ch) => result[ch] === 'failed' || result[ch] === 'skipped');
-  if (!anySent) {
-    return { kind: 'warning', title: channels.every((ch) => result[ch] === 'off') ? 'All alert channels are off' : 'Test alert not delivered', lines };
-  }
-  return { kind: anyProblem ? 'warning' : 'success', title: 'Test alert sent', lines };
+  const external = ['email', 'whatsapp'] as const;
+  const lines = ['In-app sent', ...external.map((ch) => line(ch, result[ch], hasPhone))];
+  const problem = external.some((ch) => result[ch] === 'failed' || result[ch] === 'skipped');
+  return { kind: problem ? 'warning' : 'success', title: problem ? 'Test alert sent with warnings' : 'Test alert sent', lines };
 }

@@ -70,7 +70,9 @@ notificationsRoutes.post('/notifications/:id/read', requireAuth, async (c) => {
 
 /**
  * Send yourself a test alert (002/FR-034; NFR-007). At most 1 per user per minute (429 `rate_limited` +
- * Retry-After). Each channel is attempted only when switched on in the user's prefs for the active org; a
+ * Retry-After). The in-app row "Test alert from TenderPilot" is ALWAYS created (spec 002 US4 scenario 8), so
+ * `inApp` is always `sent` and every allowed call does work — hence the limit is taken first. Email and
+ * WhatsApp are attempted only when switched on in the user's prefs for the active org (`off` otherwise); a
  * channel that is not configured on this server (log adapter) or has no mobile number reports `skipped`.
  * Email/WhatsApp outcomes are also recorded as delivery rows linked to the in-app row (same dedupe key), so
  * the Notifications page shows them like any other alert. Rows are written in a final state, never `pending`,
@@ -109,11 +111,8 @@ notificationsRoutes.post('/me/notifications/test', requireSession, async (c) => 
     return outcome;
   };
 
-  const result: TestAlertResult = { inApp: 'off', email: 'off', whatsapp: 'off' };
-  if (prefs.inApp) {
-    await db.insert(notifications).values({ ...base, channel: 'in_app', status: 'sent', sentAt: now });
-    result.inApp = 'sent';
-  }
+  await db.insert(notifications).values({ ...base, channel: 'in_app', status: 'sent', sentAt: now });
+  const result: TestAlertResult = { inApp: 'sent', email: 'off', whatsapp: 'off' };
   result.email = await attempt('email', prefs.email, async () => {
     const r = await mailer.send({
       to: user.email,

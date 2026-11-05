@@ -7,6 +7,7 @@ import type { ScoringWeights } from '@tp/core/contracts/analyse';
 import type { IngestionRunsResponse } from '@tp/core/contracts/identify';
 import { api, type Paged } from '@/lib/api';
 import { ME_KEY } from '@/lib/auth';
+import { notificationKeys } from '@/features/notifications/api';
 
 export const settingsKeys = {
   members: ['org', 'members'] as const,
@@ -88,7 +89,7 @@ export function useSendTestAlert() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.post<TestAlertResult>('/me/notifications/test'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
   });
 }
 

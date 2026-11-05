@@ -129,19 +129,21 @@ describe('002/FR-034 POST /me/notifications/test', () => {
     expect((await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie })).status).toBe(200);
   });
 
-  it('attempts only enabled channels: WhatsApp on with a phone → attempted; in-app/email off → nothing', async () => {
+  it('always creates the in-app row; email/WhatsApp only when enabled (in-app/email off, WhatsApp on)', async () => {
     const u = await signup(ctx.app);
     await request(ctx.app, 'PATCH', '/api/me', { cookie: u.cookie, json: { phone: '+919822012345' } });
     await request(ctx.app, 'PUT', '/api/me/notification-prefs', { cookie: u.cookie, json: { ...DEFAULTS, inApp: false, email: false, whatsapp: true } });
     const mail = ctx.mailer.sent.length;
     const wa = ctx.whatsapp.sent.length;
     const r = await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie });
-    expect(r.body).toEqual({ inApp: 'off', email: 'off', whatsapp: 'skipped' });
+    expect(r.body).toEqual({ inApp: 'sent', email: 'off', whatsapp: 'skipped' });
     expect(ctx.mailer.sent.length).toBe(mail);
     expect(ctx.whatsapp.sent.length).toBe(wa + 1);
     expect(ctx.whatsapp.sent.at(-1)!.to).toBe('+919822012345');
     const rows = await testRows(u.me.user.id);
-    expect(rows.map((x) => [x.channel, x.status])).toEqual([['whatsapp', 'skipped']]);
+    expect(rows.map((x) => [x.channel, x.status]).sort()).toEqual([['in_app', 'sent'], ['whatsapp', 'skipped']]);
+    const list = await request(ctx.app, 'GET', '/api/notifications', { cookie: u.cookie });
+    expect(list.body.items[0]).toMatchObject({ title: 'Test alert from TenderPilot' });
   });
 
   it('WhatsApp on but the mobile was cleared later → skipped without calling the provider', async () => {
@@ -175,6 +177,31 @@ describe('002/FR-034 POST /me/notifications/test', () => {
     } finally {
       ctx.deps.mailer = original;
     }
+  });
+
+  it('uses the preferences of the active org (two-org user)', async () => {
+    const u = await twoOrgUser();
+    await request(ctx.app, 'PATCH', '/api/me', { cookie: u.cookie, json: { phone: '+919822012345' } });
+    await u.use(u.orgA);
+    expect((await request(ctx.app, 'PUT', '/api/me/notification-prefs', { cookie: u.cookie, json: { ...DEFAULTS, whatsapp: true } })).status).toBe(200);
+
+    await u.use(u.orgB); // org B keeps the defaults
+    const wa = ctx.whatsapp.sent.length;
+    const inB = await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie });
+    expect(inB.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'off' });
+    expect(ctx.whatsapp.sent.length).toBe(wa);
+
+    ctx.clock.advance(61_000);
+    await u.use(u.orgA);
+    const inA = await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie });
+    expect(inA.status).toBe(200);
+    expect(inA.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'skipped' });
+    expect(ctx.whatsapp.sent.length).toBe(wa + 1);
+    expect(ctx.whatsapp.sent.at(-1)!.to).toBe('+919822012345');
+
+    const rows = await testRows(u.userId);
+    expect(rows.filter((x) => x.orgId === u.orgB).map((x) => x.channel).sort()).toEqual(['email', 'in_app']);
+    expect(rows.filter((x) => x.orgId === u.orgA).map((x) => x.channel).sort()).toEqual(['email', 'in_app', 'whatsapp']);
   });
 
   it('requires a signed-in web session', async () => {
