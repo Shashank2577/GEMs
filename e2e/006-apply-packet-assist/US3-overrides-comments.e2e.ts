@@ -385,3 +385,17 @@ test('S11 @mention notifies a non-owner/non-assignee; author or Bid Manager can 
   await expect(rail.getByRole('button', { name: /Comment actions/ })).toHaveCount(0);
   void E;
 });
+
+test('S12 Overridden row at 375px passes axe (NFR-006) @mobile', async ({ page, context }) => {
+  await reset();
+  const r = await call('bid_manager', 'post', `/api/workspaces/${wsId}/overrides`, { itemId: OEM, reason: REASON });
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  await signInAs(context, fx, 'bid_manager');
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(`/workspaces/${wsId}?step=documents`);
+  await expect(row(page, OEM)).toContainText('Overridden');
+  await expect(row(page, OEM)).toContainText(`Override: ${REASON}`);
+  await shot(page, 's12-overridden-row-375');
+  await a11y(page, 's12-overridden-row', { include: [`#item-${OEM}`] });
+  await reset();
+});
