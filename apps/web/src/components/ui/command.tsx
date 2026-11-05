@@ -1,5 +1,5 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from 'react';
-import { Command as CommandPrimitive } from 'cmdk';
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type HTMLAttributes, type ReactNode } from 'react';
+import { Command as CommandPrimitive, useCommandState } from 'cmdk';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './dialog';
@@ -63,7 +63,15 @@ export const CommandItem = forwardRef<ElementRef<typeof CommandPrimitive.Item>, 
 );
 CommandItem.displayName = 'CommandItem';
 
-export const CommandSeparator = forwardRef<ElementRef<typeof CommandPrimitive.Separator>, ComponentPropsWithoutRef<typeof CommandPrimitive.Separator>>(
-  ({ className, ...props }, ref) => <CommandPrimitive.Separator ref={ref} className={cn('-mx-2 my-1 h-px bg-border', className)} {...props} />,
+/**
+ * Decorative divider between groups, hidden while searching (like cmdk's). Not cmdk's own Separator: that one forces
+ * `role="separator"`, which is not an allowed child of the `listbox` (axe aria-required-children, 002/NFR-004).
+ */
+export const CommandSeparator = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { alwaysRender?: boolean }>(
+  ({ className, alwaysRender, ...props }, ref) => {
+    const idle = useCommandState((s) => !s.search);
+    if (!alwaysRender && !idle) return null;
+    return <div ref={ref} aria-hidden className={cn('-mx-2 my-1 h-px bg-border', className)} {...props} />;
+  },
 );
 CommandSeparator.displayName = 'CommandSeparator';

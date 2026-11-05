@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Check, Chrome, Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
-import { API_TOKEN_LIMIT, type ApiTokenSummary, type CreatedApiToken } from '@tp/core/contracts/auth';
+import { API_TOKEN_LIMIT, type ApiTokenScope, type ApiTokenSummary, type CreatedApiToken } from '@tp/core/contracts/auth';
 import {
   Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, ErrorState, Field,
   Input, Kbd, Select, SkeletonList, toast,
@@ -9,19 +10,24 @@ import { errorMessage } from '@/lib/api';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { copyText, useCreateToken, useRevokeToken, useTokens } from '../api';
 import { DEFAULT_TOKEN_EXPIRY_CHOICE, TOKEN_EXPIRY_OPTIONS, expiresInDaysFor, tokenExpiry, tokenHintLabel, type TokenExpiryChoice } from '../token-expiry';
+import { TOKEN_SCOPE_OPTIONS, initialTokenScope, tokenScopeLabel } from '../token-scope';
 import { Panel } from './Panel';
 
 export default function TokensSection() {
   const q = useTokens();
   const revoke = useRevokeToken();
-  const [open, setOpen] = useState(false);
+  const [params, setParams] = useSearchParams();
+  // The Submit step links here with ?scope=read: open the dialog with "Extension (read-only)" preselected.
+  const linkedScope = initialTokenScope(params.toString());
+  const [open, setOpen] = useState(linkedScope !== null);
+  const [scope, setScope] = useState<ApiTokenScope>(linkedScope ?? 'full');
   const [revoking, setRevoking] = useState<ApiTokenSummary | null>(null);
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://your-tenderpilot-url';
 
   return (
     <div className="grid gap-6">
-      <Panel title="API tokens" description="Personal tokens let the TenderPilot Chrome extension read your bid workspaces. They act as you, in this organization."
-        aside={<Button onClick={() => setOpen(true)}><KeyRound /> Create token</Button>}>
+      <Panel title="API tokens" description="Personal tokens let the TenderPilot Chrome extension read your bid workspaces. They act as you, in this organization — choose “Extension (read-only)” so a leaked token cannot change anything."
+        aside={<Button onClick={() => { setScope('full'); setOpen(true); }}><KeyRound /> Create token</Button>}>
         {q.isLoading ? <SkeletonList rows={2} /> : q.isError ? <ErrorState compact error={q.error} onRetry={() => q.refetch()} /> : q.data!.items.length === 0 ? (
           <EmptyState compact icon={KeyRound} title="No tokens yet" body="Create one to connect the browser extension." />
         ) : (
@@ -35,6 +41,7 @@ export default function TokensSection() {
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="truncate text-sm font-medium">{t.name}</span>
                       <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground" title="Last 4 characters of the token">{tokenHintLabel(t.hint)}</code>
+                      <Badge size="sm" tone={t.scope === 'read' ? 'info' : 'neutral'} title={t.scope === 'read' ? 'Can only read — cannot change anything' : 'Can read and write, like you'}>{tokenScopeLabel(t.scope)}</Badge>
                       <Badge size="sm" tone={exp.tone} title={t.expiresAt ? `Expires ${formatDateIST(t.expiresAt)}` : undefined}>{exp.label}</Badge>
                     </span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">Created {formatDateIST(t.createdAt)} · {t.lastUsedAt ? `last used ${relativeTime(t.lastUsedAt)}` : 'never used'}</span>
@@ -52,7 +59,7 @@ export default function TokensSection() {
           {[
             <>Build it with <code className="rounded bg-muted px-1.5 py-0.5 text-xs">pnpm --filter @tp/extension build</code> (or get the zip from your admin).</>,
             <>Open <Kbd>chrome://extensions</Kbd>, switch on <strong>Developer mode</strong> and choose <strong>Load unpacked</strong> → <code className="rounded bg-muted px-1.5 py-0.5 text-xs">apps/extension/dist</code>.</>,
-            <>Click the TenderPilot icon, paste <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{origin}</code> and a token from above, then <strong>Save &amp; connect</strong>.</>,
+            <>Create a token with access <strong>Extension (read-only)</strong>. Click the TenderPilot icon, paste <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{origin}</code> and that token, then <strong>Save &amp; connect</strong>.</>,
             <>On the GeM bid page, pick the workspace and press <strong>Fill allowed fields</strong>. Review every value.</>,
           ].map((s, i) => (
             <li key={i} className="flex gap-3">
@@ -68,7 +75,8 @@ export default function TokensSection() {
         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><Chrome className="size-3.5" /> Works in Chrome, Edge and Brave.</div>
       </Panel>
 
-      <CreateTokenDialog open={open} onOpenChange={setOpen} />
+      <CreateTokenDialog open={open} scope={scope} onScopeChange={setScope}
+        onOpenChange={(o) => { setOpen(o); if (!o && params.has('scope')) { params.delete('scope'); setParams(params, { replace: true }); } }} />
       <ConfirmDialog open={!!revoking} onOpenChange={(o) => !o && setRevoking(null)} title={`Revoke “${revoking?.name}”?`}
         description="Anything using this token (like the browser extension) stops working immediately." confirmLabel="Revoke token" loading={revoke.isPending}
         onConfirm={() => revoking && revoke.mutate(revoking.id, { onSuccess: () => { toast.success('Token revoked'); setRevoking(null); }, onError: (e) => toast.error(errorMessage(e)) })} />
@@ -76,7 +84,7 @@ export default function TokensSection() {
   );
 }
 
-function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+function CreateTokenDialog({ open, onOpenChange, scope, onScopeChange }: { open: boolean; onOpenChange: (o: boolean) => void; scope: ApiTokenScope; onScopeChange: (s: ApiTokenScope) => void }) {
   const create = useCreateToken();
   const [name, setName] = useState('Chrome extension');
   const [expiry, setExpiry] = useState<TokenExpiryChoice>(DEFAULT_TOKEN_EXPIRY_CHOICE);
@@ -89,7 +97,7 @@ function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    create.mutate({ name: name.trim(), expiresInDays: expiresInDaysFor(expiry) }, { onSuccess: setCreated, onError: (e2) => toast.error(errorMessage(e2)) });
+    create.mutate({ name: name.trim(), scope, expiresInDays: expiresInDaysFor(expiry) }, { onSuccess: setCreated, onError: (e2) => toast.error(errorMessage(e2)) });
   };
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -118,6 +126,9 @@ function CreateTokenDialog({ open, onOpenChange }: { open: boolean; onOpenChange
             </DialogHeader>
             <Field label="Token name" required>
               <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />
+            </Field>
+            <Field label="Access" hint={TOKEN_SCOPE_OPTIONS.find((o) => o.value === scope)?.hint}>
+              <Select value={scope} onValueChange={(v) => onScopeChange(v as ApiTokenScope)} options={TOKEN_SCOPE_OPTIONS.map(({ value, label }) => ({ value, label }))} />
             </Field>
             <Field label="Expires" hint={`Expired tokens stop working. You can hold up to ${API_TOKEN_LIMIT} active tokens.`}>
               <Select value={expiry} onValueChange={(v) => setExpiry(v as TokenExpiryChoice)}

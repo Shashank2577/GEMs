@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Eye, Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck } from 'lucide-react';
@@ -122,7 +122,7 @@ function MobileTabBar({ onMore }: { onMore: () => void }) {
       <ul className="grid grid-cols-5">
         {MOBILE_TABS.map((t) => (
           <li key={t.to}>
-            <NavLink to={t.to} className={({ isActive }) => cn('flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring', isActive ? 'text-primary' : 'text-muted-foreground')}>
+            <NavLink to={t.to} className={({ isActive }) => cn('flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring', isActive ? 'text-primary-ink' : 'text-muted-foreground')}>
               {({ isActive }) => (
                 <>
                   <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-primary-soft')}>
@@ -170,11 +170,18 @@ export function AppShell() {
   const loc = useLocation();
 
   useEffect(() => { setDrawer(false); }, [loc.pathname]);
-  useEffect(() => { document.getElementById('main')?.focus({ preventScroll: true }); window.scrollTo(0, 0); }, [loc.pathname]);
+  // Focus <main> after each route change (002/US7 S7) — but not on first load, so the first Tab still lands on
+  // "Skip to content".
+  const lastPath = useRef(loc.pathname);
+  useEffect(() => {
+    if (lastPath.current === loc.pathname) return;
+    lastPath.current = loc.pathname;
+    document.getElementById('main')?.focus({ preventScroll: true }); window.scrollTo(0, 0);
+  }, [loc.pathname]);
 
   return (
     <div className="min-h-dvh bg-background">
-      <a href="#main" className="sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>
+      <a href="#main" className="sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring">Skip to content</a>
 
       {/* Desktop sidebar */}
       <aside

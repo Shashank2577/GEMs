@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { AnalysisDto, FactorStatus, Requirement, StaleReason, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
-import { formatDateIST, formatINR } from '@/lib/format';
+import { formatDateIST, formatINR, relativeTime } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
   turnover: Banknote, experience: Award, similarWork: Handshake, emd: Landmark, mii: Flag, oem: BadgeCheck,
@@ -106,6 +106,53 @@ export function formatRequirementValue(r: Requirement): string {
 export function mismatchedDocuments(analysis: Pick<AnalysisDto, 'createdAt'>, documents: TenderDocumentDto[] | undefined): TenderDocumentDto[] {
   const at = Date.parse(analysis.createdAt);
   return (documents ?? []).filter((d) => d.bidNumberFound && !(Date.parse(d.createdAt) > at));
+}
+
+/** How often the page re-reads the analysis while another member's run is in progress (FR-029). */
+export const ANALYSIS_POLL_MS = 3000;
+
+/** Another analysis for this org+tender is running (GET …/analysis `lastAttempt`, FR-028/FR-029). */
+export function isAnalysisRunning(a: Pick<AnalysisDto, 'lastAttempt'> | null | undefined): boolean {
+  return a?.lastAttempt?.status === 'running';
+}
+
+/**
+ * US3 #15 warning when the newest attempt failed but a previous result is shown, else null:
+ * "The last re-analysis failed: <reason>. Showing the previous result from <relative time>."
+ */
+export function failedAttemptCopy(a: Pick<AnalysisDto, 'status' | 'lastAttempt' | 'updatedAt'> | null | undefined, now: Date = new Date()): string | null {
+  if (!a || a.status !== 'done' || a.lastAttempt?.status !== 'failed') return null;
+  const reason = friendlyAnalysisError(a.lastAttempt.error).replace(/[.\s]+$/, '');
+  return `The last re-analysis failed: ${reason}. Showing the previous result from ${relativeTime(a.updatedAt, now)}.`;
+}
+
+/**
+ * A user-safe reason for a failed analysis (S6). The raw error is kept in logs and the DB; only the
+ * known-safe cases are shown, anything else (stack-ish or provider text) becomes a generic message.
+ */
+export function friendlyAnalysisError(raw: string | null | undefined): string {
+  const e = (raw ?? '').trim();
+  if (/timed out|took too long/i.test(e)) return 'it took too long and timed out';
+  if (/pdf|unreadable|password/i.test(e)) return 'a document could not be read';
+  return 'something went wrong while reading the documents';
+}
+
+/** Documents whose page count was capped (S1): `pageCount` read of `totalPages`. */
+export function truncatedDocuments(docs: readonly { fileName: string; pageCount: number | null; totalPages?: number | null }[] | undefined) {
+  return (docs ?? []).filter((d) => d.pageCount != null && d.totalPages != null && d.totalPages > d.pageCount)
+    .map((d) => ({ fileName: d.fileName, analysed: d.pageCount as number, total: d.totalPages as number }));
+}
+
+/**
+ * What the Analysis tab shows: the result, a failed first attempt ("Try again"), or "in progress".
+ * `lastAttempt` wins over a `running`/`pending` row: a first-ever run that timed out (S3, FR-028) is
+ * failed, never "in progress" forever, even if an older API still reports the row as running.
+ */
+export function analysisPanelState(a: Pick<AnalysisDto, 'status' | 'error' | 'lastAttempt'>): { kind: 'result' } | { kind: 'in_progress' } | { kind: 'failed'; error: string | null } {
+  if (a.status === 'done') return { kind: 'result' };
+  if (a.lastAttempt?.status === 'failed') return { kind: 'failed', error: a.lastAttempt.error ?? a.error ?? null };
+  if (a.status === 'failed') return { kind: 'failed', error: a.error ?? null };
+  return { kind: 'in_progress' };
 }
 
 /** The "Check documents: … is for GEM/…." prefix the API puts on an analysis summary, if any. */

@@ -1,0 +1,89 @@
+[
+  {
+    "label": "before build",
+    "request": "GET /api/assist/e6e5db67-c9a9-4400-a042-6913f45d4093",
+    "status": 200,
+    "response": [
+      {
+        "kind": "vault",
+        "title": "GST registration certificate"
+      },
+      {
+        "kind": "vault",
+        "title": "PAN card of the firm"
+      },
+      {
+        "kind": "vault",
+        "title": "Audited balance sheets — last 3 financial years"
+      },
+      {
+        "kind": "vault",
+        "title": "OEM authorisation certificate (MAF) for this bid"
+      },
+      {
+        "kind": "annexure",
+        "title": "Undertaking regarding Non-Blacklisting / Non-Debarment"
+      },
+      {
+        "kind": "annexure",
+        "title": "Self-Certificate of Local Content (Make in India)"
+      }
+    ]
+  },
+  {
+    "label": "after build",
+    "request": "GET /api/assist/e6e5db67-c9a9-4400-a042-6913f45d4093",
+    "status": 200,
+    "response": [
+      {
+        "kind": "packet",
+        "title": "Technical bid packet (merged PDF)",
+        "fileName": "GEM_2026_B_700001_technical_packet.pdf",
+        "url": "http://localhost:8788/api/packets/392f503d-9718-4118-b5dd-c3dee5bfb3f6/download",
+        "pages": 11
+      },
+      {
+        "kind": "vault",
+        "title": "GST registration certificate",
+        "fileName": "gst.pdf",
+        "url": "http://localhost:8788/api/vault/13838e51-a83d-4e4f-b41e-37512ab4bc71/download",
+        "pages": 1
+      },
+      {
+        "kind": "vault",
+        "title": "PAN card of the firm",
+        "fileName": "pan.pdf",
+        "url": "http://localhost:8788/api/vault/85433032-8c2a-4f42-81fd-6ee86e2bb12b/download",
+        "pages": 1
+      },
+      {
+        "kind": "vault",
+        "title": "Audited balance sheets — last 3 financial years",
+        "fileName": "bs-2024.pdf",
+        "url": "http://localhost:8788/api/vault/70143de4-aed2-42e5-b5ff-ca43a820cc3e/download",
+        "pages": 3
+      },
+      {
+        "kind": "vault",
+        "title": "OEM authorisation certificate (MAF) for this bid",
+        "fileName": "maf.pdf",
+        "url": "http://localhost:8788/api/vault/81e43941-73d3-4ce8-b293-02650d3ca4cb/download",
+        "pages": 1
+      },
+      {
+        "kind": "annexure",
+        "title": "Undertaking regarding Non-Blacklisting / Non-Debarment",
+        "fileName": "non_blacklisting.pdf",
+        "url": "http://localhost:8788/api/workspaces/e6e5db67-c9a9-4400-a042-6913f45d4093/annexures/non_blacklisting.pdf?download=1",
+        "pages": 1
+      },
+      {
+        "kind": "annexure",
+        "title": "Self-Certificate of Local Content (Make in India)",
+        "fileName": "mii_self_cert.pdf",
+        "url": "http://localhost:8788/api/workspaces/e6e5db67-c9a9-4400-a042-6913f45d4093/annexures/mii_self_cert.pdf?download=1",
+        "pages": 1
+      }
+    ]
+  }
+]

@@ -8,12 +8,14 @@
  */
 import { collectControls, toTarget } from './dom';
 import { fillAll, fillOne, plan, type PayloadField, type PlanEntry } from './fill';
-import type { ContentRequest, ContentResponse, ScanSummary } from './messages';
+import { makeMessageListener } from './listener';
+import type { ScanSummary } from './messages';
 
 const CHIP_CLASS = 'tp-fill-chip';
+const MANUAL_CLASS = 'tp-manual-chip';
 
 function clearChips() {
-  document.querySelectorAll(`.${CHIP_CLASS}`).forEach((n) => n.remove());
+  document.querySelectorAll(`.${CHIP_CLASS}, .${MANUAL_CLASS}`).forEach((n) => n.remove());
   document.querySelectorAll<HTMLElement>('[data-tp-state]').forEach((el) => {
     el.style.outline = '';
     el.style.outlineOffset = '';
@@ -43,14 +45,35 @@ function chipFor(entry: PlanEntry, el: HTMLElement) {
   el.insertAdjacentElement('afterend', chip);
 }
 
+/** Radio / checkbox question: show the prepared answer in the chip title, never click anything (FR-077). */
+function manualChipFor(entry: PlanEntry, el: HTMLElement) {
+  const chip = document.createElement('span');
+  chip.className = MANUAL_CLASS;
+  chip.textContent = 'TP';
+  chip.title = `Left for you — “${entry.field!.label}”: choose “${entry.field!.value}” yourself`;
+  chip.setAttribute('role', 'note');
+  chip.setAttribute('aria-label', chip.title);
+  Object.assign(chip.style, {
+    marginLeft: '6px', padding: '1px 6px', font: '600 10px/16px system-ui, sans-serif', color: '#fff', background: '#b45309',
+    borderRadius: '999px', verticalAlign: 'middle',
+  } satisfies Partial<CSSStyleDeclaration>);
+  el.insertAdjacentElement('afterend', chip);
+}
+
 function scan(fields: PayloadField[]): ScanSummary {
   clearChips();
   const controls = collectControls(document);
   const entries = plan(controls.map(toTarget), fields);
-  const summary: ScanSummary = { fillable: 0, forbidden: 0, unmatched: 0, noValue: 0, keys: [] };
+  const summary: ScanSummary = { fillable: 0, forbidden: 0, unmatched: 0, noValue: 0, manual: 0, keys: [] };
   entries.forEach((e, i) => {
     if (e.status === 'forbidden') { summary.forbidden++; e.target.mark('blocked', `TenderPilot never fills this (${e.reason}) — you do it on GeM`); return; }
     if (e.status === 'unmatched') { summary.unmatched++; return; }
+    if (e.status === 'manual') {
+      summary.manual++;
+      e.target.mark('manual', `TenderPilot leaves this to you: ${e.field!.label} — prepared answer “${e.field!.value}”`);
+      manualChipFor(e, controls[i]);
+      return;
+    }
     if (e.status !== 'fillable') { summary.noValue++; return; }
     summary.fillable++;
     summary.keys.push(e.field!.key);
@@ -60,15 +83,10 @@ function scan(fields: PayloadField[]): ScanSummary {
   return summary;
 }
 
-chrome.runtime.onMessage.addListener((msg: ContentRequest, _sender, respond: (r: ContentResponse) => void) => {
-  try {
-    if (msg.type === 'tp:scan') respond({ ok: true, scan: scan(msg.fields) });
-    else if (msg.type === 'tp:fill') {
-      const report = fillAll(collectControls(document).map(toTarget), msg.fields, { keys: msg.keys, overwrite: msg.overwrite });
-      respond({ ok: true, report });
-    } else if (msg.type === 'tp:clear') { clearChips(); respond({ ok: true }); }
-  } catch (e) {
-    respond({ ok: false, error: (e as Error).message });
-  }
-  return false;
-});
+chrome.runtime.onMessage.addListener(
+  makeMessageListener(chrome.runtime.id, {
+    scan,
+    fill: (msg) => fillAll(collectControls(document).map(toTarget), msg.fields, { keys: msg.keys, overwrite: msg.overwrite }),
+    clear: clearChips,
+  }),
+);

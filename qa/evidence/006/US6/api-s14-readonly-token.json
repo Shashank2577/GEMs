@@ -1,0 +1,131 @@
+[
+  {
+    "label": "GET /api/auth/me",
+    "request": "Bearer read",
+    "status": 200,
+    "response": {
+      "user": {
+        "id": "691b441a-8b73-4a9e-b7d4-ed04ea78f2d9",
+        "name": "QA analyst mw35kw8l1",
+        "email": "analyst.mw35kw8l1@example.in",
+        "phone": null
+      },
+      "org": {
+        "id": "1a935d02-f938-470d-9f3f-3a384733798f",
+        "name": "Sharma Infotech mw35kw8l1",
+        "slug": "sharma-infotech-mw35kw8l1",
+        "plan": "trial",
+        "onboardingState": {},
+        "scoringWeights": null
+      },
+      "role": "analyst",
+      "orgs": [
+        {
+          "id": "1a935d02-f938-470d-9f3f-3a384733798f",
+          "name": "Sharma Infotech mw35kw8l1",
+          "slug": "sharma-infotech-mw35kw8l1",
+          "role": "analyst"
+        }
+      ]
+    }
+  },
+  {
+    "label": "GET /api/workspaces",
+    "request": "Bearer read",
+    "status": 200,
+    "response": {
+      "total": 2
+    }
+  },
+  {
+    "label": "GET /api/assist/{id}",
+    "request": "Bearer read",
+    "status": 200,
+    "response": {
+      "noFinancials": true
+    }
+  },
+  {
+    "label": "PUT assist-values",
+    "request": "PUT /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/assist-values",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "read_only_token",
+        "message": "This API token is read-only"
+      }
+    }
+  },
+  {
+    "label": "POST comments",
+    "request": "POST /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/comments",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "read_only_token",
+        "message": "This API token is read-only"
+      }
+    }
+  },
+  {
+    "label": "PATCH workspace",
+    "request": "PATCH /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "read_only_token",
+        "message": "This API token is read-only"
+      }
+    }
+  },
+  {
+    "label": "POST packets",
+    "request": "POST /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/packets",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "read_only_token",
+        "message": "This API token is read-only"
+      }
+    }
+  },
+  {
+    "label": "POST submitted",
+    "request": "POST /api/workspaces/8c9a5431-7ec8-459e-adb4-b20a4e0768c9/submitted",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "read_only_token",
+        "message": "This API token is read-only"
+      }
+    }
+  },
+  {
+    "label": "POST api-tokens (mint broader)",
+    "request": "POST /api/me/api-tokens",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "read_only_token",
+        "message": "This API token is read-only"
+      }
+    }
+  },
+  {
+    "label": "POST logout",
+    "request": "POST /api/auth/logout",
+    "status": 403,
+    "response": {
+      "error": {
+        "code": "read_only_token",
+        "message": "This API token is read-only"
+      }
+    }
+  },
+  {
+    "label": "control: full token PUT",
+    "request": "PUT assist-values",
+    "status": 200,
+    "response": null
+  }
+]

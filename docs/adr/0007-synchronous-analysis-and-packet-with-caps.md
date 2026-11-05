@@ -54,3 +54,25 @@ Keep both operations synchronous. Make the bounds explicit, cheap to check, and 
 - Unit tests for the caps (pages, chars, calls, packet bytes/items) in `packages/core` and `apps/api/test`.
 - An analysis with 5 documents makes ≤ 2 LLM calls (fake LLM counts calls) and finishes < 10 s in tests.
 - A packet request totalling 45 MB returns 413 with `details.items`; no `packets` row is created.
+
+## Amendment 1 (2026-11-05): 150-page read cap instead of the 300-page reject
+
+**Decision.** The page cap in decision 1 is implemented differently from the sketch above. There is no
+`MAX_TENDER_DOC_PAGES = 300` / 422 `too_many_pages` rejection. Instead `MAX_EXTRACT_PAGES = 150`
+(`packages/core/src/contracts/analyse.ts`): the upload / GeM fetch is accepted, only the first 150 pages are read
+(sequentially, page by page), and the truncation is made visible rather than silent:
+
+- `tender_documents.total_pages` stores the PDF's real page count next to `page_count` (pages actually read); it is
+  null for rows created before migration 0012. Set for uploads, explicit GeM fetches and the auto-fetch inside analyse.
+- The document DTO exposes `totalPages`; the Documents tab shows "Only the first 150 of N pages were read" on the
+  document, uploads answer with a `pages_truncated` warning, and the Analysis panel shows a note when any analysed
+  document is truncated.
+
+**Why not reject at 300.** Rejecting would have refused otherwise usable bids whose eligibility and ATC sections sit in
+the first pages, and the memory measurement (plan.md "Workers budget") showed 300 pages already above budget while 150
+pages was workable. Reading a prefix with a visible warning gives the user the choice (upload the key sections as a
+separate PDF) instead of a dead end. The cost: requirements located after page 150 are not extracted, so the warning
+must stay prominent. The `scanned_pdf` rejection is unchanged.
+
+**Evidence limits.** The memory figures behind 150 were measured for the extraction step only, under local workerd
+(`wrangler dev --local`), not for the full upload + analyse route and not under production Workers limits.
