@@ -1,0 +1,25 @@
+ ✓ test/foundation.test.ts > crypto > hashes and verifies passwords with PBKDF2
+ ✓ test/foundation.test.ts > crypto > tokens are random and hashes are stable
+ ✓ test/foundation.test.ts > crypto > slugify
+ ✓ test/foundation.test.ts > blob stores > filesystem store honours the contract and rejects traversal
+ ✓ test/foundation.test.ts > blob stores > memory store honours the contract
+ ✓ test/foundation.test.ts > provider adapters > LLM client calls the Anthropic Messages API and parses JSON replies
+ ✓ test/foundation.test.ts > provider adapters > parseJsonLoose handles prose and arrays
+ ✓ test/foundation.test.ts > provider adapters > Resend mailer and WhatsApp send the right payloads
+ ✓ test/foundation.test.ts > provider adapters > createDeps degrades gracefully without keys
+ ✓ test/foundation.test.ts > provider adapters > scheduled pipeline runs every step
+ ✓ test/foundation.test.ts > security headers (008 FR-013) > every API response (2xx/4xx/5xx, JSON) carries nosniff, referrer and permissions policy; no HSTS over http
+ ✓ test/foundation.test.ts > security headers (008 FR-013) > adds HSTS on https, and behind a trusted proxy that forwarded https only
+ ✓ test/foundation.test.ts > security headers (008 FR-013) > file streams (PDF preview/download) may only be framed same-origin
+ ✓ test/foundation.test.ts > security headers (008 FR-013) > parses the Cloudflare _headers file the SPA ships and resolves headers per path (Node static server parity)
+ ✓ test/foundation.test.ts > security headers (008 FR-013) > isHttpsRequest trusts x-forwarded-proto only behind a trusted proxy
+ ✓ test/foundation.test.ts > Node static server headers (008 FR-013) > serves / and SPA routes with the _headers CSP + security headers, never serves /_headers, keeps API headers
+ ✓ test/worker.test.ts > worker fetch() > /api/* → Hono on a per-request pool (closed via waitUntil), APP_VERSION from env, security headers + HSTS
+ ✓ test/worker.test.ts > worker fetch() > everything else → static assets (SPA), without opening a pool
+ ✓ test/worker.test.ts > worker fetch() > bootstrap failure (no DATABASE_URL) → 503 service_unavailable with security headers
+ ✓ test/worker.test.ts > worker fetch() > PDF preview streamed from R2 may only be framed same-origin (FR-013)
+ ✓ test/worker.test.ts > worker scheduled() (FR-012) > awaits the job (not a bare waitUntil): it settles only after runScheduledJobs does; the pool closes via waitUntil
+ ✓ test/worker.test.ts > worker scheduled() (FR-012) > rejects when every step failed, so the cron invocation is marked failed; still closes the pool
+ ✓ test/worker.test.ts > worker scheduled() (FR-012) > rejects when the job throws or the pool cannot be created
+ ✓ test/worker.test.ts > worker scheduled() (FR-012) > resolves when at least one step succeeded (steps are isolated; failures are logged)
+      Tests  24 passed (24)

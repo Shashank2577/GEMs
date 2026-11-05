@@ -1,0 +1,48 @@
+== wrangler deploy --dry-run --env staging
+ ⛅️ wrangler 4.157.0
+────────────────────
+✨ Read 94 files from the assets directory /home/user/GEMs/apps/web/dist
+Total Upload: 4476.70 KiB / gzip: 1054.02 KiB
+Your Worker has access to the following bindings:
+Binding                                                            Resource                  
+env.BLOBS (tenderpilot-blobs-staging)                              R2 Bucket                 
+env.ASSETS                                                         Assets                    
+env.APP_URL ("https://staging.tenderpilot.in")                     Environment Variable      
+env.GEM_BASE_URL ("https://bidplus.gem.gov.in")                    Environment Variable      
+env.LLM_MODEL ("claude-sonnet-5-5")                                Environment Variable      
+env.MAIL_FROM ("TenderPilot Staging <alerts@tenderpil...")         Environment Variable      
+env.APP_VERSION ("(hidden)")                                       Environment Variable      
+--dry-run: exiting now.
+== wrangler deploy --dry-run --env ""
+ ⛅️ wrangler 4.157.0
+────────────────────
+✨ Read 94 files from the assets directory /home/user/GEMs/apps/web/dist
+Total Upload: 4476.70 KiB / gzip: 1054.02 KiB
+Your Worker has access to the following bindings:
+Binding                                                       Resource                  
+env.BLOBS (tenderpilot-blobs)                                 R2 Bucket                 
+env.ASSETS                                                    Assets                    
+env.APP_URL ("https://app.tenderpilot.in")                    Environment Variable      
+env.GEM_BASE_URL ("https://bidplus.gem.gov.in")               Environment Variable      
+env.LLM_MODEL ("claude-sonnet-5-5")                           Environment Variable      
+env.MAIL_FROM ("TenderPilot <alerts@tenderpilot.in>")         Environment Variable      
+env.APP_VERSION ("(hidden)")                                  Environment Variable      
+--dry-run: exiting now.
+== wrangler deploy --dry-run 
+ ⛅️ wrangler 4.157.0
+────────────────────
+▲ [WARNING] Multiple environments are defined in the Wrangler configuration file, but no target environment was specified for the deploy command.
+  To avoid unintentional changes to the wrong environment, it is recommended to explicitly specify the target environment using the `-e|--env` flag or CLOUDFLARE_ENV env variable.
+  If your intention is to use the top-level environment of your configuration simply pass an empty string to the flag to target such environment. For example `--env=""`.
+✨ Read 94 files from the assets directory /home/user/GEMs/apps/web/dist
+Total Upload: 4476.70 KiB / gzip: 1054.02 KiB
+Your Worker has access to the following bindings:
+Binding                                                       Resource                  
+env.BLOBS (tenderpilot-blobs)                                 R2 Bucket                 
+env.ASSETS                                                    Assets                    
+env.APP_URL ("https://app.tenderpilot.in")                    Environment Variable      
+env.GEM_BASE_URL ("https://bidplus.gem.gov.in")               Environment Variable      
+env.LLM_MODEL ("claude-sonnet-5-5")                           Environment Variable      
+env.MAIL_FROM ("TenderPilot <alerts@tenderpilot.in>")         Environment Variable      
+env.APP_VERSION ("(hidden)")                                  Environment Variable      
+--dry-run: exiting now.

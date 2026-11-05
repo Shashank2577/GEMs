@@ -1,0 +1,20 @@
+triggers: ['workflow_call', 'workflow_dispatch']
+job staging: needs=None environment=staging concurrency={'group': 'deploy-staging', 'cancel-in-progress': False}
+  1. actions/checkout@v4 
+  2. Resolve version 
+  3. pnpm/action-setup@v4 
+  4. actions/setup-node@v4 
+  5. pnpm install --frozen-lockfile 
+  6. pnpm --filter @tp/web build 
+  7. pnpm db:migrate (staging) DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }} | run: pnpm db:migrate
+  8. wrangler deploy --env staging run: pnpm exec wrangler deploy --env staging --var "APP_VERSION:${SHA7}"
+  9. smoke (staging) run: scripts/smoke.sh "$BASE_URL" "$SHA7" | tee -a "$GITHUB_STEP_SUMMARY"
+job production: needs=staging environment=production concurrency={'group': 'deploy-production', 'cancel-in-progress': False}
+  1. actions/checkout@v4 
+  2. pnpm/action-setup@v4 
+  3. actions/setup-node@v4 
+  4. pnpm install --frozen-lockfile 
+  5. pnpm --filter @tp/web build 
+  6. pnpm db:migrate (production) DATABASE_URL=${{ secrets.PROD_DATABASE_URL }} | run: pnpm db:migrate
+  7. wrangler deploy run: pnpm exec wrangler deploy --env "" --var "APP_VERSION:${SHA7}"
+  8. smoke (production) run: scripts/smoke.sh "$BASE_URL" "$SHA7" | tee -a "$GITHUB_STEP_SUMMARY"

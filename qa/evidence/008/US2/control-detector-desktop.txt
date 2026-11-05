@@ -1,0 +1,5 @@
+console.error Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY=''. Either the 'unsafe-inline' keyword, a hash ('sha256-/828jo0Q2yUwc7Cdg/Y3/aiDuLisECXh1o8ZlP4wV4w='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.
+event script-src-elem blocked=inline source=-:4
+console.error Framing 'https://example.com/' violates the following Content Security Policy directive: "frame-src 'self' blob:". The request has been blocked.
+
+event frame-src blocked=https://example.com source=-:0

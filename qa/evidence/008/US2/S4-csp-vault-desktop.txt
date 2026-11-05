@@ -1,0 +1,3 @@
+final url: http://localhost:8788/vault?doc=6f4eec00-caae-4b3b-8dce-a8659b125b45
+iframe file response: 200 application/pdf csp=frame-ancestors 'self'
+violations: 0

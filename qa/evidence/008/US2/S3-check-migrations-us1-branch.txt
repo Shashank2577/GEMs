@@ -1,0 +1,26 @@
+$ check-migrations 9990_____.sql: ALTER TABLE tenders ALTER COLUMN title TYPE text; 
+check-migrations: destructive statements found (add "-- tp:allow-destructive <reason>" as line 1 to accept):
+packages/db/migrations/9990_____.sql:1: ALTER COLUMN TYPE — ALTER TABLE tenders ALTER COLUMN title TYPE text
+exit=1
+$ check-migrations 9990_______.sql: ALTER TABLE tenders RENAME COLUMN title TO t2; 
+check-migrations: destructive statements found (add "-- tp:allow-destructive <reason>" as line 1 to accept):
+packages/db/migrations/9990_______.sql:1: RENAME — ALTER TABLE tenders RENAME COLUMN title TO t2
+exit=1
+$ check-migrations 9990___________.sql: DROP TABLE tenders; 
+check-migrations: destructive statements found (add "-- tp:allow-destructive <reason>" as line 1 to accept):
+packages/db/migrations/9990___________.sql:1: DROP TABLE — DROP TABLE tenders
+exit=1
+$ check-migrations 9990____________.sql: ALTER TABLE tenders DROP COLUMN title; 
+check-migrations: destructive statements found (add "-- tp:allow-destructive <reason>" as line 1 to accept):
+packages/db/migrations/9990____________.sql:1: DROP COLUMN — ALTER TABLE tenders DROP COLUMN title
+exit=1
+$ check-migrations 9990_____________.sql: ALTER TABLE tenders ALTER COLUMN title SET NOT NULL; 
+check-migrations: destructive statements found (add "-- tp:allow-destructive <reason>" as line 1 to accept):
+packages/db/migrations/9990_____________.sql:1: SET NOT NULL without DEFAULT — ALTER TABLE tenders ALTER COLUMN title SET NOT NULL
+exit=1
+$ check-migrations 9990_____nullable_ok.sql: ALTER TABLE tenders ADD COLUMN x text; 
+check-migrations: 1 migration(s) additive: packages/db/migrations/9990_____nullable_ok.sql
+exit=0
+$ check-migrations 9991_allowed.sql: -- tp:allow-destructive approved cleanup DROP TABLE legacy; 
+check-migrations: 1 migration(s) additive: packages/db/migrations/9991_allowed.sql
+exit=0

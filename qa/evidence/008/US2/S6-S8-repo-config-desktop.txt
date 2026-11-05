@@ -1,0 +1,20 @@
+PASS  wrangler.toml [limits] cpu_ms = 120000
+PASS  [env.staging] name = "tenderpilot-staging"
+PASS  [env.staging] R2 bucket tenderpilot-blobs-staging
+PASS  [env.staging.vars] own APP_URL
+PASS  cron identical in both envs (*/30 * * * * | */30 * * * *)
+PASS  workers_dev = false (workers.dev disabled)
+PASS  production custom domain app.tenderpilot.in
+PASS  runbook states Workers Paid is required
+PASS  runbook § Secrets row for DATABASE_URL has location, user, rotation, blast radius
+PASS  runbook § Secrets row for ANTHROPIC_API_KEY has location, user, rotation, blast radius
+PASS  runbook § Secrets row for RESEND_API_KEY has location, user, rotation, blast radius
+PASS  runbook § Secrets row for WHATSAPP_TOKEN has location, user, rotation, blast radius
+PASS  runbook § Secrets row for WHATSAPP_PHONE_ID has location, user, rotation, blast radius
+PASS  runbook § Secrets row for SENTRY_DSN has location, user, rotation, blast radius
+PASS  runbook § Secrets row for ADMIN_TOKEN has location, user, rotation, blast radius
+PASS  runbook § Secrets row for CLOUDFLARE_API_TOKEN has location, user, rotation, blast radius
+PASS  runbook § Secrets row for NEON_API_KEY has location, user, rotation, blast radius
+PASS  specs/001 plan.md no longer mentions SESSION_SECRET except to say it was removed
+PASS  runbook § Restore drill has a drill log table
+INFO  restore-drill log row is still "_pending operator_" (T041 open): no dated drill recorded

@@ -1,0 +1,62 @@
+GET / -> 200
+  strict-transport-security: (absent)
+  x-content-type-options: nosniff
+  referrer-policy: strict-origin-when-cross-origin
+  permissions-policy: camera=(), microphone=(), geolocation=()
+  content-security-policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+  cache-control: no-cache
+  content-type: text/html; charset=utf-8
+
+GET /api/health -> 200
+  strict-transport-security: (absent)
+  x-content-type-options: nosniff
+  referrer-policy: strict-origin-when-cross-origin
+  permissions-policy: camera=(), microphone=(), geolocation=()
+  content-security-policy: (absent)
+  cache-control: no-store
+  content-type: application/json
+
+GET /dashboard -> 200
+  strict-transport-security: (absent)
+  x-content-type-options: nosniff
+  referrer-policy: strict-origin-when-cross-origin
+  permissions-policy: camera=(), microphone=(), geolocation=()
+  content-security-policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+  cache-control: no-cache
+  content-type: text/html; charset=UTF-8
+
+GET /api/nope -> 404
+  strict-transport-security: (absent)
+  x-content-type-options: nosniff
+  referrer-policy: strict-origin-when-cross-origin
+  permissions-policy: camera=(), microphone=(), geolocation=()
+  content-security-policy: (absent)
+  cache-control: no-store
+  content-type: application/json
+
+GET /assets/index-BhAzzi9W.js -> 200
+  strict-transport-security: (absent)
+  x-content-type-options: nosniff
+  referrer-policy: strict-origin-when-cross-origin
+  permissions-policy: camera=(), microphone=(), geolocation=()
+  content-security-policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+  cache-control: public, max-age=31536000, immutable
+  content-type: text/javascript; charset=utf-8
+
+GET /_headers -> 404
+  strict-transport-security: (absent)
+  x-content-type-options: nosniff
+  referrer-policy: strict-origin-when-cross-origin
+  permissions-policy: camera=(), microphone=(), geolocation=()
+  content-security-policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+  cache-control: (absent)
+  content-type: text/plain; charset=UTF-8
+
+GET /api/vault/<id>/download?inline=1 -> 200
+  strict-transport-security: (absent)
+  x-content-type-options: nosniff
+  referrer-policy: strict-origin-when-cross-origin
+  permissions-policy: camera=(), microphone=(), geolocation=()
+  content-security-policy: frame-ancestors 'self'
+  cache-control: private, no-store
+  content-type: application/pdf

@@ -1,0 +1,5 @@
+preview POST 200 application/pdf csp=frame-ancestors 'self'
+iframe src scheme: blob:http://…
+blob: HTML control frame text: blob frame loaded
+violations: 0
+
