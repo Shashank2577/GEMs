@@ -31,6 +31,20 @@ describe('parseAwardResult — extra edge cases and hostile timing', () => {
     expect(p('')).toBeNull();
   });
 
+  it('names must hold a Unicode letter: Devanagari, Tamil, CJK, Arabic accepted; digits, danda, symbols, emoji, full-width digits rejected', () => {
+    const name = (n: string) => parseAwardResult(t(`<tr><td>1</td><td>${n}</td><td>5000</td></tr>`))?.l1Seller ?? null;
+    for (const ok of ['सुरेश एंटरप्राइज', 'தமிழ் நிறுவனம்', '株式会社テスト', 'شركة النجاح']) expect(name(ok)).toBe(ok);
+    for (const bad of ['१२३४', '।', '★', '→', '🏆', '１２３４', '— ★ —']) expect(name(bad)).toBeNull();
+  });
+
+  it('short row under a header with no name word uses the content fallback (B3c); Price-only header stays null (B10)', () => {
+    const r = parseAwardResult('<table><tr><th>Rank</th><th>Bid</th><th>Price</th></tr><tr><td>Gamma Co</td><td>Rs. 1,50,000</td></tr></table>');
+    expect(r?.l1Seller).toBe('Gamma Co');
+    expect(r?.l1Price).toBe(150000);
+    expect(r?.bidders).toEqual([{ rank: 0, name: 'Gamma Co', price: 150000 }]);
+    expect(parseAwardResult('<table><tr><th>Price</th></tr><tr><td>Foo Co</td><td>100</td></tr></table>')).toBeNull();
+  });
+
   it('S.No | Seller | Price | Rank keeps document order with S.No ignored', () => {
     const r = parseAwardResult('<table><tr><th>S.No</th><th>Seller</th><th>Price</th><th>Rank</th></tr><tr><td>1</td><td>B Co</td><td>200</td><td>L2</td></tr><tr><td>2</td><td>A Co</td><td>100</td><td>l1</td></tr></table>');
     expect(r!.bidders.map((b) => b.rank)).toEqual([2, 1]);

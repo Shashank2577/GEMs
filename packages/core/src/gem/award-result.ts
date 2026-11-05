@@ -162,14 +162,10 @@ function parseRank(text: string): number {
   return parseInt(text.slice(i), 10);
 }
 
+const LETTER = /\p{L}/u;
+/** True when the text holds any Unicode letter (digits, danda, symbols, emoji and punctuation are not letters). Single class: no backtracking. */
 function hasLetter(s: string): boolean {
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (isAlpha(c)) return true;
-    // non-ASCII letters count; general punctuation (dashes, quotes), currency symbols, CJK punctuation and Latin-1 symbols do not
-    if (c > 127 && !isWs(c) && !(c >= 0x2000 && c <= 0x206f) && !(c >= 0x20a0 && c <= 0x20cf) && !(c >= 0x3000 && c <= 0x303f) && c !== 0xd7 && c !== 0xf7 && !(c >= 0xa1 && c <= 0xbf)) return true;
-  }
-  return false;
+  return LETTER.test(s);
 }
 
 function cleanName(name: string): string {
@@ -217,7 +213,10 @@ interface Accepted extends AwardBidder {
 function interpretRow(h: Header, cells: string[], marked: boolean, pos: number): Accepted | null {
   const noRoles = h.rankIdx < 0 && h.nameIdx < 0 && h.priceIdx < 0;
   const needed = Math.max(h.nameIdx, h.priceIdx);
-  const useHeader = !noRoles && !(h.nameIdx >= 0 && h.priceIdx >= 0 && needed >= cells.length);
+  // a short row (fewer cells than the header's name/price column) falls back to content, as for a header with no usable role words (B3c);
+  // a lone price column (`Price` header, B10) has no room for a name, so it never takes this path
+  const shortRow = h.priceIdx >= 0 && needed >= cells.length && (h.nameIdx >= 0 || h.cols > (h.rankIdx >= 0 ? 2 : 1));
+  const useHeader = !noRoles && !shortRow;
   let rank = 0;
   let name = '';
   let price = NaN;

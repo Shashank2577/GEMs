@@ -69,10 +69,16 @@ Column mapping inside a price table, from the first row's header words (not by p
 - When the header labels rank and/or price but no name word, the name is read from cell contents (first cell containing letters
   that is not the rank or price cell), provided the header has at least one unlabelled column to hold it (a lone `Price` header
   does not: B10 stays `null`).
-- Fallback when a role has no header word (B3c; B4 is a header-path case, not a fallback): the first row has no usable role headers or the table is only partially
-  labelled (e.g. `Rank | Firm | Price` is fully labelled, `Rank | Price | Bid` has no name word), then use content: the price is the right-most cell that parses as a positive amount in a column that is not the rank
-  column; the name is the first cell with letters that is not the rank/price cell; rank is a cell that is purely a rank token
-  (`1`, `L1`, `l2`).
+- Content fallback (used instead of the header columns): the price is the right-most cell that parses as a positive amount and is not
+  the rank cell; the name is the first cell with letters that is not the rank/price cell; rank is a cell that is purely a rank
+  token (`1`, `L1`, `l2`) in the first position.
+  - Partial labelling: if the header labels some roles but not the name (e.g. `Rank | Price | Bid`), the header path is used for
+    the labelled columns and the name is read from cell contents as described above.
+  - Short rows (B3c): a row with fewer cells than the header's name or price column (e.g. header `Rank | Bid | Price`, row
+    `Gamma Co | Rs. 1,50,000`) is not discarded; it is read with the content fallback (rank 0 if there is no rank cell). A lone
+    `Price` header still gives `null` (B10).
+  - B4 (`Rank | Name`) is a header-path case, not a fallback: the only number is the rank, so there is no price and the result is `null`.
+  - Example: `Rank | Firm | Price` is fully labelled (rank, price and a name column are all found), so it uses the header path.
 - A rank value is `N` or `L<N>` (case-insensitive) with N a positive integer, giving N; anything else, or no rank column, gives `0`.
 - Rank is never reused as the price: a cell identified as the rank cell is excluded from price candidates (B4).
 

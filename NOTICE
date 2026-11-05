@@ -68,7 +68,8 @@ rank 1, else first row), and the authors had seen the earlier port. No GEM-SCRAP
 Other reference repositories in the owner's reference set (Giridar33/gem-tender-tracker,
 PranavTamada/Tender_Scraper, Mujahid-Alam/gem-tender-pdf-extractor,
 Giri-Aayush/gem, rounittxx/gem-bid-scraper, IshanMaheshwari-777/GEM-SCRAPER) were consulted for portal behaviour but no code or text from
-them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.
+the consulted repositories is present in the current tree as of 2026-11-05. An earlier GEM-SCRAPER port was removed in #537 and remains in
+git history. Add an entry above before copying from any of them.
 
 Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
 copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for our own label table
