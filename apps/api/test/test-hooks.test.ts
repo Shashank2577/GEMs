@@ -18,7 +18,7 @@ describe('E2E mail capture hook', () => {
     const app = createApp(ctx.deps, { testHooks: true });
     const r = await app.request(`${TEST_APP_URL}/api/__test/mail`);
     expect(r.status).toBe(200);
-    expect((await r.json()).sent).toEqual([expect.objectContaining({ to: 'a@example.com', subject: 'Hello', headers: { 'List-Unsubscribe': '<x>' } })]);
+    expect(((await r.json()) as { sent: unknown[] }).sent).toEqual([expect.objectContaining({ to: 'a@example.com', subject: 'Hello', headers: { 'List-Unsubscribe': '<x>' } })]);
   });
 
   it('is never mounted in production, even when enabled', async () => {
