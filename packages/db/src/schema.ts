@@ -188,9 +188,29 @@ export const vaultDocuments = pgTable('vault_documents', {
   pageCount: integer('page_count'),
   uploadedBy: uuid('uploaded_by').references(() => users.id),
   lastReminderDays: integer('last_reminder_days'),
+  /** Hex SHA-256 of the current file for duplicate detection (FR-067); null = unknown (pre-existing rows). */
+  contentSha256: text('content_sha256'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type) }));
+}, (t) => ({
+  orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type),
+  shaIdx: index('vault_org_sha_idx').on(t.orgId, t.contentSha256),
+}));
+
+/** Previous files of a vault document, kept on renewal/replace (FR-065; at most 5 per document). */
+export const vaultDocumentVersions = pgTable('vault_document_versions', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  documentId: uuid('document_id').notNull().references(() => vaultDocuments.id, { onDelete: 'cascade' }),
+  blobKey: text('blob_key').notNull(),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  pageCount: integer('page_count'),
+  expiryDate: date('expiry_date'),
+  replacedBy: uuid('replaced_by').references(() => users.id),
+  replacedAt: timestamp('replaced_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgIdx: index('vault_versions_org_idx').on(t.orgId), docIdx: index('vault_versions_doc_idx').on(t.documentId, t.replacedAt.desc()) }));
 
 // ───────────── Tenders (global, public GeM data) ─────────────
 

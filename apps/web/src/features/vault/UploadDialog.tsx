@@ -8,7 +8,9 @@ import {
 } from '@/components/ui';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useUploadVault } from './api';
+import { DuplicatePrompt } from './doc-ui';
 import { checkVaultFile } from './file-check';
+import { duplicateOf, type DuplicateInfo } from './renew';
 import { DocumentForm, emptyDraft, validateDraft, type DocDraft } from './DocumentForm';
 
 const titleFrom = (name: string) => name.replace(/\.[A-Za-z0-9]{1,5}$/, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').replace(/(?<!\d)(20\d{2}) (\d{2})(?!\d)/, '$1-$2').trim();
@@ -23,17 +25,19 @@ export function serverFieldErrors(e: unknown): Record<string, string> {
   return {};
 }
 
+/** `onUploaded(id, doc?)` opens a document: the new one (with its DTO), or the existing one after **Open existing** (FR-067, id only). */
 export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUploaded }: {
-  open: boolean; onOpenChange: (o: boolean) => void; initialFile?: File | null; presetType?: DocType | null; onUploaded?: (id: string, doc: VaultDocumentDto) => void;
+  open: boolean; onOpenChange: (o: boolean) => void; initialFile?: File | null; presetType?: DocType | null; onUploaded?: (id: string, doc?: VaultDocumentDto) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [draft, setDraft] = useState<DocDraft>(emptyDraft());
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [dup, setDup] = useState<DuplicateInfo | null>(null);
   const upload = useUploadVault();
 
   useEffect(() => {
     if (!open) return;
-    setErrors({});
+    setErrors({}); setDup(null);
     if (initialFile && !checkVaultFile(initialFile)) { setFile(initialFile); setDraft(draftForFile(initialFile, presetType)); }
     else { setFile(null); setDraft(emptyDraft(presetType ?? 'other')); }
   }, [open, initialFile, presetType]);
@@ -47,10 +51,10 @@ export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUp
       const g = draftForFile(f, presetType);
       return { ...d, type: d.title || presetType ? d.type : g.type, title: d.title || g.title, financialYear: d.financialYear || g.financialYear };
     });
-    setErrors({});
+    setErrors({}); setDup(null);
   };
 
-  const submit = () => {
+  const submit = (allowDuplicate = false) => {
     if (!file) { setErrors({ file: 'Choose a file to upload' }); return; }
     const e = validateDraft(draft);
     setErrors(e);
@@ -59,7 +63,7 @@ export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUp
       file,
       fields: {
         type: draft.type, title: draft.title.trim(), number: draft.number.trim(), issuer: draft.issuer.trim(), issueDate: draft.issueDate,
-        expiryDate: draft.expiryDate, financialYear: draft.financialYear, tags: draft.tags.length ? draft.tags : undefined,
+        expiryDate: draft.expiryDate, financialYear: draft.financialYear, tags: draft.tags.length ? draft.tags : undefined, allowDuplicate,
       },
     }, {
       onSuccess: (doc) => {
@@ -70,6 +74,8 @@ export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUp
         onOpenChange(false);
       },
       onError: (err) => {
+        const d = duplicateOf(err);
+        if (d) { setDup(d); return; }
         const f = serverFieldErrors(err);
         setErrors(Object.keys(f).length ? f : { file: errorMessage(err) });
       },
@@ -104,6 +110,13 @@ export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUp
             />
           )}
           {errors.file && <p role="alert" className="-mt-3 text-xs font-medium text-danger">{errors.file}</p>}
+          {dup && (
+            <DuplicatePrompt
+              title={dup.title} busy={upload.isPending}
+              onOpenExisting={() => { onUploaded?.(dup.existingId); onOpenChange(false); }}
+              onUploadAnyway={() => submit(true)}
+            />
+          )}
           <DocumentForm draft={draft} onChange={setDraft} errors={errors} />
         </form>
         <DialogFooter className="items-center sm:justify-between">

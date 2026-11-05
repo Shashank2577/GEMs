@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
-import { activityLog, companyProfiles, notifications, vaultDocuments } from '@tp/db';
+import { activityLog, companyProfiles, notifications, vaultDocuments, vaultDocumentVersions } from '@tp/db';
 import { createApp } from '../src/app';
 import { contentDisposition, safeFileName } from '../src/routes/vault';
 import type { AppDeps } from '../src/deps';
@@ -12,8 +12,11 @@ import { createTestContext, request, seedOrgWithRoles, signup, type TestContext 
 // 4 Nov 2026 10:00 IST
 const NOW = new Date('2026-11-04T04:30:00Z');
 
+/** Every call yields distinct bytes (FR-067 duplicate detection would otherwise reject same-second fixtures). */
+let pdfSeq = 0;
 async function pdf(pages = 2): Promise<Uint8Array> {
   const d = await PDFDocument.create();
+  d.setSubject(`fixture ${++pdfSeq}`);
   for (let i = 0; i < pages; i++) d.addPage([200, 200]).drawText(`Page ${i + 1}`, { x: 20, y: 100 });
   return d.save();
 }
@@ -599,7 +602,7 @@ describe('vault — headers, replace, isolation and rollback (T033)', () => {
     expect(inline.headers.get('x-content-type-options')).toBe('nosniff');
   });
 
-  it('replacing a PDF with a PNG deletes the old blob and updates mime type and page count (FR-032)', async () => {
+  it('replacing a PDF with a PNG keeps the old blob as a version and updates mime type and page count (FR-032, FR-065)', async () => {
     const up = await request(ctx.app, 'POST', '/vault', { cookie: b.analyst.cookie, form: { file: file(await pdf(4), 'udyam.pdf'), type: 'udyam', title: 'Udyam certificate', number: 'UDYAM-MH-26-0123456' } });
     expect(up.body.pageCount).toBe(4);
     const [before] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, up.body.id));
@@ -608,7 +611,8 @@ describe('vault — headers, replace, isolation and rollback (T033)', () => {
     expect(r.body).toMatchObject({ fileName: 'udyam-scan.png', mimeType: 'image/png', pageCount: 1, sizeBytes: PNG.length, type: 'udyam', title: 'Udyam certificate', number: 'UDYAM-MH-26-0123456' });
     const [after] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, up.body.id));
     expect(after!.blobKey).not.toBe(before!.blobKey);
-    expect(await ctx.deps.blobs.head(before!.blobKey)).toBeNull();
+    // FR-065 (US6): the previous file is kept as a version instead of being deleted.
+    expect(await ctx.deps.blobs.head(before!.blobKey)).not.toBeNull();
     expect(await ctx.deps.blobs.head(after!.blobKey)).not.toBeNull();
     const d = await request(ctx.app, 'GET', `/vault/${up.body.id}/download`, { cookie: b.viewer.cookie });
     expect(d.headers.get('content-type')).toBe('image/png');
@@ -1001,5 +1005,300 @@ describe('vault delete — review fixes (FR-041)', () => {
     expect(pcs.body.items[0].cracDocumentId).toBe(doc.body.id);
     const [prof] = await ctx.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, o.orgId));
     expect(prof!.oemAuthorizations[0]!.documentId).toBe(doc.body.id);
+  });
+});
+
+/** T064 (#152): renew in one step, version history, duplicate detection (US6; FR-064…FR-067). */
+describe('vault renewal, versions and duplicates (T064)', () => {
+  let r6: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  beforeAll(async () => { r6 = await seedOrgWithRoles(ctx.app, 'Renewal Traders'); });
+
+  const versionsOf = (docId: string) =>
+    ctx.db.select().from(vaultDocumentVersions).where(eq(vaultDocumentVersions.documentId, docId));
+  const isoUpload = async (title: string, bytes: Uint8Array, name = 'iso.pdf') => {
+    const r = await request(ctx.app, 'POST', '/vault', { cookie: r6.analyst.cookie, form: { file: file(bytes, name), type: 'iso', title, issueDate: '2023-11-15', expiryDate: '2026-11-14', number: 'QMS-OLD' } });
+    expect(r.status, r.text).toBe(201);
+    return r.body as { id: string };
+  };
+
+  it('renew with a new expiry updates metadata, resets last_reminder_days and logs vault.renewed (FR-064)', async () => {
+    const oldBytes = await pdf(1);
+    const doc = await isoUpload('ISO 9001 Renew', oldBytes);
+    await ctx.db.update(vaultDocuments).set({ lastReminderDays: 30 }).where(eq(vaultDocuments.id, doc.id));
+    const r = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, {
+      cookie: r6.analyst.cookie, form: { file: file(await pdf(3), 'iso-2026.pdf'), issueDate: '2026-11-04', expiryDate: '2029-11-03', number: 'QMS-NEW' },
+    });
+    expect(r.status, r.text).toBe(200);
+    expect(r.body).toMatchObject({ issueDate: '2026-11-04', expiryDate: '2029-11-03', number: 'QMS-NEW', status: 'valid', fileName: 'iso-2026.pdf', pageCount: 3, title: 'ISO 9001 Renew' });
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    expect(row!.lastReminderDays).toBeNull();
+    const acts = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, doc.id), eq(activityLog.action, 'vault.renewed')));
+    expect(acts).toHaveLength(1);
+    expect(acts[0]!.meta).toMatchObject({ fromExpiry: '2026-11-14', toExpiry: '2029-11-03' });
+  });
+
+  it('a plain replace (no new expiry) keeps the reminder state and does not log vault.renewed', async () => {
+    const doc = await isoUpload('ISO plain replace', await pdf(1));
+    await ctx.db.update(vaultDocuments).set({ lastReminderDays: 30 }).where(eq(vaultDocuments.id, doc.id));
+    const r = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'scan.pdf') } });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ expiryDate: '2026-11-14', issueDate: '2023-11-15', number: 'QMS-OLD' });
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    expect(row!.lastReminderDays).toBe(30);
+    expect(await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, doc.id), eq(activityLog.action, 'vault.renewed')))).toHaveLength(0);
+  });
+
+  it('rejects renewal dates where issue > expiry (also against the stored expiry) and stores nothing', async () => {
+    const doc = await isoUpload('ISO bad dates', await pdf(1));
+    const [before] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    const bad = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'x.pdf'), issueDate: '2026-12-01', expiryDate: '2026-11-30' } });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.details.fields.expiryDate).toBe('Expiry date is before the issue date');
+    const vsStored = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'x.pdf'), issueDate: '2027-01-01' } });
+    expect(vsStored.status).toBe(400);
+    const badDate = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'x.pdf'), expiryDate: '2029-02-30' } });
+    expect(badDate.status).toBe(400);
+    const [after] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    expect(after).toEqual(before);
+    expect(await versionsOf(doc.id)).toHaveLength(0);
+  });
+
+  it('keeps the previous file as a downloadable version, even when the new file has the same name (FR-065, FR-066)', async () => {
+    const oldBytes = await pdf(2);
+    const doc = await isoUpload('ISO versions', oldBytes, 'iso.pdf');
+    const [before] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    const newBytes = await pdf(1);
+    const r = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(newBytes, 'iso.pdf'), expiryDate: '2029-11-13' } });
+    expect(r.status).toBe(200);
+    const [after] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    expect(after!.blobKey).not.toBe(before!.blobKey);
+    expect(after!.blobKey.startsWith(`org/${r6.orgId}/vault/${doc.id}/`)).toBe(true);
+
+    // Viewer may list and download versions.
+    const list = await request(ctx.app, 'GET', `/vault/${doc.id}/versions`, { cookie: r6.viewer.cookie });
+    expect(list.status).toBe(200);
+    expect(list.body.items).toHaveLength(1);
+    const v = list.body.items[0];
+    expect(v).toMatchObject({ fileName: 'iso.pdf', mimeType: 'application/pdf', sizeBytes: oldBytes.length, pageCount: 2, expiryDate: '2026-11-14', replacedBy: { id: r6.analyst.me.user.id } });
+    expect(v.replacedBy.name).toBeTruthy();
+    expect(v.downloadUrl).toBe(`/api/vault/${doc.id}/versions/${v.id}/download`);
+    expect(typeof v.replacedAt).toBe('string');
+
+    const d = await request(ctx.app, 'GET', `/vault/${doc.id}/versions/${v.id}/download`, { cookie: r6.viewer.cookie });
+    expect(d.status).toBe(200);
+    expect(new Uint8Array(await d.res.arrayBuffer())).toEqual(oldBytes);
+    expect(d.headers.get('content-disposition')).toBe('attachment; filename="iso.pdf"; filename*=UTF-8\'\'iso.pdf');
+    expect(d.headers.get('cache-control')).toBe('private, no-store');
+    expect(d.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(d.headers.get('content-type')).toBe('application/pdf');
+    const inline = await request(ctx.app, 'GET', `/vault/${doc.id}/versions/${v.id}/download?inline=1`, { cookie: r6.viewer.cookie });
+    expect(inline.headers.get('content-disposition')).toMatch(/^inline; /);
+
+    // The current file is the new one.
+    const cur = await request(ctx.app, 'GET', `/vault/${doc.id}/download`, { cookie: r6.viewer.cookie });
+    expect(new Uint8Array(await cur.res.arrayBuffer())).toEqual(newBytes);
+  });
+
+  it('keeps at most 5 versions: the 6th renewal prunes the oldest version and its blob (FR-065)', async () => {
+    const doc = await isoUpload('ISO six renewals', await pdf(1), 'v0.pdf');
+    for (let i = 1; i <= 6; i++) {
+      const r = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), `v${i}.pdf`) } });
+      expect(r.status, r.text).toBe(200);
+    }
+    const rows = await versionsOf(doc.id);
+    expect(rows).toHaveLength(5);
+    const list = await request(ctx.app, 'GET', `/vault/${doc.id}/versions`, { cookie: r6.viewer.cookie });
+    // Newest first: v5 … v1; v0 was pruned.
+    expect(list.body.items.map((v: any) => v.fileName)).toEqual(['v5.pdf', 'v4.pdf', 'v3.pdf', 'v2.pdf', 'v1.pdf']);
+    // The pruned v0 blob is gone; every kept version's blob is present.
+    const keys = rows.map((x) => x.blobKey);
+    expect(keys.some((k) => k.endsWith('/v0.pdf'))).toBe(false);
+    for (const k of keys) expect(await ctx.deps.blobs.head(k)).not.toBeNull();
+    expect(await ctx.deps.blobs.head(`org/${r6.orgId}/vault/${doc.id}/v0.pdf`)).toBeNull();
+  });
+
+  it('deleting a document removes its versions and their blobs (FR-065)', async () => {
+    const doc = await isoUpload('ISO delete with versions', await pdf(1), 'a.pdf');
+    await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'b.pdf') } });
+    await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'c.pdf') } });
+    const vs = await versionsOf(doc.id);
+    expect(vs).toHaveLength(2);
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    const d = await request(ctx.app, 'DELETE', `/vault/${doc.id}`, { cookie: r6.analyst.cookie });
+    expect(d.status).toBe(200);
+    expect(await versionsOf(doc.id)).toHaveLength(0);
+    for (const k of [row!.blobKey, ...vs.map((v) => v.blobKey)]) expect(await ctx.deps.blobs.head(k), k).toBeNull();
+  });
+
+  it('version routes are org-scoped: another org, another document or a bad id → 404 (FR-066)', async () => {
+    const doc = await isoUpload('ISO isolated versions', await pdf(1), 'one.pdf');
+    await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'two.pdf') } });
+    const [v] = await versionsOf(doc.id);
+    const sibling = await isoUpload('ISO sibling', await pdf(1), 'sib.pdf');
+    const other = await signup(ctx.app, { orgName: 'Version Snoopers' });
+    for (const p of [`/vault/${doc.id}/versions`, `/vault/${doc.id}/versions/${v!.id}/download`]) {
+      const r = await request(ctx.app, 'GET', p, { cookie: other.cookie });
+      expect(r.status, p).toBe(404);
+      expect(r.body.error.code, p).toBe('not_found');
+    }
+    for (const p of [`/vault/${sibling.id}/versions/${v!.id}/download`, `/vault/${doc.id}/versions/not-a-uuid/download`, `/vault/xyz/versions`]) {
+      expect((await request(ctx.app, 'GET', p, { cookie: r6.viewer.cookie })).status, p).toBe(404);
+    }
+    expect((await request(ctx.app, 'GET', `/vault/${sibling.id}/versions`, { cookie: r6.viewer.cookie })).body.items).toEqual([]);
+    expect((await request(ctx.app, 'GET', `/vault/${doc.id}/versions`)).status).toBe(401);
+  });
+
+  it('duplicate upload → 409 duplicate_document {existingId,title}; allowDuplicate=1 → 201; other orgs unaffected (FR-067)', async () => {
+    const bytes = await pdf(1);
+    const first = await isoUpload('ISO original', bytes, 'orig.pdf');
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, first.id));
+    expect(row!.contentSha256).toMatch(/^[0-9a-f]{64}$/);
+    const before = (await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.orgId, r6.orgId))).length;
+
+    const dup = await request(ctx.app, 'POST', '/vault', { cookie: r6.analyst.cookie, form: { file: file(bytes, 'copy.pdf'), type: 'iso' } });
+    expect(dup.status).toBe(409);
+    expect(dup.body.error).toMatchObject({ code: 'duplicate_document', details: { existingId: first.id, title: 'ISO original' } });
+    expect((await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.orgId, r6.orgId))).length).toBe(before);
+
+    const anyway = await request(ctx.app, 'POST', '/vault', { cookie: r6.analyst.cookie, form: { file: file(bytes, 'copy.pdf'), type: 'iso', allowDuplicate: '1' } });
+    expect(anyway.status).toBe(201);
+
+    // Same bytes in another org are not a duplicate.
+    const other = await signup(ctx.app, { orgName: 'Other Duplicates' });
+    expect((await request(ctx.app, 'POST', '/vault', { cookie: other.cookie, form: { file: file(bytes, 'orig.pdf') } })).status).toBe(201);
+  });
+
+  it('replace with a file identical to another document → 409 unless allowDuplicate=1; the same document is not its own duplicate (FR-067)', async () => {
+    const aBytes = await pdf(1);
+    const a = await isoUpload('ISO dup A', aBytes, 'a.pdf');
+    const b2 = await isoUpload('ISO dup B', await pdf(1), 'b.pdf');
+    const dup = await request(ctx.app, 'PUT', `/vault/${b2.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(aBytes, 'a-copy.pdf') } });
+    expect(dup.status).toBe(409);
+    expect(dup.body.error.details).toEqual({ existingId: a.id, title: 'ISO dup A' });
+    expect(await versionsOf(b2.id)).toHaveLength(0);
+    const ok = await request(ctx.app, 'PUT', `/vault/${b2.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(aBytes, 'a-copy.pdf'), allowDuplicate: '1' } });
+    expect(ok.status).toBe(200);
+    const self = await request(ctx.app, 'PUT', `/vault/${a.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(aBytes, 'a-again.pdf') } });
+    expect(self.status).toBe(409); // b2 now holds the same bytes
+    const c = await isoUpload('ISO dup C', await pdf(1), 'c.pdf');
+    const [cRow] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, c.id));
+    const cBytes = new Uint8Array(await (await ctx.deps.blobs.get(cRow!.blobKey))!.arrayBuffer());
+    expect((await request(ctx.app, 'PUT', `/vault/${c.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(cBytes, 'c-rescan.pdf') } })).status).toBe(200);
+  });
+
+  it('documents stored before hashing (content_sha256 null) are hashed lazily and still caught as duplicates (FR-067)', async () => {
+    const bytes = await pdf(1);
+    const legacy = await isoUpload('ISO legacy', bytes, 'legacy.pdf');
+    await ctx.db.update(vaultDocuments).set({ contentSha256: null }).where(eq(vaultDocuments.id, legacy.id));
+    const dup = await request(ctx.app, 'POST', '/vault', { cookie: r6.analyst.cookie, form: { file: file(bytes, 'legacy-copy.pdf') } });
+    expect(dup.status).toBe(409);
+    expect(dup.body.error.details.existingId).toBe(legacy.id);
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, legacy.id));
+    expect(row!.contentSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('two concurrent replaces of the same document: one 200, the other 409 conflict with its blob removed', async () => {
+    const doc = await isoUpload('ISO race', await pdf(1), 'race.pdf');
+    const written: string[] = [];
+    // Hold both blob writes until both requests have read the row, so they really race.
+    let release!: () => void;
+    const both = new Promise<void>((r) => { release = r; });
+    const blobs: AppDeps['blobs'] = {
+      ...ctx.deps.blobs,
+      put: async (key, body, o) => {
+        written.push(key);
+        if (written.length === 2) release();
+        await both;
+        return ctx.deps.blobs.put(key, body, o);
+      },
+    };
+    const app = createApp({ ...ctx.deps, blobs });
+    const [a, b] = await Promise.all([
+      request(app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'a.pdf') } }),
+      request(app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'b.pdf') } }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    const loser = a.status === 409 ? a : b;
+    expect(loser.body.error.code).toBe('conflict');
+    expect(written).toHaveLength(2);
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    const loserKey = written.find((k) => k !== row!.blobKey)!;
+    expect(written).toContain(row!.blobKey);
+    expect(await ctx.deps.blobs.head(loserKey)).toBeNull();
+    expect(await ctx.deps.blobs.head(row!.blobKey)).not.toBeNull();
+    const vs = await versionsOf(doc.id);
+    expect(vs.map((v) => v.fileName)).toEqual(['race.pdf']);
+    expect(await ctx.deps.blobs.head(vs[0]!.blobKey)).not.toBeNull();
+  });
+
+  it('clearing the expiry on replace is not a renewal: no vault.renewed, reminder state kept (FR-064)', async () => {
+    const doc = await isoUpload('ISO cleared expiry', await pdf(1));
+    await ctx.db.update(vaultDocuments).set({ lastReminderDays: 7 }).where(eq(vaultDocuments.id, doc.id));
+    const r = await request(ctx.app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'n.pdf'), expiryDate: '' } });
+    expect(r.status).toBe(200);
+    expect(r.body.expiryDate).toBeNull();
+    const [row] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    expect(row!.lastReminderDays).toBe(7);
+    expect(await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, doc.id), eq(activityLog.action, 'vault.renewed')))).toHaveLength(0);
+  });
+
+  it('lazy hashing marks rows whose blob is gone as "missing" and reads at most 5 blobs per request (FR-067)', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'Lazy Hash Traders');
+    // Seven legacy rows with identical size and unknown hash; one blob is gone.
+    const sameSize = (n: number) => { const b = new Uint8Array(4096); b.set(PNG); b[100] = n; return b; };
+    const ids: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const up = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(sameSize(i), `p${i}.png`, 'image/png'), title: `Legacy ${i}` } });
+      expect(up.status, up.text).toBe(201);
+      ids.push(up.body.id);
+    }
+    await ctx.db.update(vaultDocuments).set({ contentSha256: null }).where(eq(vaultDocuments.orgId, o.orgId));
+    const [first] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, ids[0]!));
+    await ctx.deps.blobs.delete(first!.blobKey);
+    let gets = 0;
+    const app = createApp({ ...ctx.deps, blobs: { ...ctx.deps.blobs, get: async (k) => { gets++; return ctx.deps.blobs.get(k); } } });
+    const r1 = await request(app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(sameSize(99), 'new.png', 'image/png') } });
+    expect(r1.status).toBe(201);
+    expect(gets).toBe(5);
+    const rows = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.orgId, o.orgId));
+    expect(rows.find((x) => x.id === ids[0])!.contentSha256).toBe('missing');
+    expect(rows.filter((x) => x.contentSha256 === null)).toHaveLength(2);
+    // The next upload continues with the remaining unknown rows and catches the duplicate among them.
+    gets = 0;
+    const r2 = await request(app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(sameSize(6), 'again.png', 'image/png') } });
+    expect(r2.status).toBe(409);
+    expect(r2.body.error.details.existingId).toBe(ids[6]);
+    expect(gets).toBe(2);
+  });
+
+  it('a DB failure during replace removes the new blob and leaves the old file, row and versions untouched', async () => {
+    const oldBytes = await pdf(1);
+    const doc = await isoUpload('ISO doomed renewal', oldBytes, 'same.pdf');
+    const [before] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    const written: string[] = [];
+    const blobs: AppDeps['blobs'] = { ...ctx.deps.blobs, put: async (key, body, o) => { written.push(key); return ctx.deps.blobs.put(key, body, o); } };
+    const db = new Proxy(ctx.db, {
+      get(target, prop, recv) {
+        if (prop === 'transaction') {
+          return (fn: Parameters<typeof target.transaction>[0]) => target.transaction(async (tx) => {
+            await fn(tx);
+            throw new Error('simulated commit failure');
+          });
+        }
+        const v = Reflect.get(target, prop, recv);
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+    const app = createApp({ ...ctx.deps, db, blobs });
+    const r = await request(app, 'PUT', `/vault/${doc.id}/file`, { cookie: r6.analyst.cookie, form: { file: file(await pdf(1), 'same.pdf'), expiryDate: '2029-11-13' } });
+    expect(r.status).toBe(500);
+    expect(written).toHaveLength(1);
+    expect(written[0]).not.toBe(before!.blobKey);
+    expect(await ctx.deps.blobs.head(written[0]!)).toBeNull();
+    const [after] = await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, doc.id));
+    expect(after).toEqual(before);
+    expect(await versionsOf(doc.id)).toHaveLength(0);
+    const cur = await request(ctx.app, 'GET', `/vault/${doc.id}/download`, { cookie: r6.viewer.cookie });
+    expect(new Uint8Array(await cur.res.arrayBuffer())).toEqual(oldBytes);
   });
 });
