@@ -13,7 +13,7 @@ const best = (q: string) => [...SETTINGS_ITEMS].sort((a, b) => score(b, q) - sco
 describe('SETTINGS_ITEMS', () => {
   it('lists every settings sub-page from FR-039 with unique routes', () => {
     expect(SETTINGS_ITEMS.map((i) => i.label)).toEqual([
-      'Organization', 'Your account', 'Team & roles', 'Notifications', 'Scoring weights', 'API tokens & extension', 'Sync health', 'Activity log',
+      'Organization', 'Plan & usage', 'Your account', 'Team & roles', 'Notifications', 'Scoring weights', 'API tokens & extension', 'Sync health', 'Activity log',
     ]);
     expect(new Set(SETTINGS_ITEMS.map((i) => i.to)).size).toBe(SETTINGS_ITEMS.length);
     expect(new Set(SETTINGS_ITEMS.map(settingsPaletteValue)).size).toBe(SETTINGS_ITEMS.length);

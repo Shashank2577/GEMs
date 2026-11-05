@@ -235,6 +235,24 @@ export function parseBidPlusDoc(doc: BidPlusDoc, opts: ParseOptions = {}): Norma
   return { ...t, contentHash: tenderContentHash(t) };
 }
 
+const normStr = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+const asDate = (v: unknown): Date | null => {
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+};
+
+/** True when both sides are the same value for diff/alerting purposes (case- and whitespace-insensitive strings, instant-equal dates). */
+export function sameValue(a: unknown, b: unknown): boolean {
+  const da = asDate(a), db = asDate(b);
+  if (da && db) return da.getTime() === db.getTime();
+  if (typeof a === 'string' && typeof b === 'string') return normStr(a) === normStr(b);
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
 /** Compare two tenders on the tracked fields → `{field: {from, to}}` (empty when identical). */
 export function diffTenders(
   before: Partial<Record<TrackedField, unknown>>,
@@ -245,7 +263,7 @@ export function diffTenders(
   for (const f of TRACKED_FIELDS) {
     const a = norm(before[f]);
     const b = norm(after[f]);
-    if (JSON.stringify(a) !== JSON.stringify(b)) out[f] = { from: a, to: b };
+    if (!sameValue(a, b)) out[f] = { from: a, to: b };
   }
   return out;
 }

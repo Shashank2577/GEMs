@@ -795,8 +795,7 @@ anywhere and never used to fill GeM.
 - **FR-083**: Outcome prices MUST never appear in the assist payload, the extension or any GeM-facing output.
 - **FR-084** *(gap)*: The submit confirmation MUST list open blockers (informational) and log `openBlockers`.
 - **FR-085** *(gap)*: The outcome dialog MUST offer **Suggest from GeM result**: parse a user-supplied HTML file of the public
-  GeM RA/bid result page (rank/price/seller table heuristics ported from `IshanMaheshwari-777_GEM-SCRAPER/scraper.py`
-  `scrape_ra_schedule`) via a pure `parseAwardResult(html)` in `@tp/core/gem/award.ts`, returning `{ l1Price, l1Seller,
+  GeM RA/bid result page (rank/price/seller evaluation-table reader, an independent reimplementation (clean-room in process, not in provenance) from `award-parser-spec.md` (issue #537)) via a pure `parseAwardResult(html)` in `@tp/core/gem/award.ts`, returning `{ l1Price, l1Seller,
   bidders }` for the user to confirm; TenderPilot MUST NOT log in to GeM or fetch non-public pages.
 - **FR-086**: The header MUST show a Won/Lost badge with the compact L1 price when recorded.
 

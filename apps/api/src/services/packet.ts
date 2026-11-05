@@ -5,7 +5,7 @@
  */
 import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
-  activityLog, analyses, annexureTemplates, bidWorkspaces, comments, companyProfiles, memberships, packets, tenderDocuments, tenders, users,
+  activityLog, analyses, annexureTemplates, bidWorkspaces, comments, companyProfiles, memberships, packetLedger, packets, tenderDocuments, tenders, users,
   vaultDocuments,
 } from '@tp/db';
 import type { ActivityItem } from '@tp/core/contracts/auth';
@@ -352,7 +352,12 @@ export async function recoverStuckPackets(deps: AppDeps, org: string, workspaceI
   );
   const [any] = await deps.db.select({ id: packets.id }).from(packets).where(stale).limit(1);
   if (!any) return 0;
-  const rows = await deps.db.update(packets).set({ status: 'failed', warnings: [PACKET_INTERRUPTED] }).where(stale).returning({ id: packets.id });
+  const rows = await deps.db.transaction(async (tx) => {
+    const marked = await tx.update(packets).set({ status: 'failed', warnings: [PACKET_INTERRUPTED] }).where(stale).returning({ id: packets.id });
+    // An interrupted build does not count toward the monthly packets (008/FR-036).
+    if (marked.length) await tx.delete(packetLedger).where(inArray(packetLedger.packetId, marked.map((x) => x.id)));
+    return marked;
+  });
   if (rows.length) deps.logger.warn('packet build interrupted', { workspaceId, packets: rows.map((x) => x.id) });
   return rows.length;
 }
@@ -425,10 +430,15 @@ export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdVal
       { totalBytes, limitBytes, items: sized.filter((x) => x.sizeBytes > 0).sort((a, b) => b.sizeBytes - a.sizeBytes).slice(0, 10) });
   }
 
-  const [row] = await deps.db.insert(packets).values({
-    orgId: org, workspaceId: w.id, status: 'building', items: items.map((i) => ({ kind: i.kind, refId: i.refId, title: i.title, pages: i.pages })),
-    createdBy: userIdValue, defaultUids: computed.map(packetItemUid),
-  }).returning();
+  // 008/FR-036: the ledger row is what `packetsPerMonth` counts; it has no foreign key, so it outlives the packet.
+  const row = await deps.db.transaction(async (tx) => {
+    const [p] = await tx.insert(packets).values({
+      orgId: org, workspaceId: w.id, status: 'building', items: items.map((i) => ({ kind: i.kind, refId: i.refId, title: i.title, pages: i.pages })),
+      createdBy: userIdValue, defaultUids: computed.map(packetItemUid),
+    }).returning();
+    await tx.insert(packetLedger).values({ packetId: p!.id, orgId: org, createdAt: p!.createdAt });
+    return p!;
+  });
 
   const templatesByKey = new Map(templates.map((tp) => [tp.key, tp]));
   const loadBytes = async (it: BuildItem): Promise<Uint8Array | null> => {
@@ -468,7 +478,11 @@ export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdVal
     return done;
   } catch (e) {
     deps.logger.error('packet build failed', { packetId: row.id, error: (e as Error).message });
-    const [failed] = await deps.db.update(packets).set({ status: 'failed', warnings: [`Build failed: ${(e as Error).message}`] }).where(eq(packets.id, row.id)).returning();
+    const failed = await deps.db.transaction(async (tx) => {
+      const [f] = await tx.update(packets).set({ status: 'failed', warnings: [`Build failed: ${(e as Error).message}`] }).where(eq(packets.id, row.id)).returning();
+      await tx.delete(packetLedger).where(eq(packetLedger.packetId, row.id)); // a failed build does not count (FR-036)
+      return f;
+    });
     return failed;
   }
 }

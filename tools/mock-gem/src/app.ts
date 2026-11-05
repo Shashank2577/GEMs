@@ -8,7 +8,9 @@
  *
  * Admin switches for E2E (not part of GeM):
  *   POST /__admin/publish {count?}     publish N new bids (simulates fresh tenders)
- *   POST /__admin/corrigendum/:bidNumber {days?}   extend a bid's end date (bid number URL-encoded, or ?bidNumber=)
+ *   POST /__admin/corrigendum/:bidNumber {days?, endAt?, quantity?, emd?}   amend a bid: extend its end date (default
+ *                                      +7 days), and optionally set its quantity and EMD in ₹ (bid number URL-encoded, or ?bidNumber=)
+ *   POST /__admin/cancel/:bidNumber    mark a bid cancelled on GeM (`b_is_cancelled`); reset restores it (bid number URL-encoded, or ?bidNumber=)
  *   POST /__admin/fail {mode:'down'|'html'|'off'}  simulate GeM outages
  *   POST /__admin/document-mode {mode:'normal'|'404'|'html'|'scanned'|'oversize'}  how /showbidDocument answers
  *                                      (404 page, HTML login page, PDF without text layer, > 25 MB stream)
@@ -251,7 +253,22 @@ export function createMockGem(opts: MockGemOptions = {}) {
     const newEnd = body.endAt ? new Date(String(body.endAt)) : new Date(end.getTime() + days * 86_400_000);
     doc.final_end_date_sort = [toGemSolrDate(newEnd)];
     if (body.quantity != null) doc.b_total_quantity = [Number(body.quantity)];
-    return c.json({ ok: true, bidNumber, endAt: newEnd.toISOString() });
+    if (body.emd != null) {
+      const emd = Number(body.emd);
+      if (!Number.isFinite(emd) || emd < 0) return c.json({ ok: false, error: 'emd must be a non-negative number' }, 400);
+      doc.b_emd_amount = [emd];
+    }
+    return c.json({ ok: true, bidNumber, endAt: newEnd.toISOString(), quantity: body.quantity != null ? Number(body.quantity) : undefined, emd: body.emd != null ? Number(body.emd) : undefined });
+  });
+
+  app.post('/__admin/cancel/*', async (c) => {
+    const body = await readJson(c);
+    const fromPath = decodeURIComponent(c.req.path.replace(/^\/__admin\/cancel\/?/, ''));
+    const bidNumber = String(body.bidNumber ?? c.req.query('bidNumber') ?? fromPath);
+    const doc = findByBidNumber(bidNumber);
+    if (!doc) return c.json({ ok: false, error: `Unknown bid ${bidNumber}` }, 404);
+    doc.b_is_cancelled = [1];
+    return c.json({ ok: true, bidNumber, cancelled: true });
   });
 
   app.post('/__admin/fail', async (c) => {
