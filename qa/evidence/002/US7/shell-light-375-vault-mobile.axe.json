@@ -1,0 +1,169 @@
+{
+  "url": "http://localhost:8800/vault",
+  "timestamp": "2026-11-05T04:58:02.241Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "13.5pt (18px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"relative border-b bg-gradient-to-br from-primary-soft via-card to-accent-soft/40 px-5 py-8 sm:px-8\">",
+                  "target": [
+                    ".from-primary-soft"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h2 class=\"text-lg font-semibold tracking-tight\">Build your bid-ready vault once, reuse it on every tender</h2>",
+          "target": [
+            "h2"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"relative border-b bg-gradient-to-br from-primary-soft via-card to-accent-soft/40 px-5 py-8 sm:px-8\">",
+                  "target": [
+                    ".from-primary-soft"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-sm text-muted-foreground\">Upload each certificate one time. TenderPilot tracks expiry dates, reminds your team 30, 7 and 1 day before anything lapses, and auto-attaches the right file when you prepare a bid packet.</p>",
+          "target": [
+            ".max-w-2xl.flex-col.gap-3 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "7.9pt (10.5px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<nav aria-label=\"Primary\" class=\"safe-bottom fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur-xl md:hidden\">",
+                  "target": [
+                    ".safe-bottom"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"group flex w-full items-start gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary-soft/30 focus-ring disabled:pointer-events-none\">",
+                  "target": [
+                    "li:nth-child(3) > .items-start.hover\\:border-primary\\/40.hover\\:bg-primary-soft\\/30"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/dashboard\">",
+          "target": [
+            ".text-\\[10\\.5px\\].gap-1[href$=\"dashboard\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "7.9pt (10.5px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<nav aria-label=\"Primary\" class=\"safe-bottom fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 backdrop-blur-xl md:hidden\">",
+                  "target": [
+                    ".safe-bottom"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"group flex w-full items-start gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary-soft/30 focus-ring disabled:pointer-events-none\">",
+                  "target": [
+                    "li:nth-child(3) > .items-start.hover\\:border-primary\\/40.hover\\:bg-primary-soft\\/30"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button class=\"flex h-14 w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium text-muted-foreground focus-ring\">",
+          "target": [
+            "li:nth-child(5) > .text-\\[10\\.5px\\].gap-1.h-14"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        }
+      ]
+    }
+  ],
+  "passes": 20
+}

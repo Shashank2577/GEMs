@@ -1,0 +1,634 @@
+{
+  "url": "http://localhost:8800/tenders",
+  "timestamp": "2026-11-05T04:55:04.112Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\" data-aria-hidden=\"true\" aria-hidden=\"true\">Skip to content</a>",
+          "target": [
+            ".z-\\[60\\]"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" class=\"rounded-md focus-ring\" href=\"/dashboard\">",
+                  "target": [
+                    ".rounded-md[aria-label=\"TenderPilot home\"][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Collapse sidebar\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Collapse sidebar\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\">",
+                  "target": [
+                    "#radix-\\:r3\\:"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-8 w-full items-center gap-2 rounded-lg border bg-card px-2.5 text-[13px] text-muted-foreground shadow-xs transition-colors hover:border-foreground/15 hover:text-foreground focus-ring\">",
+                  "target": [
+                    ".hover\\:border-foreground\\/15.w-full.shadow-xs"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/dashboard\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring bg-card text-foreground shadow-sm ring-1 ring-border\" href=\"/tenders\">",
+                  "target": [
+                    ".ring-1"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/watchlists\">",
+                  "target": [
+                    "a[href$=\"watchlists\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/vault\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"vault\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/profile\">",
+                  "target": [
+                    "a[href$=\"profile\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/notifications\">",
+                  "target": [
+                    "a[href$=\"notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/settings\">",
+                  "target": [
+                    "a[href$=\"settings\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<aside class=\"fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out md:block w-[248px]\" aria-label=\"Sidebar\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".inset-y-0"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button class=\"ml-auto hidden h-8 w-full max-w-sm items-center gap-2 rounded-lg border bg-subtle px-3 text-[13px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground focus-ring md:mr-auto md:ml-0 md:flex\">",
+                  "target": [
+                    ".md\\:mr-auto"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Theme: system\" id=\"radix-:r9:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r9\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"QM Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<header class=\"sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-xl sm:px-6\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".top-0"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-8 item...\" aria-label=\"GeM sync status: Not...\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    ".shadow-xs[aria-haspopup=\"dialog\"][data-state=\"closed\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<header class=\"mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".mb-6"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">My matches</button>",
+                  "target": [
+                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">New</button>",
+                  "target": [
+                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">Closing this week</button>",
+                  "target": [
+                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">Go verdicts</button>",
+                  "target": [
+                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button role=\"tab\" aria-selected=\"true\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring bg-foreground text-background shadow-sm\">All open bids</button>",
+                  "target": [
+                    ".bg-foreground"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"-mx-4 mb-4 flex items-center gap-3 overflow-x-auto px-4 pb-1 scrollbar-thin sm:mx-0 sm:px-0\" role=\"tablist\" aria-label=\"Saved views\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".overflow-x-auto"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"true\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring border-primary/30 bg-primary-soft text-primary\">Any time</button>",
+                  "target": [
+                    ".border-primary\\/30"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">3 days</button>",
+                  "target": [
+                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">7 days</button>",
+                  "target": [
+                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">14 days</button>",
+                  "target": [
+                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">30 days</button>",
+                  "target": [
+                    ".hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(5)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Under ₹10 L</button>",
+                  "target": [
+                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">₹10 L – ₹1 Cr</button>",
+                  "target": [
+                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">₹1 Cr – ₹5 Cr</button>",
+                  "target": [
+                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Above ₹5 Cr</button>",
+                  "target": [
+                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"decimal\" placeholder=\"Min\" aria-label=\"Minimum value in lak...\" value=\"\" style=\"\">",
+                  "target": [
+                    "input[placeholder=\"Min\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"decimal\" placeholder=\"Max\" aria-label=\"Maximum value in lak...\" value=\"\" style=\"\">",
+                  "target": [
+                    "input[placeholder=\"Max\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Go</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Review</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">No-Go</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Not analysed</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Bid</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Reverse auction</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Service</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Bunch</button>",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".pt-2 > .transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\].duration-150.disabled\\:pointer-events-none"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<aside class=\"hidden w-64 shrink-0 lg:block\" aria-label=\"Filters\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".w-64"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search item, buyer, ...\" aria-label=\"Search tenders\" value=\"\" style=\"\">",
+                  "target": [
+                    ".pl-9"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative select-none...\" aria-label=\"Hide filters\" data-state=\"closed\">",
+                  "target": [
+                    ".size-9"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"flex flex-wrap items-center gap-2\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".flex-wrap.gap-2[data-aria-hidden=\"true\"]"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" role=\"switch\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer inline-flex h-5...\" id=\"matched-only\">",
+                  "target": [
+                    "#matched-only"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex items-center ju...\" aria-label=\"Sort tenders\">",
+                  "target": [
+                    ".data-\\[placeholder\\]\\:text-muted-foreground"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(2)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"flex items-center gap-2\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".mt-2.flex-wrap.justify-between > .gap-2[data-aria-hidden=\"true\"][aria-hidden=\"true\"]"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".hover\\:bg-primary\\/90"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"flex flex-col items-center justify-center rounded-xl border border-dashed bg-subtle text-center px-6 py-14\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".border-dashed"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"cursor-help text-muted-foreground/70\" data-state=\"closed\">ⓘ</span>",
+          "target": [
+            ".cursor-help"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        }
+      ]
+    }
+  ],
+  "passes": 22
+}

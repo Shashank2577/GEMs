@@ -1,0 +1,157 @@
+{
+  "url": "http://localhost:8800/settings/notifications",
+  "timestamp": "2026-11-05T04:58:13.322Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/team\">",
+          "target": [
+            "a[href$=\"team\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/scoring\">",
+          "target": [
+            "a[href$=\"scoring\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/api-tokens\">",
+          "target": [
+            "a[href$=\"api-tokens\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.8pt (13px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"min-h-dvh bg-background\">",
+                  "target": [
+                    ".bg-background"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<a class=\"flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\" href=\"/settings/sync\">",
+          "target": [
+            "a[href$=\"sync\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        }
+      ]
+    }
+  ],
+  "passes": 25
+}
