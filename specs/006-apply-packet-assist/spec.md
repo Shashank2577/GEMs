@@ -169,7 +169,7 @@ row turns **Ready** with an **Auto-matched** badge without any mapping call.
    REG-06"; PAN card — Ready, Auto-matched; Audited balance sheets — Ready, Auto-matched, "Balance sheet 2024-25" with "FY
    2024-25" (the newest FY wins over 2023-24); OEM authorisation — **Expired**, Required, "Dell MAF" with an expired badge,
    red-tinted card, buttons **Change**, **Upload renewed**; Udyam — **Missing**, Optional, "No matching document in the
-   vault.", buttons **Choose document**, **Upload Udyam registration** (label from the document-type catalog);
+   vault.", buttons **Choose document**, **Upload Udyam (MSE) certificate** (label from the document-type catalog);
    Non-blacklisting and Make in India — **Generated**, "Generated from your profile · Print, sign and stamp before upload",
    **Preview**.
 3. **Given** the filter tabs "All 7", "Needs attention 2", "Covered 5", **When** the user selects "Needs attention",
