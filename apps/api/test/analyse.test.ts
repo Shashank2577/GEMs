@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { activityLog, analyses, companyProfiles, pastContracts, tenders, vaultDocuments } from '@tp/db';
+import { activityLog, analyses, companyProfiles, pastContracts, tenderDocuments, tenders, vaultDocuments } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { createApp } from '../src/app';
 import type { LlmClient } from '../src/deps';
@@ -20,6 +20,10 @@ const gemFetch: typeof fetch = async (input) => {
   const url = String(input instanceof Request ? input.url : input);
   gemCalls.push(url);
   const m = url.match(/\/showbidDocument\/(.+)$/);
+  if (m?.[1] === 'oversize') {
+    // Advertises 26 MB; the client must refuse it without buffering the body (FR-008).
+    return new Response(new TextEncoder().encode('%PDF-1.7 big') as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf', 'content-length': String(26 * 1024 * 1024) } });
+  }
   if (m && pdfs[m[1]]) return new Response(pdfs[m[1]] as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf' } });
   return new Response('not found', { status: 404 });
 };
@@ -300,5 +304,119 @@ describe('LLM enrichment (fake client)', () => {
     expect(r2.body.method).toBe('rules');
     const rows = await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id));
     expect(rows.every((x) => x.status === 'done')).toBe(true);
+  });
+});
+
+describe('US1 documents: messages, bid-number check, removal, staleness (FR-002, FR-005, FR-008..FR-010, FR-044)', () => {
+  const upload = (tenderId: string, file: File, cookie = roles.analyst.cookie, kind = 'bid') =>
+    request(ctx.app, 'POST', `/tenders/${tenderId}/documents`, { cookie, form: { file, kind } });
+
+  it('upload response carries no warnings and bidNumberFound null when the PDF matches the tender (US1 #2)', async () => {
+    const t = await insertTender('go-it-services', { contentHash: 'us1-match', source: 'us1-match' });
+    const r = await upload(t.id, pdfFile('go-it-services'));
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({ kind: 'bid', pageCount: 4, hasText: true, source: 'upload', orgId: roles.orgId, textSource: 'pdf', bidNumberFound: null, warnings: [] });
+    const list = await request(ctx.app, 'GET', `/tenders/${t.id}/documents`, { cookie: roles.viewer.cookie });
+    expect(list.body.items[0]).toMatchObject({ bidNumberFound: null, textSource: 'pdf' });
+    expect(list.body.items[0]).not.toHaveProperty('text');
+  });
+
+  it('a PDF printed with another bid number is stored with a bid_number_mismatch warning (US1 #16)', async () => {
+    const t = await insertTender('go-it-services', { contentHash: 'us1-mismatch', source: 'us1-mismatch' }); // GEM/2026/B/6120451
+    const r = await upload(t.id, pdfFile('review-hardware-oem')); // printed GEM/2026/B/6133872
+    expect(r.status).toBe(201);
+    expect(r.body.warnings).toEqual([{ code: 'bid_number_mismatch', found: 'GEM/2026/B/6133872' }]);
+    expect(r.body.bidNumberFound).toBe('GEM/2026/B/6133872');
+    const list = await request(ctx.app, 'GET', `/tenders/${t.id}/documents`, { cookie: roles.viewer.cookie });
+    expect(list.body.items).toHaveLength(1);
+    expect(list.body.items[0].bidNumberFound).toBe('GEM/2026/B/6133872');
+  });
+
+  it('answers the exact spec messages for empty, missing, non-PDF, oversize and unreadable uploads; nothing is stored (US1 #4–#7)', async () => {
+    const t = await insertTender('go-it-services', { contentHash: 'us1-errors', source: 'us1-errors' });
+    const empty = await upload(t.id, new File([], 'empty.pdf', { type: 'application/pdf' }));
+    expect(empty.status).toBe(400);
+    expect(empty.body.error).toMatchObject({ code: 'bad_request', message: 'The file is empty' });
+    const missing = await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { kind: 'bid' } });
+    expect(missing.status).toBe(400);
+    expect(missing.body.error).toMatchObject({ code: 'validation_error', message: 'Choose a PDF file to upload', details: { fields: { file: 'Required' } } });
+    const docx = await upload(t.id, new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])], 'tender.pdf', { type: 'application/pdf' }));
+    expect(docx.status).toBe(415);
+    expect(docx.body.error).toMatchObject({ code: 'unsupported_media_type', message: 'Only PDF files can be analysed. Export the document to PDF and try again.' });
+    const big = new Uint8Array(26 * 1024 * 1024);
+    big.set(new TextEncoder().encode('%PDF-1.7'));
+    const tooBig = await upload(t.id, new File([big], 'big.pdf', { type: 'application/pdf' }));
+    expect(tooBig.status).toBe(413);
+    expect(tooBig.body.error).toMatchObject({ code: 'payload_too_large', message: 'The file is larger than 25 MB' });
+    const broken = await upload(t.id, new File(['%PDF-1.7\ninvalid fixture'], 'broken.pdf', { type: 'application/pdf' }));
+    expect(broken.status).toBe(422);
+    expect(broken.body.error).toMatchObject({ code: 'unreadable_pdf', message: 'We could not read this PDF. It may be password-protected or damaged.' });
+    const list = await request(ctx.app, 'GET', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie });
+    expect(list.body.total).toBe(0);
+  });
+
+  it('GeM 404 and oversize documents → 502 gem_unavailable with specific copy (US1 #10, FR-008)', async () => {
+    const gone = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/7000101', contentHash: 'us1-404', source: 'us1-404', gemBidId: 'gone' });
+    const r404 = await request(ctx.app, 'POST', `/tenders/${gone.id}/fetch-documents`, { cookie: roles.analyst.cookie });
+    expect(r404.status).toBe(502);
+    expect(r404.body.error).toMatchObject({ code: 'gem_unavailable', message: 'GeM no longer serves this bid document. Upload the PDF instead.' });
+    const big = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/7000102', contentHash: 'us1-big', source: 'us1-big', gemBidId: 'oversize' });
+    gemCalls.length = 0;
+    const rBig = await request(ctx.app, 'POST', `/tenders/${big.id}/fetch-documents`, { cookie: roles.analyst.cookie });
+    expect(rBig.status).toBe(502);
+    expect(rBig.body.error).toMatchObject({ code: 'gem_unavailable', message: 'The GeM document is larger than 25 MB — download it from GeM and upload it here.' });
+    expect(gemCalls).toHaveLength(1); // not retried
+    const rows = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, big.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('uploading marks the org\'s analysis stale with reason document_added (FR-044)', async () => {
+    const t = await insertTender('go-it-services', { contentHash: 'us1-added', source: 'us1-added' });
+    await upload(t.id, pdfFile('go-it-services'));
+    const a = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(a.body).toMatchObject({ stale: false, staleReason: null, staleAt: null, notes: [] });
+    await upload(t.id, pdfFile('go-it-services', 'ATC.pdf'), roles.analyst.cookie, 'atc');
+    const after = await request(ctx.app, 'GET', `/tenders/${t.id}/analysis`, { cookie: roles.viewer.cookie });
+    expect(after.body).toMatchObject({ id: a.body.id, stale: true, staleReason: 'document_added', staleAt: ctx.clock.now().toISOString() });
+  });
+
+  it('DELETE removes the org\'s own upload (204, blob gone, audited) and marks the analysis stale (US1 #17, FR-009)', async () => {
+    const t = await insertTender('go-it-services', { contentHash: 'us1-remove', source: 'us1-remove', gemBidId: 'go-it-services' });
+    const bid = await upload(t.id, pdfFile('go-it-services'));
+    const atc = await upload(t.id, pdfFile('go-it-services', 'ATC.pdf'), roles.analyst.cookie, 'atc');
+    const a = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(a.status).toBe(201);
+    const [row] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.id, atc.body.id));
+    expect(await ctx.deps.blobs.get(row.blobKey)).not.toBeNull();
+
+    expect((await request(ctx.app, 'DELETE', `/tenders/${t.id}/documents/${atc.body.id}`, { cookie: roles.viewer.cookie })).status).toBe(403);
+    const other = await signup(ctx.app, { orgName: 'Remove Other Co' });
+    const foreign = await request(ctx.app, 'DELETE', `/tenders/${t.id}/documents/${atc.body.id}`, { cookie: other.cookie });
+    expect(foreign.status).toBe(404);
+    expect(foreign.body.error.code).toBe('not_found');
+
+    const del = await request(ctx.app, 'DELETE', `/tenders/${t.id}/documents/${atc.body.id}`, { cookie: roles.analyst.cookie });
+    expect(del.status).toBe(204);
+    expect(del.text).toBe('');
+    expect(await ctx.deps.blobs.get(row.blobKey)).toBeNull();
+    const list = await request(ctx.app, 'GET', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie });
+    expect(list.body.items.map((d: any) => d.id)).toEqual([bid.body.id]);
+    const log = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, roles.orgId), eq(activityLog.action, 'tender.document_removed')));
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({ entityType: 'tender', entityId: t.id, meta: { documentId: atc.body.id, fileName: 'ATC.pdf', kind: 'atc' } });
+    const after = await request(ctx.app, 'GET', `/tenders/${t.id}/analysis`, { cookie: roles.viewer.cookie });
+    expect(after.body).toMatchObject({ id: a.body.id, stale: true, staleReason: 'document_removed' });
+    expect((await request(ctx.app, 'DELETE', `/tenders/${t.id}/documents/${atc.body.id}`, { cookie: roles.analyst.cookie })).status).toBe(404);
+    expect((await request(ctx.app, 'DELETE', `/tenders/${t.id}/documents/not-a-uuid`, { cookie: roles.analyst.cookie })).status).toBe(404);
+  });
+
+  it('GeM-fetched documents cannot be removed (403 forbidden)', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/7000103', contentHash: 'us1-gemdel', source: 'us1-gemdel', gemBidId: 'go-it-services' });
+    const f = await request(ctx.app, 'POST', `/tenders/${t.id}/fetch-documents`, { cookie: roles.analyst.cookie });
+    expect(f.status).toBe(201);
+    const r = await request(ctx.app, 'DELETE', `/tenders/${t.id}/documents/${f.body.items[0].id}`, { cookie: roles.owner.cookie });
+    expect(r.status).toBe(403);
+    expect(r.body.error).toMatchObject({ code: 'forbidden', message: 'Documents fetched from GeM are shared and cannot be removed' });
+    expect((await request(ctx.app, 'GET', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie })).body.total).toBe(1);
   });
 });
