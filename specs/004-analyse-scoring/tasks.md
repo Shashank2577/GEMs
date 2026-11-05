@@ -250,14 +250,14 @@ description: "Task list for 004 Analyse — bid documents, eligibility extractio
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T035a [US2] Follow-up to T035: replace/augment the corpus with real anonymised GeM PDFs (SC-001) — synthesised corpus only so far
+- [ ] T035a [US2] Follow-up to T035: replace/augment the corpus with real anonymised GeM PDFs (SC-001) — synthesised corpus only so far — NOTE: needs-human; see `specs/004-analyse-scoring/corpus/README.md`
 
 - [ ] T095 [P] Update `specs/001-gem-tender-copilot/contracts/api.md § Analyse` with the new endpoints (`DELETE …/documents/:docId`, `…/ocr`, `/analyses/:id/rescore`, `/analysis/capabilities`), new fields (`staleReason`, `staleAt`, `notes`, `lastAttempt`, `textSource`, `bidNumberFound`, `warnings`) and error codes (`analysis_running`, `ocr_unavailable`, `ocr_failed`) FR-009 FR-028 FR-037 FR-043 FR-052 FR-053 (#273) — NOTE: the endpoints/fields/codes that exist now are documented (`DELETE …/documents/:docId`, `/analyses/:id/rescore`, `fetch-documents?refresh=1`, `staleReason`/`staleAt`/`notes`/`lastAttempt`/`textSource`/`bidNumberFound`/`warnings`/`totalPages`, 409 codes); the US7 stub section (`…/ocr`, `/analysis/capabilities`, `ocr_unavailable`, `ocr_failed`) is marked pending. US7 additions land with US7 — tick this task in the US7 PR.
 - [x] T096 [P] Experience basis hint: when contracts give fewer years than the incorporation date, append "(incorporated N years ago — add older contracts as proof)" to the experience detail; tests in `packages/core/src/analyse/score.ts`, `packages/core/test/analyse/score.test.ts` FR-022 (#275) — done: hint only on a failed experience factor when the incorporation date would meet the bid (verified pass sentences unchanged); `packages/core/test/analyse/score.test.ts` "experience basis hint"
-- [ ] T097 Run `/cairn-analyze` on `specs/004-analyse-scoring/` and resolve spec/plan/tasks inconsistencies (#277)
-- [ ] T098 Run `/cairn-taskstoissues` to create GitHub issues for the 7 stories and every open task (labels `spec:004`, `area:analyse`, `type`, `priority`, `role`) on the project board per `CONVENTIONS.md` (#279)
-- [ ] T099 `cairn-reviewer` review of each 004 PR (ai-sdlc review conventions; no Codex), findings recorded on the issue, no blocking findings open per `CONVENTIONS.md` (#281)
-- [ ] T100 QA sign-off: aggregate `qa/evidence/004/US1..US7/VERDICT.md` into `qa/evidence/004/SUMMARY.md` with pass/fail per acceptance scenario and links to screenshots, videos and traces SC-007 (#283)
+- [x] T097 Run `/cairn-analyze` on `specs/004-analyse-scoring/` and resolve spec/plan/tasks inconsistencies (#277) — done: `specs/004-analyse-scoring/analysis-report.md`; inconsistencies fixed in spec/plan/tasks
+- [x] T098 Run `/cairn-taskstoissues` to create GitHub issues for the 7 stories and every open task (labels `spec:004`, `area:analyse`, `type`, `priority`, `role`) on the project board per `CONVENTIONS.md` (#279) — done: issues exist with `spec:004`/`area:analyse-scoring` for the epic #166, stories #167–#172 and #174 and every task except T035a (follow-up, no issue yet); the label is `area:analyse-scoring`
+- [ ] T099 `cairn-reviewer` review of each 004 PR (ai-sdlc review conventions; no Codex), findings recorded on the issue, no blocking findings open per `CONVENTIONS.md` (#281) — NOTE: review record for US1–US6 in `qa/evidence/004/REVIEWS.md` (no blocking findings open); stays open until the US7 PR is reviewed
+- [ ] T100 QA sign-off: aggregate `qa/evidence/004/US1..US7/VERDICT.md` into `qa/evidence/004/SUMMARY.md` with pass/fail per acceptance scenario and links to screenshots, videos and traces SC-007 (#283) — NOTE: `qa/evidence/004/SUMMARY.md` aggregates US1–US6 with US7 = pending; tick and update in the US7 PR
 
 ---
 
