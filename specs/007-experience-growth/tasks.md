@@ -43,7 +43,7 @@ task is sized at ≤ 1 day.
 - [x] T002 [P] E2E scaffold for this spec: create `e2e/007-experience-growth/` and add helpers `evidence007(page, story, name)` (writes `qa/evidence/007/<story>/`), `inviteAs(request, role)` (returns a logged-in context for bid_manager/analyst/viewer), `atPhone(page)` (375×812), `noHorizontalOverflow(page)` (asserts `scrollWidth ≤ innerWidth`) and `seedDemoAndGetWorkspaces(request)` in `e2e/support/fixtures.ts` NFR-007, FR-094 (#299)
 - [x] T003 [P] Add `@axe-core/playwright` (exact version) to root `package.json` devDependencies and an `a11y(page, name)` helper in `e2e/support/fixtures.ts` running tags `wcag2a, wcag2aa, wcag21a, wcag21aa`, failing on serious/critical and saving JSON next to the evidence FR-094, NFR-004 (#300)
 - [x] T004 [P] Create or append root `NOTICE` with the attribution for `arush15june/gem-search` (MIT, © arush15june) covering the bid-result parser ported to `packages/core/src/gem/award.ts` NFR-009 (#301)
-- [ ] T005 [P] Document the new/changed contracts (`myWork`, `awaitingDecision`, `DELETE /demo`, onboarding key whitelist, `bid_workspaces_org_stage_idx`) in `specs/001-gem-tender-copilot/contracts/api.md` § Dashboard & demo and `specs/001-gem-tender-copilot/data-model.md` FR-048, FR-065, FR-070 (#302)
+- [x] T005 [P] Document the new/changed contracts (`myWork`, `awaitingDecision`, `DELETE /demo`, onboarding key whitelist, `bid_workspaces_org_stage_idx`) in `specs/001-gem-tender-copilot/contracts/api.md` § Dashboard & demo and `specs/001-gem-tender-copilot/data-model.md` FR-048, FR-065, FR-070 (#302)
 
 ---
 
@@ -243,9 +243,9 @@ task is sized at ≤ 1 day.
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T079 [P] Update `e2e/README.md` with the 007 helpers (`evidence007`, `inviteAs`, `a11y`, `noHorizontalOverflow`) and mark 001 T081's US6/US7 E2E items as delivered by 007 in `specs/001-gem-tender-copilot/tasks.md` NFR-007 (#352)
-- [ ] T080 Run `/cairn-analyze` across `specs/007-experience-growth/{spec,plan,tasks}.md` and fix inconsistencies; cairn review of each PR against Constitution I and IV first (ai-sdlc review conventions in `CONVENTIONS.md`), recording findings in the PR NFR-007 (#353)
-- [ ] T081 QA roll-up: `qa/evidence/007/README.md` linking each story's `VERDICT.md`, video, trace and screenshots, and the SC-001…SC-008 measurements NFR-007 (#354)
+- [x] T079 [P] Update `e2e/README.md` with the 007 helpers (`evidence007`, `inviteAs`, `a11y`, `noHorizontalOverflow`) and mark 001 T081's US6/US7 E2E items as delivered by 007 in `specs/001-gem-tender-copilot/tasks.md` NFR-007 (#352)
+- [x] T080 Run `/cairn-analyze` across `specs/007-experience-growth/{spec,plan,tasks}.md` and fix inconsistencies; cairn review of each PR against Constitution I and IV first (ai-sdlc review conventions in `CONVENTIONS.md`), recording findings in the PR NFR-007 (#353)
+- [x] T081 QA roll-up: `qa/evidence/007/README.md` linking each story's `VERDICT.md`, video, trace and screenshots, and the SC-001…SC-008 measurements NFR-007 (#354)
 
 ---
 
