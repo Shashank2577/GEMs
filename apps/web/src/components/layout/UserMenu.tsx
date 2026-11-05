@@ -19,6 +19,7 @@ export function UserMenu({ compact, className }: { compact?: boolean; className?
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        data-testid="user-menu"
         className={cn('flex items-center gap-2 rounded-full focus-ring', !compact && 'rounded-lg p-1 pr-2 hover:bg-muted', className)}
       >
         <Avatar name={me.user.name} size="sm" />

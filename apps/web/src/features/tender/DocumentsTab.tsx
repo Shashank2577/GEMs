@@ -120,6 +120,9 @@ function DocRow({ doc, tenderId, bidNumber, onRemove }: { doc: TenderDocumentDto
             <Badge size="sm" tone={doc.kind === 'corrigendum' ? 'warning' : 'neutral'}>{DOC_KIND_LABEL[doc.kind]}</Badge>
             {doc.source === 'gem' ? <span className="inline-flex items-center gap-1"><Globe className="size-3" aria-hidden /> From GeM</span> : <span>Uploaded</span>}
             <span>· {doc.pageCount ?? '?'} pages · {formatBytes(doc.sizeBytes)}</span>
+            {doc.pageCount != null && doc.totalPages != null && doc.totalPages > doc.pageCount && (
+              <Badge size="sm" tone="warning" data-testid="pages-truncated">Only the first {doc.pageCount} of {doc.totalPages} pages were read</Badge>
+            )}
             <Tooltip content={formatDateIST(doc.createdAt, { time: true })}><span>· {relativeTime(doc.createdAt)}</span></Tooltip>
             {!doc.hasText && <Badge size="sm" tone="warning">No text — scanned?</Badge>}
             {doc.bidNumberFound && (

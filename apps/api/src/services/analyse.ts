@@ -64,7 +64,7 @@ export const withPrefix = (prefix: string, summary: string) => (prefix ? `${pref
 export function toDocumentDto(d: DocRow, tenderBidNumber?: string | null): TenderDocumentDto {
   return {
     id: d.id, tenderId: d.tenderId, orgId: d.orgId, kind: d.kind, fileName: d.fileName, sizeBytes: d.sizeBytes,
-    pageCount: d.pageCount, sourceUrl: d.sourceUrl, hasText: !!d.text && d.text.replace(/\s+/g, '').length > 0,
+    pageCount: d.pageCount, totalPages: d.totalPages ?? null, sourceUrl: d.sourceUrl, hasText: !!d.text && d.text.replace(/\s+/g, '').length > 0,
     source: d.orgId ? 'upload' : 'gem', textSource: d.textSource, bidNumberFound: bidNumberMismatch(d, tenderBidNumber),
     createdAt: iso(d.createdAt),
   };
@@ -85,7 +85,7 @@ export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
     score: a.score, confidence: a.confidence, verdict: a.verdict, summary: a.summary, error: a.error, stale: a.stale,
     staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [],
     createdBy: a.createdBy, createdAt: iso(a.createdAt), updatedAt: iso(a.updatedAt),
-    ...(docs ? { documents: docs.map((d) => ({ id: d.id, fileName: d.fileName, kind: d.kind, pageCount: d.pageCount })) } : {}),
+    ...(docs ? { documents: docs.map((d) => ({ id: d.id, fileName: d.fileName, kind: d.kind, pageCount: d.pageCount, totalPages: d.totalPages ?? null })) } : {}),
   };
 }
 
@@ -148,7 +148,7 @@ export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): P
   await deps.blobs.put(blobKey, bytes, { contentType: 'application/pdf' });
   const [doc] = await deps.db.insert(tenderDocuments).values({
     id, tenderId: input.tenderId, orgId: input.orgId, kind: input.kind, fileName, blobKey,
-    sizeBytes: bytes.length, pageCount: pages.length, text: joinPages(pages), sourceUrl: null,
+    sizeBytes: bytes.length, pageCount: pages.length, totalPages, text: joinPages(pages), sourceUrl: null,
   }).returning();
   await logActivity(deps.db, {
     orgId: input.orgId, userId: input.userId, action: 'tender.document_uploaded', entityType: 'tender', entityId: input.tenderId,
@@ -215,12 +215,12 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
   const fileName = `${tender.bidNumber.replace(/[^\w-]+/g, '-')}.pdf`;
   const [doc] = await deps.db.insert(tenderDocuments).values({
     id, tenderId: tender.id, orgId: null, kind: 'bid', fileName, blobKey, sizeBytes: got.bytes.length,
-    pageCount: pages.length, text: joinPages(pages), sourceUrl: got.url,
+    pageCount: pages.length, totalPages, text: joinPages(pages), sourceUrl: got.url,
   }).returning();
   if (!tender.documentUrl) await deps.db.update(tenders).set({ documentUrl: got.url }).where(eq(tenders.id, tender.id));
   await logActivity(deps.db, {
     orgId: input.orgId, userId: input.userId, action: 'tender.document_fetched', entityType: 'tender', entityId: tender.id,
-    meta: { documentId: id, pages: pages.length, sourceUrl: got.url },
+    meta: { documentId: id, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), sourceUrl: got.url },
   });
   return { documents: [doc], fetched: 1, tender };
 }

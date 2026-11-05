@@ -615,6 +615,13 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     expect(got.body.factors.find((f: any) => f.key === 'experience').overridden).toMatchObject({ status: 'pass', reason: 'JV partner brings 6 years' });
     expect(got.body.lastAttempt).toEqual({ status: 'failed', error: 'database unavailable', at: ctx.clock.now().toISOString() });
 
+    // S2: the feed card and tender detail keep the last done score after the failed re-analysis.
+    const feed = await request(ctx.app, 'GET', `/tenders/${t.id}`, { cookie: roles.viewer.cookie });
+    expect(feed.body.analysis).toMatchObject({ id: first.body.id, score: ov.body.score, verdict: 'go' });
+    expect(feed.body.analysisDetail).toMatchObject({ id: first.body.id, status: 'done' });
+    const sorted = await request(ctx.app, 'GET', '/tenders?sort=-score&limit=50', { cookie: roles.viewer.cookie });
+    expect(sorted.body.items.find((i: any) => i.id === t.id)?.analysis).toMatchObject({ id: first.body.id, score: ov.body.score });
+
     // Re-analysing after the failure carries the override from the last DONE analysis, not the failed row.
     ctx.clock.advance(1000);
     const again = await POST(ctx.app, t.id);

@@ -122,8 +122,25 @@ export function isAnalysisRunning(a: Pick<AnalysisDto, 'lastAttempt'> | null | u
  */
 export function failedAttemptCopy(a: Pick<AnalysisDto, 'status' | 'lastAttempt' | 'updatedAt'> | null | undefined, now: Date = new Date()): string | null {
   if (!a || a.status !== 'done' || a.lastAttempt?.status !== 'failed') return null;
-  const reason = (a.lastAttempt.error ?? '').trim().replace(/[.\s]+$/, '') || 'unknown error';
+  const reason = friendlyAnalysisError(a.lastAttempt.error).replace(/[.\s]+$/, '');
   return `The last re-analysis failed: ${reason}. Showing the previous result from ${relativeTime(a.updatedAt, now)}.`;
+}
+
+/**
+ * A user-safe reason for a failed analysis (S6). The raw error is kept in logs and the DB; only the
+ * known-safe cases are shown, anything else (stack-ish or provider text) becomes a generic message.
+ */
+export function friendlyAnalysisError(raw: string | null | undefined): string {
+  const e = (raw ?? '').trim();
+  if (/timed out|took too long/i.test(e)) return 'it took too long and timed out';
+  if (/pdf|unreadable|password/i.test(e)) return 'a document could not be read';
+  return 'something went wrong while reading the documents';
+}
+
+/** Documents whose page count was capped (S1): `pageCount` read of `totalPages`. */
+export function truncatedDocuments(docs: readonly { fileName: string; pageCount: number | null; totalPages?: number | null }[] | undefined) {
+  return (docs ?? []).filter((d) => d.pageCount != null && d.totalPages != null && d.totalPages > d.pageCount)
+    .map((d) => ({ fileName: d.fileName, analysed: d.pageCount as number, total: d.totalPages as number }));
 }
 
 /**

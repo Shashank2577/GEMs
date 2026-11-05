@@ -127,7 +127,7 @@ export function experienceYears(pcs: ScorePastContract[], profile: ScoreProfile 
 const OEM_STOPWORDS = new Set([
   'the', 'and', 'for', 'with', 'from', 'supply', 'supplies', 'purchase', 'procurement', 'installation', 'commissioning', 'maintenance',
   'service', 'services', 'item', 'items', 'product', 'products', 'equipment', 'equipments', 'system', 'systems', 'related', 'type', 'set',
-  'new', 'various', 'other', 'others', 'gem', 'bid', 'tender', 'including', 'complete', 'including', 'unit', 'units', 'india', 'indian',
+  'new', 'various', 'other', 'others', 'gem', 'bid', 'tender', 'including', 'complete', 'unit', 'units', 'india', 'indian',
   'limited', 'ltd', 'pvt', 'private', 'authorised', 'authorized', 'authorisation', 'authorization', 'partner', 'reseller', 'channel',
 ]);
 

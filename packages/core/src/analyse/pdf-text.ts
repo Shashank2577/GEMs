@@ -34,9 +34,10 @@ export interface ExtractedPdf {
 export async function extractPdf(bytes: Uint8Array | ArrayBuffer, opts: { maxPages?: number } = {}): Promise<ExtractedPdf> {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   if (!isPdf(data)) throw new PdfTextError('The file is not a PDF');
+  let pdf: Awaited<ReturnType<typeof getDocumentProxy>> | undefined;
   try {
     // pdf.js transfers/detaches the buffer it is given; pass a copy so callers keep theirs.
-    const pdf = await getDocumentProxy(new Uint8Array(data));
+    pdf = await getDocumentProxy(new Uint8Array(data));
     const totalPages = pdf.numPages;
     const take = Math.min(totalPages, opts.maxPages ?? totalPages);
     const pages: string[] = [];
@@ -47,10 +48,11 @@ export async function extractPdf(bytes: Uint8Array | ArrayBuffer, opts: { maxPag
         .replace(/\r\n?/g, '\n').replace(/\f/g, ' '));
       page.cleanup();
     }
-    await pdf.cleanup();
     return { pages, totalPages };
   } catch (e) {
     throw new PdfTextError(`Could not read the PDF: ${(e as Error).message}`);
+  } finally {
+    await pdf?.destroy().catch(() => undefined);
   }
 }
 

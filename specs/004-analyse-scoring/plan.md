@@ -290,7 +290,10 @@ All ports recorded in a new root `NOTICE` (the file is referenced from `gem/clie
   `MAX_EXTRACT_PAGES = 150` (typical GeM bid + ATC are 20-100 pages) in `packages/core/src/contracts/analyse.ts`; extraction
   runs sequentially page by page (`extractPdf` in `pdf-text.ts`); an upload over the cap stores the first 150 pages, answers
   with a `pages_truncated` warning (shown as a toast) and records `totalPages` on the `tender.document_uploaded` activity.
-  GeM-fetched documents are capped the same way (logged). CI-safe coverage lives in `apps/api/test/analyse-large.test.ts`
+  GeM-fetched documents are capped the same way. The real page count is persisted (`tender_documents.total_pages`, migration
+  0012) and shown in the Documents tab and on the Analysis panel, so truncation is never silent (see ADR-0007 Amendment 1).
+  **Scope of the measurement:** T052 measured text extraction under workerd only (local `wrangler dev`); upload, analyse and
+  the DB path were exercised under Node/vitest, never end to end under workerd or production Workers limits. CI-safe coverage lives in `apps/api/test/analyse-large.test.ts`
   (160-page PDF). Follow-up if production still reports memory-limit errors: avoid the extra `new Uint8Array(data)` copy by
   storing to R2 first and handing pdf.js ownership of the buffer, and stream the multipart body.
 - **Label-to-next-label parsing** over line-prefix parsing (Mujahid-Alam) or single-regex-per-field (erenmyeager15): robust to bilingual labels that wrap and interleave. Kept; extend the label table instead.

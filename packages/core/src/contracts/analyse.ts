@@ -61,7 +61,10 @@ export interface TenderDocumentDto {
   kind: TenderDocKind;
   fileName: string;
   sizeBytes: number;
+  /** Pages read (capped at 150, 004/NFR-005). */
   pageCount: number | null;
+  /** The PDF's real page count; > pageCount means the document was truncated. Null for rows that predate the column. */
+  totalPages: number | null;
   sourceUrl: string | null;
   hasText: boolean;
   source: 'gem' | 'upload';
@@ -101,7 +104,7 @@ export interface AnalysisDto {
   createdAt: string;
   updatedAt: string;
   /** Documents the analysis read. */
-  documents?: { id: string; fileName: string; kind: TenderDocKind; pageCount: number | null }[];
+  documents?: { id: string; fileName: string; kind: TenderDocKind; pageCount: number | null; totalPages?: number | null }[];
   /**
    * GET …/analysis only (FR-029): the newest attempt when it is still running or failed. The DTO
    * itself is then the latest done analysis (or that attempt when nothing has completed yet).

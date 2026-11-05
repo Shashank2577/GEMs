@@ -12,7 +12,7 @@ import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useOverride } from './api';
 import { ChecklistCard } from './ChecklistCard';
-import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, failedAttemptCopy, isAnalysisRunning } from './labels';
+import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, failedAttemptCopy, friendlyAnalysisError, isAnalysisRunning, truncatedDocuments } from './labels';
 
 const eff = (f: ScoreFactor): FactorStatus => f.overridden?.status ?? f.status;
 
@@ -52,7 +52,7 @@ export function AnalysisInProgress({ hasResult }: { hasResult: boolean }) {
 /** US3 #15: the newest attempt failed; the previous result stays visible below (FR-029). */
 function FailedAttemptWarning({ copy, canAnalyse, onReanalyse, reanalysing, disabled }: { copy: string; canAnalyse: boolean; onReanalyse: () => void; reanalysing: boolean; disabled: boolean }) {
   return (
-    <div role="alert" className="flex flex-col gap-3 rounded-xl border border-danger/30 bg-danger-soft/50 p-4 sm:flex-row sm:items-center">
+    <div role="status" className="flex flex-col gap-3 rounded-xl border border-danger/30 bg-danger-soft/50 p-4 sm:flex-row sm:items-center">
       <TriangleAlert className="size-5 shrink-0 text-danger" aria-hidden />
       <p className="min-w-0 flex-1 text-sm">{copy}</p>
       {canAnalyse && <Button size="sm" variant="secondary" onClick={onReanalyse} loading={reanalysing} disabled={disabled}>{!reanalysing && <RefreshCw />} Try again</Button>}
@@ -77,6 +77,7 @@ export function AnalysisPanel({
 
   const running = isAnalysisRunning(analysis);
   const failedCopy = failedAttemptCopy(analysis);
+  const truncated = truncatedDocuments(analysis.documents);
 
   const state = analysisPanelState(analysis);
   if (state.kind === 'in_progress') return <AnalysisInProgress hasResult={false} />;
@@ -86,7 +87,7 @@ export function AnalysisPanel({
       <Card className="border-danger/30">
         <CardContent className="flex flex-col items-start gap-3 p-6">
           <div className="flex items-center gap-2 font-semibold text-danger"><AlertOctagon className="size-5" /> The last analysis failed</div>
-          <p className="text-sm text-muted-foreground">{state.error ?? 'Something went wrong while reading the documents.'} Try again, or upload a cleaner PDF in the Documents tab.</p>
+          <p className="text-sm text-muted-foreground">Reason: {friendlyAnalysisError(state.error)}. Try again, or upload a cleaner PDF in the Documents tab.</p>
           {canAnalyse && <Button size="sm" onClick={onReanalyse} loading={reanalysing} disabled={analyseDisabled}><RefreshCw /> Try again</Button>}
         </CardContent>
       </Card>
@@ -104,6 +105,12 @@ export function AnalysisPanel({
       <div className="grid min-w-0 content-start gap-6">
         {running && <AnalysisInProgress hasResult />}
         {!running && failedCopy && <FailedAttemptWarning copy={failedCopy} canAnalyse={canAnalyse} onReanalyse={onReanalyse} reanalysing={reanalysing} disabled={analyseDisabled} />}
+        {truncated.length > 0 && (
+          <div data-testid="truncated-note" className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft/50 p-4 text-sm">
+            <Info className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <p>{truncated.map((d) => `${d.fileName}: only the first ${d.analysed} of ${d.total} pages were read.`).join(' ')} Requirements later in the file were not analysed; upload the key sections as a separate PDF.</p>
+          </div>
+        )}
         <ScoreCard analysis={analysis} onReanalyse={onReanalyse} reanalysing={reanalysing} canAnalyse={canAnalyse} disabled={analyseDisabled} />
 
         <Card>

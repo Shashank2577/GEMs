@@ -22,6 +22,7 @@ export function OrgSwitcher({ collapsed, className }: { collapsed?: boolean; cla
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        data-testid="org-switcher"
         className={cn('group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring', collapsed && 'justify-center', className)}
         aria-label={collapsed ? `Organization: ${me.org.name}. Switch organization` : undefined}
       >

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Requirement } from '@tp/core/contracts/analyse';
 import type { TenderDocumentDto } from '@tp/core/contracts/analyse';
-import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
+import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, friendlyAnalysisError, truncatedDocuments, isAnalysisRunning, mismatchedDocuments, staleReasonCopy } from './labels';
 
 describe('staleReasonCopy (FR-043)', () => {
   it('falls back to the corrigendum copy when the reason is null or missing (legacy stale analyses)', () => {
@@ -67,9 +67,11 @@ describe('run lifecycle copy (FR-028, FR-029)', () => {
 
   it('failedAttemptCopy shows the reason and the previous result time (US3 #15)', () => {
     expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'failed', error: 'LLM provider down.', at: now.toISOString() } }, now))
-      .toBe('The last re-analysis failed: LLM provider down. Showing the previous result from 3 hours ago.');
+      .toBe('The last re-analysis failed: something went wrong while reading the documents. Showing the previous result from 3 hours ago.');
+    expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'failed', error: 'timed out', at: now.toISOString() } }, now))
+      .toBe('The last re-analysis failed: it took too long and timed out. Showing the previous result from 3 hours ago.');
     expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'failed', error: null, at: now.toISOString() } }, now))
-      .toBe('The last re-analysis failed: unknown error. Showing the previous result from 3 hours ago.');
+      .toBe('The last re-analysis failed: something went wrong while reading the documents. Showing the previous result from 3 hours ago.');
   });
 
   it('analysisPanelState: a first-ever run that timed out is failed with Try again, never "in progress" (S3)', () => {
@@ -86,5 +88,19 @@ describe('run lifecycle copy (FR-028, FR-029)', () => {
     expect(failedAttemptCopy(done, now)).toBeNull();
     expect(failedAttemptCopy({ ...done, lastAttempt: { status: 'running', error: null, at: now.toISOString() } }, now)).toBeNull();
     expect(failedAttemptCopy({ status: 'failed', updatedAt: done.updatedAt, lastAttempt: { status: 'failed', error: 'boom', at: now.toISOString() } }, now)).toBeNull();
+  });
+
+  it('friendlyAnalysisError hides raw provider/stack text but keeps timed out friendly (S6)', () => {
+    expect(friendlyAnalysisError('timed out')).toBe('it took too long and timed out');
+    expect(friendlyAnalysisError('ECONNREFUSED 10.0.0.4:5432 at Object.query (/srv/db.js:12)')).toBe('something went wrong while reading the documents');
+    expect(friendlyAnalysisError(null)).toBe('something went wrong while reading the documents');
+  });
+
+  it('truncatedDocuments lists only documents whose pages were capped (S1)', () => {
+    expect(truncatedDocuments([
+      { fileName: 'a.pdf', pageCount: 150, totalPages: 280 }, { fileName: 'b.pdf', pageCount: 20, totalPages: 20 },
+      { fileName: 'c.pdf', pageCount: 5, totalPages: null }, { fileName: 'd.pdf', pageCount: 5 },
+    ])).toEqual([{ fileName: 'a.pdf', analysed: 150, total: 280 }]);
+    expect(truncatedDocuments(undefined)).toEqual([]);
   });
 });
