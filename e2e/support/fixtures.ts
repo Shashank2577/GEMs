@@ -1,6 +1,7 @@
-import { test as base, expect, type Page, type APIRequestContext } from '@playwright/test';
-import { mkdirSync, copyFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { test as base, expect, request as playwrightRequest, type Page, type APIRequestContext, type Browser, type BrowserContext } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 export const GEM_URL = `http://127.0.0.1:${process.env.E2E_GEM_PORT || 4011}`;
 
@@ -60,6 +61,102 @@ export async function collectRunArtifacts(spec: string, story: string, page: Pag
   const video = page.video();
   await page.close();
   if (video) { try { copyFileSync(await video.path(), join(dir, `${slug}-${info.project.name}.webm`)); } catch { /* no video */ } }
+}
+
+// ───────────── 007 Experience & Growth helpers (T002, T003) ─────────────
+
+/** Evidence screenshot for spec 007: writes `qa/evidence/007/<story>/<name>.png` (story = 'US1' … 'US7'). */
+export function evidence007(page: Page, story: string, name: string) {
+  return evidence(page, '007', story, name);
+}
+
+export type InvitedRole = 'bid_manager' | 'analyst' | 'viewer';
+
+export interface InvitedUser {
+  user: ReturnType<typeof uniqueUser>;
+  role: InvitedRole;
+  /** Logged-in API context for the invited user (dispose() it when done). */
+  api: APIRequestContext;
+  /** Cookies of the logged-in session, usable with `browser.newContext({ storageState })`. */
+  storageState: Awaited<ReturnType<APIRequestContext['storageState']>>;
+  /** A browser context logged in as this user, with the project's base URL, timezone and locale. */
+  newContext(browser: Browser): Promise<BrowserContext>;
+  /** Shortcut: a fresh page in `newContext(browser)`. */
+  newPage(browser: Browser): Promise<Page>;
+}
+
+/**
+ * Invite a new member with `role` into the org of `request` (must be an Owner/Bid Manager session), accept the
+ * invitation and return a logged-in context for them. Usage:
+ *   const analyst = await inviteAs(page.request, 'analyst');
+ *   const p = await analyst.newPage(browser); await p.goto('/dashboard');
+ */
+export async function inviteAs(request: APIRequestContext, role: InvitedRole): Promise<InvitedUser> {
+  const use = base.info().project.use;
+  const baseURL = use.baseURL;
+  const user = uniqueUser(role.replace('_', ''));
+  const inv = await request.post('/api/org/invitations', { data: { email: user.email, role } });
+  expect(inv.status(), await inv.text()).toBe(201);
+  const token = String((await inv.json()).inviteUrl).split('/invite/')[1];
+  expect(token, 'invite token').toBeTruthy();
+  const api = await playwrightRequest.newContext({ baseURL });
+  const acc = await api.post('/api/auth/accept-invite', { data: { token, name: user.name, password: user.password } });
+  expect(acc.status(), await acc.text()).toBe(200);
+  const storageState = await api.storageState();
+  const newContext = (browser: Browser) =>
+    browser.newContext({ ...base.info().project.use, storageState, baseURL, timezoneId: use.timezoneId, locale: use.locale });
+  return {
+    user, role, api, storageState, newContext,
+    async newPage(browser) { return (await newContext(browser)).newPage(); },
+  };
+}
+
+/** Phone viewport used by the 007 mobile checks (375 × 812). */
+export async function atPhone(page: Page) {
+  await page.setViewportSize({ width: 375, height: 812 });
+}
+
+/** Assert the page does not scroll horizontally (`scrollWidth ≤ innerWidth`). */
+export async function noHorizontalOverflow(page: Page) {
+  const m = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+  expect(m.scrollWidth, `horizontal overflow: scrollWidth ${m.scrollWidth} > innerWidth ${m.innerWidth}`).toBeLessThanOrEqual(m.innerWidth);
+  return m;
+}
+
+/** Seed the demo dataset into the current org and return the seed response plus the org's workspace cards. */
+export async function seedDemoAndGetWorkspaces(request: APIRequestContext) {
+  const seeded = await request.post('/api/demo/seed');
+  expect(seeded.ok(), await seeded.text()).toBeTruthy();
+  const list = await request.get('/api/workspaces');
+  expect(list.ok(), await list.text()).toBeTruthy();
+  const body = await list.json();
+  return { seed: await seeded.json(), workspaces: body.items as { id: string; stage: string; tender: { id: string; title: string } & Record<string, unknown> }[], list: body };
+}
+
+export const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+
+/**
+ * Accessibility audit with axe (WCAG 2.1 A/AA). Saves the full result as JSON next to the evidence
+ * (`qa/evidence/<spec>/<story>/<name>.axe.json`) and fails on any serious or critical violation.
+ * `story` defaults to the `US<n>` in the test file name (e.g. US1-dashboard.e2e.ts → 'US1').
+ */
+export async function a11y(page: Page, name: string, opts: { spec?: string; story?: string; include?: string[]; exclude?: string[]; disableRules?: string[] } = {}) {
+  const info = base.info();
+  const spec = opts.spec ?? '007';
+  const story = opts.story ?? basename(info.file).match(/US\d+/)?.[0] ?? 'misc';
+  let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
+  for (const sel of opts.include ?? []) builder = builder.include(sel);
+  for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
+  if (opts.disableRules?.length) builder = builder.disableRules(opts.disableRules);
+  const results = await builder.analyze();
+  const dir = join('qa', 'evidence', spec, story);
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, `${name}.axe.json`);
+  writeFileSync(file, JSON.stringify({ url: results.url, timestamp: results.timestamp, violations: results.violations, incomplete: results.incomplete, passes: results.passes.length }, null, 2));
+  await info.attach(`${name}.axe.json`, { path: file, contentType: 'application/json' });
+  const blocking = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+  expect(blocking.map((v) => ({ id: v.id, impact: v.impact, help: v.help, targets: v.nodes.slice(0, 5).map((n) => n.target.join(' ')) })), `axe serious/critical violations on ${name}`).toEqual([]);
+  return results;
 }
 
 export const test = base;
