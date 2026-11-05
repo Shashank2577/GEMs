@@ -199,7 +199,8 @@ export const queryClient: QueryClient = new QueryClient({
     onError: (err, _vars, _ctx, mutation) => {
       if (handleSessionEnd(err, mutation.meta) || handleForbidden(err)) return;
       // Offline / unreachable (007/FR-096): mutations are not paused (networkMode 'always'), so they fail at once; say so once.
-      if (err instanceof ApiError && err.status === 0) toast.error(err.message, { id: errorToastId(err.message) });
+      // Mutations that toast their own failure set `meta.handlesNetworkError` so the user sees one toast, not two.
+      if (err instanceof ApiError && err.status === 0 && !mutation.meta?.handlesNetworkError) toast.error(err.message, { id: errorToastId(err.message) });
     },
   }),
   defaultOptions: {

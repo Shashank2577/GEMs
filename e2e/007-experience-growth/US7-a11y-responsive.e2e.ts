@@ -120,7 +120,7 @@ for (const vp of VIEWPORTS) {
         SUMMARY[name] = { axeFailed: true };
         try {
           const results = await a11y(page, name, { story: `${STORY}/axe`, spec: '007' });
-          SUMMARY[name] = { violations: results.violations.length, serious: 0 };
+          SUMMARY[name] = { violations: results.violations.length, serious: results.violations.filter((v) => v.impact === 'serious').length };
         } catch (e) {
           problems.push({ axe: flat(e) });
         }
