@@ -13,11 +13,16 @@ export function usePipeline(f: { mine: boolean; q: string }) {
   });
 }
 
+/** PATCH body of a card move: only the fields that were given (a plain stage move carries no `position`). */
+export const moveBody = ({ stage, position }: { stage?: string; position?: number }) => ({
+  ...(stage ? { stage } : {}), ...(position !== undefined ? { position } : {}),
+});
+
 export function useMoveCard() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, stage, position }: { id: string; stage?: string; position?: number }) =>
-      api.patch<WorkspaceDto>(`/workspaces/${id}`, { ...(stage ? { stage } : {}), ...(position !== undefined ? { position } : {}) }),
+      api.patch<WorkspaceDto>(`/workspaces/${id}`, moveBody({ stage, position })),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: ['workspaces'] });
       qc.invalidateQueries({ queryKey: ['workspace', v.id] });

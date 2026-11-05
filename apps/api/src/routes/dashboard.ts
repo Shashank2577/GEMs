@@ -29,6 +29,8 @@ const DAY = 86_400_000;
 const IST_OFFSET = 330 * 60_000;
 const STAGES: DashboardStage[] = ['identified', 'analysing', 'go', 'preparing', 'ready', 'submitted', 'won', 'lost', 'dropped'];
 const CLOSED_STAGES: DashboardStage[] = ['won', 'lost', 'dropped'];
+/** "My bids" lists work still in flight: closed outcomes and already-submitted bids (spec US5-2) are excluded. */
+const MY_WORK_EXCLUDED_STAGES: DashboardStage[] = [...CLOSED_STAGES, 'submitted'];
 /** Cap of both persona lists (FR-070). */
 const MY_WORK_LIMIT = 5;
 
@@ -192,7 +194,7 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
       w: bidWorkspaces, bidNumber: tenders.bidNumber, title: tenders.title, endAt: tenders.endAt,
     }).from(bidWorkspaces).innerJoin(tenders, eq(tenders.id, bidWorkspaces.tenderId))
       .where(and(
-        eq(bidWorkspaces.orgId, org), notInArray(bidWorkspaces.stage, CLOSED_STAGES),
+        eq(bidWorkspaces.orgId, org), notInArray(bidWorkspaces.stage, MY_WORK_EXCLUDED_STAGES),
         or(eq(bidWorkspaces.ownerId, me), sql`${bidWorkspaces.assigneeIds} @> ${JSON.stringify([me])}::jsonb`),
       ))
       .orderBy(sql`${bidWorkspaces.dueAt} asc nulls last`, sql`${tenders.endAt} asc nulls last`, bidWorkspaces.id)
@@ -204,12 +206,12 @@ dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
       from ${bidWorkspaces} w
       join ${tenders} t on t.id = w.tender_id
       join lateral (
-        select x.status, x.score, x.verdict from ${analyses} x
+        select x.status, x.score, x.verdict, x.updated_at from ${analyses} x
         where x.org_id = w.org_id and x.tender_id = w.tender_id
-        order by x.created_at desc limit 1
+        order by x.created_at desc, x.id desc limit 1
       ) a on a.status = 'done'
       where w.org_id = ${org} and w.stage = 'analysing'
-      order by w.updated_at asc, w.id
+      order by a.updated_at asc, w.created_at asc, w.id
       limit ${MY_WORK_LIMIT}`),
   ]);
 

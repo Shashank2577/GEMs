@@ -1,9 +1,9 @@
 /**
  * "Awaiting your decision" (T061; 007/FR-072, US5) — analysed bids that need a Go / No-Go call. bid_manager+ get one-tap
- * "Go" and "Drop" (each behind a confirmation) that reuse the pipeline's `useMoveCard()` PATCH; analysts see the same
+ * "Go" (one tap, no dialog) and "Drop" (behind a confirmation) that reuse the pipeline's `useMoveCard()` PATCH; analysts see the same
  * list read-only; viewers never get the card (DashboardPage). Moving a card refreshes ['dashboard'], so it leaves the list.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Gavel, X } from 'lucide-react';
 import type { DecisionItem } from '@tp/core/contracts/experience';
@@ -19,7 +19,7 @@ export const DECISIONS_EMPTY = 'Nothing is waiting on a decision — analysed bi
 
 type Choice = 'go' | 'drop';
 export const CHOICES: Record<Choice, { stage: 'go' | 'dropped'; label: string; title: string; confirm: string; done: string; tone: 'primary' | 'danger' }> = {
-  go: { stage: 'go', label: 'Go', title: 'Move this bid to Go?', confirm: 'Go', done: 'Moved to Go', tone: 'primary' },
+  go: { stage: 'go', label: 'Go', title: 'Move this bid to Go?', confirm: 'Go', done: 'Moved to Go', tone: 'primary' }, // one tap: title/confirm unused
   drop: { stage: 'dropped', label: 'Drop', title: 'Drop this bid?', confirm: 'Drop', done: 'Bid dropped', tone: 'danger' },
 };
 
@@ -29,9 +29,25 @@ export function DecisionsCard({ items, className }: { items?: DecisionItem[]; cl
   const move = useMoveCard();
   const [pending, setPending] = useState<{ item: DecisionItem; choice: Choice } | null>(null);
   const choice = pending ? CHOICES[pending.choice] : null;
+  // Rows with a Go in flight: a ref guards against same-tick double taps, state drives the disabled UI.
+  const inFlight = useRef(new Set<string>());
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const setRowBusy = (id: string, on: boolean) => {
+    if (on) inFlight.current.add(id); else inFlight.current.delete(id);
+    setBusy(new Set(inFlight.current));
+  };
+  const goNow = (workspaceId: string) => {
+    if (inFlight.current.has(workspaceId)) return;
+    setRowBusy(workspaceId, true);
+    move.mutate({ id: workspaceId, stage: CHOICES.go.stage }, {
+      onSuccess: () => toast.success(CHOICES.go.done),
+      onError: (e) => toast.error(errorMessage(e)),
+      onSettled: () => setRowBusy(workspaceId, false),
+    });
+  };
 
   return (
-    <Card className={cn('flex flex-col', className)} aria-labelledby="decisions-title">
+    <Card role="region" className={cn('flex flex-col', className)} aria-labelledby="decisions-title">
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle id="decisions-title">Awaiting your decision</CardTitle>
@@ -61,8 +77,8 @@ export function DecisionsCard({ items, className }: { items?: DecisionItem[]; cl
                 </Link>
                 {canDecide && it.workspaceId && (
                   <div className="flex shrink-0 gap-2">
-                    <Button className="h-11 flex-1 sm:h-9 sm:flex-none" onClick={() => setPending({ item: it, choice: 'go' })} aria-label={`Go: ${it.title}`}><Check /> Go</Button>
-                    <Button variant="secondary" className="h-11 flex-1 sm:h-9 sm:flex-none" onClick={() => setPending({ item: it, choice: 'drop' })} aria-label={`Drop: ${it.title}`}><X /> Drop</Button>
+                    <Button className="h-11 flex-1 sm:h-9 sm:flex-none" onClick={() => goNow(it.workspaceId!)} disabled={busy.has(it.workspaceId)} aria-label={`Go: ${it.title}`}><Check /> Go</Button>
+                    <Button variant="secondary" className="h-11 flex-1 sm:h-9 sm:flex-none" onClick={() => setPending({ item: it, choice: 'drop' })} disabled={busy.has(it.workspaceId)} aria-label={`Drop: ${it.title}`}><X /> Drop</Button>
                   </div>
                 )}
               </li>

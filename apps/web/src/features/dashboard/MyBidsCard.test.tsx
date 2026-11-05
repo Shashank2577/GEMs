@@ -25,6 +25,8 @@ describe('MyBidsCard (007/FR-071)', () => {
     expect(html).toContain('Due 10 Jan 2099');
     expect(html).toContain('60% · 2 blockers');
     expect(html).toContain('href="/workspaces/w1"');
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Readiness: Supply of laptops"');
     expect(html).not.toContain('data-overdue');
   });
 

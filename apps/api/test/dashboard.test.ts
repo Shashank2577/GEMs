@@ -312,10 +312,11 @@ describe('GET /api/dashboard — persona widgets (myWork, awaitingDecision)', ()
     const a = await mk('preparing', 9, { ownerId: me, dueAt: days(3) });
     const b = await mk('go', 5, { assigneeIds: [other, me], dueAt: days(1) });
     const c = await mk('identified', 4, { ownerId: me }); // no dueAt → after dated ones, by endAt
-    const d2 = await mk('submitted', 2, { assigneeIds: [me] }); // no dueAt, earlier endAt than c
+    const d2 = await mk('ready', 2, { assigneeIds: [me] }); // no dueAt, earlier endAt than c
     const e = await mk('analysing', null, { ownerId: me }); // no dueAt, no endAt → last
     await mk('won', 1, { ownerId: me, dueAt: days(0) });        // closed stages excluded
     await mk('lost', 1, { assigneeIds: [me] });
+    await mk('submitted', 1, { ownerId: me, dueAt: days(0) }); // submitted is no longer in flight (US5-2)
     await mk('dropped', 1, { ownerId: me });
     await mk('preparing', 1, { ownerId: other, assigneeIds: [other], dueAt: days(0) }); // someone else's
     const g = await mk('go', 6, { ownerId: me, dueAt: days(20) }); // sixth active item: `e` (no dates) is cut by the cap of 5
@@ -323,7 +324,7 @@ describe('GET /api/dashboard — persona widgets (myWork, awaitingDecision)', ()
     expect(e.ws.id).toBeTruthy();
     expect(r.myWork!.map((x) => x.workspaceId)).toEqual([b.ws.id, a.ws.id, g.ws.id, d2.ws.id, c.ws.id]);
     expect(r.myWork).toHaveLength(5);
-    expect(r.myWork!.every((x) => !['won', 'lost', 'dropped'].includes(x.stage))).toBe(true);
+    expect(r.myWork!.every((x) => !['won', 'lost', 'dropped', 'submitted'].includes(x.stage))).toBe(true);
     expect(r.myWork![0]).toMatchObject({ tenderId: b.t.id, bidNumber: b.t.bidNumber, stage: 'go', dueAt: days(1).toISOString(), endAt: days(5).toISOString() });
 
     // Without the 20-day item the order is fully determined: due ↑, then endAt ↑ with nulls last (cap not reached).
@@ -337,7 +338,7 @@ describe('GET /api/dashboard — persona widgets (myWork, awaitingDecision)', ()
     const w1 = await mk2('preparing', 9, { ownerId: me2, dueAt: days(3) });
     const w2 = await mk2('go', 5, { assigneeIds: [me2], dueAt: days(1) });
     const w3 = await mk2('identified', 4, { ownerId: me2 });
-    const w4 = await mk2('submitted', 2, { assigneeIds: [me2] });
+    const w4 = await mk2('ready', 2, { assigneeIds: [me2] });
     const w5 = await mk2('analysing', null, { ownerId: me2 });
     const ordered = await dash(o2.bidManager.cookie);
     expect(ordered.myWork!.map((x) => x.workspaceId)).toEqual([w2, w1, w4, w3, w5]);
@@ -369,7 +370,7 @@ describe('GET /api/dashboard — persona widgets (myWork, awaitingDecision)', ()
     const mk = async (stage: typeof bidWorkspaces.$inferInsert['stage'], updatedAt: Date, a?: Partial<typeof analyses.$inferInsert> | null) => {
       const t = await tender(days(10));
       const [ws] = await ctx.db.insert(bidWorkspaces).values({ orgId, tenderId: t.id, stage, updatedAt }).returning();
-      if (a !== null) await analysis(orgId, t.id, a);
+      if (a !== null) await analysis(orgId, t.id, { updatedAt, ...a });
       return { t, id: ws!.id };
     };
     const newest = await mk('analysing', days(-1), { score: 55, verdict: 'review' });

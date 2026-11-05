@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DecisionItem } from '@tp/core/contracts/experience';
 import { TooltipProvider } from '@/components/ui';
 import { can as canRole } from '@/lib/auth';
+import { moveBody } from '../pipeline/api';
 
 let role: 'owner' | 'bid_manager' | 'analyst' | 'viewer' = 'owner';
 vi.mock('@/lib/auth', async (orig) => {
@@ -24,6 +25,18 @@ describe('DecisionsCard (007/FR-072)', () => {
   it('moves to Go / Dropped through the pipeline stages', () => {
     expect(CHOICES.go.stage).toBe('go');
     expect(CHOICES.drop.stage).toBe('dropped');
+  });
+
+  it('Go is one tap: PATCH {stage:"go"} with no position', () => {
+    expect(CHOICES.go.done).toBe('Moved to Go');
+    expect(moveBody({ stage: CHOICES.go.stage })).toStrictEqual({ stage: 'go' });
+    expect(moveBody({ stage: 'go', position: 0 })).toStrictEqual({ stage: 'go', position: 0 });
+  });
+
+  it('exposes the card as a labelled region', () => {
+    const html = render([item]);
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-labelledby="decisions-title"');
   });
 
   it.each(['owner', 'bid_manager'] as const)('%s sees Go and Drop on each row', (r) => {

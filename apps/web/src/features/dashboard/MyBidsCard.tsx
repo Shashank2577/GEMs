@@ -20,7 +20,7 @@ export const isOverdue = (dueAt: string | null, now: Date): boolean => !!dueAt &
 export function MyBidsCard({ items, className }: { items?: MyWorkItem[]; className?: string }) {
   const now = useNow(60_000);
   return (
-    <Card className={cn('flex flex-col', className)} aria-labelledby="my-bids-title">
+    <Card role="region" className={cn('flex flex-col', className)} aria-labelledby="my-bids-title">
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle id="my-bids-title">My bids</CardTitle>
@@ -58,7 +58,7 @@ function MyBidRow({ w, now }: { w: MyWorkItem; now: Date }) {
         </span>
         <span className="mt-2 flex items-center gap-3">
           <span className="flex min-w-0 flex-1 items-center gap-2" title={analysed ? `${percent}% of the packet is ready` : 'Not analysed yet'}>
-            <Progress value={analysed ? percent : 0} tone="auto" size="sm" aria-label="Readiness" />
+            <Progress value={analysed ? percent : 0} tone="auto" size="sm" aria-label={`Readiness: ${w.title}`} />
             <span className="tabular shrink-0 text-xs text-muted-foreground">
               {analysed ? `${percent}%${blockers ? ` · ${blockers} blocker${blockers === 1 ? '' : 's'}` : ''}` : 'Not analysed'}
             </span>
