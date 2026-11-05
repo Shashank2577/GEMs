@@ -34,7 +34,7 @@ import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, forbidden, notFound, unprocessable } from '../lib/errors';
 import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
-import { markStale } from './staleness';
+import { keepStaleOnCompletion, markStale } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
 type DocRow = typeof tenderDocuments.$inferSelect;
@@ -483,7 +483,9 @@ export async function analyseTender(
       });
       const [done] = await tx.update(analyses).set({
         status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
-        score: result.score, confidence: result.confidence, verdict: result.verdict, summary: withPrefix(prefix, result.summary), error: null, stale: false,
+        score: result.score, confidence: result.confidence, verdict: result.verdict, summary: withPrefix(prefix, result.summary), error: null,
+        // FR-045: a change made while this run was going (markStale flags running rows) keeps it stale.
+        ...keepStaleOnCompletion(),
         notes, warnings, updatedAt: deps.clock.now(),
       }).where(ours).returning();
       return done ?? null;
@@ -567,7 +569,9 @@ export async function overrideFactor(
  * corrigendum or a document change (or with no recorded reason) answers 409 `reanalysis_required`.
  * The row is read FOR UPDATE: markStale (which does not take the advisory lock) then either committed
  * before our read, so we see its reason, or waits for our commit and re-flags the row afterwards, so a
- * change racing with the re-score is never lost (S3).
+ * change racing with the re-score is never lost (S3). That is why the flag is cleared unconditionally here,
+ * unlike a run's completion (FR-045, `keepStaleOnCompletion`): nothing can flag this row between our read and
+ * our write, and comparing with `created_at` would be wrong anyway (a re-scored row's own change is newer).
  */
 export async function rescoreAnalysis(
   deps: AppDeps,

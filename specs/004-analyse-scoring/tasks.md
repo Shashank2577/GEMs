@@ -208,7 +208,7 @@ description: "Task list for 004 Analyse — bid documents, eligibility extractio
 
 ### Remaining
 
-- [ ] T074 [US6] Ingest uses `markStale(…, 'corrigendum')` (sets `stale_reason`, `stale_at`); analysis completion keeps `stale` when `stale_at` > its `created_at`; API tests in `apps/api/src/services/ingest.ts`, `apps/api/src/services/analyse.ts`, `apps/api/test/ingest.test.ts`, `apps/api/test/staleness.test.ts` FR-043 FR-045 (#240)
+- [x] T074 [US6] Ingest uses `markStale(…, 'corrigendum')` (sets `stale_reason`, `stale_at`); analysis completion keeps `stale` when `stale_at` > its `created_at`; API tests in `apps/api/src/services/ingest.ts`, `apps/api/src/services/analyse.ts`, `apps/api/test/ingest.test.ts`, `apps/api/test/staleness.test.ts` FR-043 FR-045 (#240)
 - [ ] T075 [P] [US6] Profile & past-contract mutations (`PUT /profile`, `POST/PATCH/DELETE /past-contracts`) call `markStale({orgId, openOnly}, 'profile_changed')`; API test in `apps/api/src/routes/profile.ts`, `apps/api/test/staleness.test.ts` FR-044 (#242)
 - [ ] T076 [P] [US6] Vault mutations (`POST /vault`, `PATCH /vault/:id`, `PUT /vault/:id/file`, `DELETE /vault/:id`) call `markStale({orgId, openOnly}, 'vault_changed')`; API test in `apps/api/src/routes/vault.ts`, `apps/api/test/staleness.test.ts` FR-044 (#244)
 - [ ] T077 [P] [US6] Document upload → `markStale({orgId, tenderIds:[id]}, 'document_added')`; weights save → `markStale({orgId, openOnly}, 'weights_changed')`; API tests in `apps/api/src/services/analyse.ts`, `apps/api/test/staleness.test.ts` FR-044 (#246) — _Note: the document-upload `markStale(..., 'document_added')` part was delivered in US1 (#167 / PR #478); the weights part remains._

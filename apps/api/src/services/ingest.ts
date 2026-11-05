@@ -18,7 +18,7 @@
  */
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import {
-  analyses, ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
+  ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
   type WatchlistCriteria,
 } from '@tp/db';
 import { INGESTION_RUN_BUDGET_MS } from '@tp/core/contracts/caps';
@@ -27,6 +27,7 @@ import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender }
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { REAL_ONLY } from '../lib/tender-scope';
+import { markStale } from './staleness';
 
 export interface RunIngestionOptions {
   trigger?: 'cron' | 'manual' | 'seed';
@@ -348,8 +349,10 @@ async function upsertTender(
   await db.update(tenders).set({ ...merged, updatedAt: now }).where(eq(tenders.id, prev.id));
   await db.insert(tenderEvents).values({ tenderId: prev.id, kind, changes, createdAt: now });
   if (corrigendum) {
-    // The reason matters: a corrigendum needs a full re-analysis, Re-score refuses it (FR-037, FR-043).
-    await db.update(analyses).set({ stale: true, staleReason: 'corrigendum', staleAt: now, updatedAt: now }).where(eq(analyses.tenderId, prev.id));
+    // Every org's analyses (FR-041). The reason matters: a corrigendum needs a full re-analysis, Re-score
+    // refuses it (FR-037, FR-043). markStale flags done and running rows only (a running one completes as
+    // stale, FR-045) and locks them in a fixed order, so it cannot deadlock with Re-score or another markStale.
+    await markStale(db, { tenderIds: [prev.id] }, 'corrigendum', now);
   }
   return { id: prev.id, kind: 'updated', corrigendum };
 }

@@ -143,7 +143,10 @@ describe('runIngestion', () => {
 
   it('acceptance #4: a corrigendum updates the end date, records history and marks analyses stale', async () => {
     const [t] = await ctx.db.select().from(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/6421001'));
-    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go' });
+    const analysedAt = new Date(ctx.clock.now().getTime() - 86_400_000);
+    await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'done', score: 72, verdict: 'go', createdAt: analysedAt, updatedAt: analysedAt });
+    // A failed attempt has no result to invalidate: markStale leaves it alone (004/T074).
+    const [failed] = await ctx.db.insert(analyses).values({ orgId: team.orgId, tenderId: t.id, status: 'failed', error: 'x', createdAt: new Date(0) }).returning();
     const r = await admin(`/__admin/corrigendum/${encodeURIComponent('GEM/2026/B/6421001')}`, { days: 7 });
     expect(r.status).toBe(200);
     ctx.clock.advance(30 * 60_000);
@@ -154,10 +157,12 @@ describe('runIngestion', () => {
     const events = await ctx.db.select().from(tenderEvents).where(and(eq(tenderEvents.tenderId, t.id), eq(tenderEvents.kind, 'corrigendum')));
     expect(events).toHaveLength(1);
     expect(events[0].changes).toEqual({ endAt: { from: t.endAt!.toISOString(), to: after.endAt!.toISOString() } });
-    const [a] = await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id));
+    const [a] = await ctx.db.select().from(analyses).where(and(eq(analyses.tenderId, t.id), eq(analyses.status, 'done')));
     expect(a.stale).toBe(true);
     expect(a.staleReason).toBe('corrigendum'); // Re-score refuses it: a corrigendum needs a re-analysis (004/FR-037)
-    expect(a.staleAt).not.toBeNull();
+    expect(a.staleAt).toEqual(ctx.clock.now()); // via markStale (004/FR-043, T074): when the corrigendum was seen
+    expect(a.updatedAt).toEqual(analysedAt); // "Analysed <time>" is not moved
+    expect((await ctx.db.select().from(analyses).where(eq(analyses.id, failed.id)))[0]).toMatchObject({ stale: false, staleReason: null, staleAt: null });
     // Members who track it get an in-app heads-up; the match itself is not duplicated.
     expect(await count(notifications, and(eq(notifications.kind, 'deadline'), eq(notifications.orgId, team.orgId))!)).toBe(4);
     expect(await count(tenderMatches, eq(tenderMatches.tenderId, t.id))).toBe(1);
