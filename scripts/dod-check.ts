@@ -20,6 +20,11 @@
  * When GH_TOKEN, PR_NUMBER and GITHUB_REPOSITORY are set, title/body/labels and the PR's commits come from the GitHub
  * API; otherwise commits are `git log <merge-base(BASE_SHA, HEAD_SHA)>..HEAD_SHA`.
  *
+ * criteria-met (spec 008 FR-004): a "not met" or blank row fails. An "unverifiable" row passes only when the same row
+ * gives a reason AND references an OPEN tracking issue (`#n`) for closing the gap; with the GitHub API available the
+ * issue must be open, otherwise (local runs) the reference is checked for presence only. Accepted unverifiable rows are
+ * listed in the rule message.
+ *
  * A verdict counts as approved via the .aisdlc/qa/verdict-comment.md heading `## QA verdict — APPROVED`, `qa:approved`
  * or a `Verdict: approved` line; any REJECTED / `qa:rejected` / `Verdict: rejected` signal wins.
  *
@@ -139,21 +144,54 @@ export function verdictOf(text: string): 'approved' | 'rejected' | 'missing' {
   return approved ? 'approved' : 'missing';
 }
 
-/** Pure: verdict-approved + criteria-met rules over VERDICT.md text. Rejection signals win over approval. */
-export function checkVerdict(text: string): RuleResult[] {
+/** Pure: `#n` issue references in a markdown table row (outside the verdict cell). */
+export function rowIssueRefs(row: string): number[] {
+  return [...row.matchAll(/(?<![\w/])#(\d+)\b/g)].map((m) => Number(m[1]));
+}
+
+/**
+ * Pure: verdict-approved + criteria-met rules over VERDICT.md text. Rejection signals win over approval.
+ * `openIssues`: open issue numbers in the repo (from the API), or null/undefined when unknown (local runs).
+ */
+export function checkVerdict(text: string, openIssues?: ReadonlySet<number> | null): RuleResult[] {
   const verdict = verdictOf(text);
   const rows = criterionRows(stripComments(text));
-  // Every criterion must be exactly "met" (an emoji/markup suffix is tolerated); "not met", "unverifiable", blanks fail.
-  const bad = rows.filter((r) => /^\s*not met\b/.test(r.verdict) || !/^met\b/.test(r.verdict));
+  const bad: string[] = [];
+  const accepted: string[] = [];
+  for (const r of rows) {
+    if (/^met\b/.test(r.verdict)) continue;
+    if (/^unverifiable\b/.test(r.verdict)) {
+      const rest = r.row.replace(/\bunverifiable\b/i, '');
+      const refs = rowIssueRefs(rest);
+      const reason = rest.replace(/#\d+/g, '').replace(/[|*_`\s-]/g, '').length >= 10;
+      if (!refs.length || !reason) { bad.push(`${r.row}  ← unverifiable needs a reason and an open tracking issue (#n)`); continue; }
+      if (openIssues && !refs.some((n) => openIssues.has(n))) {
+        bad.push(`${r.row}  ← tracking issue ${refs.map((n) => `#${n}`).join(', ')} is not open`);
+        continue;
+      }
+      accepted.push(`${r.row}  → tracked by ${refs.map((n) => `#${n}`).join(', ')}${openIssues ? '' : ' (issue state not checked)'}`);
+      continue;
+    }
+    bad.push(r.row); // "not met", blank, "partially met", anything else
+  }
   let criteria: RuleResult;
   if (!rows.length) criteria = { rule: 'criteria-met', ok: false, message: 'No acceptance-criteria table with a "Verdict" column in VERDICT.md' };
   else if (bad.length) {
     criteria = {
       rule: 'criteria-met',
       ok: false,
-      message: `Acceptance criteria not "met" (not met / unverifiable / blank): ${bad.length}\n${bad.map((r) => `    ${r.row}`).join('\n')}`,
+      message: `Acceptance criteria not met (not met / blank / untracked unverifiable): ${bad.length}\n${bad.map((r) => `    ${r}`).join('\n')}`,
     };
-  } else criteria = { rule: 'criteria-met', ok: true, message: `all ${rows.length} acceptance criteria met` };
+  } else {
+    const met = rows.length - accepted.length;
+    criteria = {
+      rule: 'criteria-met',
+      ok: true,
+      message: accepted.length
+        ? `${met} of ${rows.length} acceptance criteria met; ${accepted.length} unverifiable with an open tracking issue:\n${accepted.map((r) => `    ${r}`).join('\n')}`
+        : `all ${rows.length} acceptance criteria met`,
+    };
+  }
   return [
     verdict === 'approved'
       ? { rule: 'verdict-approved', ok: true, message: 'VERDICT.md is approved' }
@@ -214,6 +252,8 @@ export interface DodInput {
   readVerdict: (path: string) => string | null;
   /** Files (relative paths) under a story evidence folder. */
   listEvidence: (dir: string) => string[];
+  /** Open issue numbers (GitHub API); null/undefined when unknown — unverifiable rows then need a #ref only. */
+  openIssues?: ReadonlySet<number> | null;
 }
 
 export interface DodOutcome { ok: boolean; story: StoryRef | null; results: RuleResult[]; notes: string[] }
@@ -239,7 +279,7 @@ export function evaluate(input: DodInput): DodOutcome {
     results.push({ rule: 'verdict-exists', ok: false, message: `Missing QA verdict: ${path}` });
   } else {
     results.push({ rule: 'verdict-exists', ok: true, message: path });
-    results.push(...checkVerdict(verdict));
+    results.push(...checkVerdict(verdict, input.openIssues));
     results.push(checkMedia(dir, input.listEvidence(dir), verdict));
   }
   results.push(checkTrailers(input.commits));
@@ -355,8 +395,30 @@ function listFiles(dir: string): string[] {
   });
 }
 
+/** Open issue numbers in the repo via the GitHub API (null when unavailable, e.g. local runs). */
+async function loadOpenIssues(): Promise<Set<number> | null> {
+  const env = process.env;
+  if (!(env.GH_TOKEN && env.GITHUB_REPOSITORY)) return null;
+  const open = new Set<number>();
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const res = await fetch(`${env.GITHUB_API_URL ?? 'https://api.github.com'}/repos/${env.GITHUB_REPOSITORY}/issues?state=open&per_page=100&page=${page}`, {
+        headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
+      });
+      if (!res.ok) return null;
+      const items = (await res.json()) as { number: number }[];
+      for (const i of items) open.add(i.number);
+      if (items.length < 100) break;
+    }
+  } catch {
+    return null;
+  }
+  return open;
+}
+
 async function main() {
   const outcome = evaluate({
+    openIssues: await loadOpenIssues(),
     pr: await loadPr(),
     commits: await loadCommits(),
     index: loadIndex(),
