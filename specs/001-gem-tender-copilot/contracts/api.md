@@ -70,13 +70,15 @@ and `conflict` (409):
 Security headers on every response (FR-050): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (`SAMEORIGIN`
 for inline document previews), `Referrer-Policy: no-referrer`, `Strict-Transport-Security` on https, and a CSP for the SPA.
 
-## Identify — owner: Identify module (`routes/tenders.ts`, `routes/watchlists.ts`, `routes/ingestion.ts`, `routes/notifications.ts`)
+## Identify — owner: Identify module (`routes/tenders.ts`, `routes/watchlists.ts`, `routes/ingestion.ts`, `routes/notifications.ts`, `routes/insights.ts`)
 
 | Method | Path | Notes |
 |---|---|---|
 | GET | /tenders | `q` is full-text over bid number, title, category, ministry, department, organisation, buyer office, state, city and item names (008/FR-073; `websearch_to_tsquery` syntax: `"phrase"`, `or`, leading `-word`; every word is a prefix match; ASCII punctuation separates words, so `2062` finds `IS-2062`; bid numbers also match by prefix, and a query shaped like a bid number, e.g. `GEM/2026/B/12`, uses only the prefix match). Other params: `state,ministry,category,status,closingWithinDays,minValue,maxValue,matched(0/1),watchlistId,verdict,stage,sort(endAt|-createdAt|score|value),page,pageSize` → `{items: TenderListItem[], total, facets:{states,ministries,categories}}`. `TenderListItem` = tender core fields + `{matches:[{watchlistId,watchlistName,reasons}], analysis?:{score,verdict}, workspace?:{id,stage}, seen, isNew}` |
 | GET | /tenders/:id | `TenderDetail` = tender + `events` + `documents` + `matches` + `analysis` (latest for org) + `workspace` |
 | POST | /tenders/:id/seen, /tenders/:id/dismiss | – |
+| GET | /tenders/:id/result | any member of an org that can see the tender (404 otherwise, incl. another org's demo tender). Public GeM result data (003/FR-062, built in US6) → `TenderResultDto` `{tenderId, tenderStatus, evaluationStatus:'not_evaluated'\|'technical_evaluated'\|'financial_evaluated'\|'awarded', evaluationLabel, bidders:[{rank, seller, price (₹), level:'L1'…, awarded}] (by rank), winner, lowestPrice, anomalies:[{code:'winner_not_lowest_price', message}], categories, sourceUrl, fetchedAt, checkedAt, lastCheckFailed, checkUntil}`. Always 200: before GeM publishes, `bidders:[]` with the last known `evaluationStatus` (never checked → `not_evaluated`, `checkedAt:null`) |
+| GET | /insights/competitors | any member. `category?, state?, page, pageSize≤100` → `CompetitorsResponse` `{items:[{seller, wins, awardedValue, bids, categories[≤5], anomalies, lastWinAt}], total, tenders, flaggedAwards, facets:{categories, states}}` (003/FR-064, built in US6). Org-scoped: only the caller's org's tracked tenders (non-dismissed match, analysis or workspace) that GeM awarded with a published bidder table; sellers ranked by wins, then awarded value. 400 `validation_error` on bad paging |
 | GET/POST | /watchlists | criteria per `WatchlistCriteria` |
 | PATCH/DELETE (W) | /watchlists/:id | – |
 | POST | /watchlists/preview | `{criteria}` → `{count, sample: TenderListItem[]}` |
@@ -258,8 +260,9 @@ Both arrays hold at most 5 items (`MY_WORK_LIMIT`), are computed for the signed-
 ## Scheduled (Worker `scheduled`, also `POST /ingestion/run`)
 
 1. `runIngestion()` — fetch N pages, upsert tenders, record events, match watchlists, create notifications.
-2. `dispatchNotifications()` — send pending email/WhatsApp (skipped when not configured), daily digests.
-3. `runExpiryReminders()` — 30/7/1-day and on-expiry vault reminders (deduped per document, expiry date and threshold; also `POST /vault/reminders/run` per org).
+2. `runDailyResults()` (003/US6, FR-061) — first tick at/after 10:00 IST, once per IST day (`job_runs` claim): checks ≤ 50 tracked tenders closed within 30 days and not checked in 24 h on GeM's submitted-bids search and result view, stores `tender_results`, marks awarded tenders (`awarded` event) and sends in-app `result` alerts; recorded as an `ingestion_runs` row of `kind = 'results'` (not listed by `GET /ingestion/runs`).
+3. `dispatchNotifications()` — send pending email/WhatsApp (skipped when not configured), daily digests.
+4. `runExpiryReminders()` — 30/7/1-day and on-expiry vault reminders (deduped per document, expiry date and threshold; also `POST /vault/reminders/run` per org).
 
 ## Error codes for limits and capacity (spec 008, FR-018, FR-021, FR-040)
 
@@ -269,7 +272,7 @@ Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/
 |---|---|---|---|
 | 402 | `plan_limit_reached` | a plan limit (seats, watchlists, analyses, vault bytes, packets) is reached; `enterprise` is never limited (`PLAN_LIMITS`, `packages/core/src/contracts/plans.ts`) | `{limit, used, max, plan, resetsAt?}` (`resetsAt` = next IST month start, monthly limits only) |
 | 402 | `plan_expired` | the free trial has ended: every write except the FR-038 allow-list (auth, own account/sessions, revoking an API token, marking notifications read, notification prefs, `DELETE /demo`, `POST /tenders/:id/seen`, leaving the org `DELETE /org/members/me`, revoking an invitation `DELETE /org/invitations/:id`, and the operator-only `/admin/*`); reads keep working | `{plan:'trial', trialEndsAt}` |
-| 409 | `ingestion_running` | `POST /ingestion/run` while another ingestion run is `running` (unique partial index `ingestion_runs_one_running_uq`) | `{run}` |
+| 409 | `ingestion_running` | `POST /ingestion/run` while another listing ingestion run is `running` (unique partial index `ingestion_runs_one_running_uq`, one running run per `kind`) | `{run}` |
 | 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
 | 413 | `packet_too_large` | the packet has more than 40 items (`PACKET_MAX_ITEMS`), or the stored sizes of the selected documents exceed `PACKET_MAX_INPUT_BYTES` (40 MB on the Worker; 006/FR-056's 60 MB code default on Node). Checked before any document is loaded | item count: `{items, maxItems}`; size: `{totalBytes, limitBytes, items:[{title,sizeBytes}]}` (10 largest) |
 | 422 | `document_too_long` | tender document over 300 pages (`MAX_TENDER_DOC_PAGES`; refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning); on upload, GeM fetch and analyse's auto-fetch | `{pages, maxPages}` |

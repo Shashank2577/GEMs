@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AlertTriangle, CircleDot, FilePlus2, Gauge, History, Lock, RefreshCw, UserRoundPen, XCircle, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, CircleDot, FilePlus2, Gauge, History, Lock, RefreshCw, Trophy, UserRoundPen, XCircle, type LucideIcon } from 'lucide-react';
 import type { TenderEventDto } from '@tp/core/contracts/identify';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import { Badge, Card, CardContent, EmptyState, ErrorState, SkeletonList, Tooltip } from '@/components/ui';
@@ -18,6 +18,7 @@ const EVENT_META: Record<TenderEventDto['kind'], { label: string; icon: LucideIc
   corrigendum: { label: 'Corrigendum issued', icon: AlertTriangle, cls: 'bg-warning-soft text-[hsl(32_90%_36%)] dark:text-warning' },
   closed: { label: 'Bid closed', icon: Lock, cls: 'bg-muted text-muted-foreground' },
   cancelled: { label: 'Bid cancelled', icon: XCircle, cls: 'bg-danger-soft text-danger' },
+  awarded: { label: 'Awarded on GeM', icon: Trophy, cls: 'bg-primary-soft text-primary' }, // 003/US6 results refresh
 };
 
 function activityIcon(action: string): LucideIcon {

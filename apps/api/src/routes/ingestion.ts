@@ -15,7 +15,7 @@ import { REAL_ONLY } from '../lib/tender-scope';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { dispatchNotifications } from '../services/alerts';
-import { IngestionBusyError, runIngestion, type IngestionRunRow } from '../services/ingest';
+import { IngestionBusyError, LISTING_RUNS, runIngestion, type IngestionRunRow } from '../services/ingest';
 import type { AppEnv } from '../types';
 
 export const ingestionRoutes = new Hono<AppEnv>();
@@ -35,7 +35,7 @@ const fmtTimeIst = (d: Date) =>
 /** When the next manual sync is allowed (008/FR-026), or null when it is allowed now. */
 export async function nextManualSyncAt(deps: AppDeps): Promise<Date | null> {
   const [lastManual] = await deps.db.select({ finishedAt: ingestionRuns.finishedAt }).from(ingestionRuns)
-    .where(and(eq(ingestionRuns.trigger, 'manual'), isNotNull(ingestionRuns.finishedAt)))
+    .where(and(LISTING_RUNS, eq(ingestionRuns.trigger, 'manual'), isNotNull(ingestionRuns.finishedAt)))
     .orderBy(desc(ingestionRuns.finishedAt)).limit(1);
   if (!lastManual?.finishedAt) return null;
   const retryAt = new Date(lastManual.finishedAt.getTime() + deps.config.manualSyncCooldownMin * 60_000);
@@ -73,9 +73,11 @@ ingestionRoutes.get('/ingestion/runs', requireAuth, async (c) => {
   const deps = c.var.deps;
   const now = deps.clock.now();
   const [runs, [lastOk], [counts], retryAt] = await Promise.all([
-    deps.db.select().from(ingestionRuns).orderBy(desc(ingestionRuns.startedAt)).limit(20),
+    // Listing runs only: results-refresh runs (kind 'results') are not syncs, and their rows are derived from which
+    // tenders orgs track, so they are never shown to every org here (Constitution IV).
+    deps.db.select().from(ingestionRuns).where(LISTING_RUNS).orderBy(desc(ingestionRuns.startedAt)).limit(20),
     deps.db.select({ at: ingestionRuns.finishedAt }).from(ingestionRuns)
-      .where(or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial')))
+      .where(and(LISTING_RUNS, or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial'))))
       .orderBy(desc(ingestionRuns.finishedAt)).limit(1),
     deps.db.select({
       total: sql<number>`count(*)::int`,

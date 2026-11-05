@@ -163,7 +163,7 @@ export interface TenderListResponse {
   facets: { states: Facet[]; ministries: Facet[]; categories: Facet[] };
 }
 
-export interface TenderEventDto { id: string; kind: 'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled'; changes: Record<string, { from: unknown; to: unknown }>; createdAt: string }
+export interface TenderEventDto { id: string; kind: 'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled' | 'awarded'; changes: Record<string, { from: unknown; to: unknown }>; createdAt: string }
 export interface TenderDocumentDto { id: string; kind: string; fileName: string; sizeBytes: number; pageCount: number | null; sourceUrl: string | null; orgOwned: boolean; createdAt: string }
 
 export interface TenderDetail extends TenderListItem {
@@ -171,6 +171,97 @@ export interface TenderDetail extends TenderListItem {
   documents: TenderDocumentDto[];
   /** Full latest analysis for the org (shape owned by the Analyse module). */
   analysisDetail: Record<string, unknown> | null;
+}
+
+// ───────────── Results & competitor insights (003/US6) ─────────────
+
+/** Evaluation stage of a closed bid, from GeM `b_buyer_status` 0..3 (core gem/result.ts BUYER_STATUS). */
+export const EVALUATION_STATUSES = ['not_evaluated', 'technical_evaluated', 'financial_evaluated', 'awarded'] as const;
+export type EvaluationStatus = (typeof EVALUATION_STATUSES)[number];
+export const EVALUATION_STATUS_LABEL: Record<EvaluationStatus, string> = {
+  not_evaluated: 'Not evaluated',
+  technical_evaluated: 'Technical evaluated',
+  financial_evaluated: 'Financial evaluated',
+  awarded: 'Awarded',
+};
+
+/** Results are checked daily for this many days after a tender closes (FR-061). */
+export const RESULT_CHECK_DAYS = 30;
+
+export interface ResultBidderDto {
+  /** Row number on GeM's result page (1-based). */
+  rank: number;
+  seller: string;
+  /** Total quoted price in rupees. */
+  price: number;
+  /** "L1" … "Ln". */
+  level: string;
+  /** True for the awarded row (GeM's mark, else the L1 row). */
+  awarded: boolean;
+}
+
+/** GET /tenders/:id/result (FR-062). Always 200 for a visible tender; `bidders: []` until GeM publishes the result. */
+export interface TenderResultDto {
+  tenderId: string;
+  /** The tender's own status (`awarded` once GeM reports the award). */
+  tenderStatus: 'open' | 'closed' | 'cancelled' | 'awarded';
+  evaluationStatus: EvaluationStatus;
+  /** Human label, e.g. "Technical evaluated". */
+  evaluationLabel: string;
+  /** Sorted by rank. */
+  bidders: ResultBidderDto[];
+  winner: ResultBidderDto | null;
+  lowestPrice: number | null;
+  /** E.g. `{code:'winner_not_lowest_price', message:'Winner is not the lowest price'}`. */
+  anomalies: { code: 'winner_not_lowest_price'; message: string }[];
+  categories: string[];
+  /** GeM public result page, when it has been read. */
+  sourceUrl: string | null;
+  /** Last successful read from GeM (null = never checked successfully). */
+  fetchedAt: string | null;
+  /** Last check attempt (null = never checked). */
+  checkedAt: string | null;
+  /** The last check failed (GeM unreachable or an unreadable page); the data shown is from `fetchedAt`. */
+  lastCheckFailed: boolean;
+  /** Daily checks run until this time (closing + 30 days); null when the tender has no closing date. */
+  checkUntil: string | null;
+}
+
+export const competitorsQuerySchema = z.object({
+  category: z.string().trim().min(1).max(120).optional(),
+  state: z.string().trim().min(1).max(80).optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+export type CompetitorsQuery = z.output<typeof competitorsQuerySchema>;
+
+export interface CompetitorDto {
+  seller: string;
+  /** Awarded tenders this seller won (among the org's tracked awarded tenders matching the filters). */
+  wins: number;
+  /** Sum of the seller's winning prices, rupees. */
+  awardedValue: number;
+  /** Bidder-table appearances (wins included). */
+  bids: number;
+  /** Categories of the tenders the seller bid on, most frequent first (≤ 5). */
+  categories: string[];
+  /** Wins where the winner was not the lowest price ("winner is not the lowest price"). */
+  anomalies: number;
+  /** Closing date of the seller's latest win (ISO), null without wins. */
+  lastWinAt: string | null;
+}
+
+/** GET /insights/competitors (FR-064): org-scoped (tracked tenders only), sellers ranked by wins, then awarded value. */
+export interface CompetitorsResponse {
+  items: CompetitorDto[];
+  /** Sellers matching the filters. */
+  total: number;
+  /** Awarded tracked tenders (with a published bidder table) behind the numbers. */
+  tenders: number;
+  /** Awards flagged "winner is not the lowest price" among those tenders. */
+  flaggedAwards: number;
+  /** Filter options over the org's awarded tracked tenders (ignoring the current filters). */
+  facets: { categories: string[]; states: string[] };
 }
 
 // ───────────── Ingestion ─────────────

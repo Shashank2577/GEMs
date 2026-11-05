@@ -6,9 +6,13 @@
 import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
-  analyses, bidWorkspaces, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, watchlists,
+  analyses, bidWorkspaces, notifications, tenderDocuments, tenderEvents, tenderMatches, tenderResults, tenders, watchlists,
 } from '@tp/db';
-import { tenderQuerySchema, type Facet, type TenderListItem, type TenderQuery } from '@tp/core/contracts/identify';
+import {
+  EVALUATION_STATUS_LABEL, RESULT_CHECK_DAYS, tenderQuerySchema,
+  type Facet, type TenderListItem, type TenderQuery, type TenderResultDto,
+} from '@tp/core/contracts/identify';
+import { detectAnomalies } from '@tp/core/gem/result';
 import { uuidSchema } from '@tp/core/contracts/common';
 import type { AppDeps } from '../deps';
 import { conflict, notFound } from '../lib/errors';
@@ -307,4 +311,43 @@ tendersRoutes.post('/tenders/:id/dismiss', requireAuth, async (c) => {
     .where(and(eq(tenderMatches.orgId, org), eq(tenderMatches.tenderId, t.id))).returning({ id: tenderMatches.id });
   if (!updated.length) throw conflict('Only tenders that match one of your watchlists can be dismissed');
   return c.json({ ok: true, dismissed: !undo });
+});
+
+/**
+ * The stored GeM result as a TenderResultDto (003/FR-062). No row yet → `not_evaluated`, no bidders, never checked.
+ * The winner is GeM's awarded row, else L1; anomalies are recomputed from the stored bidders (FR-064).
+ */
+export function tenderResultDto(
+  t: Pick<TenderRow, 'id' | 'status' | 'endAt'>, r: typeof tenderResults.$inferSelect | null | undefined,
+): TenderResultDto {
+  const bidders = [...(r?.bidders ?? [])].sort((a, b) => a.rank - b.rank)
+    .map((b) => ({ rank: b.rank, seller: b.seller, price: b.price, level: b.level, awarded: !!b.awarded }));
+  const marked = bidders.find((b) => b.awarded);
+  const l1 = bidders.find((b) => b.level.toUpperCase() === 'L1') ?? null;
+  const winner = marked ?? l1;
+  const shown = winner && !marked ? bidders.map((b) => ({ ...b, awarded: b === winner })) : bidders;
+  const evaluationStatus = r?.evaluationStatus ?? 'not_evaluated';
+  return {
+    tenderId: t.id,
+    tenderStatus: t.status,
+    evaluationStatus,
+    evaluationLabel: EVALUATION_STATUS_LABEL[evaluationStatus] ?? EVALUATION_STATUS_LABEL.not_evaluated,
+    bidders: shown,
+    winner: winner ? { ...winner, awarded: true } : null,
+    lowestPrice: bidders.length ? Math.min(...bidders.map((b) => b.price)) : null,
+    anomalies: detectAnomalies(bidders, winner),
+    categories: r?.categories ?? [],
+    sourceUrl: r?.sourceUrl ?? null,
+    fetchedAt: r?.fetchedAt?.toISOString() ?? null,
+    checkedAt: r ? r.checkedAt.toISOString() : null,
+    lastCheckFailed: !!r?.error,
+    checkUntil: t.endAt ? new Date(t.endAt.getTime() + RESULT_CHECK_DAYS * 86_400_000).toISOString() : null,
+  };
+}
+
+/** GET /tenders/:id/result (003/FR-062) — public GeM result data, any member of an org that can see the tender. */
+tendersRoutes.get('/tenders/:id/result', requireAuth, async (c) => {
+  const t = await loadTender(c);
+  const [r] = await c.var.deps.db.select().from(tenderResults).where(eq(tenderResults.tenderId, t.id));
+  return c.json(tenderResultDto(t, r));
 });

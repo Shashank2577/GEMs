@@ -1,13 +1,14 @@
 /**
  * Scheduled pipeline shared by the Worker `scheduled()` handler and the Node in-process cron:
- * ingestion → alerts → reminders → cleanups → housekeeping (once per IST day after 02:00, 008/FR-070), each isolated
- * so one failure does not stop the others.
+ * ingestion → results (once per IST day from 10:00, 003/US6 FR-061) → alerts → reminders → cleanups → housekeeping
+ * (once per IST day after 02:00, 008/FR-070), each isolated so one failure does not stop the others.
  */
 import type { AppDeps } from '../deps';
 import { IngestionBusyError, runIngestion } from '../services/ingest';
 import { dispatchNotifications } from '../services/alerts';
 import { runExpiryReminders } from '../services/reminders';
 import { runHousekeeping } from '../services/housekeeping';
+import { runDailyResults } from '../services/results';
 import { pruneAuthState } from './rate-limit';
 import { pruneRateLimits } from './rate-limiter';
 
@@ -24,6 +25,8 @@ export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' |
         deps.logger.info('ingestion skipped: already running', { runId: e.run?.id ?? null });
       }
     }],
+    // Daily results refresh (job_runs claim + one running `results` run cluster-wide); a busy run is not a failure.
+    ['results', () => runDailyResults(deps)],
     ['alerts', () => dispatchNotifications(deps)],
     ['reminders', () => runExpiryReminders(deps)],
     ['auth-cleanup', () => pruneAuthState(deps.db, deps.clock.now())],

@@ -157,7 +157,8 @@ describe('repo capacity indexes (T064, T068, T069)', () => {
     expect(found.find((f) => f.name === 'tenders_open_state_idx')?.def)
       .toMatch(/\(state, created_at DESC, COALESCE\(end_at, 'infinity'::timestamp with time zone\)\) WHERE \(status = 'open'::text\)/);
     expect(found.find((f) => f.name === 'notifications_pending_idx')?.def).toMatch(/status = 'pending'.*channel = ANY/);
-    expect(found.find((f) => f.name === 'ingestion_runs_one_running_uq')?.def).toMatch(/UNIQUE INDEX .*\(true\).*WHERE \(status = 'running'::text\)/);
+    // One running run per kind (003/US6 0025): listing syncs and the results refresh never block each other.
+    expect(found.find((f) => f.name === 'ingestion_runs_one_running_uq')?.def).toMatch(/UNIQUE INDEX .*\(kind\).*WHERE \(status = 'running'::text\)/);
     const seed = await rows<{ id: string }>(sql`select id from gem_throttle`);
     expect(seed.length).toBeLessThanOrEqual(1); // seeded by 0012; other suites truncate it, the lease upserts it back
   });
