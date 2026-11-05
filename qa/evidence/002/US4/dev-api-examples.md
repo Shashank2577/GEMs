@@ -40,7 +40,7 @@ Cookie: tp_session=…
 }
 ```
 
-## 3. In-app and email off, WhatsApp on with +919812345678
+## 3. In-app pref off (test row is always created), email off, WhatsApp on with +919812345678
 
 ```http
 POST /api/me/notifications/test
@@ -51,7 +51,7 @@ Cookie: tp_session=…
 
 ```json
 {
-  "inApp": "off",
+  "inApp": "sent",
   "email": "off",
   "whatsapp": "skipped"
 }
