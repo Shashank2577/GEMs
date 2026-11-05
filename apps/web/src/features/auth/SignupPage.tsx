@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/label';
 import { toast } from '@/components/ui/toaster';
 import { safeNext, useAuth } from '@/lib/auth';
-import { ApiError, errorMessage } from '@/lib/api';
+import { ApiError, errorMessage, tooManyAttemptsMessage } from '@/lib/api';
 import { AuthLayout } from './AuthLayout';
 import { PasswordInput, StrengthMeter } from './PasswordInput';
 import { FormAlert } from './FormAlert';
@@ -41,7 +41,7 @@ export default function SignupPage() {
       navigate(safeNext(params.get('next'), '/onboarding'), { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setErrors({ email: 'An account with this email already exists. Try signing in.' });
-      else setFormError(errorMessage(err));
+      else setFormError(tooManyAttemptsMessage(err) ?? errorMessage(err)); // 429 auth.signup.ip → inline, button stays enabled
     } finally {
       setLoading(false);
     }

@@ -1,0 +1,24 @@
+# sc8-limiter-unavailable — project desktop — 2026-11-05T04:32:11.764Z
+-- rate_limits and auth_attempts renamed (DB error on the counter upsert)
+### generic rule watchlist.preview.user while limiter is down
+> POST /api/watchlists/preview
+< 200
+< content-type: application/json
+{"count":5,"sample":[{"id":"cb22a128-efef-4d3f-82bc-54eeab19433e","source":"gem","bidNumber":"GEM/2026/B/6421021","gemBidId":"7421021","bidType":"bid","title":"Laptop - Notebook","items":[{"name":"Laptop - Notebook","quantity":18}],"category":"Laptop - Notebook","quantity":18,"ministry":"Kerala","department":"Kerala State IT Mission","organisation":null,"buyerOffice":"Kerala State IT Mission, Thiruvananthapuram","state":"Kerala","city":"Thiruvananthapuram","startAt":"2026-11-03T10:30:00.000Z","endAt":"2026-11-07T09:30:00.000Z","openingAt":null,"emdAmount":45000,"estimatedValue":1440000,"epbgPe
+
+(generic rule) fail-open: request allowed
+### auth rule auth.fail.email while counter is down (correct password)
+> POST /api/auth/login
+< 503
+< content-type: application/json
+{"error":{"code":"service_unavailable","message":"Sign-in is temporarily unavailable. Please try again in a minute.","details":{"reason":"rate_limit_unavailable"}}}
+
+note: auth.signup.ip / auth.fail.ip are per-IP rules; the E2E server sees only loopback sockets, which is "IP unknown" by design (lib/client-ip.ts), so those are skipped here and covered by apps/api/test/ops-limits.test.ts.
+-- tables restored
+### after restore: login works again
+> POST /api/auth/login
+< 200
+< content-type: application/json
+{"user":{"id":"8bb8bceb-7832-46b0-a4fa-3fc4b37747b4","name":"QA outage mw31u70414","email":"outage.mw31u70414@example.in","phone":null},"org":{"id":"702d7257-a3f7-4f5c-9893-2c9a37077603","name":"outage Traders mw31u70414","slug":"outage-traders-mw31u70414","plan":"trial","onboardingState":{},"scoringWeights":null},"role":"owner","orgs":[{"id":"702d7257-a3f7-4f5c-9893-2c9a37077603","name":"outage Traders mw31u70414","slug":"outage-traders-mw31u70414","role":"owner"}]}
+
+warn log line rate_limit_unavailable is asserted by apps/api/test/ops-limits.test.ts (server stdout is not reachable from Playwright).

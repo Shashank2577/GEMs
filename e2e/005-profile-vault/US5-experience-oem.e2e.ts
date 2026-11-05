@@ -142,7 +142,7 @@ test.describe('US5 Experience', () => {
     await expect(sec.getByText('1 contract · total ₹58.2 L · largest ₹58.2 L')).toBeVisible();
     if (info.project.name === 'mobile') {
       await expect(sec.getByRole('table')).toBeHidden();
-      const card = sec.locator('ul [role=button]').first();
+      const card = sec.getByRole('listitem').first().getByRole('button').first(); // row-open button of the card (#493)
       await expect(card).toBeVisible();
       await expect(sec.getByText('No CRAC')).toBeHidden();
       await expect(sec.getByText('Proof')).toBeHidden();
@@ -330,6 +330,10 @@ test.describe('US5 review-driven behaviours', () => {
     await page.getByRole('option', { name: 'Upload a new CRAC…' }).focus();
     await page.keyboard.press('Enter');                                   // choose it
     await expect(uploadDialog(page)).toBeVisible();
+    // Wait until the picker's listbox layer is fully gone and the dialog's open animation has finished: while either
+    // is still in flight, the topmost dismissable layer can swallow the Escape (observed flake, ~1 in 13 runs).
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await uploadDialog(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
     // keyboard focus must move into the upload dialog (focus trap) before Esc is meaningful
     await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('[role=dialog]')?.textContent?.includes('Add a document'))).toBe(true);
     await page.keyboard.press('Escape');
@@ -477,22 +481,11 @@ test.describe('US5 accessibility (axe)', () => {
     await oemSection(page).getByRole('button', { name: 'Add OEM authorisation' }).click();
   };
 
-  test('Experience + OEM sections and the contract dialog: no serious/critical axe violations @mobile', async ({ page }, info) => {
+  test('Experience + OEM sections and the contract dialog: no serious/critical axe violations @mobile', async ({ page }) => {
     await setup(page);
-    // Mobile cards: ResponsiveTable nests the actions button inside a role=button card (nested-interactive) -> tracked
-    // separately below as a known issue outside this story's criteria; every other rule still runs on mobile.
-    const disableRules = info.project.name === 'mobile' ? ['nested-interactive'] : [];
-    await a11y(page, 'profile-experience-oem', { include: ['section#sec-experience', 'section#sec-oem'], disableRules });
+    await a11y(page, 'profile-experience-oem', { include: ['section#sec-experience', 'section#sec-oem'] });
     await experience(page).getByRole('button', { name: 'Add contract' }).first().click();
     await expect(contractDialog(page)).toBeVisible();
     await a11y(page, 'contract-dialog', { include: ['[role=dialog]'] });
-  });
-
-  // KNOWN ISSUE (filed as a bug): passes while the violation exists; once fixed it flips and test.fail() will report it.
-  test('KNOWN ISSUE mobile contract cards: nested-interactive (card role=button contains the actions button) @mobile', async ({ page }, info) => {
-    test.skip(info.project.name !== 'mobile', 'cards only render on phones');
-    test.fail();
-    await setup(page);
-    await a11y(page, 'mobile-cards-nested-interactive', { include: ['section#sec-experience'] });
   });
 });

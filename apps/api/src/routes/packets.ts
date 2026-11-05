@@ -20,6 +20,7 @@ import { HttpError, notFound } from '../lib/errors';
 import { contentDisposition } from '../lib/http';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { rateLimit } from '../middleware/rate-limit';
 import { buildWorkspacePacket, getTenderRow, recoverStuckPackets, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
 import type { AppEnv } from '../types';
 
@@ -117,7 +118,7 @@ packetsRoutes.get('/workspaces/:id/packets', requireAuth, async (c) => {
   return c.json({ items: rows.map((r) => toPacketDto(r, ppl)), total: rows.length });
 });
 
-packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), async (c) => {
+packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), rateLimit('packet.org'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
   const w = await getWorkspace(deps, org, c.req.param('id'));

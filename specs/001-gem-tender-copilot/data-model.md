@@ -11,9 +11,10 @@ The executable source of truth is `packages/db/src/schema.ts` (Drizzle). Migrati
 | Invitation | `invitations` | org | hashed token, expiry |
 | Session / API token | `sessions`, `api_tokens` | user | hashed opaque tokens |
 | Notification prefs | `notification_prefs` | org+user | channels, instant/daily, expiry reminders |
-| Company profile | `company_profiles` | org (1:1) | GSTIN, PAN, Udyam/MSE, Startup, MII class, financial years, categories, OEM auths |
+| Company profile | `company_profiles` | org (1:1) | GSTIN, PAN, Udyam/MSE, Startup, MII class, financial years, categories, OEM auths (`documentId` → an `oem_authorization` vault doc); `updated_at` is the optimistic-concurrency token (`expectedUpdatedAt`) |
 | Past contract | `past_contracts` | org | value, buyer, CRAC doc link |
-| Vault document | `vault_documents` | org | type, number, issue/expiry, FY, blob key; status derived |
+| Vault document | `vault_documents` | org | type, number, issue/expiry, FY, blob key, `content_sha256` (hex SHA-256 of the current file for duplicate detection; null = unknown, hashed lazily; the sentinel `'missing'` marks a row whose blob is gone so it is not re-read), `last_reminder_days`; status derived; idx `org_id`, `(org_id,type)`, `(org_id,content_sha256)`, `expiry_date` (reminder scan) |
+| Vault document version | `vault_document_versions` | org | previous files of a vault document kept on replace/renew (max 5): `document_id` (cascade), blob key, file name, mime, size, pages, expiry while current, `replaced_by`, `replaced_at`; idx `org_id`, `(document_id, replaced_at desc)` |
 | Tender | `tenders` | global (public) | unique (source, bid_number); content hash for change detection |
 | Tender event | `tender_events` | global | created/updated/corrigendum/closed |
 | Tender document | `tender_documents` | global (org_id null) or org upload | extracted text, pages split by `\f` |
@@ -34,3 +35,4 @@ The executable source of truth is `packages/db/src/schema.ts` (Drizzle). Migrati
   `ready` requires every mandatory checklist item mapped to a non-expired document or overridden (M role, reason).
 - Analysis: `pending → running → done | failed`; `stale=true` when a tender event changes requirements after analysis.
 - Vault status (derived): `expired` (expiry < today), `expiring` (≤ 30 days), `valid`.
+- Vault reminders: 30 → 7 → 1 → on expiry (0); `last_reminder_days` records the last threshold sent and resets when the expiry date changes (edit or renewal).

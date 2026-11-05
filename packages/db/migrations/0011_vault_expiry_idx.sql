@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "vault_expiry_idx" ON "vault_documents" USING btree ("expiry_date");

@@ -1,5 +1,5 @@
 /** Copy for US4 notification UX (002/FR-032, FR-034). Pure so it can be unit-tested. */
-import type { TestAlertOutcome, TestAlertResult } from '@tp/core/contracts/auth';
+import type { TestAlertOutcome, TestAlertResult, TestAlertSkipReason } from '@tp/core/contracts/auth';
 
 export const WHATSAPP_STOPS_WARNING = 'WhatsApp alerts will stop until you add a mobile number.';
 
@@ -13,14 +13,17 @@ export function whatsappStopsWarning(opts: { storedPhone: string | null | undefi
 
 const CHANNEL_LABEL = { email: 'Email', whatsapp: 'WhatsApp' } as const;
 
-function line(channel: 'email' | 'whatsapp', outcome: TestAlertOutcome, hasPhone: boolean): string {
+function line(channel: 'email' | 'whatsapp', outcome: TestAlertOutcome, hasPhone: boolean, reason?: TestAlertSkipReason): string {
   const label = CHANNEL_LABEL[channel];
   switch (outcome) {
     case 'sent': return `${label} sent`;
     case 'failed': return `${label} failed to send`;
     case 'off': return `${label} is off`;
     case 'skipped':
-      return channel === 'whatsapp' && !hasPhone ? 'WhatsApp needs a mobile number' : `${label} not configured on this server`;
+      // Prefer the server's reason; older servers omit `skipReasons`, so fall back to inferring it from the profile.
+      return (reason ?? (channel === 'whatsapp' && !hasPhone ? 'no_phone' : 'not_configured')) === 'no_phone'
+        ? 'WhatsApp needs a mobile number'
+        : `${label} not configured on this server`;
   }
 }
 
@@ -30,7 +33,7 @@ function line(channel: 'email' | 'whatsapp', outcome: TestAlertOutcome, hasPhone
  */
 export function testAlertToast(result: TestAlertResult, hasPhone: boolean): { kind: 'success' | 'warning'; title: string; lines: string[] } {
   const external = ['email', 'whatsapp'] as const;
-  const lines = ['In-app sent', ...external.map((ch) => line(ch, result[ch], hasPhone))];
+  const lines = ['In-app sent', ...external.map((ch) => line(ch, result[ch], hasPhone, result.skipReasons?.[ch]))];
   const problem = external.some((ch) => result[ch] === 'failed' || result[ch] === 'skipped');
   return { kind: problem ? 'warning' : 'success', title: problem ? 'Test alert sent with warnings' : 'Test alert sent', lines };
 }

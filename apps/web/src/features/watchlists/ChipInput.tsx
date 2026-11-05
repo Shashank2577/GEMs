@@ -90,7 +90,7 @@ export function ChipInput({
           aria-describedby={describedBy}
           aria-autocomplete="list"
           aria-controls={sugg.length ? listId : undefined}
-          className="h-6 min-w-[8rem] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
+          className="h-6 min-w-[8rem] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground/70"
         />
       </div>
       {sugg.length > 0 && focused && (
@@ -124,7 +124,7 @@ export function MultiSelect({
             id={id}
             type="button"
             className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm shadow-xs hover:border-foreground/20 focus-ring"
-            aria-label={`${value.length ? `${value.length} selected` : placeholder}, ${label}`}
+            aria-label={value.length ? `${label}: ${value.length} selected` : placeholder ? `${label}: ${placeholder}` : label}
           >
             <span className={cn('truncate', !value.length && 'text-muted-foreground')}>
               {value.length ? `${value.length} selected` : placeholder}

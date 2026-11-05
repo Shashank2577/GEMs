@@ -245,7 +245,7 @@ open it, click **Download**, and verify the bytes equal the original.
     changed `last_reminder_days` is reset to null (the 30/7/1 cycle restarts).
 12. **Given** **Replace file** with a new PDF, **Then** `PUT /api/vault/:id/file` returns **200** with the new file name,
     size and page count, metadata unchanged; the toast "File replaced" has description "Metadata kept. Update the expiry
-    date if this is a renewed copy."; the old blob is deleted when its key differs; `activity_log` has
+    date if this is a renewed copy."; the old file is kept as a version (FR-065); `activity_log` has
     `vault.file_replaced`.
 13. **Given** the delete (trash) button, **When** the user confirms "Delete “<title>”?" with **Delete document**, **Then**
     `DELETE /api/vault/:id` returns **200** `{ok:true}`, the row and blob are removed, any past contract whose CRAC pointed

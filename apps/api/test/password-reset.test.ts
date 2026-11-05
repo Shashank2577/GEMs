@@ -84,9 +84,20 @@ describe('POST /api/auth/forgot-password', () => {
 
   it('the account lookup and email happen in the background (same foreground work for unknown emails)', async () => {
     const a = await signup(ctx.app);
-    await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email: a.email } });
+    const mine = eq(passwordResets.userId, a.me.user.id);
+    // Hold password_resets locked so the background task cannot get past its first write: the response must arrive
+    // anyway, with nothing sent and no reset row yet — i.e. none of that work is on the response path.
+    await ctx.db.transaction(async (tx) => {
+      await tx.execute(sql`lock table password_resets in access exclusive mode`);
+      const r = await request(ctx.app, 'POST', '/api/auth/forgot-password', { json: { email: a.email } });
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({ ok: true });
+      expect(ctx.mailer.sent).toHaveLength(0);
+      expect(await tx.select().from(passwordResets).where(mine)).toHaveLength(0);
+    });
     await settleDeferred(ctx.deps);
     expect(ctx.mailer.sent).toHaveLength(1);
+    expect(await ctx.db.select().from(passwordResets).where(mine)).toHaveLength(1);
   });
 });
 

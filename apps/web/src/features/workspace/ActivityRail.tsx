@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { MessageSquare, Send } from 'lucide-react';
+import { MessageSquare, MoreHorizontal, Send, Trash2 } from 'lucide-react';
 import type { WorkspaceDetail } from '@tp/core/contracts/apply';
-import { Avatar, Button, Kbd, Textarea, toast } from '@/components/ui';
-import { RoleGate } from '@/lib/auth';
+import { Avatar, Button, ConfirmDialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Kbd, Textarea, toast } from '@/components/ui';
+import { RoleGate, useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
 import { formatDateIST, relativeTime } from '@/lib/format';
-import { useComment } from './api';
+import { useComment, useDeleteComment } from './api';
 import { describeActivity } from './labels';
 
 export function ActivityRail({ data }: { data: WorkspaceDetail }) {
   const [body, setBody] = useState('');
   const comment = useComment(data.workspace.id);
+  const del = useDeleteComment(data.workspace.id);
+  const { me, can } = useAuth();
+  const [deleting, setDeleting] = useState<string | null>(null);
   const post = () => {
     const b = body.trim();
     if (!b) return;
@@ -27,7 +30,17 @@ export function ActivityRail({ data }: { data: WorkspaceDetail }) {
               <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm border bg-card px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-[13px] font-semibold">{c.user.name}</span>
-                  <time dateTime={c.createdAt} title={formatDateIST(c.createdAt, { time: true })} className="shrink-0 text-2xs text-muted-foreground">{relativeTime(c.createdAt)}</time>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <time dateTime={c.createdAt} title={formatDateIST(c.createdAt, { time: true })} className="text-2xs text-muted-foreground">{relativeTime(c.createdAt)}</time>
+                    {(c.user.id === me?.user.id || can('bid_manager')) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`Comment actions for ${c.user.name}`} className="-my-1 size-6"><MoreHorizontal /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem destructive onSelect={() => setDeleting(c.id)}><Trash2 />Delete comment</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </span>
                 </div>
                 <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px]">{c.body}</p>
               </div>
@@ -48,6 +61,11 @@ export function ActivityRail({ data }: { data: WorkspaceDetail }) {
             </div>
           </div>
         </RoleGate>
+        <ConfirmDialog
+          open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)} loading={del.isPending} confirmLabel="Delete comment"
+          title="Delete this comment?" description="It will be removed from the discussion for everyone on this bid."
+          onConfirm={() => deleting && del.mutate(deleting, { onSuccess: () => { toast.success('Comment deleted'); setDeleting(null); }, onError: (e) => toast.error(errorMessage(e)) })}
+        />
       </section>
 
       <section aria-labelledby="ws-activity">

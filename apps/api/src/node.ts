@@ -5,18 +5,21 @@
  * Env: PORT (8787), DATABASE_URL, BLOB_DIR (.data/blobs), WEB_DIST (apps/web/dist),
  *      AUTO_MIGRATE=1 (run migrations on boot), CRON_INTERVAL_MS (in-process scheduler; 0/unset = off).
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { createNodeDb } from '@tp/db';
+import { spaCspFor } from '@tp/core/security/headers';
 import { createApp } from './app';
 import { createDeps } from './adapters/index';
 import { createFsBlobStore } from './adapters/blob-fs';
 import type { RuntimeEnv } from './env';
 import { runScheduledJobs } from './lib/scheduled';
+import { settleDeferred } from './lib/defer';
+import { securityHeaders } from './middleware/security';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '../../..');
@@ -26,6 +29,12 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
   const databaseUrl = env.DATABASE_URL || 'postgres://tp:tp@localhost:5433/tenderpilot';
   const blobDir = resolve(repoRoot, env.BLOB_DIR || '.data/blobs');
   const webDist = resolve(repoRoot, env.WEB_DIST || 'apps/web/dist');
+
+  // 008/FR-022: cf-connecting-ip can only be trusted on the Worker (Cloudflare overwrites it there). On Node a client
+  // could send it directly, so refuse to start rather than silently trusting a forgeable header.
+  if (/^cloudflare$/i.test(env.TRUST_PROXY ?? '')) {
+    throw new Error('TRUST_PROXY=cloudflare is only valid on the Cloudflare Worker. On Node use TRUST_PROXY=1 behind a reverse proxy, or leave it unset.');
+  }
 
   if (env.AUTO_MIGRATE === '1' || env.AUTO_MIGRATE === 'true') {
     const { runMigrations } = await import('@tp/db/migrate');
@@ -41,10 +50,21 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
   });
 
   const server = new Hono();
+  const indexPath = resolve(webDist, 'index.html');
+  const hasWeb = existsSync(indexPath);
+  // 002/FR-050: security headers on every response; the SPA's CSP allows the inline theme script by the hash of the
+  // built index.html being served (recomputed when the file changes, e.g. a rebuild while the server runs).
+  let cspCache: { mtimeMs: number; csp: string } | null = null;
+  const spaCsp = async () => {
+    if (!existsSync(indexPath)) return undefined;
+    const { mtimeMs } = statSync(indexPath);
+    if (cspCache?.mtimeMs !== mtimeMs) cspCache = { mtimeMs, csp: await spaCspFor(readFileSync(indexPath, 'utf8')) };
+    return cspCache.csp;
+  };
+  server.use('*', securityHeaders({ csp: spaCsp }));
   server.route('/', createApp(deps));
 
-  const indexPath = resolve(webDist, 'index.html');
-  if (existsSync(indexPath)) {
+  if (hasWeb) {
     const root = relative(process.cwd(), webDist) || '.';
     server.use('/*', serveStatic({
       root,
@@ -77,6 +97,8 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
   const shutdown = async () => {
     if (timer) clearInterval(timer);
     httpServer.close();
+    // Background work (lib/defer.ts, e.g. a password-reset email) still needs the pool: close only after it settles.
+    await settleDeferred(deps).catch(() => {});
     await close();
   };
   return { deps, server, shutdown, port };
