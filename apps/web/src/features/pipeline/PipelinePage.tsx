@@ -2,19 +2,20 @@
  * Pipeline (T072; US6): Kanban of bid workspaces by stage with drag-and-drop (dnd-kit; mouse, touch and keyboard),
  * filters (owner, closing window, search), column totals (count + EMD) and a table view.
  * Moves call PATCH /api/workspaces/:id {stage, position}; a 409 (e.g. "Ready" with missing documents) reverts the
- * card and explains the blockers.
+ * card and explains the blockers. 007/US2 hardening: a "Move to…" menu on every card (FR-029), "Record the result"
+ * after Won/Lost (FR-030), "Show dropped (N)" + drop confirmation (FR-031), debounced search synced to ?q= (FR-032).
  */
-import { forwardRef, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes } from 'react';
+import { forwardRef, memo, useEffect, useMemo, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragOverEvent, type DragStartEvent, type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { AlertTriangle, Columns3, GripVertical, KanbanSquare, MessageSquare, Search, Table2, Trophy, XCircle } from 'lucide-react';
-import { PIPELINE_STAGES, type StageName, type WorkspaceCard } from '@tp/core/contracts/apply';
+import { AlertTriangle, Archive, Columns3, GripVertical, KanbanSquare, MessageSquare, Search, Table2, Trophy, XCircle } from 'lucide-react';
+import { PIPELINE_STAGES, STAGES, type StageName, type WorkspaceCard } from '@tp/core/contracts/apply';
 import {
-  Avatar, Badge, Button, Countdown, EmptyState, ErrorState, Input, PageHeader, Progress, ResponsiveTable, ScoreRing, Segmented, Select,
+  Avatar, Badge, Button, ConfirmDialog, Countdown, EmptyState, ErrorState, Input, PageHeader, Progress, ResponsiveTable, ScoreRing, Segmented, Select,
   Skeleton, StageBadge, Tooltip, VerdictBadge, toast, type Column,
 } from '@/components/ui';
 import { ApiError, errorMessage } from '@/lib/api';
@@ -24,6 +25,9 @@ import { useLocalStorage } from '@/lib/hooks';
 import { STAGE_LABEL, type Stage } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useMoveCard, usePipeline } from './api';
+import { MoveToMenu } from './MoveToMenu';
+import { DROP_CONFIRM_BODY, DROP_CONFIRM_TITLE, SEARCH_DEBOUNCE_MS, VIEW_ONLY_NOTE } from './moves';
+import { OutcomeDialog, type OutcomeTarget } from './OutcomeDialog';
 import { matchesClosing, positionAt, type ClosingFilter } from './position';
 
 type Board = Record<StageName, WorkspaceCard[]>;
@@ -31,37 +35,61 @@ type Board = Record<StageName, WorkspaceCard[]>;
 const STAGE_HINT: Partial<Record<StageName, string>> = {
   identified: 'Worth a look', analysing: 'Checking eligibility', go: 'Decided to bid', preparing: 'Building the packet',
   ready: 'Packet complete — submit on GeM yourself', submitted: 'Awaiting result', won: 'Contract awarded', lost: 'Not awarded',
+  dropped: 'Not bidding — history kept',
 };
 const STAGE_DOT: Partial<Record<StageName, string>> = {
   identified: 'bg-muted-foreground', analysing: 'bg-info', go: 'bg-success', preparing: 'bg-primary', ready: 'bg-accent',
-  submitted: 'bg-primary', won: 'bg-success', lost: 'bg-danger',
+  submitted: 'bg-primary', won: 'bg-success', lost: 'bg-danger', dropped: 'bg-muted-foreground',
 };
 
-const emptyBoard = (): Board => Object.fromEntries(PIPELINE_STAGES.map((s) => [s, []])) as unknown as Board;
+// Every stage (Dropped included) so non-drag moves can target hidden columns; only `stages` are rendered.
+const emptyBoard = (): Board => Object.fromEntries(STAGES.map((s) => [s, []])) as unknown as Board;
+const BOARD_WITH_DROPPED: StageName[] = [...PIPELINE_STAGES, 'dropped'];
 
 function buildBoard(items: WorkspaceCard[]): Board {
   const b = emptyBoard();
   for (const it of items) if (it.stage in b) b[it.stage].push(it);
-  for (const s of PIPELINE_STAGES) b[s].sort((a, z) => a.position - z.position || a.updatedAt.localeCompare(z.updatedAt));
+  for (const s of STAGES) b[s].sort((a, z) => a.position - z.position || a.updatedAt.localeCompare(z.updatedAt));
   return b;
+}
+
+/** Debounced value; clearing (empty string) is applied at once so "Clear filters" is instant (FR-032). */
+function useDebounced(value: string, ms: number): string {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    if (!value.trim()) { setV(value); return; }
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
 }
 
 export default function PipelinePage() {
   const { me, can } = useAuth();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useLocalStorage<'board' | 'table'>('tp:pipeline-view', 'board');
-  const [q, setQ] = useState(params.get('q') ?? '');
+  const [showDropped, setShowDropped] = useLocalStorage<boolean>('tp:pipeline-dropped', false);
+  const urlQ = params.get('q') ?? '';
+  const [q, setQ] = useState(urlQ);
+  const dq = useDebounced(q, SEARCH_DEBOUNCE_MS);
   const owner = params.get('owner') ?? 'all';
   const closing = (params.get('closing') as ClosingFilter | null) ?? 'any';
   const focusStage = params.get('stage') as StageName | null;
   const setParam = (k: string, v: string | null) => {
-    const p = new URLSearchParams(params);
-    if (v && v !== 'all' && v !== 'any') p.set(k, v); else p.delete(k);
-    setParams(p, { replace: true });
+    setParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (v && v !== 'all' && v !== 'any') p.set(k, v); else p.delete(k);
+      return p;
+    }, { replace: true });
   };
+  // Search ⇄ ?q= (FR-032): the debounced text is written to the URL (replace); a URL change from outside
+  // (back/forward, shared link) is copied into the box.
+  useEffect(() => { if (dq.trim() !== urlQ) setParam('q', dq.trim() || null); }, [dq]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (urlQ !== q.trim() && urlQ !== dq.trim()) setQ(urlQ); }, [urlQ]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const query = usePipeline({ mine: false, q });
+  const query = usePipeline({ mine: false, q: dq });
   const all = query.data?.items ?? [];
+  const droppedCount = all.filter((w) => w.stage === 'dropped').length;
   const owners = useMemo(() => {
     const m = new Map<string, string>();
     for (const w of all) if (w.owner) m.set(w.owner.id, w.owner.name);
@@ -69,7 +97,8 @@ export default function PipelinePage() {
   }, [all]);
   const filtered = useMemo(() => all.filter((w) =>
     (owner === 'all' || (owner === 'me' ? w.owner?.id === me?.user.id : owner === 'none' ? !w.owner : w.owner?.id === owner))
-    && matchesClosing(w.tender.endAt, closing)), [all, owner, closing, me]);
+    && matchesClosing(w.tender.endAt, closing)
+    && (showDropped || w.stage !== 'dropped')), [all, owner, closing, me, showDropped]);
   const filtering = owner !== 'all' || closing !== 'any' || !!q.trim();
 
   return (
@@ -93,13 +122,18 @@ export default function PipelinePage() {
             options={[{ value: 'any', label: 'Any closing date' }, { value: '3', label: 'Closing in 3 days' }, { value: '7', label: 'Closing in 7 days' },
               { value: '30', label: 'Closing in 30 days' }, { value: 'closed', label: 'Already closed' }]} />
         </div>
+        {(droppedCount > 0 || showDropped) && (
+          <Button variant={showDropped ? 'secondary' : 'ghost'} size="sm" aria-pressed={showDropped} onClick={() => setShowDropped((v) => !v)}>
+            <Archive /> Show dropped ({droppedCount})
+          </Button>
+        )}
         {filtering && (
           <Button variant="ghost" size="sm" onClick={() => { setQ(''); setParams(new URLSearchParams(), { replace: true }); }}>Clear filters</Button>
         )}
         {query.data && (
           <p className="text-[13px] text-muted-foreground sm:ml-auto">
             {pluralize(filtered.length, 'bid')}
-            {' · '}EMD {formatINRCompact(filtered.filter((w) => !['won', 'lost'].includes(w.stage)).reduce((a, w) => a + (w.tender.emdAmount ?? 0), 0))} at stake
+            {' · '}EMD {formatINRCompact(filtered.filter((w) => !['won', 'lost', 'dropped'].includes(w.stage)).reduce((a, w) => a + (w.tender.emdAmount ?? 0), 0))} at stake
           </p>
         )}
       </div>
@@ -115,7 +149,7 @@ export default function PipelinePage() {
       ) : view === 'table' ? (
         <PipelineTable items={filtered} focusStage={focusStage} />
       ) : (
-        <KanbanBoard items={filtered} canDrag={can('analyst')} focusStage={focusStage} />
+        <KanbanBoard items={filtered} canDrag={can('analyst')} focusStage={focusStage} stages={showDropped ? BOARD_WITH_DROPPED : PIPELINE_STAGES} />
       )}
     </div>
   );
@@ -123,11 +157,16 @@ export default function PipelinePage() {
 
 // ───────────── Board ─────────────
 
-function KanbanBoard({ items, canDrag, focusStage }: { items: WorkspaceCard[]; canDrag: boolean; focusStage: StageName | null }) {
+/** A move (drag or "Move to…") ready to send: the optimistic board and the board to restore on error/cancel. */
+interface PendingMove { card: WorkspaceCard; from: StageName; to: StageName; position: number; optimistic: Board; revert: Board }
+
+function KanbanBoard({ items, canDrag, focusStage, stages }: { items: WorkspaceCard[]; canDrag: boolean; focusStage: StageName | null; stages: StageName[] }) {
   const navigate = useNavigate();
   const move = useMoveCard();
   const [board, setBoard] = useState<Board>(() => buildBoard(items));
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [confirmDrop, setConfirmDrop] = useState<PendingMove | null>(null);
+  const [outcomeFor, setOutcomeFor] = useState<OutcomeTarget | null>(null);
   const snapshot = useRef<{ board: Board; stage: StageName; index: number } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -147,11 +186,43 @@ function KanbanBoard({ items, canDrag, focusStage }: { items: WorkspaceCard[]; c
   );
 
   const stageOf = (id: UniqueIdentifier, b = board): StageName | null => {
-    if ((PIPELINE_STAGES as string[]).includes(String(id))) return id as StageName;
-    for (const s of PIPELINE_STAGES) if (b[s].some((c) => c.id === id)) return s;
+    if ((stages as string[]).includes(String(id))) return id as StageName;
+    for (const s of stages) if (b[s].some((c) => c.id === id)) return s;
     return null;
   };
-  const active = activeId ? PIPELINE_STAGES.flatMap((s) => board[s]).find((c) => c.id === activeId) ?? null : null;
+  const active = activeId ? stages.flatMap((s) => board[s]).find((c) => c.id === activeId) ?? null : null;
+
+  /** Shared by drag-and-drop and "Move to…": same PATCH, toasts, revert and blocker explanation (FR-029). */
+  const commit = (m: PendingMove) => {
+    const stageChanged = m.to !== m.from;
+    setBoard(m.optimistic);
+    move.mutate({ id: m.card.id, stage: stageChanged ? m.to : undefined, position: m.position }, {
+      onSuccess: () => {
+        if (!stageChanged) return;
+        if (m.to === 'won') toast.success('Marked as won', { description: 'Record the L1 price and notes to sharpen your win-rate insights.' });
+        else if (m.to === 'submitted') toast.success('Marked as submitted', { description: 'Recorded for your team. TenderPilot never submits on GeM for you.' });
+        else toast.success(`Moved to ${STAGE_LABEL[m.to as Stage]}`);
+        if (m.to === 'won' || m.to === 'lost') setOutcomeFor({ id: m.card.id, tenderId: m.card.tender.id, title: m.card.tender.title, result: m.to });
+      },
+      onError: (err) => {
+        setBoard(m.revert);
+        explainMoveError(err, m.card, m.to, () => navigate(`/workspaces/${m.card.id}`));
+      },
+    });
+  };
+  /** Moves to Dropped need a confirmation (FR-031); the card stays put until confirmed. */
+  const requestMove = (m: PendingMove) => {
+    if (m.to === 'dropped' && m.from !== 'dropped') { setBoard(m.revert); setConfirmDrop(m); return; }
+    commit(m);
+  };
+  /** "Move to…": append to the end of the target column. */
+  const moveTo = (card: WorkspaceCard, to: StageName) => {
+    const from = STAGES.find((s) => board[s].some((c) => c.id === card.id)) ?? card.stage;
+    const col = board[to].filter((c) => c.id !== card.id);
+    const position = positionAt(col, col.length);
+    const optimistic = { ...board, [from]: board[from].filter((c) => c.id !== card.id), [to]: [...col, { ...card, stage: to, position }] };
+    requestMove({ card, from, to, position, optimistic, revert: board });
+  };
 
   const onDragStart = (e: DragStartEvent) => {
     const s = stageOf(e.active.id)!;
@@ -192,19 +263,9 @@ function KanbanBoard({ items, canDrag, focusStage }: { items: WorkspaceCard[]; c
     if (to === snap.stage && index === snap.index) return;
     const card = col[index]!;
     const position = positionAt(col.filter((c) => c.id !== a.id), index);
-    const stageChanged = to !== snap.stage;
-    setBoard({ ...next, [to]: col.map((c) => (c.id === card.id ? { ...c, stage: to, position } : c)) });
-    move.mutate({ id: String(a.id), stage: stageChanged ? to : undefined, position }, {
-      onSuccess: () => {
-        if (!stageChanged) return;
-        if (to === 'won') toast.success('Marked as won', { description: 'Record the L1 price and notes in the workspace to sharpen your win-rate insights.' });
-        else if (to === 'submitted') toast.success('Marked as submitted', { description: 'Recorded for your team. TenderPilot never submits on GeM for you.' });
-        else toast.success(`Moved to ${STAGE_LABEL[to as Stage]}`);
-      },
-      onError: (err) => {
-        setBoard(snap.board);
-        explainMoveError(err, card, to, () => navigate(`/workspaces/${card.id}`));
-      },
+    requestMove({
+      card, from: snap.stage, to, position, revert: snap.board,
+      optimistic: { ...next, [to]: col.map((c) => (c.id === card.id ? { ...c, stage: to, position } : c)) },
     });
   };
 
@@ -221,7 +282,7 @@ function KanbanBoard({ items, canDrag, focusStage }: { items: WorkspaceCard[]; c
       }}>
       {/* Stage jump chips (phones) */}
       <nav aria-label="Jump to stage" className="scrollbar-thin -mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 md:hidden">
-        {PIPELINE_STAGES.map((s) => (
+        {stages.map((s) => (
           <button key={s} type="button" className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium focus-ring"
             onClick={() => scroller.current?.querySelector<HTMLElement>(`[data-stage="${s}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })}>
             <span className={cn('size-1.5 rounded-full', STAGE_DOT[s])} />{STAGE_LABEL[s as Stage]}<span className="tabular text-muted-foreground">{board[s].length}</span>
@@ -229,19 +290,25 @@ function KanbanBoard({ items, canDrag, focusStage }: { items: WorkspaceCard[]; c
         ))}
       </nav>
       <div ref={scroller} className="scrollbar-thin -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 md:snap-none lg:-mx-8 lg:px-8">
-        {PIPELINE_STAGES.map((s) => (
-          <KanbanColumn key={s} stage={s} cards={board[s]} canDrag={canDrag} highlighted={focusStage === s} />
+        {stages.map((s) => (
+          <KanbanColumn key={s} stage={s} cards={board[s]} canDrag={canDrag} highlighted={focusStage === s} onMove={moveTo} />
         ))}
       </div>
       <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }}>
         {active ? <CardView card={active} overlay /> : null}
       </DragOverlay>
-      {!canDrag && <p className="mt-1 text-xs text-muted-foreground">You have view-only access. Ask a Bid Manager to move bids between stages.</p>}
+      {!canDrag && <p className="mt-1 text-xs text-muted-foreground">{VIEW_ONLY_NOTE}</p>}
+      <ConfirmDialog open={!!confirmDrop} onOpenChange={(o) => { if (!o) setConfirmDrop(null); }}
+        title={DROP_CONFIRM_TITLE} description={DROP_CONFIRM_BODY} confirmLabel="Drop bid"
+        onConfirm={() => { const m = confirmDrop; setConfirmDrop(null); if (m) commit({ ...m, revert: board }); }}>
+        {confirmDrop && <p className="text-sm font-medium">{confirmDrop.card.tender.title}</p>}
+      </ConfirmDialog>
+      <OutcomeDialog target={outcomeFor} onClose={() => setOutcomeFor(null)} />
     </DndContext>
   );
 }
 
-const titleOf = (b: Board, id: UniqueIdentifier) => PIPELINE_STAGES.flatMap((s) => b[s]).find((c) => c.id === id)?.tender.title ?? 'bid';
+const titleOf = (b: Board, id: UniqueIdentifier) => STAGES.flatMap((s) => b[s]).find((c) => c.id === id)?.tender.title ?? 'bid';
 
 function explainMoveError(err: unknown, card: WorkspaceCard, to: StageName, open: () => void) {
   if (err instanceof ApiError && err.status === 409) {
@@ -257,7 +324,9 @@ function explainMoveError(err: unknown, card: WorkspaceCard, to: StageName, open
   toast.error(`Couldn’t move “${card.tender.title.slice(0, 40)}…”`, { description: errorMessage(err) });
 }
 
-function KanbanColumn({ stage, cards, canDrag, highlighted }: { stage: StageName; cards: WorkspaceCard[]; canDrag: boolean; highlighted: boolean }) {
+function KanbanColumn({ stage, cards, canDrag, highlighted, onMove }: {
+  stage: StageName; cards: WorkspaceCard[]; canDrag: boolean; highlighted: boolean; onMove: (card: WorkspaceCard, to: StageName) => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const emd = cards.reduce((a, c) => a + (c.tender.emdAmount ?? 0), 0);
   return (
@@ -281,7 +350,7 @@ function KanbanColumn({ stage, cards, canDrag, highlighted }: { stage: StageName
       </header>
       <SortableContext id={stage} items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <ol ref={setNodeRef} className="flex min-h-[120px] flex-1 flex-col gap-2 px-2 pb-2">
-          {cards.map((c) => <SortableCard key={c.id} card={c} disabled={!canDrag} />)}
+          {cards.map((c) => <SortableCard key={c.id} card={c} disabled={!canDrag} onMove={onMove} />)}
           {cards.length === 0 && (
             <li className="flex flex-1 items-center justify-center rounded-lg border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
               {canDrag ? 'Drop a bid here' : 'No bids'}
@@ -293,19 +362,20 @@ function KanbanColumn({ stage, cards, canDrag, highlighted }: { stage: StageName
   );
 }
 
-function SortableCard({ card, disabled }: { card: WorkspaceCard; disabled: boolean }) {
+function SortableCard({ card, disabled, onMove }: { card: WorkspaceCard; disabled: boolean; onMove: (card: WorkspaceCard, to: StageName) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id, disabled });
   const style: CSSProperties = { transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined, transition };
   return (
     <li ref={setNodeRef} style={style} className={cn(isDragging && 'opacity-40')}>
-      <CardView card={card} handleProps={disabled ? undefined : { ...attributes, ...listeners }} />
+      <CardView card={card} handleProps={disabled ? undefined : { ...attributes, ...listeners }}
+        menu={disabled ? undefined : <MoveToMenu title={card.tender.title} stage={card.stage} onMove={(to) => onMove(card, to)} />} />
     </li>
   );
 }
 
-const CardView = memo(forwardRef<HTMLDivElement, { card: WorkspaceCard; overlay?: boolean; handleProps?: HTMLAttributes<HTMLElement> }>(
-  function CardView({ card, overlay, handleProps }, ref) {
-    const done = card.stage === 'submitted' || card.stage === 'won' || card.stage === 'lost';
+const CardView = memo(forwardRef<HTMLDivElement, { card: WorkspaceCard; overlay?: boolean; handleProps?: HTMLAttributes<HTMLElement>; menu?: ReactNode }>(
+  function CardView({ card, overlay, handleProps, menu }, ref) {
+    const done = card.stage === 'submitted' || card.stage === 'won' || card.stage === 'lost' || card.stage === 'dropped';
     const r = card.readiness;
     return (
       <div ref={ref} className={cn('group relative rounded-lg border bg-card p-3 shadow-xs transition-shadow hover:shadow-md',
@@ -316,8 +386,9 @@ const CardView = memo(forwardRef<HTMLDivElement, { card: WorkspaceCard; overlay?
             <GripVertical className="size-3.5" />
           </button>
         )}
+        {menu && <div className="absolute right-8 top-1.5">{menu}</div>}
         <Link to={`/workspaces/${card.id}`} className="block rounded focus-ring" draggable={false}>
-          <div className="flex items-start gap-2.5 pr-5">
+          <div className={cn('flex items-start gap-2.5', menu ? 'pr-12' : 'pr-5')}>
             <ScoreRing score={card.analysis?.score} verdict={card.analysis?.verdict ?? undefined} size={34} animate={false} />
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 text-[13px] font-medium leading-snug">{card.tender.title}</p>
@@ -328,6 +399,7 @@ const CardView = memo(forwardRef<HTMLDivElement, { card: WorkspaceCard; overlay?
           <div className="mt-2.5 flex items-center justify-between gap-2">
             {card.stage === 'won' ? <Badge tone="success" size="sm"><Trophy /> Won</Badge>
               : card.stage === 'lost' ? <Badge tone="danger" size="sm"><XCircle /> Lost</Badge>
+                : card.stage === 'dropped' ? <Badge tone="neutral" size="sm"><Archive /> Dropped</Badge>
                 : card.stage === 'submitted' ? <span className="text-2xs text-muted-foreground">Submitted {card.submittedAt ? formatDateIST(card.submittedAt) : ''}</span>
                   : <Countdown to={card.tender.endAt} compact />}
             <span className="flex items-center gap-2">
@@ -372,7 +444,7 @@ function PipelineTable({ items, focusStage }: { items: WorkspaceCard[]; focusSta
   const navigate = useNavigate();
   const rows = useMemo(() => [...items]
     .filter((w) => !focusStage || w.stage === focusStage)
-    .sort((a, b) => PIPELINE_STAGES.indexOf(a.stage) - PIPELINE_STAGES.indexOf(b.stage) || (a.tender.endAt ?? '').localeCompare(b.tender.endAt ?? '')), [items, focusStage]);
+    .sort((a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || (a.tender.endAt ?? '').localeCompare(b.tender.endAt ?? '')), [items, focusStage]);
   const columns: Column<WorkspaceCard>[] = [
     {
       key: 'tender', header: 'Tender', primary: true, className: 'max-w-[360px]',

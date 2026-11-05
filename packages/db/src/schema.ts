@@ -382,7 +382,11 @@ export const bidWorkspaces = pgTable('bid_workspaces', {
   position: real('position').notNull().default(0), // kanban order within stage
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId) }));
+}, (t) => ({
+  uq: uniqueIndex('workspace_org_tender_uq').on(t.orgId, t.tenderId),
+  /** Pipeline/dashboard stage aggregates (007/NFR-001). */
+  orgStageIdx: index('bid_workspaces_org_stage_idx').on(t.orgId, t.stage),
+}));
 
 export const comments = pgTable('comments', {
   id: id(),

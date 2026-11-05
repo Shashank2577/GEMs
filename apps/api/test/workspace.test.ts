@@ -1,7 +1,8 @@
 /** Bid workspace API (T063, T067; FR-023, FR-028, US4 acceptance 1–2, US6 activity). */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { activityLog, analyses, notifications, type ChecklistItem } from '@tp/db';
+import { activityLog, analyses, bidWorkspaces, notifications, tenders, type ChecklistItem } from '@tp/db';
+import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
@@ -9,8 +10,12 @@ let ctx: TestContext;
 let s: Awaited<ReturnType<typeof seedApply>>;
 let wsId: string;
 
+const GEM = 'http://mock-gem.test';
+const mock = createMockGem({ now: () => NOW, token: 'c'.repeat(32) });
+
 beforeAll(async () => {
-  ctx = await createTestContext({ now: NOW });
+  // GeM traffic (optional L1 hint, 007/T033) goes to the in-process mock BidPlus.
+  ctx = await createTestContext({ now: NOW, gemBaseUrl: GEM, fetch: async (input, init) => mock.app.fetch(new Request(input as string, init)) });
   s = await seedApply(ctx);
 });
 afterAll(() => ctx?.close());
@@ -402,5 +407,184 @@ describe('mapping & readiness edge cases (T028; 006/FR-013, FR-016, FR-017, FR-0
     expect(r.body.error.code).toBe('validation_error');
     expect(r.body.error.details.fields.nope).toBe('Not an item of this bid’s checklist');
     expect((await request(ctx.app, 'PUT', `/workspaces/${id}/mapping`, { cookie: org.viewer.cookie, json: { pan: 'auto' } })).status).toBe(403);
+  });
+});
+
+// ───────────── 007 / US2 pipeline (T027, T033, T036) ─────────────
+
+describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () => {
+  let demo: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  const cards = async (query = '') => (await request(ctx.app, 'GET', `/workspaces${query}`, { cookie: demo.viewer.cookie })).body.items as any[];
+
+  beforeAll(async () => {
+    demo = await seedOrgWithRoles(ctx.app, 'Demo Pipeline Org');
+    const r = await request(ctx.app, 'POST', '/demo/seed', { cookie: demo.bidManager.cookie });
+    expect(r.status).toBe(201);
+  });
+
+  it('lists 16 cards with byStage; ?stage=won,lost → 3 (comma or repeated); unknown stage → 400 with details.fields.stage', async () => {
+    const all = await request(ctx.app, 'GET', '/workspaces', { cookie: demo.viewer.cookie });
+    expect(all.status).toBe(200);
+    expect(all.body.total).toBe(16);
+    expect(all.body.items).toHaveLength(16);
+    expect(all.body.byStage).toEqual({ identified: 3, analysing: 2, go: 2, preparing: 2, ready: 1, submitted: 3, won: 2, lost: 1 });
+    expect((await request(ctx.app, 'GET', '/workspaces?stage=won,lost', { cookie: demo.viewer.cookie })).body.total).toBe(3);
+    expect((await request(ctx.app, 'GET', '/workspaces?stage=won&stage=lost', { cookie: demo.viewer.cookie })).body.total).toBe(3);
+    const bad = await request(ctx.app, 'GET', '/workspaces?stage=archived', { cookie: demo.viewer.cookie });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('validation_error');
+    expect(bad.body.error.details.fields.stage).toEqual(expect.any(String));
+  });
+
+  it('a Viewer cannot PATCH (403); a foreign-org workspace id answers 404', async () => {
+    const [first] = await cards('?stage=identified');
+    const v = await request(ctx.app, 'PATCH', `/workspaces/${first.id}`, { cookie: demo.viewer.cookie, json: { stage: 'analysing' } });
+    expect(v.status).toBe(403);
+    const foreign = await request(ctx.app, 'PATCH', `/workspaces/${wsId}`, { cookie: demo.analyst.cookie, json: { stage: 'analysing' } });
+    expect(foreign.status).toBe(404);
+    expect((await cards('?stage=identified')).map((c) => c.id)).toContain(first.id); // unchanged
+  });
+
+  it('?mine=1 returns only cards the caller owns or is assigned to', async () => {
+    expect((await request(ctx.app, 'GET', '/workspaces?mine=1', { cookie: demo.analyst.cookie })).body.total).toBe(0);
+    const [target] = await cards('?stage=go');
+    const a = await request(ctx.app, 'PATCH', `/workspaces/${target.id}`, { cookie: demo.bidManager.cookie, json: { assigneeIds: [demo.analyst.me.user.id] } });
+    expect(a.status).toBe(200);
+    const mine = await request(ctx.app, 'GET', '/workspaces?mine=true', { cookie: demo.analyst.cookie });
+    expect(mine.body.items.map((i: any) => i.id)).toEqual([target.id]);
+    // The demo seeder (the Bid Manager) owns all 16.
+    expect((await request(ctx.app, 'GET', '/workspaces?mine=1', { cookie: demo.bidManager.cookie })).body.total).toBe(16);
+  });
+
+  it('moving to Ready without a completed analysis → 409 conflict, reason not_analysed', async () => {
+    // Every demo card is analysed; drop one card's analysis to get a "not analysed" bid.
+    const [unanalysed] = await cards('?stage=identified');
+    await ctx.db.delete(analyses).where(and(eq(analyses.orgId, demo.orgId), eq(analyses.tenderId, unanalysed.tender.id)));
+    expect((await cards('?stage=identified')).find((c) => c.id === unanalysed.id).readiness.analysed).toBe(false);
+    const r = await request(ctx.app, 'PATCH', `/workspaces/${unanalysed.id}`, { cookie: demo.analyst.cookie, json: { stage: 'ready' } });
+    expect(r.status).toBe(409);
+    expect(r.body.error).toMatchObject({ code: 'conflict', message: 'Analyse the tender before marking the bid ready to submit.', details: { reason: 'not_analysed' } });
+  });
+
+  it('Submitted → Won without an outcome sets outcome {result: won, at: now} and logs the stage change', async () => {
+    const sub = (await cards('?stage=submitted')).find((c) => !c.outcome);
+    const r = await request(ctx.app, 'PATCH', `/workspaces/${sub.id}`, { cookie: demo.analyst.cookie, json: { stage: 'won', position: 99 } });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ stage: 'won', position: 99, outcome: { result: 'won', at: NOW.toISOString() } });
+    const [act] = await ctx.db.select().from(activityLog).where(and(eq(activityLog.action, 'workspace.stage_changed'), eq(activityLog.entityId, sub.id)));
+    expect(act.meta).toMatchObject({ from: 'submitted', to: 'won', fromLabel: 'Submitted', toLabel: 'Won' });
+    expect(act.userId).toBe(demo.analyst.me.user.id);
+  });
+
+  it('sets submittedAt on the first move to Submitted only', async () => {
+    const [ready] = await cards('?stage=ready');
+    expect(ready.submittedAt).toBeNull();
+    const r = await request(ctx.app, 'PATCH', `/workspaces/${ready.id}`, { cookie: demo.analyst.cookie, json: { stage: 'submitted' } });
+    expect(r.status).toBe(200);
+    expect(r.body.submittedAt).toBe(NOW.toISOString());
+    ctx.clock.advance(3_600_000);
+    try {
+      expect((await request(ctx.app, 'PATCH', `/workspaces/${ready.id}`, { cookie: demo.analyst.cookie, json: { stage: 'preparing' } })).status).toBe(200);
+      const again = await request(ctx.app, 'PATCH', `/workspaces/${ready.id}`, { cookie: demo.analyst.cookie, json: { stage: 'submitted' } });
+      expect(again.body.submittedAt).toBe(NOW.toISOString());
+    } finally {
+      ctx.clock.set(NOW);
+    }
+  });
+
+  describe('GET /tenders/:id/result-hint — optional L1 hint (007/T033, FR-030)', () => {
+    const tenderOf = async (stage: string) => {
+      const [row] = await ctx.db.select({ id: tenders.id, gemBidId: tenders.gemBidId }).from(bidWorkspaces)
+        .innerJoin(tenders, eq(tenders.id, bidWorkspaces.tenderId))
+        .where(and(eq(bidWorkspaces.orgId, demo.orgId), eq(bidWorkspaces.stage, stage as any)));
+      return row!;
+    };
+
+    it('analyst+ only; 404 without a workspace for the tender in the caller\'s org', async () => {
+      const t = await tenderOf('lost');
+      expect((await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.viewer.cookie })).status).toBe(403);
+      const other = await signup(ctx.app, { orgName: 'Hint Rival' });
+      expect((await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: other.cookie })).status).toBe(404);
+      expect((await request(ctx.app, 'GET', '/tenders/not-a-uuid/result-hint', { cookie: demo.analyst.cookie })).status).toBe(404);
+    });
+
+    it('reads the public result page through the GeM adapter and returns L1 (no seller names); cached on repeat', async () => {
+      const t = await tenderOf('lost');
+      const before = mock.state.requests.results;
+      const r = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+      expect(r.status).toBe(200);
+      const l1 = 950_000 + (Number(t.gemBidId) % 97) * 25_000;
+      expect(r.body).toMatchObject({ available: true, l1Price: l1, sourceUrl: `${GEM}/bidding/bid/getBidResultView/${t.gemBidId}`, fetchedAt: NOW.toISOString() });
+      expect(r.body.bidders).toEqual([
+        { rank: 1, level: 'L1', price: l1 }, { rank: 2, level: 'L2', price: Math.round(l1 * 1.04) }, { rank: 3, level: 'L3', price: Math.round(l1 * 1.09) },
+      ]);
+      expect(JSON.stringify(r.body)).not.toContain('Kaveri');
+      expect(mock.state.requests.results).toBe(before + 1);
+      await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+      expect(mock.state.requests.results).toBe(before + 1);
+    });
+
+    it('degrades to { available: false } when GeM is down or the tender has no GeM id', async () => {
+      const t = await tenderOf('won');
+      mock.state.failMode = 'down';
+      try {
+        const r = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({ available: false, reason: 'gem_unavailable' });
+      } finally {
+        mock.state.failMode = 'off';
+      }
+      // seedApply's tender has no BidPlus b_id.
+      const none = await request(ctx.app, 'GET', `/tenders/${s.tender.id}/result-hint`, { cookie: s.org.analyst.cookie });
+      expect(none.body).toEqual({ available: false, reason: 'no_gem_id' });
+    });
+  });
+});
+
+describe('position renumbering (007/T036; FR-033)', () => {
+  let owner: Awaited<ReturnType<typeof signup>>;
+  const column = async (stage: string) =>
+    ((await request(ctx.app, 'GET', `/workspaces?stage=${stage}`, { cookie: owner.cookie })).body.items as any[]).map((i) => ({ id: i.id as string, position: i.position as number }));
+  const start = async (n: number) => {
+    const t = await seedTender(ctx, n);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: owner.cookie });
+    expect(r.status).toBe(201);
+    return r.body.id as string;
+  };
+
+  beforeAll(async () => { owner = await signup(ctx.app, { orgName: 'Renumber Org' }); });
+
+  it('keeps order when 60 cards are inserted between the same pair (midpoints run out → column renumbered 1, 2, 3, …)', async () => {
+    const a = await start(100);
+    const b = await start(101);
+    const inserted: string[] = [];
+    let renumbered = 0;
+    for (let i = 0; i < 60; i++) {
+      const id = await start(200 + i);
+      const col = (await column('identified')).filter((c) => c.id !== id);
+      const ai = col.findIndex((c) => c.id === a);
+      const mid = (col[ai]!.position + col[ai + 1]!.position) / 2; // between A and its current right neighbour
+      const r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: owner.cookie, json: { position: mid } });
+      expect(r.status).toBe(200);
+      if (Number.isInteger(r.body.position) && r.body.position === 2) renumbered++;
+      inserted.push(id);
+    }
+    const final = await column('identified');
+    expect(final.map((c) => c.id)).toEqual([a, ...[...inserted].reverse(), b]);
+    for (let i = 1; i < final.length; i++) expect(final[i]!.position).toBeGreaterThan(final[i - 1]!.position);
+    expect(renumbered).toBeGreaterThanOrEqual(2); // float4 midpoints near 1 run out after ~23 halvings
+  });
+
+  it('renumbers when neighbours differ by < 1e-9, in one transaction with the move', async () => {
+    const [x, y, z] = [await start(300), await start(301), await start(302)];
+    await ctx.db.update(bidWorkspaces).set({ stage: 'analysing', position: 0 }).where(eq(bidWorkspaces.id, x));
+    await ctx.db.update(bidWorkspaces).set({ stage: 'analysing', position: 5e-10 }).where(eq(bidWorkspaces.id, y));
+    const r = await request(ctx.app, 'PATCH', `/workspaces/${z}`, { cookie: owner.cookie, json: { stage: 'analysing', position: 2.5e-10 } });
+    expect(r.status).toBe(200);
+    expect(await column('analysing')).toEqual([{ id: x, position: 1 }, { id: z, position: 2 }, { id: y, position: 3 }]);
+    // A representable midpoint is used as is (no renumbering).
+    const ok = await request(ctx.app, 'PATCH', `/workspaces/${z}`, { cookie: owner.cookie, json: { position: 2.5 } });
+    expect(ok.body.position).toBe(2.5);
+    expect((await column('analysing')).map((c) => c.position)).toEqual([1, 2.5, 3]);
   });
 });

@@ -15,6 +15,13 @@
       "when": 1793845957931,
       "tag": "0001_tranquil_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793848591612,
+      "tag": "0002_wise_silverclaw",
+      "breakpoints": true
     }
   ]
 }

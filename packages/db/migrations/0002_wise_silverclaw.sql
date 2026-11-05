@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "bid_workspaces_org_stage_idx" ON "bid_workspaces" USING btree ("org_id","stage");

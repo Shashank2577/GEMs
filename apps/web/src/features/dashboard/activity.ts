@@ -28,6 +28,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'vault.updated': return 'updated';
     case 'vault.file_replaced': return 'replaced the file of';
     case 'vault.deleted': return 'deleted';
+    case 'vault.reminders_run': return 'sent document expiry reminders';
     case 'watchlist.created': return 'created the watchlist';
     case 'watchlist.deleted': return 'deleted the watchlist';
     case 'profile.updated': return 'updated the';
@@ -54,7 +55,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
 
 /** Actions whose target should not be printed after the sentence. */
 export const SELF_CONTAINED = new Set(['member.joined', 'org.created', 'org.updated', 'org.scoring_weights_updated', 'ingestion.run', 'api_token.created', 'api_token.revoked', 'demo.seeded',
-  'annexure.template_updated', 'annexure.template_reset']);
+  'annexure.template_updated', 'annexure.template_reset', 'vault.reminders_run']);
 
 /** Every action the API writes to the activity log (kept in sync by activity.test.ts). */
 export const KNOWN_ACTIONS = [
@@ -62,7 +63,7 @@ export const KNOWN_ACTIONS = [
   'workspace.assigned', 'workspace.item_overridden', 'workspace.override_removed', 'workspace.mapping_changed', 'workspace.due_changed',
   'workspace.assist_values_saved', 'workspace.packet_built', 'workspace.packet_failed', 'packet.built',
   'tender.analysed', 'tender.document_uploaded', 'tender.document_fetched', 'analysis.factor_overridden',
-  'vault.uploaded', 'vault.updated', 'vault.file_replaced', 'vault.deleted',
+  'vault.uploaded', 'vault.updated', 'vault.file_replaced', 'vault.deleted', 'vault.reminders_run',
   'watchlist.created', 'watchlist.deleted',
   'profile.updated', 'profile.past_contract_added', 'profile.past_contract_updated', 'profile.past_contract_deleted',
   'annexure.template_updated', 'annexure.template_reset',

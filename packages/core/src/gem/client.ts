@@ -14,6 +14,7 @@
  * Request shape adapted from erenmyeager15/india-government-tenders-scraper (Apache-2.0) and
  * arush15june/gem-search (MIT) — see NOTICE.
  */
+import { bidResultPath } from './award';
 import { parseBidPlusDoc, parseBidPlusResponse, type BidPlusPage, type NormalizedTender } from './parse';
 
 export interface GemClientOptions {
@@ -140,6 +141,21 @@ export class GemClient {
       throw new GemError('GeM did not return a PDF for this bid document', res.status);
     }
     return { bytes, contentType, url: path.startsWith('http') ? path : `${this.baseUrl}${path}` };
+  }
+
+  /**
+   * Fetch the public bid-result (award) page HTML for a BidPlus `b_id` (007/T033). Read-only, same throttle and
+   * back-off as every other request. 404 → `null` (no result published).
+   */
+  async fetchBidResultHtml(gemBidId: string): Promise<{ html: string; url: string } | null> {
+    const path = bidResultPath(gemBidId);
+    const res = await this.request(path, {
+      method: 'GET',
+      headers: { accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8', referer: `${this.baseUrl}/all-bids`, 'x-requested-with': 'XMLHttpRequest' },
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new GemError(`GeM bid result failed: HTTP ${res.status}`, res.status, res.status >= 500);
+    return { html: await res.text(), url: `${this.baseUrl}${path}` };
   }
 
   // ───────────── internals ─────────────
