@@ -9,7 +9,7 @@
  *   PATCH  /past-contracts/:id     → PastContractDto                                      analyst+
  *   DELETE /past-contracts/:id     → { ok: true }                                         analyst+
  */
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { companyProfiles, pastContracts, vaultDocuments } from '@tp/db';
 import {
@@ -19,7 +19,7 @@ import {
 import { uuidSchema } from '@tp/core/contracts/common';
 import { profileCompleteness } from '@tp/core/vault/completeness';
 import { averageTurnoverLastN } from '@tp/core/vault/validators';
-import { dateTimeIST } from '@tp/core/packet/pdf-utils';
+import { dateTimeIST } from '@tp/core/time';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { conflict, notFound, validationError } from '../lib/errors';
@@ -66,36 +66,62 @@ export async function buildProfileResponse(deps: AppDeps, org: string): Promise<
 
 profileRoutes.get('/profile', requireAuth, async (c) => c.json(await buildProfileResponse(c.var.deps, orgId(c))));
 
+/** Thrown inside the profile transaction when another save won the race (FR-014). */
+const profileConflict = (stored: Date | null) =>
+  conflict(`Someone else saved the profile at ${stored ? dateTimeIST(stored) : 'an earlier time'}. Reload to see their changes.`, {
+    updatedAt: stored?.toISOString() ?? null,
+  });
+
+/** `updated_at` truncated to whole milliseconds (JS Date precision) as epoch ms; Postgres keeps microseconds. */
+const updatedAtMs = sql<number>`floor(extract(epoch from ${companyProfiles.updatedAt}) * 1000)::float8`;
+
 profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
   const { db } = c.var.deps;
   const org = orgId(c);
   const { expectedUpdatedAt, ...input } = await parseJson(c, profileInputSchema);
-  const [existing] = await db.select().from(companyProfiles).where(eq(companyProfiles.orgId, org));
-  // Optimistic concurrency (FR-014): when the client says which version it edited, refuse to overwrite a newer one.
-  // null means "I saw no saved profile yet", so it conflicts with any existing row.
-  if (expectedUpdatedAt !== undefined) {
-    const stored = existing?.updatedAt ?? null;
-    const expected = expectedUpdatedAt === null ? null : Date.parse(expectedUpdatedAt);
-    if ((stored?.getTime() ?? null) !== expected) {
-      throw conflict(`Someone else saved the profile at ${stored ? dateTimeIST(stored) : 'an earlier time'}. Reload to see their changes.`, {
-        updatedAt: stored?.toISOString() ?? null,
-      });
-    }
-  }
   // Merge: keys absent from the body keep their stored value.
   const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) as Partial<ProfileRow>;
-  const merged = { ...EMPTY_PROFILE, ...(existing ?? {}), ...patch };
-  // Cross-field check against stored values too (e.g. only the PAN was changed).
-  if (merged.gstin && merged.pan && merged.gstin.slice(2, 12) !== merged.pan && ('gstin' in patch || 'pan' in patch)) {
-    const field = 'gstin' in patch ? 'gstin' : 'pan';
-    throw validationError(`${field}: GSTIN ${merged.gstin} belongs to PAN ${merged.gstin.slice(2, 12)}, not ${merged.pan}`, {
-      fields: { [field]: field === 'gstin' ? `This GSTIN belongs to PAN ${merged.gstin.slice(2, 12)}, not ${merged.pan}` : `Your GSTIN is registered to PAN ${merged.gstin.slice(2, 12)}` },
-    });
-  }
-  const { orgId: _o, updatedAt: _u, ...values } = merged as ProfileRow;
   const now = c.var.deps.clock.now();
-  await db.insert(companyProfiles).values({ ...values, orgId: org, updatedAt: now })
-    .onConflictDoUpdate({ target: companyProfiles.orgId, set: { ...values, updatedAt: now } });
+
+  await db.transaction(async (tx) => {
+    // Lock the org's row so the concurrency check and the write are atomic (FR-014).
+    const [found] = await tx.select({ row: companyProfiles, ms: updatedAtMs }).from(companyProfiles)
+      .where(eq(companyProfiles.orgId, org)).for('update');
+    const existing = found?.row;
+    // Optimistic concurrency: refuse to overwrite a version the client did not load.
+    // null means "I saw no saved profile yet", so it conflicts with any existing row.
+    if (expectedUpdatedAt !== undefined) {
+      const expected = expectedUpdatedAt === null ? null : Date.parse(expectedUpdatedAt);
+      if ((found ? Number(found.ms) : null) !== expected) throw profileConflict(existing?.updatedAt ?? null);
+    }
+    const merged = { ...EMPTY_PROFILE, ...(existing ?? {}), ...patch };
+    // Cross-field check against stored values too (e.g. only the PAN was changed).
+    if (merged.gstin && merged.pan && merged.gstin.slice(2, 12) !== merged.pan && ('gstin' in patch || 'pan' in patch)) {
+      const field = 'gstin' in patch ? 'gstin' : 'pan';
+      throw validationError(`${field}: GSTIN ${merged.gstin} belongs to PAN ${merged.gstin.slice(2, 12)}, not ${merged.pan}`, {
+        fields: { [field]: field === 'gstin' ? `This GSTIN belongs to PAN ${merged.gstin.slice(2, 12)}, not ${merged.pan}` : `Your GSTIN is registered to PAN ${merged.gstin.slice(2, 12)}` },
+      });
+    }
+    const { orgId: _o, updatedAt: _u, ...values } = merged as ProfileRow;
+    if (existing) {
+      // updated_at is the version token: always move it forward, even for two saves in the same millisecond.
+      const prevMs = Number(found!.ms);
+      const stamp = now.getTime() > prevMs ? now : new Date(prevMs + 1);
+      await tx.update(companyProfiles).set({ ...values, updatedAt: stamp }).where(eq(companyProfiles.orgId, org));
+    } else if (expectedUpdatedAt !== undefined) {
+      // No row to lock: a concurrent first save may insert it. Only one insert may win.
+      const inserted = await tx.insert(companyProfiles).values({ ...values, orgId: org, updatedAt: now })
+        .onConflictDoNothing({ target: companyProfiles.orgId }).returning({ orgId: companyProfiles.orgId });
+      if (!inserted.length) {
+        const [other] = await tx.select({ updatedAt: companyProfiles.updatedAt }).from(companyProfiles).where(eq(companyProfiles.orgId, org));
+        throw profileConflict(other?.updatedAt ?? null);
+      }
+    } else {
+      // Legacy clients (no expectedUpdatedAt): last write wins.
+      await tx.insert(companyProfiles).values({ ...values, orgId: org, updatedAt: now })
+        .onConflictDoUpdate({ target: companyProfiles.orgId, set: { ...values, updatedAt: now } });
+    }
+  });
   await logActivity(db, { orgId: org, userId: userId(c), action: 'profile.updated', entityType: 'profile', entityId: org, meta: { fields: Object.keys(patch) } });
   return c.json(await buildProfileResponse(c.var.deps, org));
 });

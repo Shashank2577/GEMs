@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   averageTurnoverLastN, fyLabelForDate, fyStartYear, gstinCheckChar, gstinPan, gstinState, lastCompletedFys, normalizeFy, panEntityType,
-  toE164IndianMobile, UDYAM_STATE_CODES, validateCin, validateDpiit, validateGstin, validateIfsc, validatePan, validatePincode, validateUdyam,
+  toE164IndianMobile, UDYAM_STATE_CODES, udyamState, validateCin, validateDpiit, validateGstin, validateIfsc, validatePan, validatePincode, validateUdyam,
 } from '../../src/vault/validators';
 
 // Real-format GSTINs whose check characters were computed with the mod-36 algorithm
@@ -65,6 +65,15 @@ describe('other identifiers', () => {
     for (const sc of ['MH', 'DL', 'TS', 'OD', 'LA', 'DN']) expect(validateUdyam(`UDYAM-${sc}-01-0000001`)).toBeNull();
     expect(validateUdyam('UDYAM-XX-26-0123456')).toBe('"XX" is not a valid state code in a Udyam number');
     expect(validateUdyam('udyam-zz-26-0123456')).toBe('"ZZ" is not a valid state code in a Udyam number');
+  });
+  it('Udyam accepts alias state codes DD → DN and TG → TS, but not prototype keys', () => {
+    expect(validateUdyam('UDYAM-DD-01-0000001')).toBeNull();
+    expect(validateUdyam('UDYAM-TG-02-0000001')).toBeNull();
+    expect(udyamState('DD')).toBe(udyamState('DN'));
+    expect(udyamState('tg')).toBe('Telangana');
+    expect(Object.keys(UDYAM_STATE_CODES)).not.toContain('DD');
+    expect(udyamState('constructor')).toBeNull();
+    expect(udyamState('__proto__')).toBeNull();
   });
   it('CIN year bound uses an injectable now (FR-015)', () => {
     const now = new Date('2026-11-05T00:00:00Z');

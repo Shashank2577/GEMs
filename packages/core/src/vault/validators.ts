@@ -94,11 +94,21 @@ export const UDYAM_STATE_CODES: Record<string, string> = {
   JK: 'Jammu and Kashmir', LA: 'Ladakh', LD: 'Lakshadweep', PY: 'Puducherry',
 };
 
+/** Codes seen on older / alternate Udyam certificates → canonical code above. */
+export const UDYAM_STATE_ALIASES: Record<string, string> = { DD: 'DN', TG: 'TS' };
+
+/** Canonical state/UT name for a Udyam state code (aliases accepted), or null. */
+export function udyamState(code: string): string | null {
+  const c = code.toUpperCase();
+  const canonical = Object.hasOwn(UDYAM_STATE_ALIASES, c) ? UDYAM_STATE_ALIASES[c]! : c;
+  return Object.hasOwn(UDYAM_STATE_CODES, canonical) ? UDYAM_STATE_CODES[canonical]! : null;
+}
+
 export function validateUdyam(raw: string): string | null {
   const v = normalizeId(raw);
   if (!/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(v)) return 'Udyam number format is UDYAM-XX-00-0000000 (e.g. UDYAM-MH-26-0123456)';
   const state = v.slice(6, 8);
-  if (!UDYAM_STATE_CODES[state]) return `"${state}" is not a valid state code in a Udyam number`;
+  if (!udyamState(state)) return `"${state}" is not a valid state code in a Udyam number`;
   return null;
 }
 

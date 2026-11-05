@@ -140,11 +140,17 @@ export default function ProfilePage() {
 
   // Adopt fresh server data unless the user has unsaved edits (e.g. a past-contract change refetches the profile).
   const prevSaved = useRef<Draft | null>(null);
+  /**
+   * The server version the draft is based on (FR-014). Set only when the draft is (re)adopted from the server —
+   * not on every background refetch — so a stale draft is never sent with a newer timestamp.
+   */
+  const baseUpdatedAt = useRef<string | null>(null);
   useEffect(() => {
-    if (!saved) return;
-    setDraft((d) => (!d || !prevSaved.current || same(d, prevSaved.current) ? saved : d));
+    if (!saved || !profile.data) return;
+    const adopt = !draft || !prevSaved.current || same(draft, prevSaved.current);
+    if (adopt) { setDraft(saved); baseUpdatedAt.current = profile.data.profile.updatedAt; }
     prevSaved.current = saved;
-  }, [saved]);
+  }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirty = !!draft && !!saved && !same(draft, saved);
   const clientErrors = useMemo(() => (draft ? validate(draft) : {}), [draft]);
@@ -172,6 +178,8 @@ export default function ProfilePage() {
     ({ currentLocation, nextLocation }: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }) => dirty && currentLocation.pathname !== nextLocation.pathname,
     [dirty],
   ));
+  // A pending block is moot once the edits are gone (saved or discarded meanwhile).
+  useEffect(() => { if (blocker.state === 'blocked' && !dirty) blocker.reset(); }, [blocker, dirty]);
 
   // Section scroll-spy
   useEffect(() => {
@@ -211,9 +219,9 @@ export default function ProfilePage() {
       jump(sectionOf(first), first.split('.')[0]);
       return;
     }
-    save.mutate({ ...draft, expectedUpdatedAt: profile.data!.profile.updatedAt } as unknown as ProfileInput, {
+    save.mutate({ ...draft, expectedUpdatedAt: baseUpdatedAt.current } as unknown as ProfileInput, {
       onSuccess: (r) => {
-        setDraft(stripMeta(r.profile)); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null);
+        setDraft(stripMeta(r.profile)); baseUpdatedAt.current = r.profile.updatedAt; prevSaved.current = stripMeta(r.profile); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null);
         toast.success('Profile saved', { description: `${r.completeness}% complete${r.issues[0] ? ` · next: ${r.issues[0].message}` : ''}` });
       },
       onError: (e) => {
@@ -223,7 +231,7 @@ export default function ProfilePage() {
       },
     });
   };
-  const discard = () => { setDraft(saved); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); };
+  const discard = () => { setDraft(saved); baseUpdatedAt.current = profile.data!.profile.updatedAt; setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null); };
   // Replace the (stale) draft with the latest saved profile only when the user asks to (FR-014).
   const reload = async () => {
     setReloading(true);
@@ -232,6 +240,7 @@ export default function ProfilePage() {
     if (!r.data) { toast.error(errorMessage(r.error)); return; }
     const fresh = stripMeta(r.data.profile);
     prevSaved.current = fresh;
+    baseUpdatedAt.current = r.data.profile.updatedAt;
     setDraft(fresh); setSubmitted(false); setBlurred(new Set()); setServerErrors({}); setConflict(null);
   };
 
