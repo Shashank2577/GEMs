@@ -12,7 +12,8 @@
  * The session is re-bootstrapped once on 403/419 (expired CSRF).
  *
  * Request shape adapted from erenmyeager15/india-government-tenders-scraper (Apache-2.0) and
- * arush15june/gem-search (MIT) — see NOTICE.
+ * arush15june/gem-search (MIT) — see NOTICE. fetchSubmittedPage / fetchBidResult (spec 003 US6) are adapted from
+ * gem-search `search_bids` (bidStatusType "bidrastatus" + filter.byStatus) and `get_bid_result`.
  */
 import { bidResultPath } from './award';
 import { isPdfBody, readBoundedBody, SourceBodyLimitError } from './http';
@@ -51,6 +52,17 @@ export interface FetchPageOptions {
   sort?: 'Bid-End-Date-Latest' | 'Bid-End-Date-Oldest' | 'Bid-Start-Date-Latest';
 }
 
+/** GeM `filter.byStatus` values for submitted (closed) bids: awarded / technically evaluated / financially evaluated. */
+export type SubmittedBidStatus = 'bid_awarded' | 'tech_evaluated' | 'fin_evaluated';
+
+export interface FetchSubmittedPageOptions {
+  page?: number;
+  /** Free-text search (bid number or keywords). */
+  search?: string;
+  /** Restrict to one evaluation stage; omitted = every submitted bid. */
+  byStatus?: SubmittedBidStatus;
+}
+
 /** Machine-readable GemError causes callers branch on (status covers plain HTTP failures). */
 export type GemErrorCode = 'too_large' | 'timeout';
 
@@ -69,16 +81,25 @@ export const MAX_RESULT_BYTES = 1024 * 1024;
  * oversized body is cut off (the stream is cancelled) and the prefix returned.
  */
 export async function readTextCapped(res: Response, maxBytes: number): Promise<string> {
+  return (await readTextCappedInfo(res, maxBytes)).text;
+}
+
+/**
+ * readTextCapped that also says whether the cap was hit (`truncated`), so a caller that must not treat a cut-off
+ * page as complete (the results refresh, 003/US6) can refuse it. Reaching exactly `maxBytes` counts as truncated.
+ */
+export async function readTextCappedInfo(res: Response, maxBytes: number): Promise<{ text: string; truncated: boolean }> {
   const declared = Number(res.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) {
     await res.body?.cancel().catch(() => {});
     // Not retryable: the same page will be just as large next time.
-    throw new GemError(`GeM response too large (${declared} bytes)`, res.status, false);
+    throw new GemError(`GeM response too large (${declared} bytes)`, res.status, false, 'too_large');
   }
-  if (!res.body) return '';
+  if (!res.body) return { text: '', truncated: false };
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let truncated = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -86,6 +107,7 @@ export async function readTextCapped(res: Response, maxBytes: number): Promise<s
     if (value.length >= room) {
       chunks.push(value.subarray(0, room));
       total += room;
+      truncated = true;
       await reader.cancel().catch(() => {});
       break;
     }
@@ -95,7 +117,7 @@ export async function readTextCapped(res: Response, maxBytes: number): Promise<s
   const buf = new Uint8Array(total);
   let off = 0;
   for (const c of chunks) { buf.set(c, off); off += c.length; }
-  return new TextDecoder().decode(buf);
+  return { text: new TextDecoder().decode(buf), truncated };
 }
 /** Default cap for a downloaded bid document — same as the upload limit (FR-008). */
 export const MAX_GEM_DOCUMENT_BYTES = 25 * 1024 * 1024;
@@ -140,8 +162,7 @@ export class GemClient {
 
   /** Fetch one listing page (raw docs + paging info). */
   async fetchPage(opts: FetchPageOptions = {}): Promise<BidPlusPage> {
-    await this.ensureSession();
-    const payload = {
+    return this.postListing({
       page: opts.page ?? 1,
       param: { searchBid: opts.search ?? '', searchType: 'fullText' },
       filter: {
@@ -151,7 +172,40 @@ export class GemClient {
         byEndDate: { from: '', to: '' },
         sort: opts.sort ?? 'Bid-Start-Date-Latest',
       },
-    };
+    });
+  }
+
+  /**
+   * Search submitted (closed) bids by evaluation stage: `bidStatusType: "bidrastatus"` plus `filter.byStatus`
+   * (`bid_awarded` | `tech_evaluated` | `fin_evaluated`). Read-only; same throttle, retry and CSRF handling as
+   * fetchPage. Adapted from gem-search `search_bids` (MIT) — see NOTICE.
+   */
+  async fetchSubmittedPage(opts: FetchSubmittedPageOptions = {}): Promise<BidPlusPage> {
+    return this.postListing({
+      page: opts.page ?? 1,
+      param: { searchBid: opts.search ?? '', searchType: 'fullText' },
+      filter: {
+        bidStatusType: 'bidrastatus',
+        byType: 'all',
+        highBidValue: '',
+        byEndDate: { from: '', to: '' },
+        sort: 'Bid-End-Date-Latest',
+        ...(opts.byStatus ? { byStatus: opts.byStatus } : {}),
+      },
+    });
+  }
+
+  /**
+   * Public bid-result view for a BidPlus `b_id` (`/bidding/bid/getBidResultView/<id>`), adapted from gem-search
+   * `get_bid_result` (MIT). Returns the raw HTML for `parseBidResultHtml`; 404 → `null`. `truncated` is true when
+   * the body hit MAX_RESULT_BYTES and was cut off — such a page must not be stored as complete.
+   */
+  fetchBidResult(gemBidId: string): Promise<{ html: string; url: string; truncated: boolean } | null> {
+    return this.getBidResult(gemBidId);
+  }
+
+  private async postListing(payload: object): Promise<BidPlusPage> {
+    await this.ensureSession();
     const send = () => this.request('/all-bids-data', {
       method: 'POST',
       headers: {
@@ -215,6 +269,11 @@ export class GemClient {
    * back-off as every other request. 404 → `null` (no result published).
    */
   async fetchBidResultHtml(gemBidId: string): Promise<{ html: string; url: string } | null> {
+    const r = await this.getBidResult(gemBidId);
+    return r && { html: r.html, url: r.url };
+  }
+
+  private async getBidResult(gemBidId: string): Promise<{ html: string; url: string; truncated: boolean } | null> {
     const path = bidResultPath(gemBidId);
     const res = await this.request(path, {
       method: 'GET',
@@ -222,7 +281,8 @@ export class GemClient {
     });
     if (res.status === 404) return null;
     if (!res.ok) throw new GemError(`GeM bid result failed: HTTP ${res.status}`, res.status, res.status >= 500);
-    return { html: await readTextCapped(res, MAX_RESULT_BYTES), url: `${this.baseUrl}${path}` };
+    const { text, truncated } = await readTextCappedInfo(res, MAX_RESULT_BYTES);
+    return { html: text, url: `${this.baseUrl}${path}`, truncated };
   }
 
   // ───────────── internals ─────────────

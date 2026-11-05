@@ -41,6 +41,15 @@ export async function mockGem(request: APIRequestContext, path: string, data?: u
 }
 
 /**
+ * Evaluate / award a bid on mock-gem (`POST /__admin/award/<bidNumber>`, spec 003 US6): the bid closes now if still
+ * open and shows under `bidrastatus` listings. `status` defaults to `awarded` (result view serves the recorded awarded
+ * page); `tech_evaluated` / `fin_evaluated` leave the result "not yet published".
+ */
+export async function gemAward(request: APIRequestContext, bidNumber: string, status: 'awarded' | 'tech_evaluated' | 'fin_evaluated' = 'awarded') {
+  return mockGem(request, `/__admin/award/${encodeURIComponent(bidNumber)}`, { status });
+}
+
+/**
  * Evidence: a named full-page screenshot attached to the test report AND copied to
  * qa/evidence/<spec>/<story>/<name>.png so the QA verdict can link to it.
  */

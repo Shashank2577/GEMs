@@ -1,4 +1,4 @@
-import { Bell, Building2, FileStack, KanbanSquare, LayoutDashboard, Radar, Settings, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { Bell, Building2, FileStack, KanbanSquare, LayoutDashboard, Radar, Swords, Settings, ShieldCheck, type LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/types';
 
 export interface NavItem {
@@ -18,6 +18,7 @@ export const NAV_MAIN: NavItem[] = [
   { to: '/watchlists', label: 'Watchlists', icon: Radar, keywords: ['alerts', 'filters', 'categories'] },
   { to: '/pipeline', label: 'Pipeline', icon: KanbanSquare, short: 'Pipeline', keywords: ['kanban', 'workspaces', 'bids'] },
   { to: '/vault', label: 'Document vault', icon: ShieldCheck, short: 'Vault', keywords: ['certificates', 'gst', 'pan', 'documents'] },
+  { to: '/competitors', label: 'Competitors', icon: Swords, keywords: ['insights', 'sellers', 'winners', 'awards', 'results', 'l1'] },
 ];
 
 export const NAV_ORG: NavItem[] = [

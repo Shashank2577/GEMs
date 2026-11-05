@@ -165,6 +165,7 @@ const GLOBAL: Record<string, { why: string; call: () => Call }> = {
   'POST /tenders/:id/workspace': { why: 'creates B’s own workspace', call: () => asB('POST', `/tenders/${ids.tender}/workspace`) },
   'GET /tenders/:id/documents': { why: 'public GeM documents + B’s own uploads', call: () => asB('GET', `/tenders/${ids.tender}/documents`) },
   'GET /tenders/:id/result-hint': { why: 'public GeM tender; needs B’s own workspace (404 otherwise), read-only', call: () => asB('GET', `/tenders/${ids.tender}/result-hint`) },
+  'GET /tenders/:id/result': { why: 'public GeM result data (tender_results is global, 003/FR-062), read-only', call: () => asB('GET', `/tenders/${ids.tender}/result`) },
   'DELETE /annexure-templates/:key': {
     why: 'key is a template name; resets B’s own override',
     call: () => asB('DELETE', '/annexure-templates/non_blacklisting'),
@@ -218,6 +219,7 @@ const DEMO_CASES: Record<string, () => Call> = {
   'GET /tenders/:id/analysis': () => asB('GET', `/tenders/${demoTenderId}/analysis`),
   'POST /tenders/:id/workspace': () => asB('POST', `/tenders/${demoTenderId}/workspace`),
   'GET /tenders/:id/result-hint': () => asB('GET', `/tenders/${demoTenderId}/result-hint`),
+  'GET /tenders/:id/result': () => asB('GET', `/tenders/${demoTenderId}/result`),
 };
 
 /** Registered path → sweep key where the code's parameter name differs from the contract's. */

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { RESCORABLE_STALE_REASONS, isRescorableReason, type AnalysisDto, type AnalysisWarning, type FactorStatus, type Requirement, type StaleReason, type TenderDocKind, type TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
+import { EVALUATION_STATUS_LABEL, type EvaluationStatus } from '@tp/core/contracts/identify';
 import { formatDateIST, formatINR, relativeTime } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
@@ -183,10 +184,12 @@ export function documentCheckPrefix(summary: string | null | undefined): string 
 export const CHANGE_LABEL: Record<string, string> = {
   endAt: 'Closing date', openingAt: 'Opening date', startAt: 'Start date', emdAmount: 'EMD', estimatedValue: 'Estimated value',
   quantity: 'Quantity', epbgPercent: 'ePBG %', status: 'Status', title: 'Title', category: 'Category', documentUrl: 'Bid document',
+  evaluation: 'GeM evaluation',
 };
 
 export function formatChangeValue(key: string, v: unknown): string {
   if (v == null || v === '') return '—';
+  if (key === 'evaluation' && typeof v === 'string' && v in EVALUATION_STATUS_LABEL) return EVALUATION_STATUS_LABEL[v as EvaluationStatus];
   if (/At$/.test(key) && typeof v === 'string') return formatDateIST(v, { time: true });
   if (/(Amount|Value)$/.test(key) && typeof v === 'number') return formatINR(v);
   if (typeof v === 'object') return JSON.stringify(v);
