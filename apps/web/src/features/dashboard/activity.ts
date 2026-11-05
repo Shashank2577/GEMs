@@ -39,6 +39,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'annexure.template_updated': return 'customised an annexure template';
     case 'annexure.template_reset': return 'reset an annexure template to the default';
     case 'member.invited': return 'invited';
+    case 'member.invite_resent': return 'resent the invitation to';
     case 'member.invite_revoked': return 'cancelled the invitation for';
     case 'member.joined': return 'joined the team';
     case 'member.role_changed': return 'changed the role of';
@@ -68,6 +69,6 @@ export const KNOWN_ACTIONS = [
   'watchlist.created', 'watchlist.deleted',
   'profile.updated', 'profile.past_contract_added', 'profile.past_contract_updated', 'profile.past_contract_deleted',
   'annexure.template_updated', 'annexure.template_reset',
-  'member.invited', 'member.invite_revoked', 'member.joined', 'member.role_changed', 'member.removed',
+  'member.invited', 'member.invite_revoked', 'member.invite_resent', 'member.joined', 'member.role_changed', 'member.removed',
   'org.created', 'org.updated', 'org.scoring_weights_updated', 'ingestion.run', 'api_token.created', 'api_token.revoked', 'demo.seeded',
 ] as const;
