@@ -645,7 +645,7 @@ page.
   Provenance of the three demo watchlists is the `demo.seeded` activity entry's `meta.watchlistIds` (orgs seeded before
   that was recorded fall back to a name + creator + exact back-dating rule); rows are never matched by name alone.
   `removeDemo` also deletes user-written activity that is about demo workspaces/tenders, which goes beyond the text above
-  (tracked in #523 item 2: keep, or narrow it). Demo tenders are global and stay. Intent unchanged.
+  (deviation, tracked in #523 item 2: keep, or narrow it). Demo tenders are global and stay.
 - **FR-066** *(gap)*: The dashboard MUST show the demo banner with "Remove demo data" and a confirmation dialog (US4-12).
 - **FR-067** *(gap)*: Demo tenders MUST be badged "Sample" wherever tenders are listed or shown.
   *As delivered (T080) — PARTIAL, requirement unchanged:* `isDemo` is on every tender DTO and the badge shows in the
@@ -817,5 +817,5 @@ page.
   matching for onboarding keywords, profile-driven setup, dashboard tabs).
 - The canonical host `https://tenderpilot.in` used in `index.html` (canonical, og, JSON-LD), `robots.txt` and
   `sitemap.xml` is an **assumption**: `wrangler.toml` has `APP_URL=https://tenderpilot.workers.dev` and ADR-0005 / spec 008
-  mention `app.tenderpilot.in`. Confirm before launch (#534 item 6); it must then be changed in those four places.
+  mention `app.tenderpilot.in`. Confirm before launch (#534 item 6); it must then be changed in those three files.
 - E2E runs in Chromium only (desktop + Pixel 7 emulation); real-device testing on iOS Safari is a manual QA check.
