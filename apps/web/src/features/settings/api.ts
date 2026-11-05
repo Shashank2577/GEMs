@@ -33,6 +33,7 @@ export function useUpdateOrg() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { name?: string; onboardingState?: Record<string, boolean> }) => api.patch('/org', body),
+    meta: { handlesNetworkError: true }, // call site toasts its own failure (incl. offline) — skip the global offline toast
     onSuccess: () => qc.invalidateQueries({ queryKey: ME_KEY }),
   });
 }

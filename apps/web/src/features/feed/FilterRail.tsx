@@ -71,7 +71,7 @@ export function FacetList({ facets, selected, onChange, label, searchable = true
         {q && !shown.length && <li className="px-1.5 py-1 text-xs text-muted-foreground">No match for “{q}”</li>}
       </ul>
       {!q && items.length > initial && (
-        <button type="button" onClick={() => setAll((x) => !x)} className="inline-flex w-fit items-center gap-1 rounded px-1.5 text-xs font-medium text-primary hover:underline dark:text-indigo-300 focus-ring">
+        <button type="button" onClick={() => setAll((x) => !x)} className="inline-flex min-h-6 w-fit items-center gap-1 rounded px-1.5 text-xs font-medium text-primary hover:underline dark:text-indigo-300 focus-ring">
           {all ? 'Show less' : `Show all ${items.length}`}
           <ChevronDown className={cn('size-3 transition-transform', all && 'rotate-180')} />
         </button>

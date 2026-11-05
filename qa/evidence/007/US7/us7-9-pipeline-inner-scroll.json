@@ -1,0 +1,20 @@
+{
+  "page": {
+    "scrollWidth": 375,
+    "innerWidth": 375
+  },
+  "inner": [
+    {
+      "tag": "NAV",
+      "cls": "scrollbar-thin -mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 ",
+      "scrollWidth": 873,
+      "clientWidth": 375
+    },
+    {
+      "tag": "DIV",
+      "cls": "scrollbar-thin -mx-4 flex snap-x snap-mandatory gap-3 overfl",
+      "scrollWidth": 2636,
+      "clientWidth": 375
+    }
+  ]
+}
