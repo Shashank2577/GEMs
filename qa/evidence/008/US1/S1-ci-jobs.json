@@ -58,5 +58,13 @@
     "timeout": 5,
     "runsOn": "ubuntu-latest",
     "ifExpr": "always()"
+  },
+  {
+    "name": "deploy",
+    "needs": [
+      "ci-gate"
+    ],
+    "runsOn": "reusable workflow",
+    "ifExpr": "github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-gate.result == 'success'"
   }
 ]

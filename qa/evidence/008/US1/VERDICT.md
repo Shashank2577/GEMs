@@ -1,5 +1,7 @@
 ## QA verdict — REJECTED
 
+**Round 2** (re-review of cd4ab13 after developer rework; round 1 was commit 83d45e8, rejected on 3b and 8).
+
 **Work item:** #356 · **PR:** #475 · **Reviewer:** qa (claude-code/Sonnet 5.5) · **Session:** https://claude.ai/code/session_01BUi6mJsfhPsYf5Epv2QfEt
 
 Spec 008 User Story 1, scenarios 1-8 read from `specs/008-operations-scale/spec.md` and task T026 before the diff.
@@ -28,7 +30,7 @@ Screenshots are rendered from API data and logs (GitHub UI needs a login). E2E: 
 | 7a | Scenario 7: "a docs-only PR … `ci` runs only `typecheck` (path filter)" | met | `scripts/docs-only.sh` cases (docs/specs/md true; code, qa/evidence md, moved code, empty false); unit/migrations gated by `changes.code`, api/e2e skipped through needs chain, ci-gate passes on skipped. Logic and unit tests only, no live docs-only PR. [S7-docs-only-filter.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S7-docs-only-filter.png), [S7-docs-only-cases.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S7-docs-only-cases.json) |
 | 7b | "and finishes in < 5 minutes" | met | inferred, not run live: in the green run `changes` + `typecheck` took 43 s end to end (whole 7-job run 3 m 29 s). [S1-green-run-jobs-and-steps.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S1-green-run-jobs-and-steps.png) |
 | 7c | "and `dod` is skipped" | met | `dod` job always runs (so the required check reports) but skips every step and prints "Docs-only PR: Definition-of-Done check skipped."; result is a pass, not a literal skip. Accepted as the intent, see observation 3. [S7-docs-only-filter.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S7-docs-only-filter.png) |
-| 8 | Scenario 8: "a push to `main`, … when `ci` succeeds, the deploy workflow (US2) is allowed to start; when it fails, no deploy runs" | **unverifiable** | No deploy workflow exists on this branch (US2 #357). US1 only provides the prerequisite: `ci` triggers on push to `main` and `ci-gate` always reports one result. The repo default branch is `claude/gem-tender-automation-om9hyj`, not `main`, so a `workflow_run: [ci]` deploy would not fire (noted in ci.yml and docs/runbook.md). Would satisfy: a deploy run (or a `needs: ci-gate` job) on a real push to main, or the criterion restated as a US2 criterion. [S8-deploy-handoff-state.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S8-deploy-handoff-state.png), [S8-deploy-handoff.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S8-deploy-handoff.txt) |
+| 8 | Scenario 8: "a push to `main`, … when `ci` succeeds, the deploy workflow (US2) is allowed to start; when it fails, no deploy runs" | met | Round 2 diff: `ci.yml` job `deploy` with `needs: ci-gate` and `if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-gate.result == 'success'`, calling reusable `deploy.yml` (placeholder until US2 T036); `ci-gate` does not need `deploy`; no `workflow_run`. `scripts/workflows.test.ts` (6 tests) and the QA spec assert this; 76 scripts tests pass. Live: on `ci` run [41959541674](https://github.com/Shashank2577/GEMs/actions/runs/41959541674) (cd4ab13, PR event) `deploy` was **skipped**, and with `e2e`/`ci-gate` red it could not have run either. A real push to `main` was not run (QA never pushes to main): the positive path is structural only. [S8-deploy-handoff-state.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S8-deploy-handoff-state.png), [S8-deploy-handoff.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/S8-deploy-handoff.txt) |
 | T026 | Evidence helpers write png/webm/txt into `qa/evidence/008/US1/`; `e2e-summary.ts` parses `results.json` | met | `e2e/008-operations-scale/US1-ci-evidence.e2e.ts`: [helper-probe.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/helper-probe.png), [helper-probe.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/helper-probe.txt), [helper-probe-json.json](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/helper-probe-json.json), videos such as [s3-pr-with-a-failing-api-test-api-red-e2e-skipped-ci-gate-re-desktop.webm](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/s3-pr-with-a-failing-api-test-api-red-e2e-skipped-ci-gate-re-desktop.webm) and [s4-e2e-artifact-e2e-evidence-run-id-qa-evidence-qa-runs-30-d-desktop.webm](https://github.com/Shashank2577/GEMs/blob/story/GEM-356-ci-gate/qa/evidence/008/US1/s4-e2e-artifact-e2e-evidence-run-id-qa-evidence-qa-runs-30-d-desktop.webm) |
 
 ### Findings
@@ -37,11 +39,10 @@ Screenshots are rendered from API data and logs (GitHub UI needs a login). E2E: 
    - Observed: `gh api repos/Shashank2577/GEMs/branches/main/protection` → HTTP 403; nothing in the PR shows the rule applied.
    - Expected: a branch-protection rule on `main` requiring `ci-gate` and `dod` (and the other contexts in the runbook), so a red check disables merging.
    - Where: `docs/runbook.md` § Branch protection (command documented, not applied).
-2. **blocking** — Scenario 8 cannot be confirmed from US1: no deploy workflow exists.
-   - Observed: `ls .github/workflows` → ci, dod, project-board, wiki-sync. Default branch is not `main`.
-   - Expected: either evidence that a deploy is gated on `ci` success, or the criterion moved to US2 (#357). The scenario is a US2 hand-off; restating it is a work-item change, not a code change in this PR.
+2. **resolved in round 2** — Scenario 8: deploy hand-off now exists (see row 8).
 3. **observation** — Scenario 7 says `dod` is "skipped"; the implementation runs `dod` and passes it with a note so that a required check always reports. Sensible; the criterion wording should say "passes without running the check".
-4. **observation** — Latent trap for US2: `workflow_run` only fires from the default branch (`claude/gem-tender-automation-om9hyj`). The deploy must be a job in ci.yml with `needs: ci-gate`, or the default branch switched to `main`.
+4. **observation** — `workflow_run` is correctly avoided (default branch is `claude/gem-tender-automation-om9hyj`). `gh workflow run deploy.yml` only works for workflows also on the default branch (runbook says so). The `deploy` caller job has no `timeout-minutes` of its own; the called job has 5.
+6. **minor (QA-side, fixed)** — `ci` run 41959541674 on cd4ab13 had `e2e` red: my own spec asserted every ci.yml job has `runs-on`, which the new reusable-workflow caller `deploy` does not. Not a product defect; spec updated in this round and the previous run of the spec had never executed on CI (run 5 was cancelled). `deploy` was skipped and `ci-gate` red, as designed.
 5. **observation** — API test count was 150 on the PR run and 164 on the probe PR run (both ≥ 145); the difference was not investigated. The dependency audit step is `continue-on-error` (17 advisories, #479).
 
 ### Not checked
@@ -49,7 +50,7 @@ Screenshots are rendered from API data and logs (GitHub UI needs a login). E2E: 
 - The contents of the 144.9 MB artifact zip (needs authenticated download); file count and globs come from the upload step log.
 - The rendered GitHub job-summary page (not exposed by the API); the CLI output was verified locally.
 - A live flaky run and a live docs-only PR on GitHub (scenarios 5 and 7 proven with a local nested Playwright run, fixtures and unit tests).
-- Cairn review findings; branch protection state; the deploy workflow.
+- Cairn review findings; branch protection state; the real deploy job on a push to main (US2 T036 fills the body).
 - Probe branch `story/GEM-356-qa-probe-red` could not be deleted (git push returned 403 from the proxy); PR #485 is closed. A human should delete the branch.
 
 ### Bug issues filed
@@ -60,4 +61,4 @@ Screenshots are rendered from API data and logs (GitHub UI needs a login). E2E: 
 
 **Verdict:** rejected
 
-`qa:rejected` — criteria 3b and 8 unverifiable (criteria 1a-3a, 4a-7c and T026 met). Rejection 1 of 3 on this item. To converge: a repo admin applies and shows the branch protection (3b), and the owner restates scenario 8 as a US2 criterion or accepts the documented hand-off; then re-review.
+`qa:rejected` — criterion 3b unverifiable (all other rows met, scenario 8 now met). Rejection 2 of 3 on this item. For the human: the one open item is not code in this PR. `docs/runbook.md` § Branch protection documents the exact `gh api -X PUT .../branches/main/protection` command, but no session here has admin scope (403), so it cannot be applied or read back. To close it: a repo admin runs that command and posts the output of the GET in the runbook's Verify block (it must list `ci-gate` and `dod` in `required_status_checks.contexts`), or the owner restates 3b as an out-of-band admin step and accepts it. Then a round 3 can approve; a further rejection would trigger `needs-human`.

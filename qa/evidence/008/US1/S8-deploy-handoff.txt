@@ -1,5 +1,5 @@
-workflows: ci.yml, dod.yml, project-board.yml, wiki-sync.yml
-deploy workflows: (none; US2 #357 not implemented)
-ci triggers on push to main: yes
-ci-gate aggregator guarantees one always-reporting result for a deploy to key on.
-default branch of the repo: claude/gem-tender-automation-om9hyj (not main), so workflow_run: [ci] would not fire for a deploy.yml on main (documented in ci.yml header and docs/runbook.md).
+ci.yml deploy job: needs ci-gate; if github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-gate.result == 'success'; uses ./.github/workflows/deploy.yml (placeholder until US2 T036)
+ci-gate does not need deploy
+no workflow_run anywhere (default branch is not main)
+live pull_request run 41959541674 (cd4ab13): changes=success, typecheck=success, unit=success, migrations-additive=success, api=success, e2e=failure, ci-gate=failure, deploy=skipped
+NOT observable here: a real push to main (QA never pushes to main); positive path is structural + scripts/workflows.test.ts.

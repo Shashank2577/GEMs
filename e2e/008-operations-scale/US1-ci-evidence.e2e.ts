@@ -26,6 +26,7 @@ interface Capture {
   uploadLog: string;
   artifacts: { id: number; name: string; size_in_bytes: number; expired: boolean; created_at: string; expires_at: string }[];
   dodLog: string;
+  round2?: { runId: number; sha: string; url: string; jobs: CapturedJob[] };
   probe?: { pr: number; runId: number; url: string; sha: string; jobs: CapturedJob[]; apiLog: string; ciGateLog: string };
 }
 const capture: Capture = JSON.parse(readFileSync(join('e2e', '008-operations-scale', 'us1-ci-capture.json'), 'utf8'));
@@ -64,7 +65,7 @@ function readJobs(file: string): Record<string, JobDef> {
       name: cur,
       needs,
       timeout: Number(block.match(/^ {4}timeout-minutes:\s*(\d+)/m)?.[1]) || undefined,
-      runsOn: block.match(/^ {4}runs-on:\s*(\S+)/m)?.[1],
+      runsOn: block.match(/^ {4}runs-on:\s*(\S+)/m)?.[1] ?? (/^ {4}uses:\s*(\S+)/m.test(block) ? 'reusable workflow' : undefined),
       ifExpr: block.match(/^ {4}if:\s*(.+)$/m)?.[1],
       block,
     };
@@ -93,7 +94,8 @@ test.describe.serial('008/US1 CI gate evidence', () => {
       expect(ci[job], `job ${job} exists`).toBeTruthy();
       expect(ci[job].timeout, `${job} timeout-minutes`).toBe(t);
     }
-    for (const j of Object.values(ci)) expect(j.runsOn, `${j.name} runs-on`).toBe('ubuntu-latest');
+    // The `deploy` job (round 2) is a caller of a reusable workflow and has no runs-on of its own.
+    for (const j of Object.values(ci).filter((x) => x.name !== 'deploy')) expect(j.runsOn, `${j.name} runs-on`).toBe('ubuntu-latest');
     // typecheck and unit are parallel (neither needs the other); api after unit; e2e after api.
     expect(ci.typecheck.needs).toEqual([]);
     expect(ci.unit.needs).not.toContain('typecheck');
@@ -316,15 +318,30 @@ export default defineConfig({
   });
 
   // ---- Scenario 8 ----
-  test('S8 push-to-main trigger exists; deploy gating belongs to US2 (no deploy workflow here)', async ({ page }) => {
+  test('S8 push to main: deploy needs ci-gate success (structure); skipped on the PR run (live)', async ({ page }) => {
     const ciText = readFileSync('.github/workflows/ci.yml', 'utf8');
     expect(ciText).toMatch(/push:\s*\n\s+branches: \[main\]/);
-    const workflows = readdirSync('.github/workflows');
-    const deployFiles = workflows.filter((f) => /deploy/i.test(f));
-    expect(deployFiles, 'no deploy workflow exists on this branch (US2)').toEqual([]);
-    const info = `workflows: ${workflows.join(', ')}\ndeploy workflows: ${deployFiles.length ? deployFiles.join(', ') : '(none; US2 #357 not implemented)'}\nci triggers on push to main: yes\nci-gate aggregator guarantees one always-reporting result for a deploy to key on.\ndefault branch of the repo: claude/gem-tender-automation-om9hyj (not main), so workflow_run: [ci] would not fire for a deploy.yml on main (documented in ci.yml header and docs/runbook.md).`;
+    expect(ciText).not.toMatch(/^\s*workflow_run:/m);
+    const d = ci.deploy;
+    expect(d, 'ci.yml has a deploy job').toBeTruthy();
+    expect(d.needs).toEqual(['ci-gate']);
+    expect(d.ifExpr).toBe("github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-gate.result == 'success'");
+    expect(d.block).toContain('uses: ./.github/workflows/deploy.yml');
+    // a red ci can never reach deploy: ci-gate fails on any failure/cancelled and deploy requires ci-gate == success
+    expect(ci['ci-gate'].needs).not.toContain('deploy');
+    const dep = readFileSync('.github/workflows/deploy.yml', 'utf8');
+    expect(dep).toMatch(/workflow_call:/);
+    expect(dep).not.toMatch(/^\s*workflow_run:/m);
+    expect(dep).toContain('T036');
+    let live = '';
+    if (capture.round2) {
+      const by = Object.fromEntries(capture.round2.jobs.map((j) => [j.name, j]));
+      expect(by.deploy.conclusion, 'deploy is skipped on a pull_request run').toBe('skipped');
+      live = `live pull_request run ${capture.round2.runId} (${capture.round2.sha.slice(0, 7)}): ${capture.round2.jobs.map((j) => `${j.name}=${j.conclusion}`).join(', ')}`;
+    }
+    const info = `ci.yml deploy job: needs ci-gate; if ${d.ifExpr}; uses ./.github/workflows/deploy.yml (placeholder until US2 T036)\nci-gate does not need deploy\nno workflow_run anywhere (default branch is not main)\n${live}\nNOT observable here: a real push to main (QA never pushes to main); positive path is structural + scripts/workflows.test.ts.`;
     saveTranscript(STORY, 'S8-deploy-handoff', info);
-    await render(page, 'Scenario 8: push to main -> deploy only after ci succeeds', 'Only the US1 side can be checked here.', `<pre>${esc(info)}</pre>`);
+    await render(page, 'Scenario 8: push to main -> deploy only after ci-gate succeeds', 'Round 2: ci.yml deploy job calling reusable deploy.yml', `<pre>${esc(info)}</pre>`);
     await evidence008(page, STORY, 'S8-deploy-handoff-state');
   });
 
