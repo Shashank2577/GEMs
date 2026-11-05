@@ -230,7 +230,7 @@ describe('Node static server headers (008 FR-013)', () => {
     await writeFile(join(dist, 'assets', 'app-abc.js'), 'console.log(1)');
     const { startNodeServer } = await import('../src/node');
     const { server, shutdown } = await startNodeServer({
-      PORT: '0', WEB_DIST: dist, DATABASE_URL: process.env.TEST_DATABASE_URL, NODE_ENV: 'test', LOG_REQUESTS: '0',
+      PORT: '0', WEB_DIST: dist, DATABASE_URL: (await import('./helpers')).TEST_DATABASE_URL, NODE_ENV: 'test', LOG_REQUESTS: '0',
     } as NodeJS.ProcessEnv);
     try {
       const csp = parseHeadersFile(readFileSync(join(dist, '_headers'), 'utf8'))[0]!.headers.find(([k]) => k === 'content-security-policy')![1];

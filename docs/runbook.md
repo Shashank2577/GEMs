@@ -145,7 +145,7 @@ Cloudflare, Neon and GitHub admin.
 | Secret | Where it lives | Used by | Rotation | Blast radius if leaked |
 |---|---|---|---|---|
 | `DATABASE_URL` | Worker secret, production and `--env staging`; **Neon pooled (`-pooler`) host** | Worker (API + cron) | Neon → Roles → reset the app role's password (or add a new role) → copy the **pooled** string → `printf '%s' "$URL" \| pnpm exec wrangler secret put DATABASE_URL [--env staging]` (deploys a new version at once) → `scripts/smoke.sh` → update `PROD_/STAGING_DATABASE_URL` if they use the same role | Read/write of every tenant's data |
-| `STAGING_DATABASE_URL` | GitHub **environment** secret on `staging` | `deploy.yml` → `pnpm db:migrate (staging)` | Same as `DATABASE_URL` on the Neon `staging` branch → `gh secret set STAGING_DATABASE_URL` | Staging data; DDL on staging |
+| `STAGING_DATABASE_URL` | GitHub **environment** secret on `staging` | `deploy.yml` → `pnpm db:migrate (staging)` | Same as `DATABASE_URL` on the Neon `staging` branch → `gh secret set STAGING_DATABASE_URL --env staging` | Staging data; DDL on staging |
 | `PROD_DATABASE_URL` | GitHub secret on the **`production` environment only** (readable only by an approved job) | `deploy.yml` → `pnpm db:migrate (production)` | Neon → reset role password → `gh secret set PROD_DATABASE_URL --env production` | Read/write + DDL on production |
 | `ANTHROPIC_API_KEY` | Worker secret (prod, staging: separate keys) | LLM analysis/assist | Anthropic Console → create key → `wrangler secret put ANTHROPIC_API_KEY` → smoke an analysis → revoke the old key | LLM spend on our account (set a monthly spend limit) |
 | `RESEND_API_KEY` | Worker secret | Alert, invite, reset emails | Resend → API keys → create (sending-only, domain `tenderpilot.in`) → `wrangler secret put` → revoke old | Mail sent as `tenderpilot.in` (phishing, domain reputation) |
@@ -221,7 +221,7 @@ Start a timer. Do it on staging first unless production is down.
 4. Swap: copy the restore branch's **pooled** URL and
    `printf '%s' "$RESTORE_POOLED_URL" | pnpm exec wrangler secret put DATABASE_URL [--env staging]` (takes effect
    immediately as a new version), then point the migrate secret at it too
-   (`gh secret set PROD_DATABASE_URL --env production` / `gh secret set STAGING_DATABASE_URL`).
+   (`gh secret set PROD_DATABASE_URL --env production` / `gh secret set STAGING_DATABASE_URL --env staging`).
 5. Redeploy and smoke: `gh workflow run deploy.yml --ref main` (or, if the code is unchanged,
    `scripts/smoke.sh <url> <current sha7>`). Stop the timer when smoke is green.
 6. Keep the old branch for ≥ 7 days for forensics, then delete it. Optionally set the restore branch as the project's
