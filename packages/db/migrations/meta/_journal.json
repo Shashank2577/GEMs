@@ -85,6 +85,13 @@
       "when": 1793854927787,
       "tag": "0011_vault_expiry_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793855576186,
+      "tag": "0012_api_token_scope",
+      "breakpoints": true
     }
   ]
 }

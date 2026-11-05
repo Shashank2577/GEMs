@@ -1,10 +1,14 @@
 /**
  * 002 US5 — API tokens for the Chrome extension: expiry, hints, per-user limit (FR-037) and
- * session-only / membership / role behaviour of bearer tokens (FR-036).
+ * session-only / membership / role behaviour of bearer tokens (FR-036); 006/FR-074 read-only scope.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
-import { apiTokens } from '@tp/db';
+import { Hono } from 'hono';
+import { and, desc, eq } from 'drizzle-orm';
+import { activityLog, apiTokens } from '@tp/db';
+import { assertWritable } from '../src/middleware/auth';
+import { errorHandler } from '../src/middleware/error';
+import type { AppEnv } from '../src/types';
 import { API_TOKEN_LIMIT } from '@tp/core/contracts/auth';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
@@ -30,7 +34,7 @@ describe('002/FR-037 token expiry and hint', () => {
     const list = await request(ctx.app, 'GET', '/api/me/api-tokens', { cookie: a.cookie });
     expect(list.body.items[0]).toEqual({
       id: r.body.id, name: 'Chrome extension', createdAt: expect.any(String), lastUsedAt: null,
-      expiresAt: r.body.expiresAt, hint: r.body.hint,
+      expiresAt: r.body.expiresAt, hint: r.body.hint, scope: 'full',
     });
     expect(JSON.stringify(list.body)).not.toContain(r.body.token);
   });
@@ -159,5 +163,174 @@ describe('002/FR-036 bearer tokens cannot manage the account', () => {
 
     await request(ctx.app, 'PATCH', `/api/org/members/${bidManager.me.user.id}`, { cookie: owner.cookie, json: { role: 'bid_manager' } });
     expect((await rename('Role Change Co 4')).status).toBe(200);
+  });
+});
+
+const READ_ONLY = { code: 'read_only_token', message: 'This API token is read-only' };
+
+describe('006/FR-074 assertWritable (unit)', () => {
+  const app = new Hono<AppEnv>();
+  app.onError(errorHandler);
+  app.all('/x/:kind/:scope', (c) => {
+    const kind = c.req.param('kind') as 'session' | 'token';
+    const raw = c.req.param('scope');
+    assertWritable(c, { kind, tokenScope: (raw === 'null' ? null : raw) as 'full' | 'read' | null });
+    return c.json({ ok: true });
+  });
+  const call = (method: string, kind: string, scope: string) => app.request(`http://tp.test/x/${kind}/${scope}`, { method });
+
+  it.each(['GET', 'HEAD'])('%s is allowed for every credential kind and scope', async (method) => {
+    for (const [kind, scope] of [['token', 'read'], ['token', 'full'], ['token', 'bogus'], ['session', 'null']]) {
+      expect((await call(method, kind, scope)).status, `${method} ${kind}/${scope}`).toBe(200);
+    }
+  });
+
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])('%s is refused for read (and unknown, fail-closed) token scopes only', async (method) => {
+    for (const scope of ['read', 'bogus', 'null']) {
+      const r = await call(method, 'token', scope);
+      expect(r.status, `${method} token/${scope}`).toBe(403);
+      expect((await r.json()).error.code).toBe('read_only_token');
+    }
+    expect((await call(method, 'token', 'full')).status).toBe(200);
+    expect((await call(method, 'session', 'null')).status).toBe(200); // cookie sessions are never affected
+  });
+});
+
+describe('006/FR-074 token scope', () => {
+  it('defaults to full; scope "read" is stored, returned on create and in the list, and logged', async () => {
+    ctx.clock.set(START);
+    const a = await signup(ctx.app);
+    const full = await create(a.cookie, { name: 'default' });
+    expect(full.status).toBe(201);
+    expect(full.body.scope).toBe('full');
+    const read = await create(a.cookie, { name: 'Extension (read-only)', scope: 'read' });
+    expect(read.status).toBe(201);
+    expect(read.body.scope).toBe('read');
+    const explicitFull = await create(a.cookie, { name: 'full', scope: 'full' });
+    expect(explicitFull.body.scope).toBe('full');
+
+    const list = await request(ctx.app, 'GET', '/api/me/api-tokens', { cookie: a.cookie });
+    const byName = Object.fromEntries(list.body.items.map((t: any) => [t.name, t.scope]));
+    expect(byName).toEqual({ default: 'full', 'Extension (read-only)': 'read', full: 'full' });
+    const [row] = await ctx.db.select().from(apiTokens).where(eq(apiTokens.id, read.body.id));
+    expect(row.scope).toBe('read');
+    const [log] = await ctx.db.select().from(activityLog)
+      .where(and(eq(activityLog.entityId, read.body.id), eq(activityLog.action, 'api_token.created'))).orderBy(desc(activityLog.createdAt));
+    expect(log.meta).toMatchObject({ scope: 'read' });
+  });
+
+  it('rejects unknown scopes with 400 and creates nothing', async () => {
+    const a = await signup(ctx.app);
+    for (const bad of ['admin', 'READ', 'write', '', null, 1, ['read']]) {
+      const r = await create(a.cookie, { name: 'bad', scope: bad });
+      expect(r.status, JSON.stringify(bad)).toBe(400);
+      expect(r.body.error.code).toBe('validation_error');
+    }
+    expect((await request(ctx.app, 'GET', '/api/me/api-tokens', { cookie: a.cookie })).body.total).toBe(0);
+  });
+
+  it('a read-only token can GET (and HEAD) but every write is 403 read_only_token, even with a valid cookie alongside', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app, 'Read Only Co');
+    const read = (await create(owner.cookie, { name: 'ro', scope: 'read' })).body.token as string;
+    for (const path of ['/api/auth/me', '/api/workspaces', '/api/me/api-tokens', '/api/org', '/api/org/members', '/api/me/notification-prefs']) {
+      expect((await request(ctx.app, 'GET', path, { bearer: read })).status, path).toBe(200);
+    }
+    expect((await request(ctx.app, 'HEAD', '/api/workspaces', { bearer: read })).status).toBe(200);
+
+    const writes: [string, string, unknown][] = [
+      ['PATCH', '/api/org', { name: 'Renamed by token' }],
+      ['PATCH', '/api/me', { name: 'Renamed by token' }],
+      ['PUT', '/api/me/notification-prefs', { inApp: false, email: false, whatsapp: false, frequency: 'daily', expiryReminders: false }],
+      ['POST', '/api/watchlists', { name: 'w', keywords: ['laptop'] }],
+      ['POST', '/api/me/api-tokens', { name: 'escalate', scope: 'full' }],
+      ['POST', '/api/auth/logout', undefined],
+    ];
+    for (const [method, path, json] of writes) {
+      const r = await request(ctx.app, method, path, { bearer: read, json });
+      expect(r.status, `${method} ${path}`).toBe(403);
+      expect(r.body.error, `${method} ${path}`).toEqual(READ_ONLY);
+      // the Bearer token wins over the cookie (resolveAuth), so a cookie alongside cannot bypass the scope
+      const both = await request(ctx.app, method, path, { bearer: read, cookie: owner.cookie, json });
+      expect(both.status, `${method} ${path} + cookie`).toBe(403);
+      expect(both.body.error).toEqual(READ_ONLY);
+    }
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: owner.cookie });
+    expect(me.body.org.name).toBe('Read Only Co');
+    expect(me.body.user.name).toBe(owner.me.user.name);
+    expect((await request(ctx.app, 'GET', '/api/watchlists', { cookie: owner.cookie })).body.items ?? []).toHaveLength(0);
+    expect((await request(ctx.app, 'GET', '/api/me/api-tokens', { cookie: owner.cookie })).body.total).toBe(1);
+    // logout with the token did not end the owner's web session
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: owner.cookie })).status).toBe(200);
+  });
+
+  it('session cookies and full-scope tokens of the same user keep writing', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app, 'Mixed Scope Co');
+    await create(owner.cookie, { name: 'ro', scope: 'read' });
+    const full = (await create(owner.cookie, { name: 'full' })).body.token as string;
+    expect((await request(ctx.app, 'PATCH', '/api/org', { bearer: full, json: { name: 'Mixed Scope Co 2' } })).status).toBe(200);
+    expect((await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { name: 'Mixed Scope Co 3' } })).status).toBe(200);
+  });
+
+  it('the scope cannot be escalated by the token holder (no create, no update route, no self-revoke) — only the web session manages it', async () => {
+    const a = await signup(ctx.app);
+    const created = await create(a.cookie, { name: 'ro', scope: 'read' });
+    const read = created.body.token as string;
+    const id = created.body.id as string;
+    // no route updates a token: PATCH/PUT are not routed (404) for the cookie, and refused for the read token
+    for (const method of ['PATCH', 'PUT']) {
+      const viaCookie = await request(ctx.app, method, `/api/me/api-tokens/${id}`, { cookie: a.cookie, json: { scope: 'full' } });
+      expect(viaCookie.status, method).toBe(404);
+      const viaToken = await request(ctx.app, method, `/api/me/api-tokens/${id}`, { bearer: read, json: { scope: 'full' } });
+      expect(viaToken.status, method).toBe(403);
+    }
+    // POST /me/api-tokens with the read token: refused (read-only first; it is session-only anyway)
+    const mintWithToken = await request(ctx.app, 'POST', '/api/me/api-tokens', { bearer: read, json: { name: 'x', scope: 'full' } });
+    expect(mintWithToken.body.error).toEqual(READ_ONLY);
+    // DELETE (revoke) is a write too
+    expect((await request(ctx.app, 'DELETE', `/api/me/api-tokens/${id}`, { bearer: read })).body.error).toEqual(READ_ONLY);
+    const rows = await ctx.db.select().from(apiTokens).where(eq(apiTokens.userId, a.me.user.id));
+    expect(rows.map((r) => r.scope)).toEqual(['read']);
+    // the owner revokes it from the web app → the token stops working (401 on reads and writes)
+    expect((await request(ctx.app, 'DELETE', `/api/me/api-tokens/${id}`, { cookie: a.cookie })).status).toBe(200);
+    expect((await request(ctx.app, 'GET', '/api/workspaces', { bearer: read })).status).toBe(401);
+    expect((await request(ctx.app, 'PATCH', '/api/org', { bearer: read, json: {} })).status).toBe(401);
+  });
+
+  it('an expired or revoked read-only token is 401 (not 403) on writes', async () => {
+    ctx.clock.set(START);
+    const a = await signup(ctx.app);
+    const read = (await create(a.cookie, { name: 'ro', scope: 'read', expiresInDays: 30 })).body.token as string;
+    ctx.clock.advance(31 * DAY);
+    const r = await request(ctx.app, 'PATCH', '/api/me', { bearer: read, json: { name: 'x' } });
+    expect(r.status).toBe(401);
+    expect(r.body.error.code).toBe('unauthorized');
+    ctx.clock.set(START);
+  });
+
+  it('fails closed: a token row with an unexpected scope value is treated as read-only', async () => {
+    const a = await signup(ctx.app);
+    const created = await create(a.cookie, { name: 'odd' });
+    await ctx.db.update(apiTokens).set({ scope: 'admin' as 'full' }).where(eq(apiTokens.id, created.body.id));
+    expect((await request(ctx.app, 'GET', '/api/workspaces', { bearer: created.body.token })).status).toBe(200);
+    const w = await request(ctx.app, 'PATCH', '/api/me', { bearer: created.body.token, json: { name: 'x' } });
+    expect(w.status).toBe(403);
+    expect(w.body.error).toEqual(READ_ONLY);
+  });
+
+  it('tenant isolation: a read-only token reads only its own org and never writes to another', async () => {
+    const orgA = await seedOrgWithRoles(ctx.app, 'Scope Org A');
+    const orgB = await seedOrgWithRoles(ctx.app, 'Scope Org B');
+    const readA = (await create(orgA.owner.cookie, { name: 'ro', scope: 'read' })).body.token as string;
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { bearer: readA });
+    expect(me.body.org.id).toBe(orgA.orgId);
+    const members = await request(ctx.app, 'GET', '/api/org/members', { bearer: readA });
+    expect(JSON.stringify(members.body)).not.toContain(orgB.owner.email);
+    // org B's token list is invisible; org B's resources are refused
+    expect((await request(ctx.app, 'GET', '/api/me/api-tokens', { bearer: readA })).body.items.map((t: any) => t.name)).toEqual(['ro']);
+    expect((await request(ctx.app, 'DELETE', `/api/org/members/${orgB.viewer.me.user.id}`, { bearer: readA })).body.error).toEqual(READ_ONLY);
+    const bMembers = await request(ctx.app, 'GET', '/api/org/members', { cookie: orgB.owner.cookie });
+    expect(JSON.stringify(bMembers.body)).toContain(orgB.viewer.email);
+    // org B's read-only token is likewise confined: org B's full-scope cookie still works on org B
+    expect((await request(ctx.app, 'PATCH', '/api/org', { cookie: orgB.owner.cookie, json: { name: 'Scope Org B 2' } })).status).toBe(200);
   });
 });
