@@ -1,0 +1,38 @@
+# Publishes wiki/ (plus generated spec and architecture pages) to the GitHub wiki on every push to main.
+# The wiki git repo exists only after the first page is created once in the GitHub UI; until then this job warns and skips.
+name: wiki-sync
+on:
+  push: { branches: [main], paths: ['wiki/**', 'specs/**', 'docs/**', 'qa/evidence/**/VERDICT.md'] }
+  workflow_dispatch: {}
+permissions: { contents: write }
+concurrency: { group: wiki-sync, cancel-in-progress: true }
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pages
+        run: |
+          mkdir -p out && cp wiki/*.md out/
+          page() { # page <title> <files...>
+            t="$1"; shift; f="out/$(echo "$t" | tr ' ' '-').md"; : > "$f"
+            for s in "$@"; do [ -f "$s" ] && { echo "<!-- source: $s -->"; cat "$s"; echo; echo '---'; } >> "$f"; done
+            [ -s "$f" ] || echo "_Spec not written yet._" > "$f"
+          }
+          page "Spec 002 Platform" specs/002-*/spec.md specs/002-*/plan.md
+          page "Spec 003 Identify" specs/003-*/spec.md specs/003-*/plan.md
+          page "Spec 004 Analyse" specs/004-*/spec.md specs/004-*/plan.md
+          page "Spec 005 Profile and Vault" specs/005-*/spec.md specs/005-*/plan.md
+          page "Spec 006 Apply" specs/006-*/spec.md specs/006-*/plan.md
+          page "Spec 007 Experience" specs/007-*/spec.md specs/007-*/plan.md
+          page "Spec 008 Operations" specs/008-*/spec.md specs/008-*/plan.md
+          page "Architecture" docs/architecture.md docs/adr/*.md
+      - name: Push to wiki
+        env: { TOKEN: '${{ github.token }}' }
+        run: |
+          url="https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          if ! git clone -q "$url" wiki-repo 2>/dev/null; then
+            echo "::warning::Wiki repo not initialised — create any page once at https://github.com/${GITHUB_REPOSITORY}/wiki, then re-run."; exit 0; fi
+          rsync -a --delete --exclude .git out/ wiki-repo/
+          cd wiki-repo && git config user.name "tenderpilot-bot" && git config user.email "bot@users.noreply.github.com"
+          git add -A && (git diff --cached --quiet || (git commit -qm "Sync wiki from ${GITHUB_SHA}" && git push -q))
