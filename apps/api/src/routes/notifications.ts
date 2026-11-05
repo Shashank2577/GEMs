@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { notificationPrefs, notifications } from '@tp/db';
 import { notificationsQuerySchema, type NotificationDto } from '@tp/core/contracts/identify';
 import {
-  DEFAULT_NOTIFICATION_PREFS, TEST_ALERT_TITLE, type TestAlertOutcome, type TestAlertResult,
+  DEFAULT_NOTIFICATION_PREFS, TEST_ALERT_TITLE, type TestAlertOutcome, type TestAlertResult, type TestAlertSkipReason,
 } from '@tp/core/contracts/auth';
 import { uuidSchema } from '@tp/core/contracts/common';
 import { notFound } from '../lib/errors';
@@ -73,7 +73,8 @@ notificationsRoutes.post('/notifications/:id/read', requireAuth, async (c) => {
  * Retry-After). The in-app row "Test alert from TenderPilot" is ALWAYS created (spec 002 US4 scenario 8), so
  * `inApp` is always `sent` and every allowed call does work — hence the limit is taken first. Email and
  * WhatsApp are attempted only when switched on in the user's prefs for the active org (`off` otherwise); a
- * channel that is not configured on this server (log adapter) or has no mobile number reports `skipped`.
+ * channel that is not configured on this server (log adapter) or has no mobile number reports `skipped`, with the
+ * reason in the optional `skipReasons` (`not_configured` | `no_phone`).
  * Email/WhatsApp outcomes are also recorded as delivery rows linked to the in-app row (same dedupe key), so
  * the Notifications page shows them like any other alert. Rows are written in a final state, never `pending`,
  * so the dispatcher does not resend them.
@@ -94,14 +95,19 @@ notificationsRoutes.post('/me/notifications/test', requireSession, async (c) => 
   const base = { orgId: orgId(c), userId: userId(c), kind: 'system' as const, title: TEST_ALERT_TITLE, body, link, dedupeKey: `test:${crypto.randomUUID()}`, createdAt: now };
   const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500);
 
-  const attempt = async (channel: 'email' | 'whatsapp', enabled: boolean, send: () => Promise<{ skipped?: boolean; reason?: string }>): Promise<TestAlertOutcome> => {
+  const skipReasons: NonNullable<TestAlertResult['skipReasons']> = {};
+  type Skip = { skipped: true; reason: string; code: TestAlertSkipReason };
+  const attempt = async (channel: 'email' | 'whatsapp', enabled: boolean, send: () => Promise<Skip | null>): Promise<TestAlertOutcome> => {
     if (!enabled) return 'off';
     let outcome: TestAlertOutcome;
     let error: string | null = null;
     try {
       const r = await send();
-      outcome = r.skipped ? 'skipped' : 'sent';
-      error = r.skipped ? r.reason ?? 'Channel not configured' : null;
+      if (r) {
+        outcome = 'skipped';
+        error = r.reason;
+        skipReasons[channel] = r.code;
+      } else outcome = 'sent';
     } catch (e) {
       logger.warn('test alert send failed', { channel, error: errMsg(e) });
       outcome = 'failed';
@@ -120,16 +126,19 @@ notificationsRoutes.post('/me/notifications/test', requireSession, async (c) => 
       html: renderAlertEmail({ heading: TEST_ALERT_TITLE, intro: body, rows: [], appUrl: config.appUrl, orgName: c.var.org.name, now }),
       text: `${TEST_ALERT_TITLE}\n${body}\n\nManage alerts: ${url}`,
     });
-    return r.skipped ? { skipped: true, reason: 'Email is not configured (RESEND_API_KEY)' } : {};
+    return r.skipped ? { skipped: true as const, reason: 'Email is not configured (RESEND_API_KEY)', code: 'not_configured' as const } : null;
   });
   result.whatsapp = await attempt('whatsapp', prefs.whatsapp, async () => {
-    if (!user.phone) return { skipped: true, reason: 'No mobile number on the account' };
+    if (!user.phone) return { skipped: true as const, reason: 'No mobile number on the account', code: 'no_phone' as const };
     const r = await whatsapp.send({
       to: user.phone,
-      template: { name: WHATSAPP_TEMPLATE, language: 'en', params: [TEST_ALERT_TITLE, 'TEST', 'n/a', url] },
+      // Same template as real alerts (title, bid number, closing date, link): readable filler for the test.
+      template: { name: WHATSAPP_TEMPLATE, language: 'en', params: [TEST_ALERT_TITLE, 'Test only (no bid)', 'No closing date (test alert)', url] },
       text: `${TEST_ALERT_TITLE}\n${body}\n${url}`,
     });
-    return r.skipped ? { skipped: true, reason: 'WhatsApp is not configured (WHATSAPP_TOKEN)' } : {};
+    return r.skipped ? { skipped: true as const, reason: 'WhatsApp is not configured (WHATSAPP_TOKEN)', code: 'not_configured' as const } : null;
   });
+  // Optional field (backward compatible): only present when something was skipped.
+  if (Object.keys(skipReasons).length) result.skipReasons = skipReasons;
   return c.json(result);
 });

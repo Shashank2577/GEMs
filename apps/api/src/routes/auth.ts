@@ -9,7 +9,7 @@ import {
 } from '@tp/db';
 import {
   API_TOKEN_LIMIT, API_TOKEN_PREFIX, PASSWORD_RESET_TTL_MINUTES, acceptInviteInputSchema, changePasswordInputSchema, createApiTokenInputSchema,
-  forgotPasswordInputSchema, loginInputSchema, notificationPrefsSchema, passwordSchema, resetPasswordInputSchema,
+  forgotPasswordInputSchema, loginInputSchema, notificationPrefsSchema, passwordSchema, resetPasswordInputSchema, resetTtlText,
   signupInputSchema, switchOrgInputSchema, updateMeInputSchema,
   DEFAULT_NOTIFICATION_PREFS, type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
 } from '@tp/core/contracts/auth';
@@ -19,7 +19,7 @@ import { getDummyHash, hashPassword, randomToken, sha256Hex, verifyPassword } fr
 import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/errors';
 import { buildMe } from '../lib/me';
 import { defer } from '../lib/defer';
-import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reset } from '../lib/rate-limit';
+import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reserveIpThenKey, reset } from '../lib/rate-limit';
 import { clearSessionCookie, firstMembership, loadMembership, loadUser, rememberOrg, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
 import { parseJson, parseWith } from '../lib/validate';
@@ -140,10 +140,8 @@ authRoutes.post('/auth/switch-org', requireSession, async (c) => {
 
 const RESET_INVALID = () => new HttpError(400, 'reset_invalid', 'This password reset link is invalid, already used or has expired. Request a new one.');
 
-/** "60" → "1 hour", "90" → "90 minutes" (email copy follows PASSWORD_RESET_TTL_MINUTES). */
-const RESET_TTL_TEXT = PASSWORD_RESET_TTL_MINUTES % 60 === 0
-  ? `${PASSWORD_RESET_TTL_MINUTES / 60} hour${PASSWORD_RESET_TTL_MINUTES === 60 ? '' : 's'}`
-  : `${PASSWORD_RESET_TTL_MINUTES} minutes`;
+/** Email copy follows PASSWORD_RESET_TTL_MINUTES ("1 hour"); the web pages use the same helper. */
+const RESET_TTL_TEXT = resetTtlText();
 
 /**
  * Always 200 `{ok:true}` (no account enumeration). Emails a single-use link to existing users.
@@ -155,13 +153,9 @@ authRoutes.post('/auth/forgot-password', async (c) => {
   const { db, clock, config, mailer } = c.var.deps;
   const now = clock.now();
   // Counted for every email (existing or not) so the 429 reveals nothing about accounts.
+  // IP first: a blocked IP does not advance the email's counter (reserveIpThenKey).
   const ip = clientIp(c, config.trustProxy);
-  const [byEmail, byIp] = await Promise.all([
-    hit(db, email, 'reset_email', RESET_EMAIL_LIMIT, now),
-    ip ? hit(db, ip, 'reset_ip', RESET_IP_LIMIT, now) : Promise.resolve(null),
-  ]);
-  const blocked = [byEmail, byIp].filter((st) => st?.over);
-  if (blocked.length) throw rateLimited(Math.max(...blocked.map((st) => st!.retryAfterSec)));
+  await reserveIpThenKey(db, ip ? { key: ip, kind: 'reset_ip', opts: RESET_IP_LIMIT } : null, { key: email, kind: 'reset_email', opts: RESET_EMAIL_LIMIT }, now);
 
   defer(c, 'password reset email', async () => {
     const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));

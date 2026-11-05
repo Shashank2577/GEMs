@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { injectDeps, noStore } from './middleware/request';
-import { originCheck } from './middleware/security';
+import { originCheck, securityHeaders } from './middleware/security';
 import { analysisRoutes } from './routes/analysis';
 import { assistRoutes } from './routes/assist';
 import { authRoutes } from './routes/auth';
@@ -52,6 +52,7 @@ export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
   app.onError(errorHandler);
   app.notFound(notFoundHandler);
+  app.use('*', securityHeaders()); // 002/FR-050: every response, incl. errors and 404s
 
   const api = new Hono<AppEnv>();
   api.use('*', injectDeps(deps));
