@@ -6,7 +6,7 @@
  *   POST /tenders/:id/fetch-documents                 download from GeM              analyst+
  *   GET  /tenders/:id/documents/:docId/download       stream (?inline=1)             viewer+
  *   DELETE /tenders/:id/documents/:docId              remove own upload (204)        analyst+
- *   POST /tenders/:id/documents/:docId/ocr            AI OCR of a scanned PDF → doc (?force=1 re-reads OCR text: bid_manager+); 402 / 409 conflict / 502 ocr_failed / 503 ocr_unavailable  analyst+
+ *   POST /tenders/:id/documents/:docId/ocr            AI OCR of a scanned PDF → doc (?force=1 re-reads own OCR text: bid_manager+, 403 on shared GeM rows); 402 / 409 conflict (incl. already being read) / 502 ocr_failed / 503 ocr_unavailable  analyst+
  *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis; 409 analysis_running / analysis_superseded  analyst+
  *   GET  /tenders/:id/analysis                        latest done Analysis (+lastAttempt) or 404  viewer+
  *   POST /analyses/:id/override                       {factorKey,status,reason}      bid_manager+
@@ -19,7 +19,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { idParamSchema, uuidSchema } from '@tp/core/contracts/common';
 import { overrideFactorInputSchema, scoringWeightsSchema, tenderDocKindSchema } from '@tp/core/contracts/analyse';
-import { HttpError, badRequest, forbidden, notFound } from '../lib/errors';
+import { HttpError, badRequest, notFound } from '../lib/errors';
 import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, roleAtLeast, userId } from '../middleware/auth';
 import { TENDER_DOC_TOO_LARGE, TENDER_DOC_UPLOAD_MAX_BYTES, bodyLimit } from '../middleware/body-limit';
@@ -83,10 +83,12 @@ analysisRoutes.post('/tenders/:id/documents/:docId/ocr', requireRole('analyst'),
   const tenderId = tenderIdOf(c.req.param('id'));
   const docId = uuidSchema.safeParse(c.req.param('docId'));
   if (!docId.success) throw notFound('Document');
-  // `?force=1` (bid_manager+, review S3): re-read a document whose text already came from OCR and replace it.
+  // `?force=1` re-reads an org-owned document whose text already came from OCR and replaces it: bid_manager+ (review
+  // S3), checked by the service only when the flag would apply — a document that still needs OCR ignores it (N7).
   const force = c.req.query('force') === '1';
-  if (force && !roleAtLeast(c.var.role, 'bid_manager')) throw forbidden('Only a bid manager or owner can re-run AI OCR on a document');
-  const { doc, tender } = await ocrTenderDocument(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, docId: docId.data, viewer: c.var.org, force });
+  const { doc, tender } = await ocrTenderDocument(c.var.deps, {
+    orgId: orgId(c), userId: userId(c), tenderId, docId: docId.data, viewer: c.var.org, force, canForce: roleAtLeast(c.var.role, 'bid_manager'),
+  });
   return c.json(toDocumentDto(doc, tender.bidNumber));
 });
 

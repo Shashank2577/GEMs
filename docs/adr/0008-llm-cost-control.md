@@ -61,10 +61,25 @@ Any analyst can trigger analyses without limit; spend is unbounded and invisible
     calls reached the model keeps the slot even when it fails (no free retries beyond the quota and the `ocr.org` rate
     limit); a run that never reached the model gives it back. We chose the existing AI slot over a separate OCR page cap:
     it needs no new plan field, shows in `GET /org/usage`, and a 150-page OCR costs about as much as an AI analysis.
-  - *Automatic OCR inside analyse* is metered under the coming analysis's id and shares its slot. If the analysis row is
-    never inserted (409/422/402 after OCR) the rows keep their tokens but their `analysis_ref` is cleared, so they hold no
-    slot; a document whose automatic OCR failed is recorded (`tender.document_ocr_failed`) and analyse does not OCR it
-    again until someone runs OCR on it explicitly.
+  - *Automatic OCR inside analyse* is metered under the coming analysis's id and shares its slot, which it reserves
+    atomically under the org row lock (`reserveOcrSlot` with that id as `analysis_ref`) BEFORE its first call — no
+    lock-free pre-check, so concurrent analyses at the quota cannot all OCR. The analysis then links the reservation and
+    uses it for its enrichment calls; whether the analysis may use AI comes from that reservation, not from the quota
+    re-check. If the analysis row is never inserted (409/422/402 after OCR): rows of an OCR run that stored text keep
+    one slot under a fresh `analysis_ref` (every stored OCR text is paid for by a slot); otherwise the unused
+    reservation is released and the rows keep their tokens but lose their `analysis_ref`. A document whose automatic OCR
+    failed — for any reason, including running out of the analysis's time — is recorded (`tender.document_ocr_failed`)
+    and analyse does not OCR it again until someone runs OCR on it explicitly (or the document is replaced).
+  - *One OCR run per document.* Before reserving a slot, a run claims the document: a row `ocr-claim:<documentId>` in
+    `rate_limits` (no migration; `window_start` = claim time, pruned with the other old rows), checked and inserted under
+    a transaction-scoped advisory lock on that key and deleted when the run ends. A claim older than the OCR budget + 2
+    minutes (a crashed run) is ignored. A concurrent manual run → 409 `conflict`; analyse skips the document. A
+    session-level advisory lock was rejected: it would pin a pooled (Neon) connection for the minutes OCR takes.
+  - *Re-OCR (`?force=1`)* is limited to the org's own uploads (bid_manager+). Shared GeM rows are read once for all
+    organisations: one org cannot spend its slots replacing the text every other org analyses → 403.
+  - *Abandoned reservations.* `reserveOcrSlot` first deletes, under the org lock, the org's unfilled reservations with
+    no `analysis_id` older than 15 minutes (left by a process that died mid-run; a live run is bounded by the 10-minute
+    OCR budget).
   - *Calls aborted in flight* (our timeout) before the provider reports usage are recorded with 0 tokens because the
     columns are NOT NULL, and a warning with `usageUnknown: true` is logged: the real count is unknown and may be billed.
   - **Cost raise — needs product sign-off before release.** 004/FR-051 raised 008/FR-031's per-analysis caps from

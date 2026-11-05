@@ -14,7 +14,8 @@ import { createApp } from '../src/app';
 import { LlmError } from '../src/adapters/llm';
 import type { AppDeps, LlmClient, LlmRequest } from '../src/deps';
 import { createMemoryRateLimiter } from '../src/lib/rate-limiter';
-import { SCANNED_DOCUMENT_MESSAGE, analyseTender } from '../src/services/analyse';
+import { ABANDONED_OCR_RESERVATION_MS } from '../src/lib/plan';
+import { OCR_BUSY_MESSAGE, SCANNED_DOCUMENT_MESSAGE, analyseTender } from '../src/services/analyse';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 
 let ctx: TestContext;
@@ -80,6 +81,22 @@ async function newTender() {
     contentHash: `ocr-${n}`, endAt: new Date('2026-11-28T09:30:00Z'),
   }).returning();
   return t!;
+}
+
+/** A gate a fake call can wait on: `entered` resolves when the call is inside, `release()` lets it reply. */
+function gate() {
+  let enter!: () => void;
+  let release!: () => void;
+  const entered = new Promise<void>((r) => { enter = r; });
+  const open = new Promise<void>((r) => { release = r; });
+  return { entered, release, during: async () => { enter(); await open; } };
+}
+
+/** `n` AI slots already used this month by earlier AI analyses. */
+async function useSlots(orgId: string, n: number) {
+  for (let i = 0; i < n; i++) {
+    await ctx.db.insert(llmUsage).values({ orgId, analysisRef: crypto.randomUUID(), kind: 'extract', model: 'm', inputTokens: 1, outputTokens: 1, createdAt: ctx.clock.now() });
+  }
 }
 
 async function upload(tenderId: string, bytes: Uint8Array, name: string, cookie = roles.analyst.cookie) {
@@ -303,19 +320,46 @@ describe('manual OCR: quota, partial replies, races, force (review B1, S3)', () 
     expect(splitPages(after!.text)).toEqual(['Page 1 text', '', 'Page 3 text']);
   });
 
-  it('two concurrent runs on one document: one stores its text (200), the other answers 409 and stores nothing', async () => {
+  it('review N4: a second OCR of a document being read → 409 before any slot or model call (manual + manual, manual + automatic, automatic + manual)', async () => {
+    const org = await seedOrgWithRoles(ctx.app, 'Claim Scan Co');
     const t = await newTender();
-    const doc = await upload(t.id, await scanPdf(1), 'race.pdf');
-    let arrived = 0;
-    let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
-    const during = async () => { if (++arrived === 2) release(); await gate; };
-    const app = appWith({ ocr: fakeOcr({ during, text: () => 'raced text' }) });
-    const [x, y] = await Promise.all([1, 2].map(() => request(app, 'POST', `/tenders/${t.id}/documents/${doc.id}/ocr`, { cookie: roles.analyst.cookie })));
-    expect([x!.status, y!.status].sort()).toEqual([200, 409]);
-    expect([x!, y!].find((r) => r.status === 409)!.body.error.code).toBe('conflict');
+    const doc = await upload(t.id, await scanPdf(1), 'race.pdf', org.analyst.cookie);
+    const g = gate();
+    const seen: LlmRequest[] = [];
+    const app = appWith({ ocr: fakeOcr({ seen, during: g.during, text: () => 'raced text' }) });
+    const first = request(app, 'POST', `/tenders/${t.id}/documents/${doc.id}/ocr`, { cookie: org.analyst.cookie });
+    await g.entered;
+    const second = await request(app, 'POST', `/tenders/${t.id}/documents/${doc.id}/ocr`, { cookie: org.owner.cookie });
+    expect(second.status, second.text).toBe(409);
+    expect(second.body.error).toEqual({ code: 'conflict', message: OCR_BUSY_MESSAGE });
+    // Analyse's automatic OCR skips it too (the sole document → 422 scanned_document) and makes no call.
+    const auto = await request(app, 'POST', `/tenders/${t.id}/analyse`, { cookie: org.analyst.cookie });
+    expect(auto.status, auto.text).toBe(422);
+    expect(auto.body.error.code).toBe('scanned_document');
+    expect(seen).toHaveLength(1);
+    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(1); // only the first run's reservation
+    g.release();
+    expect((await first).status).toBe(200);
     const acts = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, t.id), eq(activityLog.action, 'tender.document_ocr')));
     expect(acts).toHaveLength(1);
+    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(1);
+
+    // The claim is released when a run ends: a failed run does not block the next one.
+    const other = await upload(t.id, await scanPdf(1), 'other.pdf', org.analyst.cookie);
+    expect((await request(appWith({ ocr: fakeOcr({ text: () => '' }) }), 'POST', `/tenders/${t.id}/documents/${other.id}/ocr`, { cookie: org.analyst.cookie })).status).toBe(502);
+    ctx.clock.advance(1000);
+    // Automatic OCR holding the claim → manual OCR of that document is 409 too.
+    const g2 = gate();
+    const seen2: LlmRequest[] = [];
+    const app2 = appWith({ ocr: fakeOcr({ seen: seen2, during: g2.during }) });
+    const running = request(app2, 'POST', `/tenders/${t.id}/analyse`, { cookie: org.analyst.cookie });
+    await g2.entered;
+    const manual = await request(app2, 'POST', `/tenders/${t.id}/documents/${other.id}/ocr`, { cookie: org.analyst.cookie });
+    expect(manual.status, manual.text).toBe(409);
+    expect(manual.body.error.message).toBe(OCR_BUSY_MESSAGE);
+    expect(seen2).toHaveLength(1);
+    g2.release();
+    expect((await running).status).toBe(201);
   });
 
   it('a document removed while it is being read → 404', async () => {
@@ -352,6 +396,54 @@ describe('manual OCR: quota, partial replies, races, force (review B1, S3)', () 
 
     const text = await upload(t.id, await generateBidPdf(getSampleBidSpec('go-it-services')!), 'text.pdf');
     expect((await request(app, 'POST', `/tenders/${t.id}/documents/${text.id}/ocr?force=1`, { cookie: roles.owner.cookie })).status).toBe(409);
+
+    // Review N7: on a document that still needs OCR the flag does not apply, so an analyst may send it.
+    const scan = await upload(t.id, await scanPdf(1), 'needs-ocr.pdf');
+    const plain = await request(app, 'POST', `/tenders/${t.id}/documents/${scan.id}/ocr?force=1`, { cookie: roles.analyst.cookie });
+    expect(plain.status, plain.text).toBe(200);
+    expect(plain.body).toMatchObject({ textSource: 'ocr' });
+  });
+
+  it('review N5: ?force=1 on a shared GeM copy → 403 (read once for all organisations); its first OCR is allowed', async () => {
+    const t = await newTender();
+    const blobKey = `tenders/${t.id}/gem/shared-scan.pdf`;
+    const bytes = await scanPdf(1);
+    await ctx.deps.blobs.put(blobKey, bytes, { contentType: 'application/pdf' });
+    const [gem] = await ctx.db.insert(tenderDocuments).values({
+      tenderId: t.id, orgId: null, kind: 'bid', fileName: 'gem-shared.pdf', blobKey, sizeBytes: bytes.length, pageCount: 1, totalPages: 1, text: joinPages(['']),
+    }).returning();
+    const seen: LlmRequest[] = [];
+    const app = appWith({ ocr: fakeOcr({ seen, text: () => 'shared text' }) });
+    // First OCR with the flag: it still needs OCR, so the flag is ignored and the shared row is read.
+    const first = await request(app, 'POST', `/tenders/${t.id}/documents/${gem!.id}/ocr?force=1`, { cookie: roles.owner.cookie });
+    expect(first.status, first.text).toBe(200);
+    const forced = await request(app, 'POST', `/tenders/${t.id}/documents/${gem!.id}/ocr?force=1`, { cookie: roles.owner.cookie });
+    expect(forced.status).toBe(403);
+    expect(forced.body.error.code).toBe('forbidden');
+    expect(forced.body.error.message).toMatch(/Shared GeM documents are read once for all organisations/);
+    expect(seen).toHaveLength(1);
+    const [row] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.id, gem!.id));
+    expect(splitPages(row!.text)).toEqual(['shared text']);
+  });
+
+  it('review N6: reserving an OCR slot first deletes this org\'s abandoned (unfilled, > 15 min old, analysis-less) reservations', async () => {
+    const org = await seedOrgWithRoles(ctx.app, 'Abandoned Scan Co'); // trial: 10 AI slots
+    await useSlots(org.orgId, 8);
+    const old = new Date(ctx.clock.now().getTime() - ABANDONED_OCR_RESERVATION_MS - 60_000);
+    const [abandoned] = await ctx.db.insert(llmUsage).values({ orgId: org.orgId, analysisRef: crypto.randomUUID(), kind: 'extract', model: 'm', reserved: true, createdAt: old }).returning();
+    const [recent] = await ctx.db.insert(llmUsage).values({ orgId: org.orgId, analysisRef: crypto.randomUUID(), kind: 'extract', model: 'm', reserved: true, createdAt: ctx.clock.now() }).returning();
+    // A filled 0-token row (an aborted call) of the same age is kept: it may have been billed.
+    const [filled] = await ctx.db.insert(llmUsage).values({ orgId: org.orgId, analysisRef: crypto.randomUUID(), kind: 'extract', model: 'm', reserved: false, createdAt: old }).returning();
+    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(11);
+    await ctx.db.delete(llmUsage).where(eq(llmUsage.id, filled!.id)); // back to 10 = the trial quota, one of them abandoned
+    const t = await newTender();
+    const doc = await upload(t.id, await scanPdf(1), 'after-crash.pdf', org.analyst.cookie);
+    const r = await request(appWith({ ocr: fakeOcr() }), 'POST', `/tenders/${t.id}/documents/${doc.id}/ocr`, { cookie: org.analyst.cookie });
+    expect(r.status, r.text).toBe(200);
+    const left = await ctx.db.select({ id: llmUsage.id }).from(llmUsage).where(and(eq(llmUsage.orgId, org.orgId), eq(llmUsage.reserved, true)));
+    expect(left.map((x) => x.id)).toEqual([recent!.id]);
+    expect(left.map((x) => x.id)).not.toContain(abandoned!.id);
+    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(10);
   });
 });
 
@@ -449,7 +541,7 @@ describe('automatic OCR inside analyse', () => {
     expect(manual.status, manual.text).toBe(200);
   });
 
-  it('review S2: automatic OCR followed by a 409 (a run started meanwhile) leaves no orphan AI slot', async () => {
+  it('review N1: automatic OCR that stored text, followed by a 409 (a run started meanwhile): the text keeps a slot of its own', async () => {
     const org = await seedOrgWithRoles(ctx.app, 'Race Scan Co');
     const t = await newTender();
     await upload(t.id, await scanPdf(1), 'race-scan.pdf', org.analyst.cookie);
@@ -459,10 +551,68 @@ describe('automatic OCR inside analyse', () => {
     const r = await request(appWith({ ocr: fakeOcr({ during, inputTokens: 4343 }) }), 'POST', `/tenders/${t.id}/analyse`, { cookie: org.analyst.cookie });
     expect(r.status).toBe(409);
     expect(r.body.error.code).toBe('analysis_running');
+    // The text was stored, so it was paid for with one AI slot under its own ref (like a manual OCR run).
+    const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+    expect(doc!.textSource).toBe('ocr');
     const rows = await ctx.db.select().from(llmUsage).where(and(eq(llmUsage.orgId, org.orgId), eq(llmUsage.inputTokens, 4343)));
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.analysisRef).toBeNull();
-    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(0);
+    expect(rows[0]).toMatchObject({ analysisId: null, reserved: false });
+    expect(rows[0]!.analysisRef).toEqual(expect.any(String));
+    const [inserted] = await ctx.db.select({ id: analyses.id }).from(analyses).where(eq(analyses.id, rows[0]!.analysisRef!));
+    expect(inserted).toBeUndefined();
+    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(1);
+  });
+
+  it('review N2: an automatic OCR that runs out of time is recorded too; analysing again does not OCR the document again', async () => {
+    const org = await seedOrgWithRoles(ctx.app, 'Slow Scan Co');
+    const t = await newTender();
+    const doc = await upload(t.id, await scanPdf(10), 'slow-scan.pdf', org.analyst.cookie); // 2 parts
+    const seen: LlmRequest[] = [];
+    // The first part takes past the analysis's LLM deadline: the second part is never sent ('budget').
+    const app = appWith({ ocr: fakeOcr({ seen, during: async () => { ctx.clock.advance(200_000); } }) });
+    const r = await request(app, 'POST', `/tenders/${t.id}/analyse`, { cookie: org.analyst.cookie });
+    expect(r.status).toBe(422);
+    expect(r.body.error.details).toMatchObject({ ocrFailed: ['slow-scan.pdf'] });
+    expect(seen).toHaveLength(1);
+    const failed = await ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, t.id), eq(activityLog.action, 'tender.document_ocr_failed')));
+    expect(failed).toHaveLength(1);
+    expect(failed[0]!.meta).toMatchObject({ documentId: doc.id, reason: 'budget' });
+    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(0); // nothing stored, no analysis: no slot held
+    for (let i = 0; i < 2; i++) {
+      ctx.clock.advance(1000);
+      const again = await request(app, 'POST', `/tenders/${t.id}/analyse`, { cookie: org.analyst.cookie });
+      expect(again.status).toBe(422);
+    }
+    expect(seen).toHaveLength(1);
+  });
+
+  it('review N3: two concurrent analyses with one AI slot left — automatic OCR reserves it atomically, so only one gets AI', async () => {
+    const org = await seedOrgWithRoles(ctx.app, 'Last Slot Scan Co'); // trial: 10 AI slots
+    await useSlots(org.orgId, 9);
+    const ts = [await newTender(), await newTender()];
+    for (const t of ts) {
+      await upload(t.id, await generateBidPdf(getSampleBidSpec('go-it-services')!), 'bid.pdf', org.analyst.cookie);
+      await upload(t.id, await scanPdf(1), 'scan.pdf', org.analyst.cookie);
+    }
+    const ocrSeen: LlmRequest[] = [];
+    const llmSeen: LlmRequest[] = [];
+    const llm: LlmClient = {
+      model: 'sonnet', complete: async () => { throw new Error('not used'); },
+      completeJson: async <T>(req: LlmRequest) => { llmSeen.push(req); return { requirements: [] } as T; },
+    };
+    // Each OCR call lingers, so both analyses are past any pre-check before either finishes.
+    const app = appWith({ llm, ocr: fakeOcr({ seen: ocrSeen, during: () => new Promise((r) => setTimeout(r, 150)) }) });
+    const rs = await Promise.all(ts.map((t) => request(app, 'POST', `/tenders/${t.id}/analyse`, { cookie: org.analyst.cookie })));
+    for (const r of rs) expect(r.status, r.text).toBe(201);
+    expect(ocrSeen).toHaveLength(1);
+    expect(await aiSlots(org.orgId, org.owner.cookie)).toBe(10);
+    const withAi = rs.filter((r) => !(r.body.warnings ?? []).some((w: { code: string }) => w.code === 'llm_quota_reached'));
+    expect(withAi).toHaveLength(1);
+    expect(rs.filter((r) => (r.body.warnings ?? []).some((w: { code: string }) => w.code === 'llm_quota_reached'))).toHaveLength(1);
+    // Every metered call of the analysis with AI is under its own id; the other has none.
+    const ids = rs.map((r) => r.body.id as string);
+    const counts = await Promise.all(ids.map(async (id) => (await ctx.db.select({ id: llmUsage.id }).from(llmUsage).where(eq(llmUsage.analysisRef, id))).length));
+    expect(counts.filter((c) => c > 0)).toHaveLength(1);
   });
 
   it('review S4: automatic OCR calls count towards the analysis call cap', async () => {
