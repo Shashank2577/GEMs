@@ -213,7 +213,7 @@ test.describe('sc7 digest and expiry reminders', () => {
 });
 
 test.describe('sc8 test alert', () => {
-  test('sc8 "Send a test alert": in-app notification created, per-channel outcome toast', async ({ page }) => {
+  test('sc8 "Send a test alert": in-app notification created; short toast; per-channel outcome in the inline status line', async ({ page }) => {
     await signup(page);
     await page.goto('/settings/notifications');
     const [res] = await Promise.all([
@@ -226,12 +226,28 @@ test.describe('sc8 test alert', () => {
     expect(r.whatsapp).toBe('off');
     expect(['sent', 'skipped', 'failed']).toContain(r.email);
     const expectedEmail = r.email === 'sent' ? 'Email sent' : r.email === 'failed' ? 'Email failed to send' : 'Email not configured on this server';
-    const t = toastOf(page, /Test alert|not delivered/);
+    const status = page.getByRole('status').filter({ hasText: 'Test alert:' });
+    await expect(status).toBeVisible();
+    await expect(status).toHaveAttribute('aria-live', 'polite');
+    await expect(status).toContainText('In-app sent');
+    await expect(status).toContainText(expectedEmail);
+    await expect(status).toContainText('WhatsApp is off');
+    // the toast is a short one-liner (no per-channel detail)
+    const t = toastOf(page, /Test alert sent/);
     await expect(t).toBeVisible();
-    await expect(t).toContainText('In-app sent');
-    await expect(t).toContainText(expectedEmail);
-    await expect(t).toContainText('WhatsApp is off');
-    await ev(page, 'sc8-test-alert-toast');
+    expect((await t.innerText()).replace(/\s+/g, ' ').trim().length).toBeLessThan(45);
+    await expect(t).not.toContainText('In-app sent');
+    await expect(t).not.toContainText('WhatsApp');
+    if (r.email === 'sent') await expect(t).toContainText(/^Test alert sent$/m); else await expect(t).toContainText('Test alert sent with warnings');
+    // the toast does not cover the footer buttons
+    const tb = (await t.boundingBox())!;
+    for (const name of ['Send a test alert', 'Save preferences']) {
+      const bb = (await page.getByRole('button', { name }).boundingBox())!;
+      const overlap = tb.x < bb.x + bb.width && tb.x + tb.width > bb.x && tb.y < bb.y + bb.height && tb.y + tb.height > bb.y;
+      expect(overlap, `toast overlaps "${name}" button`).toBe(false);
+    }
+    await ev(page, 'sc8-test-alert-status-line');
+    await page.screenshot({ path: 'qa/evidence/002/US4/sc8-toast-vs-footer-desktop.png' });
     // the in-app notification exists with the exact title
     const list = await (await page.request.get('/api/notifications')).json();
     expect(JSON.stringify(list)).toContain('Test alert from TenderPilot');
@@ -240,17 +256,41 @@ test.describe('sc8 test alert', () => {
     await ev(page, 'sc8-notification-listed');
   });
 
-  test('sc8b second test alert within a minute -> 429 with friendly toast', async ({ page }) => {
+  test('sc8c in-app preference OFF: the test alert still creates the in-app notification', async ({ page }) => {
+    await signup(page);
+    await page.goto('/settings/notifications');
+    await page.locator('#n-inapp').click();
+    await expect(page.locator('#n-inapp')).not.toBeChecked();
+    await page.getByRole('button', { name: 'Save preferences' }).click();
+    await expect(toastOf(page, 'Notification preferences saved')).toBeVisible();
+    expect((await getPrefs(page)).inApp).toBe(false);
+    const [res] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/api/me/notifications/test') && r.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Send a test alert' }).click(),
+    ]);
+    expect(res.status()).toBe(200);
+    expect((await res.json()).inApp).toBe('sent');
+    await expect(page.getByRole('status').filter({ hasText: 'Test alert:' })).toContainText('In-app sent');
+    expect((await getPrefs(page)).inApp).toBe(false);
+    const list = await (await page.request.get('/api/notifications')).json();
+    expect(JSON.stringify(list)).toContain('Test alert from TenderPilot');
+    await page.goto('/notifications');
+    await expect(page.getByText('Test alert from TenderPilot').first()).toBeVisible();
+    await ev(page, 'sc8c-in-app-off-still-created');
+  });
+
+  test('sc8b second test alert within a minute -> 429 with friendly message in toast and inline status line', async ({ page }) => {
     await signup(page);
     await page.goto('/settings/notifications');
     await page.getByRole('button', { name: 'Send a test alert' }).click();
-    await expect(toastOf(page, /Test alert|not delivered/)).toBeVisible();
+    await expect(toastOf(page, /Test alert sent/)).toBeVisible();
     const [res] = await Promise.all([
       page.waitForResponse((r) => r.url().endsWith('/api/me/notifications/test')),
       page.getByRole('button', { name: 'Send a test alert' }).click(),
     ]);
     expect(res.status()).toBe(429);
     await expect(toastOf(page, /one test alert a minute/)).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Test alert:' })).toContainText(/one test alert a minute/);
     await ev(page, 'sc8b-rate-limited');
   });
 });
@@ -291,5 +331,21 @@ test.describe('@mobile layout', () => {
     await expect(toastOf(page, 'Profile saved')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Account menu' }).first()).toContainText('PS');
     await ev(page, 'mobile-account-saved');
+  });
+  test('@mobile test alert: toast sits above the tab bar, status line shows per-channel result, buttons reachable', async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) >= 768, 'tab bar exists only on the phone viewport (mobile project)');
+    await signup(page);
+    await page.goto('/settings/notifications');
+    await page.getByRole('button', { name: 'Send a test alert' }).click();
+    const status = page.getByRole('status').filter({ hasText: 'Test alert:' });
+    await expect(status).toContainText('In-app sent');
+    const t = toastOf(page, /Test alert sent/);
+    await expect(t).toBeVisible();
+    await page.waitForTimeout(600); // let the toast finish its enter animation
+    const tb = (await t.boundingBox())!;
+    const bar = (await page.getByRole('navigation', { name: 'Primary' }).boundingBox())!;
+    expect(tb.y + tb.height, `toast bottom ${tb.y + tb.height} must be above tab bar top ${bar.y}`).toBeLessThanOrEqual(bar.y + 1);
+    await noHorizontalScroll(page);
+    await page.screenshot({ path: 'qa/evidence/002/US4/mobile-toast-above-tab-bar.png' });
   });
 });

@@ -1,11 +1,11 @@
-## QA verdict — APPROVED
+## QA verdict — APPROVED (re-review round 2)
 
 **Work item:** #6 · **PR:** #496 · **Reviewer:** qa (claude-code/Sonnet 5.5) · **Session:** https://claude.ai/code/session_01BUi6mFdfjz9y1F3zKYmWQB
 
-Tested commit: `ee2af4d` (branch HEAD at test time; product code as committed). Uncommitted edits to product files appeared in the shared working tree at 03:46 UTC, after the Playwright and full API runs, and are NOT covered by this verdict.
+Re-review round 2 against branch HEAD `c89e4cf` (includes fix commit `d1e3b8e`: always-on in-app test row, inline aria-live result line, short toast, mobile toast offset). Round 1 approved `ee2af4d`.
 
-Tests: `e2e/002/US4-account-prefs.e2e.ts`: **13 passed, 0 failed** (desktop 11, mobile 2 `@mobile`).
-API suite: 298 passed, 1 skipped (opt-in perf) of 299; `prefs.test.ts` 11/11. See [api-tests.txt](api-tests.txt).
+Tests: `e2e/002/US4-account-prefs.e2e.ts`: **15 passed, 0 failed, 1 skipped** (desktop 12 passed + 1 skipped by design: the tab-bar test only applies to the phone viewport; mobile project 3 passed). New cases: sc8c (in-app OFF still creates row), `@mobile` toast-above-tab-bar; sc8/sc8b assertions moved to the status line.
+API suite: 299 passed, 1 skipped (opt-in perf) of 300; `prefs.test.ts` 12/12. See [api-tests.txt](api-tests.txt).
 
 ### Acceptance criteria
 
@@ -29,11 +29,13 @@ API suite: 298 passed, 1 skipped (opt-in perf) of 299; `prefs.test.ts` 11/11. Se
 | 6e | sc6: Email read-only with hint "Contact your org owner to change it." | met | [sc6-account-initial.png](sc6-account-initial.png) |
 | 7a | sc7: Daily -> in-app immediate; email/WhatsApp held and sent as one digest per org per IST day from 08:00 IST | met (API suite) | Server behaviour, no UI. `ingest.test.ts` "daily digest: held before 08:00 IST, one digest email after, never twice a day" passed ([api-tests.txt](api-tests.txt)); UI stores the Daily choice: [sc7-daily-expiry-off-stored.png](sc7-daily-expiry-off-stored.png). See Findings 1 on in-app immediacy. |
 | 7b | sc7: Expiry reminders off -> no vault expiry reminders for that user | met (API suite) | `vault.test.ts` "notifies members once per threshold and respects prefs (FR-022)" and "run with every member opted out ... reports 0 notifications" passed ([api-tests.txt](api-tests.txt)); UI stores expiryReminders:false: [sc7-daily-expiry-off-stored.png](sc7-daily-expiry-off-stored.png) |
-| 8a | sc8: "Send a test alert" creates in-app notification "Test alert from TenderPilot" | met | [sc8-notification-listed.png](sc8-notification-listed.png) (title found in `/api/notifications` and on the Notifications page) |
-| 8b | sc8: test email/WhatsApp attempted for each enabled external channel | met | Test server has log adapters: email reported per its real result, WhatsApp "off". Attempt logic: `prefs.test.ts` "attempts only enabled channels", "reports sent ... and failed when it throws" ([api-tests.txt](api-tests.txt)) |
-| 8c | sc8: toast lists outcome per channel ("Email sent", "WhatsApp not configured on this server") | met | [sc8-test-alert-toast.png](sc8-test-alert-toast.png) (In-app sent / Email not configured on this server / WhatsApp is off); 429 toast: [sc8b-rate-limited.png](sc8b-rate-limited.png) |
+| 8a | sc8: "Send a test alert" creates in-app notification "Test alert from TenderPilot" (now always, also with the in-app pref OFF) | met | [sc8-notification-listed.png](sc8-notification-listed.png) (title in `/api/notifications` and on the Notifications page; `inApp:'sent'`); [sc8c-in-app-off-still-created.png](sc8c-in-app-off-still-created.png) (pref OFF saved, still created, pref unchanged); API `prefs.test.ts` "always creates the in-app row..." ([api-tests.txt](api-tests.txt)) |
+| 8b | sc8: test email/WhatsApp attempted for each enabled external channel (and the active org's prefs are used) | met | Log adapters on the e2e server: email reported per its real result, WhatsApp "off" ([sc8-test-alert-status-line.png](sc8-test-alert-status-line.png)). API `prefs.test.ts` "always creates the in-app row; email/WhatsApp only when enabled", "reports sent ... failed", "uses the preferences of the active org (two-org user)" ([api-tests.txt](api-tests.txt)) |
+| 8c | sc8: outcome per channel ("Email sent", "WhatsApp not configured on this server") — now an inline aria-live status line; toast is short | met | [sc8-test-alert-status-line.png](sc8-test-alert-status-line.png) (`role=status` "Test alert: In-app sent · Email not configured on this server · WhatsApp is off"; toast "Test alert sent with warnings"); 429 in toast and status line: [sc8b-rate-limited.png](sc8b-rate-limited.png) |
 | T068 | `@mobile` layout of account + notifications | met | [mobile-notifications.png](mobile-notifications.png), [mobile-notifications-error.png](mobile-notifications-error.png), [mobile-account-invalid.png](mobile-account-invalid.png), [mobile-account-saved.png](mobile-account-saved.png) (no horizontal overflow, buttons inside viewport; Pixel 7) |
 | T068 | axe on account + notifications | **unverifiable** | T014 axe helper not available in this repo state; see Not checked |
+| R2-1 | Fix: desktop toast no longer covers the footer buttons | met | [sc8-toast-vs-footer-desktop.png](sc8-toast-vs-footer-desktop.png) (toast bottom-right below the footer; bounding-box overlap with both buttons asserted false) |
+| R2-2 | Fix: `@mobile` toast sits above the fixed tab bar | met | [mobile-toast-above-tab-bar.png](mobile-toast-above-tab-bar.png) (toast bottom <= tab bar top asserted on Pixel 7); video `-mobile-test-alert-toast-sits-above-the-tab-bar-status-line--mobile.webm` |
 
 Videos (one per test, desktop and mobile): `*.webm` in this folder, including the two `@mobile` tests on the mobile project. `dev-*.png` are the developer's screenshots (kept).
 
@@ -41,7 +43,9 @@ Videos (one per test, desktop and mobile): `*.webm` in this folder, including th
 
 1. **observation** — sc7a "in-app notifications appear immediately" for Daily users is not asserted directly by an API test; the digest test shows only the email-channel rows are held (`held == email rows`), which is consistent with in-app being sent at once. Not blocking.
 2. **observation** — The WhatsApp success path (`sent`) and the real email provider are only exercised with fake providers in the API suite; the e2e server uses log adapters, so toast lines are "not configured on this server".
-3. **observation** — Full-page screenshots on mobile show the fixed top bar overlaid mid-page (screenshot artifact, not a layout defect).
+
+3. **observation (round 2)** — On the phone the toast (shown a few seconds, dismissible) briefly overlays the footer buttons when the page is scrolled to the bottom ([mobile-toast-above-tab-bar.png](mobile-toast-above-tab-bar.png)); it no longer covers the tab bar, which was the fix goal. The per-channel result stays readable in the status line above. Not blocking.
+4. **observation** — Full-page screenshots on mobile show the fixed top bar overlaid mid-page (screenshot artifact, not a layout defect).
 
 ### Not checked
 
@@ -58,4 +62,4 @@ An approval covers what is in the table above. It is not a statement that the ch
 
 ### Verdict
 
-`qa:approved` — every criterion met (7a/7b via API test evidence); the axe item is an unavailable-tooling gap listed under Not checked.
+`qa:approved` (round 2) — every criterion met (7a/7b via API test evidence); the axe item is an unavailable-tooling gap listed under Not checked.

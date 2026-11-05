@@ -1,6 +1,8 @@
+Re-review round 2, HEAD c89e4cf (fix commit d1e3b8e)
 TEST_DATABASE_URL=...tenderpilot_test_us4 pnpm --filter @tp/api exec vitest run
 Test Files  18 passed | 1 skipped (19)
-Tests  298 passed | 1 skipped (299)   (skipped: perf/dashboard.perf.test.ts, opt-in)
+Tests  299 passed | 1 skipped (300)
+(skipped: perf/dashboard.perf.test.ts, opt-in)
 
 --- test/prefs.test.ts (verbose) ---
  ✓ test/prefs.test.ts > 002/FR-031 notification preferences > GET returns the defaults when no row exists
@@ -10,12 +12,13 @@ Tests  298 passed | 1 skipped (299)   (skipped: perf/dashboard.perf.test.ts, opt
  ✓ test/prefs.test.ts > 002/FR-031 notification preferences > a viewer can edit their own preferences
  ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > with defaults: in-app row created, email attempted (log mailer → skipped), WhatsApp off
  ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > is limited to 1 per minute per user (429 rate_limited + Retry-After)
- ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > attempts only enabled channels: WhatsApp on with a phone → attempted; in-app/email off → nothing
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > always creates the in-app row; email/WhatsApp only when enabled (in-app/email off, WhatsApp on)
  ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > WhatsApp on but the mobile was cleared later → skipped without calling the provider
  ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > reports `sent` from a configured provider and `failed` when it throws
+ ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > uses the preferences of the active org (two-org user)
  ✓ test/prefs.test.ts > 002/FR-034 POST /me/notifications/test > requires a signed-in web session
  Test Files  1 passed (1)
-      Tests  11 passed (11)
+      Tests  12 passed (12)
 
 --- related cases (verbose) ---
  ✓ test/vault.test.ts > vault > patch updates metadata and resets reminders when expiry changes
