@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import type { TenderListItem } from '@tp/core/contracts/identify';
+import { SampleBadge } from './SampleBadge';
 import { Badge, Countdown, ScoreRing, StageBadge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, VerdictBadge } from '@/components/ui';
 import { formatINR, formatNumberIN } from '@/lib/format';
 import type { Stage } from '@/lib/types';
@@ -46,6 +47,7 @@ export function TenderTable({ items }: { items: TenderListItem[] }) {
                 <div className="flex items-center gap-2 text-2xs text-muted-foreground">
                   {t.isNew && <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="New" />}
                   <span className="font-mono text-[11.5px]">{t.bidNumber}</span>
+                  {t.isDemo && <SampleBadge />}
                   {t.hasCorrigendum && <Badge size="sm" tone="warning">Corrigendum</Badge>}
                   {t.workspace && <StageBadge stage={t.workspace.stage as Stage} size="sm" />}
                 </div>

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Building2, Keyboard, LogOut, Moon, Settings, Sun, Monitor, UserRound } from 'lucide-react';
+import { Building2, Command, Keyboard, LogOut, Moon, Settings, Sun, Monitor, UserRound } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme, type ThemePref } from '@/lib/theme';
 import { ROLE_LABEL } from '@/lib/types';
@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/menu';
 import { toast } from '@/components/ui/toaster';
-import { cn } from '@/lib/utils';
+import { cn, initials, isMac } from '@/lib/utils';
+import { openShortcuts } from './shortcuts';
 
 export function UserMenu({ compact, className }: { compact?: boolean; className?: string }) {
   const { me, logout } = useAuth();
@@ -17,13 +18,15 @@ export function UserMenu({ compact, className }: { compact?: boolean; className?
   const navigate = useNavigate();
   if (!me) return null;
   return (
-    <DropdownMenu>
+    // Non-modal: a modal menu aria-hides the whole shell while its links stay focusable (axe aria-hidden-focus).
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         data-testid="user-menu"
         className={cn('flex items-center gap-2 rounded-full focus-ring', !compact && 'rounded-lg p-1 pr-2 hover:bg-muted', className)}
+        // The name starts with the visible avatar initials (and first name) — WCAG 2.5.3 label-in-name (axe).
+        aria-label={`${initials(me.user.name)}${compact ? '' : ` ${me.user.name.split(' ')[0]}`} Account menu`}
       >
         <Avatar name={me.user.name} size="sm" />
-        <span className="sr-only">Account menu</span>
         {!compact && <span className="hidden max-w-[8rem] truncate text-sm font-medium lg:block">{me.user.name.split(' ')[0]}</span>}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
@@ -52,7 +55,8 @@ export function UserMenu({ compact, className }: { compact?: boolean; className?
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuItem onSelect={() => window.dispatchEvent(new CustomEvent('tp:open-command'))}><Keyboard />Command palette<DropdownMenuShortcut>⌘K</DropdownMenuShortcut></DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => window.dispatchEvent(new CustomEvent('tp:open-command'))}><Command />Command palette<DropdownMenuShortcut>{isMac ? '⌘K' : 'Ctrl K'}</DropdownMenuShortcut></DropdownMenuItem>
+        <DropdownMenuItem onSelect={openShortcuts}><Keyboard />Keyboard shortcuts<DropdownMenuShortcut>?</DropdownMenuShortcut></DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="sr-only">Session</DropdownMenuLabel>
         <DropdownMenuItem

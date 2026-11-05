@@ -53,6 +53,53 @@ export interface DashboardActivity extends ActivityItem {
 
 export interface SetupStep { key: string; label: string; description: string; done: boolean; href: string }
 
+/** Keys allowed in `organizations.onboarding_state` (FR-048). */
+export const ONBOARDING_KEYS = ['company', 'categories', 'watchlist', 'documents', 'skipped', 'completed', 'demo'] as const;
+export type OnboardingKey = (typeof ONBOARDING_KEYS)[number];
+
+/** A bid assigned to the signed-in user, shown in "My work" (FR-065). */
+export interface MyWorkItem {
+  workspaceId: string;
+  tenderId: string;
+  bidNumber: string;
+  title: string;
+  stage: DashboardStage;
+  dueAt: string | null;
+  endAt: string | null;
+}
+
+/** A bid waiting on a Go / No-go decision (FR-065). */
+export interface DecisionItem {
+  tenderId: string;
+  workspaceId: string | null;
+  bidNumber: string;
+  title: string;
+  score: number | null;
+  verdict: DashboardVerdict | null;
+  endAt: string | null;
+}
+
+/** Rows removed by `DELETE /api/demo` (007/FR-065). All zeros (and `profileReset: false`) when there was nothing left. */
+export interface DemoRemovedCounts {
+  workspaces: number;
+  analyses: number;
+  matches: number;
+  comments: number;
+  notifications: number;
+  activity: number;
+  pastContracts: number;
+  vaultDocuments: number;
+  watchlists: number;
+  /** True when the company profile still held the demo company and was reset to empty (US4-14). */
+  profileReset: boolean;
+}
+
+/** Result of removing the demo dataset: `DELETE /api/demo` (007/FR-065). Demo tenders are global and stay. */
+export interface DemoRemoveResponse {
+  ok: true;
+  removed: DemoRemovedCounts;
+}
+
 export interface DashboardResponse {
   generatedAt: string;
   tiles: DashboardTiles;
@@ -80,6 +127,10 @@ export interface DashboardResponse {
   setupComplete: boolean;
   /** True when the org loaded the demo dataset. */
   demo: boolean;
+  /** Bids assigned to the signed-in user (FR-065). */
+  myWork?: MyWorkItem[];
+  /** Bids awaiting a Go / No-go decision (FR-065). */
+  awaitingDecision?: DecisionItem[];
 }
 
 export interface DemoSeedResponse {

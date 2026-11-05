@@ -21,10 +21,15 @@ export const tendersRoutes = new Hono<AppEnv>();
 
 type TenderRow = typeof tenders.$inferSelect;
 
-/** Public tender fields (no raw payload / hash). */
+/** Demo tenders are marked `raw.demo = true` by the seed (007/FR-067). */
+export function isDemoTender(raw: unknown): boolean {
+  return !!raw && typeof raw === 'object' && (raw as { demo?: unknown }).demo === true;
+}
+
+/** Public tender fields (no raw payload / hash); `isDemo` is derived from `raw.demo`. */
 export function tenderCore(t: TenderRow) {
-  const { raw: _raw, contentHash: _hash, ...rest } = t;
-  return rest;
+  const { raw, contentHash: _hash, ...rest } = t;
+  return { ...rest, isDemo: isDemoTender(raw) };
 }
 
 /** Read the query string, keeping repeated keys as arrays. */

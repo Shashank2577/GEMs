@@ -10,6 +10,7 @@ import {
   ScoreRing, StageBadge, Tooltip, VerdictBadge, toast,
 } from '@/components/ui';
 import { RoleGate } from '@/lib/auth';
+import { SampleBadge } from '@/features/feed/SampleBadge';
 import { formatDateIST, formatINR, formatNumberIN } from '@/lib/format';
 import type { Stage } from '@/lib/types';
 import { useState } from 'react';
@@ -71,6 +72,7 @@ export function TenderHero({
           <Badge tone="outline">{BID_TYPE_LABEL[tender.bidType] ?? tender.bidType}</Badge>
           {tender.status !== 'open' && <Badge tone={tender.status === 'cancelled' ? 'danger' : 'neutral'} className="capitalize">{tender.status}</Badge>}
           {tender.isNew && <Badge tone="primary" dot>New match</Badge>}
+          {tender.isDemo && <SampleBadge size="md" />}
           {tender.hasCorrigendum && <Badge tone="warning">Corrigendum</Badge>}
           {tender.workspace && <StageBadge stage={tender.workspace.stage as Stage} />}
           {tender.matches.slice(0, 2).map((m) => (

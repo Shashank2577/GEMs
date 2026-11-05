@@ -54,7 +54,7 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 - [x] T011 [P] Web API client (`ApiError`, `api.*`, `queryClient` retry rules) in `apps/web/src/lib/api.ts` FR-049
 - [x] T012 Web `AuthProvider`, `useAuth`, `can`, `useCan`, `RoleGate`, `RequireAuth`, `safeNext`, `ME_KEY` in `apps/web/src/lib/auth.tsx` FR-009 FR-026
 - [x] T013 API test harness (`createTestApp`, truncate, helpers) in `apps/api/test/helpers.ts` NFR-008
-- [ ] T014 [P] Add `@axe-core/playwright` dev dependency and an `a11y(page, spec, story, name)` helper that runs axe (WCAG 2.1 AA tags), writes the JSON report to `qa/evidence/<spec>/<story>/axe-<name>.json` and fails on serious/critical violations in `e2e/support/fixtures.ts`, `package.json` NFR-004 SC-005 (#10)
+- [x] T014 [P] Add `@axe-core/playwright` dev dependency and an `a11y(page, spec, story, name)` helper that runs axe (WCAG 2.1 AA tags), writes the JSON report to `qa/evidence/<spec>/<story>/axe-<name>.json` and fails on serious/critical violations in `e2e/support/fixtures.ts`, `package.json` NFR-004 SC-005 (#10)
 - [x] T015 [P] Add `createOrgWithRoles(request)` helper (owner signup + invite/accept bid_manager, analyst, viewer via API; returns credentials and storage states) in `e2e/support/platform.ts` SC-006 (#11)
 
 **Checkpoint**: Foundation ready — user story work can proceed in parallel
@@ -247,10 +247,10 @@ and one Playwright E2E per user story with evidence (screenshots, video, trace) 
 
 ### Remaining
 
-- [ ] T095 [P] [US7] Add a "Settings" group to the palette listing all settings sub-pages (Organization, Your account, Team & roles, Notifications, Scoring weights, API tokens & extension, Sync health, Activity log) with keywords, sourced from a shared `SETTINGS_ITEMS` export in `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/features/settings/items.ts`, `apps/web/src/features/settings/SettingsPage.tsx` FR-046 (#49)
-- [ ] T096 [P] [US7] "?" opens a "Keyboard shortcuts" dialog (⌘K, /, G+D/T/W/P/V/C/S/N, Esc), also reachable from the user menu in `apps/web/src/components/layout/ShortcutsDialog.tsx`, `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/components/layout/UserMenu.tsx` FR-046 NFR-004 (#50)
-- [ ] T097 [US7] Fix every serious/critical axe finding and contrast issue reported by T034/T045/T057/T068/T078/T088/T098 across shell, auth and settings in light and dark at 375/1440 px in `apps/web/src/components/**`, `apps/web/src/features/auth/**`, `apps/web/src/features/settings/**`, `apps/web/src/index.css` NFR-004 NFR-005 SC-005 (#51)
-- [ ] T098 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in qa/evidence/002/US7/ — sidebar collapse persistence, mobile tab bar + drawer `@mobile`, palette open/filter/quick actions per role, G-shortcuts, theme persistence without flash, skip link + focus, 404 page, axe scans light/dark at 375/1440 in `e2e/002-platform/US7-shell.e2e.ts`, `qa/evidence/002/US7/VERDICT.md` FR-045..FR-048 NFR-004 NFR-005 (#52)
+- [x] T095 [P] [US7] Add a "Settings" group to the palette listing all settings sub-pages (Organization, Your account, Team & roles, Notifications, Scoring weights, API tokens & extension, Sync health, Activity log) with keywords, sourced from a shared `SETTINGS_ITEMS` export in `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/features/settings/items.ts`, `apps/web/src/features/settings/SettingsPage.tsx` FR-046 (#49). Note: the "Activity log" palette entry is gated `ready:false` until T085 (US6) flips it, so scenario 10 is verified in US6.
+- [x] T096 [P] [US7] "?" opens a "Keyboard shortcuts" dialog (⌘K, /, G+D/T/W/P/V/C/S/N, Esc), also reachable from the user menu in `apps/web/src/components/layout/ShortcutsDialog.tsx`, `apps/web/src/components/layout/CommandPalette.tsx`, `apps/web/src/components/layout/UserMenu.tsx` FR-046 NFR-004 (#50)
+- [x] T097 [US7] Fix every serious/critical axe finding and contrast issue reported by T034/T045/T057/T068/T078/T088/T098 across shell, auth and settings in light and dark at 375/1440 px in `apps/web/src/components/**`, `apps/web/src/features/auth/**`, `apps/web/src/features/settings/**`, `apps/web/src/index.css` NFR-004 NFR-005 SC-005 (#51)
+- [x] T098 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in qa/evidence/002/US7/ — sidebar collapse persistence, mobile tab bar + drawer `@mobile`, palette open/filter/quick actions per role, G-shortcuts, theme persistence without flash, skip link + focus, 404 page, axe scans light/dark at 375/1440 in `e2e/002-platform/US7-shell.e2e.ts`, `qa/evidence/002/US7/VERDICT.md` FR-045..FR-048 NFR-004 NFR-005 (#52)
 
 **Checkpoint**: All user stories independently functional
 

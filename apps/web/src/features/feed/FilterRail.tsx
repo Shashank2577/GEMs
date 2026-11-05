@@ -161,7 +161,7 @@ export function FilterRail({ filters, facets, onChange, onReset, className }: {
 
       <Group
         title="Go / No-Go"
-        hint={<Tooltip content="Your eligibility verdict after analysing the bid document against your company profile."><span className="cursor-help text-muted-foreground/70">ⓘ</span></Tooltip>}
+        hint={<Tooltip content="Your eligibility verdict after analysing the bid document against your company profile."><span className="cursor-help text-muted-foreground">ⓘ</span></Tooltip>}
         onClear={f.verdicts.length ? () => onChange({ verdicts: [] }) : undefined}
       >
         <div className="flex flex-wrap gap-1.5">
