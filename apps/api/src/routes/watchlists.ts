@@ -3,13 +3,14 @@
  * Creating / changing a watchlist back-fills matches against currently open tenders silently
  * (no alert storm); alerts fire only for tenders ingested afterwards.
  */
-import { and, desc, eq, gte, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { tenderMatches, tenders, users, watchlists, type WatchlistCriteria } from '@tp/db';
 import {
   criteriaIsEmpty, watchlistCreateSchema, watchlistPreviewSchema, watchlistUpdateSchema, type WatchlistCriteriaDto, type WatchlistDto,
 } from '@tp/core/contracts/identify';
 import { uuidSchema } from '@tp/core/contracts/common';
+import { MAX_CANDIDATE_TENDERS } from '@tp/core/contracts/caps';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
@@ -18,20 +19,18 @@ import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { matchAndNotify } from '../services/ingest';
 import type { AppEnv } from '../types';
-import { decorateTenders } from './tenders';
+import { decorateTenders, tenderListColumns, type TenderListRow } from './tenders';
 
 export const watchlistsRoutes = new Hono<AppEnv>();
 
-type TenderRow = typeof tenders.$inferSelect;
-const CANDIDATE_LIMIT = 5000;
-
 /**
  * Open tenders that could match the criteria: a cheap SQL pre-filter (state, value, keyword ILIKE)
- * followed by the exact matcher in JS.
+ * followed by the exact matcher in JS. 008/FR-028: only open tenders still accepting bids (`end_at > now`), the
+ * list projection only, newest first, at most MAX_CANDIDATE_TENDERS rows (bounded memory per request).
  */
-export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteriaDto): Promise<{ row: TenderRow; reasons: string[]; relevance: number }[]> {
+export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteriaDto): Promise<{ row: TenderListRow; reasons: string[]; relevance: number }[]> {
   const now = deps.clock.now();
-  const conds: SQL[] = [eq(tenders.status, 'open'), or(isNull(tenders.endAt), gte(tenders.endAt, now))!];
+  const conds: SQL[] = [eq(tenders.status, 'open'), gt(tenders.endAt, now)];
   if (criteria.states.length) conds.push(inArray(tenders.state, criteria.states));
   if (criteria.minValue != null) conds.push(or(isNull(tenders.estimatedValue), gte(tenders.estimatedValue, criteria.minValue))!);
   if (criteria.maxValue != null) conds.push(or(isNull(tenders.estimatedValue), sql`${tenders.estimatedValue} <= ${criteria.maxValue}`)!);
@@ -45,8 +44,8 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
     }
     conds.push(or(...ors)!);
   }
-  const rows = await deps.db.select().from(tenders).where(and(...conds)).orderBy(desc(tenders.createdAt)).limit(CANDIDATE_LIMIT);
-  const out: { row: TenderRow; reasons: string[]; relevance: number }[] = [];
+  const rows = await deps.db.select(tenderListColumns).from(tenders).where(and(...conds)).orderBy(desc(tenders.createdAt)).limit(MAX_CANDIDATE_TENDERS);
+  const out: { row: TenderListRow; reasons: string[]; relevance: number }[] = [];
   for (const row of rows) {
     const r = matchTender(row, criteria, { now });
     if (r.matched) out.push({ row, reasons: r.reasons, relevance: r.relevance });
@@ -60,7 +59,7 @@ async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect):
   const existing = await deps.db.select({ id: tenderMatches.id, tenderId: tenderMatches.tenderId }).from(tenderMatches)
     .where(eq(tenderMatches.watchlistId, w.id));
   if (existing.length) {
-    const rows = await deps.db.select().from(tenders).where(inArray(tenders.id, existing.map((e) => e.tenderId)));
+    const rows = await deps.db.select(tenderListColumns).from(tenders).where(inArray(tenders.id, existing.map((e) => e.tenderId)));
     const stillMatching = new Set(rows.filter((t) => matchTender(t, w.criteria, { now: new Date(0) }).matched || t.status !== 'open').map((t) => t.id));
     const stale = existing.filter((e) => !stillMatching.has(e.tenderId)).map((e) => e.id);
     if (stale.length) await deps.db.delete(tenderMatches).where(inArray(tenderMatches.id, stale));

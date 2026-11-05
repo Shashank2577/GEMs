@@ -199,6 +199,10 @@ export interface IngestionRunsResponse {
   lastRun: IngestionRunDto | null;
   totalTenders: number;
   openTenders: number;
+  /** When a manual "Sync now" is allowed again (008/FR-026), or null when it is allowed now. */
+  nextManualSyncAt: string | null;
+  /** Cooldown length in minutes (server config, default 10). */
+  manualSyncCooldownMin: number;
 }
 
 // ───────────── Notifications ─────────────

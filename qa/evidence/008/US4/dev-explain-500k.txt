@@ -1,0 +1,95 @@
+-- 500k fixture: hand-written equivalents of the GET /api/tenders page query (same WHERE/ORDER as routes/tenders.ts) and the dispatcher select (services/alerts.ts#pendingNotificationsQuery)
+ tenders | open  
+---------+-------
+  500036 | 30036
+(1 row)
+
+ notifications | pending 
+---------------+---------
+       1000000 |     500
+(1 row)
+
+-- default sort (newest first)
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: created_at DESC, end_at, bid_number DESC
+         Presorted Key: created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB
+         ->  Index Scan using tenders_open_created_idx on tenders (actual rows=38 loops=1)
+               Filter: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.309 ms
+ Execution Time: 0.105 ms
+(9 rows)
+
+-- ?sort=endAt
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: end_at, created_at DESC
+         Presorted Key: end_at
+         Full-sort Groups: 1  Sort Method: top-N heapsort  Average Memory: 28kB  Peak Memory: 28kB
+         Pre-sorted Groups: 1  Sort Method: top-N heapsort  Average Memory: 28kB  Peak Memory: 28kB
+         ->  Index Scan using tenders_open_end_idx on tenders (actual rows=127 loops=1)
+               Filter: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.095 ms
+ Execution Time: 0.327 ms
+(10 rows)
+
+-- ?state=Maharashtra
+                                                         QUERY PLAN                                                          
+-----------------------------------------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: created_at DESC, end_at, bid_number DESC
+         Presorted Key: created_at
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 28kB  Peak Memory: 28kB
+         ->  Index Scan using tenders_open_created_idx on tenders (actual rows=26 loops=1)
+               Filter: ((state = 'Maharashtra'::text) AND (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now()))
+               Rows Removed by Filter: 188
+ Planning Time: 0.099 ms
+ Execution Time: 0.140 ms
+(10 rows)
+
+-- ?minValue=500000&sort=value
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Limit (actual rows=25 loops=1)
+   ->  Incremental Sort (actual rows=25 loops=1)
+         Sort Key: estimated_value DESC NULLS LAST, end_at
+         Presorted Key: estimated_value
+         Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 30kB  Peak Memory: 30kB
+         ->  Index Scan using tenders_open_value_idx on tenders (actual rows=45 loops=1)
+               Index Cond: (estimated_value >= 500000)
+               Filter: (COALESCE(end_at, 'infinity'::timestamp with time zone) >= now())
+ Planning Time: 0.118 ms
+ Execution Time: 0.141 ms
+(10 rows)
+
+-- dispatcher select (1,000,000 notifications, 500 pending)
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
+ Limit (actual rows=500 loops=1)
+   ->  Nested Loop (actual rows=500 loops=1)
+         ->  Nested Loop (actual rows=500 loops=1)
+               ->  Index Scan using notifications_pending_idx on notifications n (actual rows=500 loops=1)
+               ->  Memoize (actual rows=1 loops=500)
+                     Cache Key: n.user_id
+                     Cache Mode: logical
+                     Hits: 499  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                     ->  Index Only Scan using users_pkey on users u (actual rows=1 loops=1)
+                           Index Cond: (id = n.user_id)
+                           Heap Fetches: 1
+         ->  Memoize (actual rows=1 loops=500)
+               Cache Key: n.org_id
+               Cache Mode: logical
+               Hits: 499  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+               ->  Index Only Scan using organizations_pkey on organizations o (actual rows=1 loops=1)
+                     Index Cond: (id = n.org_id)
+                     Heap Fetches: 1
+ Planning Time: 0.537 ms
+ Execution Time: 1.867 ms
+(20 rows)
+

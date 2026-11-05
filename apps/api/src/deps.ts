@@ -104,6 +104,17 @@ export interface Logger {
   error(msg: string, meta?: Record<string, unknown>): void;
 }
 
+// ───────────── Ops primitives (spec 008) ─────────────
+
+/**
+ * Cluster-wide GeM request slot (008/FR-024, NFR-002: ≤ 1 request/s across all isolates). Implemented by US4
+ * (`lib/gem-lease.ts`); the default waits for nothing.
+ */
+export interface GemLease {
+  /** Resolve when this caller may send one request to GeM; reject (503 `gem_busy`) when the wait would exceed `maxWaitMs`. */
+  acquire(maxWaitMs: number): Promise<void>;
+}
+
 export interface AppDeps {
   db: Db;
   blobs: BlobStore;
@@ -117,6 +128,8 @@ export interface AppDeps {
   logger: Logger;
   /** Outbound fetch (GeM, providers). Injectable for tests; defaults to global fetch. */
   fetch: typeof fetch;
+  /** Cluster-wide GeM throttle (008/FR-024). */
+  gemLease: GemLease;
 }
 
 export type { AppConfig, GemConfig };

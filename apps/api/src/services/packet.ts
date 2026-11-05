@@ -19,6 +19,7 @@ import {
   type TemplateContext, type TemplateKey,
 } from '@tp/core/packet/templates';
 import { buildPacket, type BuildItem } from '@tp/core/packet/build';
+import { PACKET_GENERATED_PAGE_BYTES, PACKET_MAX_BYTES, PACKET_MAX_ITEMS, formatMb } from '@tp/core/contracts/caps';
 import { docStatus } from '@tp/core/vault/status';
 import type { AppDeps } from '../deps';
 import { HttpError, notFound } from '../lib/errors';
@@ -264,6 +265,38 @@ export function defaultPacketItems(r: Readiness, annexures: WorkspaceAnnexure[],
   return items;
 }
 
+// ───────────── pre-flight (008/FR-032) ─────────────
+
+/** 413 `packet_too_large` when a packet has more than PACKET_MAX_ITEMS items (checked before the body schema). */
+export function assertPacketItemCount(count: number): void {
+  if (count > PACKET_MAX_ITEMS) {
+    throw new HttpError(413, 'packet_too_large', `This packet has ${count} items (limit ${PACKET_MAX_ITEMS}). Deselect some items and try again.`,
+      { items: count, maxItems: PACKET_MAX_ITEMS });
+  }
+}
+
+/**
+ * Estimated input size of a packet: stored file sizes of vault/tender documents + PACKET_GENERATED_PAGE_BYTES per
+ * generated page (cover + index, annexures). Pure, so the 45 MB case is testable without 45 MB of blobs.
+ */
+export function packetInputBytes(items: PacketItemInput[], sizeOf: (it: PacketItemInput) => number | undefined): number {
+  let total = 0;
+  for (const it of items) {
+    if (it.kind === 'vault' || it.kind === 'tender_doc') total += sizeOf(it) ?? 0;
+    else total += Math.max(1, it.pages ?? 1) * PACKET_GENERATED_PAGE_BYTES;
+  }
+  return total;
+}
+
+/** 413 `packet_too_large` when the packet would exceed PACKET_MAX_BYTES (before any row or blob is written). */
+export function assertPacketSize(bytes: number): void {
+  if (bytes > PACKET_MAX_BYTES) {
+    throw new HttpError(413, 'packet_too_large',
+      `This packet would be ${formatMb(bytes)} (limit ${formatMb(PACKET_MAX_BYTES)}). Deselect large attachments and try again.`,
+      { bytes, maxBytes: PACKET_MAX_BYTES });
+  }
+}
+
 const PACKET_FILE = (bid: string) => `${bid.replace(/[^\w-]+/g, '_').replace(/_+/g, '_')}_technical_packet.pdf`;
 
 export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdValue: string, w: WorkspaceRow, requested?: PacketItemInput[]): Promise<PacketRow> {
@@ -293,6 +326,10 @@ export async function buildWorkspacePacket(deps: AppDeps, org: string, userIdVal
     if (i.kind === 'tender_doc' && !(i.refId && tdocById.has(i.refId))) bad.push(i.title);
   }
   if (bad.length) throw new HttpError(400, 'validation_error', `Unknown packet item(s): ${bad.join(', ')}`, { items: bad });
+
+  // 008/FR-032 pre-flight: refuse before writing a packets row or a blob, and before loading any file into memory.
+  assertPacketItemCount(items.length);
+  assertPacketSize(packetInputBytes(items, (it) => (it.kind === 'vault' ? vaultById.get(it.refId!)?.sizeBytes : tdocById.get(it.refId!)?.sizeBytes)));
 
   const [row] = await deps.db.insert(packets).values({
     orgId: org, workspaceId: w.id, status: 'building', items: items.map((i) => ({ kind: i.kind, refId: i.refId, title: i.title, pages: i.pages })),

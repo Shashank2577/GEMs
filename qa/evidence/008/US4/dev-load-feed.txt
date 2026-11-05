@@ -1,0 +1,7 @@
+feed.sh  base=http://localhost:8791  requests/variant=200  concurrency=10  p95 budget=300 ms  (2026-11-05T04:31:43Z)
+variant                                 n    p50_ms    p95_ms    max_ms  non2xx verdict
+/tenders                              200     184.4     265.3     396.2       0 ok
+/tenders?sort=endAt                   200     128.4     264.3     456.3       0 ok
+/tenders?state=Maharashtra            200      92.1     170.1     211.9       0 ok
+/tenders?minValue=500000              200     124.6     218.8     297.1       0 ok
+dataset: 30036 open / 500036 total tenders

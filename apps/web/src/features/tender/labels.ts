@@ -4,7 +4,7 @@ import {
   FileBadge, FileCheck2, FileSpreadsheet, FileText, Flag, Handshake, Landmark, ReceiptText, ScrollText, ShieldCheck, Sparkles,
   Timer, Truck, type LucideIcon,
 } from 'lucide-react';
-import type { FactorStatus, Requirement, StaleReason, TenderDocKind } from '@tp/core/contracts/analyse';
+import type { AnalysisWarning, FactorStatus, Requirement, StaleReason, TenderDocKind } from '@tp/core/contracts/analyse';
 import { formatDateIST, formatINR } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
@@ -113,3 +113,15 @@ export const ACTIVITY_LABEL: Record<string, string> = {
 };
 
 export { CalendarClock };
+
+/** User-facing text of an analysis warning (spec 008 FR-031, FR-037). */
+export function analysisWarningText(w: AnalysisWarning): string {
+  switch (w.code) {
+    case 'llm_budget_exhausted':
+      return `AI review covered ${w.covered} of ${w.total} document${w.total === 1 ? '' : 's'}; the rest were checked by rules only.`;
+    case 'llm_quota_reached':
+      return 'Monthly AI review limit reached — this analysis used rules only.';
+    default:
+      return 'Part of this analysis used rules only.';
+  }
+}

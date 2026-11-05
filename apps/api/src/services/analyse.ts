@@ -14,18 +14,24 @@ import {
   type Requirement, type ScoreFactor,
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
-import { enrichWithLlm } from '@tp/core/analyse/llm';
-import { PdfTextError, extractPages, isPdf, joinPages, looksScanned, splitPages } from '@tp/core/analyse/pdf-text';
+import { buildLlmPrompt, enrichWithLlm, promptChars } from '@tp/core/analyse/llm';
+import {
+  PdfPageLimitError, PdfTextError, extractPages, isPdf, isScannedDocument, joinPages, looksScanned, splitPages,
+} from '@tp/core/analyse/pdf-text';
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
-  MAX_TENDER_DOC_BYTES, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
+  ANALYSIS_BUDGET_MS, GEM_LEASE_MAX_WAIT_MS, LLM_CALL_TIMEOUT_MS, MAX_LLM_CALLS_PER_ANALYSIS, MAX_LLM_INPUT_CHARS, MAX_TENDER_DOC_PAGES,
+  SCANNED_EMPTY_PAGE_RATIO,
+} from '@tp/core/contracts/caps';
+import {
+  MAX_TENDER_DOC_BYTES, type AnalysisDto, type AnalysisWarning, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
   type TenderDocumentWarning,
 } from '@tp/core/contracts/analyse';
 import { GemClient, GemError } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
-import { HttpError, forbidden, notFound } from '../lib/errors';
+import { HttpError, forbidden, notFound, unprocessable } from '../lib/errors';
 import { markStale } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
@@ -64,7 +70,7 @@ export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
     id: a.id, orgId: a.orgId, tenderId: a.tenderId, status: a.status, method: a.method,
     requirements: a.requirements, factors: a.factors, checklist: a.checklist,
     score: a.score, confidence: a.confidence, verdict: a.verdict, summary: a.summary, error: a.error, stale: a.stale,
-    staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [],
+    staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [], warnings: a.warnings ?? [],
     createdBy: a.createdBy, createdAt: iso(a.createdAt), updatedAt: iso(a.updatedAt),
     ...(docs ? { documents: docs.map((d) => ({ id: d.id, fileName: d.fileName, kind: d.kind, pageCount: d.pageCount })) } : {}),
   };
@@ -96,10 +102,17 @@ const safeName = (name: string) => {
   return cleaned || 'document.pdf';
 };
 
+/** 008/FR-030 messages (spec 008 US4 scenarios 8–9). */
+export const documentTooLongMessage = (pages: number) =>
+  `This document has ${pages} pages. TenderPilot reads up to ${MAX_TENDER_DOC_PAGES} pages — upload the bid document and ATC separately.`;
+export const SCANNED_DOCUMENT_MESSAGE = 'This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.';
+
+/** Extract text per page; > MAX_TENDER_DOC_PAGES pages → 422 `document_too_long` before any text is read. */
 async function extractOrThrow(bytes: Uint8Array): Promise<string[]> {
   try {
-    return await extractPages(bytes);
+    return await extractPages(bytes, { maxPages: MAX_TENDER_DOC_PAGES });
   } catch (e) {
+    if (e instanceof PdfPageLimitError) throw unprocessable('document_too_long', documentTooLongMessage(e.pages), { pages: e.pages, maxPages: e.maxPages });
     if (e instanceof PdfTextError) throw new HttpError(422, 'unreadable_pdf', 'We could not read this PDF. It may be password-protected or damaged.');
     throw e;
   }
@@ -170,12 +183,16 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
     maxRetries: 2, backoffMs: Math.min(1000, Math.max(10, deps.gem.minIntervalMs)), timeoutMs: 45_000,
+    // Streamed with the ported bounded reader (gem/http.ts): aborts at 25 MB instead of buffering it (FR-021).
     maxDocumentBytes: MAX_TENDER_DOC_BYTES,
+    // Cluster-wide ≤ 1 request/s to GeM (008/FR-024): wait ≤ 25 s for a slot, else 503 gem_busy.
+    beforeRequest: () => deps.gemLease.acquire(GEM_LEASE_MAX_WAIT_MS),
   });
   let got: { bytes: Uint8Array; url: string };
   try {
     got = await client.fetchBidDocument(ref);
   } catch (e) {
+    if (e instanceof HttpError) throw e; // 503 gem_busy from the lease
     deps.logger.warn('analyse: GeM document fetch failed', { tenderId: tender.id, error: (e as Error).message });
     const msg = e instanceof GemError && e.code === 'too_large'
       ? 'The GeM document is larger than 25 MB — download it from GeM and upload it here.'
@@ -229,19 +246,47 @@ function overridesOf(a: AnalysisRow | null): Record<string, FactorOverride> {
   return out;
 }
 
-export async function analyseTender(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
+/** LLM limits of one analysis (008/FR-031); tests override them. */
+export interface LlmBudgetLimits { maxCalls: number; maxChars: number; callTimeoutMs: number; budgetMs: number }
+export const DEFAULT_LLM_BUDGET: LlmBudgetLimits = {
+  maxCalls: MAX_LLM_CALLS_PER_ANALYSIS, maxChars: MAX_LLM_INPUT_CHARS, callTimeoutMs: LLM_CALL_TIMEOUT_MS, budgetMs: ANALYSIS_BUDGET_MS,
+};
+/** A document gets an LLM call only when at least this much of its text still fits the character budget. */
+const MIN_LLM_DOC_CHARS = 2_000;
+/** Reserve per page for the "=== Page N ===" header around the page text. */
+const PAGE_HEADER_CHARS = 24;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`LLM call timed out after ${Math.round(ms / 1000)} s`)), Math.max(0, ms));
+  });
+  return Promise.race([p, expired]).finally(() => clearTimeout(timer));
+}
+
+export async function analyseTender(
+  deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }, opts: { llmBudget?: Partial<LlmBudgetLimits> } = {},
+): Promise<{ analysis: AnalysisRow; documents: DocRow[] }> {
   const tender = await getTender(deps, input.tenderId);
   let docs = await listTenderDocuments(deps, tender.id, input.orgId);
   if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
     try {
       docs = (await fetchGemDocuments(deps, input)).documents;
     } catch (e) {
+      // GeM busy (503) and over-long documents (422) are actionable for the user; anything else falls through.
+      if (e instanceof HttpError && (e.status === 503 || e.code === 'document_too_long')) throw e;
       deps.logger.warn('analyse: auto-fetch of GeM document failed', { tenderId: tender.id, error: (e as Error).message });
     }
   }
   if (!docs.length) {
     throw new HttpError(422, 'no_documents', 'Add the bid document first — upload the PDF or fetch it from GeM.');
   }
+  // 008/FR-030: scans without a text layer cannot be analysed. Skip them; with nothing readable left → 422.
+  const scanned = docs.filter((d) => isScannedDocument(splitPages(d.text), SCANNED_EMPTY_PAGE_RATIO));
+  const readable = docs.filter((d) => !scanned.includes(d));
+  if (!readable.length) throw unprocessable('scanned_document', SCANNED_DOCUMENT_MESSAGE, { documents: scanned.map((d) => d.fileName) });
+  const notes = scanned.map((d) => `${d.fileName} is a scan without text and was not read — upload the text PDF from GeM or an OCR’d copy.`);
+
   const previous = await latestAnalysis(deps, tender.id, input.orgId);
   const now = deps.clock.now();
   const [row] = await deps.db.insert(analyses).values({
@@ -249,22 +294,44 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
   }).returning();
 
   try {
-    const ordered = [...docs].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
+    const ordered = [...readable].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
     const perDoc: Requirement[][] = [];
     let usedLlm = false;
+    // 008/FR-031: ≤ 2 LLM calls, ≤ 90k characters, 60 s per call, 120 s overall; the rest is rules-only.
+    const limits = { ...DEFAULT_LLM_BUDGET, ...opts.llmBudget };
+    const started = Date.now();
+    const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
     for (const d of ordered) {
       const pages = splitPages(d.text);
       if (!pages.length) continue;
+      llmUse.total++;
       const meta = { documentId: d.id, fileName: d.fileName, estimatedValue: tender.estimatedValue };
       const rules = extractRequirementsRules(pages, meta);
-      if (deps.llm) {
-        const llm = deps.llm;
-        const r = await enrichWithLlm(pages, rules, (req) => llm.completeJson(req), { documentId: d.id, fileName: d.fileName });
-        if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
-        usedLlm ||= r.used;
-        perDoc.push(r.requirements);
-      } else perDoc.push(rules);
+      if (!deps.llm) { perDoc.push(rules); continue; }
+      const llm = deps.llm;
+      const elapsed = Date.now() - started;
+      const remaining = limits.maxChars - llmUse.chars;
+      const docBudget = remaining - promptChars(buildLlmPrompt([], rules)) - PAGE_HEADER_CHARS * pages.length;
+      const fits = docBudget >= Math.min(MIN_LLM_DOC_CHARS, pages.join('').length)
+        && promptChars(buildLlmPrompt(pages, rules, docBudget)) <= remaining;
+      if (llmUse.calls >= limits.maxCalls || elapsed >= limits.budgetMs || !fits) {
+        llmUse.skipped++;
+        perDoc.push(rules);
+        continue;
+      }
+      llmUse.calls++;
+      const timeoutMs = Math.min(limits.callTimeoutMs, limits.budgetMs - elapsed);
+      const r = await enrichWithLlm(pages, rules, (req) => withTimeout(llm.completeJson(req), timeoutMs), { documentId: d.id, fileName: d.fileName }, { maxChars: docBudget });
+      llmUse.chars += r.inputChars;
+      if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
+      if (r.used) llmUse.covered++;
+      usedLlm ||= r.used;
+      perDoc.push(r.requirements);
     }
+    const warnings: AnalysisWarning[] = llmUse.skipped
+      ? [{ code: 'llm_budget_exhausted', covered: llmUse.covered, total: llmUse.total }]
+      : [];
+    if (deps.llm) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: Date.now() - started });
     const requirements = combineRequirements(perDoc, requirementsFromListing(tender));
     const company = await loadCompany(deps, input.orgId);
     const result = scoreTender({
@@ -276,7 +343,7 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
     const [done] = await deps.db.update(analyses).set({
       status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
       score: result.score, confidence: result.confidence, verdict: result.verdict, summary: result.summary, error: null, stale: false,
-      updatedAt: deps.clock.now(),
+      notes, warnings, updatedAt: deps.clock.now(),
     }).where(eq(analyses.id, row.id)).returning();
     await logActivity(deps.db, {
       orgId: input.orgId, userId: input.userId, action: 'tender.analysed', entityType: 'tender', entityId: tender.id,

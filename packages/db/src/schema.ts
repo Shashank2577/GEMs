@@ -2,6 +2,7 @@
  * TenderPilot database schema — single source of truth (see specs/001-gem-tender-copilot/data-model.md).
  * Every org-owned table carries org_id (Constitution IV).
  */
+import { sql } from 'drizzle-orm';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -249,6 +250,15 @@ export const tenders = pgTable('tenders', {
   bidUq: uniqueIndex('tenders_source_bid_uq').on(t.source, t.bidNumber),
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
+  // 008/FR-027: ~6 % of tenders are open and every feed/dashboard query filters on it. Built CONCURRENTLY by the
+  // hand-edited non-transactional migration 0007 (`-- tp:non-transactional`, see migrate.ts).
+  openCreatedIdx: index('tenders_open_created_idx').on(t.createdAt.desc().nullsFirst()).where(sql`status = 'open'`),
+  openEndIdx: index('tenders_open_end_idx').on(t.endAt).where(sql`status = 'open'`),
+  // DESC NULLS LAST = the feed's "highest value" sort; also serves minValue/maxValue ranges.
+  openValueIdx: index('tenders_open_value_idx').on(t.estimatedValue.desc().nullsLast()).where(sql`status = 'open'`),
+  openStateIdx: index('tenders_open_state_idx').on(t.state).where(sql`status = 'open'`),
+  openMinistryIdx: index('tenders_open_ministry_idx').on(t.ministry).where(sql`status = 'open'`),
+  openCategoryIdx: index('tenders_open_category_idx').on(t.category).where(sql`status = 'open'`),
 }));
 
 export const tenderEvents = pgTable('tender_events', {
@@ -292,6 +302,18 @@ export const ingestionRuns = pgTable('ingestion_runs', {
   error: text('error'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, () => ({
+  // 008/FR-025: at most one running ingestion, cluster-wide (cron ticks, manual syncs, every isolate).
+  oneRunningUq: uniqueIndex('ingestion_runs_one_running_uq').on(sql`(true)`).where(sql`status = 'running'`),
+}));
+
+/**
+ * Cluster-wide GeM request slots (008/FR-024, NFR-002). One row (`id = 'gem'`): each request atomically moves
+ * `next_slot_at` forward by the minimum interval and sleeps until its own slot (`apps/api/src/lib/gem-lease.ts`).
+ */
+export const gemThrottle = pgTable('gem_throttle', {
+  id: text('id').primaryKey(),
+  nextSlotAt: timestamp('next_slot_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ───────────── Identify: watchlists & matches ─────────────
@@ -389,10 +411,21 @@ export const analyses = pgTable('analyses', {
   staleReason: text('stale_reason').$type<StaleReason>(),
   staleAt: timestamp('stale_at', { withTimezone: true }),
   notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
+  /** Machine-readable caveats rendered by the web (008/FR-031: `llm_budget_exhausted`, `llm_quota_reached`). */
+  warnings: jsonb('warnings').$type<AnalysisWarning[]>().notNull().default([]),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ orgTenderIdx: index('analyses_org_tender_idx').on(t.orgId, t.tenderId) }));
+}, (t) => ({
+  orgTenderIdx: index('analyses_org_tender_idx').on(t.orgId, t.tenderId),
+  // 008/FR-027: "latest analysis per (org, tender)" lookups in the feed sort/decorate.
+  orgTenderCreatedIdx: index('analyses_org_tender_created_idx').on(t.orgId, t.tenderId, t.createdAt.desc().nullsFirst()),
+}));
+
+/** 008/FR-031/FR-037 analysis warnings. `covered`/`total` count documents read by the LLM vs all documents. */
+export type AnalysisWarning =
+  | { code: 'llm_budget_exhausted'; covered: number; total: number }
+  | { code: 'llm_quota_reached' };
 
 // ───────────── Apply: workspace & packet ─────────────
 
@@ -478,6 +511,8 @@ export const notifications = pgTable('notifications', {
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
+  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0007).
+  pendingIdx: index('notifications_pending_idx').on(t.createdAt).where(sql`status = 'pending' AND channel IN ('email','whatsapp')`),
 }));
 
 export const activityLog = pgTable('activity_log', {

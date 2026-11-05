@@ -6,7 +6,7 @@ import { formatNumberIN, formatTimeIST, formatDateIST, relativeTime } from '@/li
 import { useNow } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { useIngestionRuns, useSyncNow } from './api';
-import { nextManualSyncAt } from './cooldown';
+import { cooldownRetryAt, syncCooldownUntil } from './cooldown';
 
 type Health = 'ok' | 'stale' | 'error' | 'never';
 
@@ -30,7 +30,9 @@ export function SyncHealth({ className }: { className?: string }) {
   if (runs.isError || !runs.data) return null;
   const { lastSuccessAt, lastRun, openTenders, items } = runs.data;
   const health = healthOf(lastSuccessAt, lastRun, now);
-  const cooldownUntil = nextManualSyncAt(items, now);
+  // 008/FR-026: server-computed cooldown (platform-wide, 10 min by default); a 429's retryAt applies at once.
+  const cooldownUntil = syncCooldownUntil(runs.data, now, cooldownRetryAt(sync.error));
+  const cooldownMin = runs.data.manualSyncCooldownMin ?? 10;
   const cooldownText = cooldownUntil ? `Next manual sync at ${formatTimeIST(cooldownUntil)} IST` : null;
   const label = sync.isPending
     ? 'Syncing with GeM…'
@@ -105,7 +107,7 @@ export function SyncHealth({ className }: { className?: string }) {
         {cooldownText && (
           <RoleGate min="bid_manager">
             <p id="sync-cooldown-hint" role="status" className="border-t bg-subtle/60 px-4 pb-3 pt-2 text-right text-2xs text-muted-foreground">
-              {cooldownText} — we keep manual syncs 2 minutes apart to stay polite to GeM.
+              {cooldownText} — manual syncs are kept {cooldownMin} minutes apart, for every organisation, to stay polite to GeM.
             </p>
           </RoleGate>
         )}

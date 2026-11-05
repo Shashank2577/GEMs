@@ -21,6 +21,7 @@ import {
   analyses, ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
   type WatchlistCriteria,
 } from '@tp/db';
+import { INGESTION_RUN_BUDGET_MS } from '@tp/core/contracts/caps';
 import { GemClient } from '@tp/core/gem/client';
 import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
 import { matchTender } from '@tp/core/match/matcher';
@@ -51,9 +52,43 @@ export const CATCH_UP_PAGES = 20;
 export const SEARCH_KEYWORDS_PER_RUN = 10;
 
 export class IngestionBusyError extends Error {
-  constructor(readonly run: IngestionRunRow) {
+  /** The running run, when it could be read (null if it finished between the conflict and the read). */
+  constructor(readonly run: IngestionRunRow | null) {
     super('A GeM sync is already running');
     this.name = 'IngestionBusyError';
+  }
+}
+
+/** True for a violation of `ingestion_runs_one_running_uq` (008/FR-025). */
+export function isOneRunningViolation(e: unknown): boolean {
+  for (let cur: unknown = e, depth = 0; cur && depth < 3; cur = (cur as { cause?: unknown }).cause, depth++) {
+    const pg = cur as { code?: string; constraint?: string };
+    if (pg.code === '23505' && pg.constraint === 'ingestion_runs_one_running_uq') return true;
+  }
+  return false;
+}
+
+async function runningRun(deps: AppDeps): Promise<IngestionRunRow | null> {
+  const [r] = await deps.db.select().from(ingestionRuns).where(eq(ingestionRuns.status, 'running')).orderBy(desc(ingestionRuns.startedAt)).limit(1);
+  return r ?? null;
+}
+
+/**
+ * Atomically reap stale running runs and insert ours (008/FR-025). The partial unique index
+ * `ingestion_runs_one_running_uq` makes a concurrent second insert fail → IngestionBusyError, whichever
+ * isolate/process it comes from.
+ */
+async function startRun(deps: AppDeps, trigger: IngestionRunRow['trigger'], now: Date): Promise<IngestionRunRow> {
+  try {
+    return await deps.db.transaction(async (tx) => {
+      await tx.update(ingestionRuns).set({ status: 'failed', error: 'Timed out (worker stopped)', finishedAt: now })
+        .where(and(eq(ingestionRuns.status, 'running'), lt(ingestionRuns.startedAt, new Date(now.getTime() - RUN_LOCK_MS))));
+      const [row] = await tx.insert(ingestionRuns).values({ trigger, status: 'running', startedAt: now }).returning();
+      return row;
+    });
+  } catch (e) {
+    if (isOneRunningViolation(e)) throw new IngestionBusyError(await runningRun(deps));
+    throw e;
   }
 }
 
@@ -66,26 +101,26 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
   const { db, clock, logger } = deps;
   const now = clock.now();
 
-  // Single-flight: don't start while another fresh run is going.
+  // Single-flight: cheap read-check first (gives the caller the running row), then the atomic reap + insert,
+  // which the partial unique index makes race-free across isolates (FR-025).
   const [busy] = await db.select().from(ingestionRuns)
     .where(and(eq(ingestionRuns.status, 'running'), gt(ingestionRuns.startedAt, new Date(now.getTime() - RUN_LOCK_MS))))
     .limit(1);
   if (busy) throw new IngestionBusyError(busy);
-  // Reap dead runs.
-  await db.update(ingestionRuns).set({ status: 'failed', error: 'Timed out (worker stopped)', finishedAt: now })
-    .where(and(eq(ingestionRuns.status, 'running'), lt(ingestionRuns.startedAt, new Date(now.getTime() - RUN_LOCK_MS))));
-
-  const [run] = await db.insert(ingestionRuns).values({ trigger: opts.trigger ?? 'cron', status: 'running', startedAt: now }).returning();
+  const run = await startRun(deps, opts.trigger ?? 'cron', now);
   const stats = { pagesFetched: 0, tendersSeen: 0, tendersCreated: 0, tendersUpdated: 0, matchesCreated: 0 };
   let listingStop: IngestionRunRow['listingStop'] = null;
   const errors: string[] = [];
 
+  // Every listing request takes a cluster-wide lease slot (FR-024); it may wait up to what is left of the run budget.
+  const budgetEnds = Date.now() + INGESTION_RUN_BUDGET_MS;
   const client = opts.client ?? new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl,
     userAgent: deps.gem.userAgent,
     minIntervalMs: deps.gem.minIntervalMs,
     maxRetries: 3,
     backoffMs: deps.gem.minIntervalMs > 0 ? 2000 : 0,
+    beforeRequest: () => deps.gemLease.acquire(Math.max(0, budgetEnds - Date.now())),
   });
 
   try {

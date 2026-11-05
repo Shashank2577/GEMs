@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { AlertOctagon, Bot, ChevronDown, Cpu, ExternalLink, Gavel, History, Info, Quote, RefreshCw, ShieldAlert, UserRoundPen } from 'lucide-react';
+import { AlertOctagon, Bot, ChevronDown, Cpu, ExternalLink, Gavel, History, Info, Quote, RefreshCw, ShieldAlert, TriangleAlert, UserRoundPen } from 'lucide-react';
 import type { AnalysisDto, FactorStatus, Requirement, ScoreFactor } from '@tp/core/contracts/analyse';
 import {
   Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -12,7 +12,7 @@ import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useOverride } from './api';
 import { ChecklistCard } from './ChecklistCard';
-import { FACTOR_HELP, FACTOR_ICON, STATUS_META } from './labels';
+import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisWarningText } from './labels';
 
 const eff = (f: ScoreFactor): FactorStatus => f.overridden?.status ?? f.status;
 
@@ -136,6 +136,7 @@ function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse }: { analysi
             {analysis.stale && <Badge tone="warning"><History /> Outdated</Badge>}
           </div>
           <p className="mt-3 text-[15px] leading-relaxed text-foreground/90">{analysis.summary}</p>
+          <AnalysisWarnings analysis={analysis} />
           {blockers.length > 0 && (
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-soft/60 px-3 py-2 text-sm text-danger">
               <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -165,6 +166,23 @@ function ScoreCard({ analysis, onReanalyse, reanalysing, canAnalyse }: { analysi
         </div>
       </div>
     </Card>
+  );
+}
+
+/** Caveats of this analysis: AI budget/quota (008/FR-031, FR-037) and documents that could not be read. */
+function AnalysisWarnings({ analysis }: { analysis: AnalysisDto }) {
+  const lines = [...(analysis.warnings ?? []).map(analysisWarningText), ...(analysis.notes ?? [])];
+  if (!lines.length) return null;
+  return (
+    <ul role="status" aria-label="Analysis warnings" data-testid="analysis-warnings"
+      className="mt-3 grid gap-1.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
+      {lines.map((line) => (
+        <li key={line} className="flex items-start gap-2">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
+          <span>{line}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

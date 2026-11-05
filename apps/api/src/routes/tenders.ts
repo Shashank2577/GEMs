@@ -3,7 +3,7 @@
  * Tenders are global public GeM data; everything org-specific (matches, analyses, workspaces,
  * seen/dismissed) is joined and filtered by the caller's org (Constitution IV).
  */
-import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, ilike, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   analyses, bidWorkspaces, notifications, tenderDocuments, tenderEvents, tenderMatches, tenders, watchlists,
@@ -20,9 +20,18 @@ export const tendersRoutes = new Hono<AppEnv>();
 
 type TenderRow = typeof tenders.$inferSelect;
 
+/**
+ * 008/FR-028: the one projection every tender LIST reads (feed, watchlist preview/back-fill, dashboard). It never
+ * includes `raw` (the full GeM payload) or `content_hash`; document text lives in `tender_documents` and is never
+ * joined here. `items` stays — the list DTO shows it.
+ */
+const { raw: _rawColumn, contentHash: _hashColumn, ...listColumns } = getTableColumns(tenders);
+export const tenderListColumns = listColumns;
+export type TenderListRow = Omit<TenderRow, 'raw' | 'contentHash'>;
+
 /** Public tender fields (no raw payload / hash). */
-export function tenderCore(t: TenderRow) {
-  const { raw: _raw, contentHash: _hash, ...rest } = t;
+export function tenderCore(t: TenderListRow) {
+  const { raw: _raw, contentHash: _hash, ...rest } = t as TenderRow;
   return rest;
 }
 
@@ -41,7 +50,10 @@ function buildFilters(q: TenderQuery, org: string, now: Date, omit?: 'state' | '
   const conds: SQL[] = [];
   const status = q.status ?? 'open';
   if (status !== 'all') conds.push(eq(tenders.status, status));
-  if (status === 'open') conds.push(or(isNull(tenders.endAt), gte(tenders.endAt, now))!);
+  // Same as `end_at IS NULL OR end_at >= now`, written so the planner does not treat "open" and "still open" as
+  // independent (it would then over-trust tenders_open_end_idx); every open-feed query stays on the open-tender
+  // partial indexes (008/FR-027).
+  if (status === 'open') conds.push(sql`coalesce(${tenders.endAt}, 'infinity'::timestamptz) >= ${now}`);
   if (q.q) {
     for (const word of q.q.split(/\s+/).filter(Boolean).slice(0, 8)) {
       const like = `%${word.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
@@ -105,7 +117,7 @@ function orderBy(q: TenderQuery, org: string): SQL[] {
 }
 
 /** Attach org-specific data (matches, analysis, workspace, seen/new) to tender rows. */
-export async function decorateTenders(deps: AppDeps, org: string, rows: TenderRow[]): Promise<TenderListItem[]> {
+export async function decorateTenders(deps: AppDeps, org: string, rows: TenderListRow[]): Promise<TenderListItem[]> {
   if (!rows.length) return [];
   const { db, clock } = deps;
   const ids = rows.map((r) => r.id);
@@ -167,7 +179,7 @@ tendersRoutes.get('/tenders', requireAuth, async (c) => {
   const offset = (q.page - 1) * q.pageSize;
 
   const [rows, [{ total }], states, ministries, categories] = await Promise.all([
-    deps.db.select().from(tenders).where(where).orderBy(...orderBy(q, org)).limit(q.pageSize).offset(offset),
+    deps.db.select(tenderListColumns).from(tenders).where(where).orderBy(...orderBy(q, org)).limit(q.pageSize).offset(offset),
     deps.db.select({ total: sql<number>`count(*)::int` }).from(tenders).where(where),
     facet(deps, tenders.state, buildFilters(q, org, now, 'state')),
     facet(deps, tenders.ministry, buildFilters(q, org, now, 'ministry')),

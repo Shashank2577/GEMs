@@ -441,3 +441,132 @@ describe('US1 documents: messages, bid-number check, removal, staleness (FR-002,
     expect((await request(ctx.app, 'GET', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie })).body.total).toBe(1);
   });
 });
+
+// ───────────── 008/US4 capacity caps (T073, T074; FR-030, FR-031) ─────────────
+
+/** A PDF with `pages` pages of real text (cheap to build, pdf.js can count it without reading the text). */
+async function longPdf(pages: number): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts } = await import('pdf-lib');
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (let i = 0; i < pages; i++) doc.addPage([595, 842]).drawText(`Bid document page ${i + 1} — eligibility criteria and terms.`, { x: 50, y: 780, size: 11, font });
+  return doc.save();
+}
+
+describe('document caps (008/FR-030, US4 scenarios 8–9)', () => {
+  const tooLong = 'This document has 301 pages. TenderPilot reads up to 300 pages — upload the bid document and ATC separately.';
+
+  it('a 301-page upload → 422 document_too_long; no tender_documents row is written', async () => {
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9300001', contentHash: 'cap-upload' });
+    const file = new File([await longPdf(301) as BlobPart], 'Huge bid.pdf', { type: 'application/pdf' });
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file, kind: 'bid' } });
+    expect(r.status).toBe(422);
+    expect(r.body.error).toEqual({ code: 'document_too_long', message: tooLong, details: { pages: 301, maxPages: 300 } });
+    expect(await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id))).toEqual([]);
+  });
+
+  it('a 301-page GeM document → 422 document_too_long on fetch and on analyse; nothing stored', async () => {
+    pdfs.long = await longPdf(301);
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9300002', contentHash: 'cap-fetch', gemBidId: 'long' });
+    const f = await request(ctx.app, 'POST', `/tenders/${t.id}/fetch-documents`, { cookie: roles.analyst.cookie });
+    expect(f.status).toBe(422);
+    expect(f.body.error.code).toBe('document_too_long');
+    const a = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(a.status).toBe(422);
+    expect(a.body.error).toMatchObject({ code: 'document_too_long', message: tooLong });
+    expect(await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id))).toEqual([]);
+    expect(await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id))).toEqual([]);
+  });
+
+  it('a scanned PDF is accepted on upload but analyse → 422 scanned_document; no analysis row', async () => {
+    const { renderScannedPdf } = await import('../../../tools/mock-gem/src/pdf');
+    const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9300003', contentHash: 'cap-scan' });
+    const scan = new File([await renderScannedPdf(5) as BlobPart], 'scan.pdf', { type: 'application/pdf' });
+    expect((await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file: scan, kind: 'bid' } })).status).toBe(201);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(422);
+    expect(r.body.error).toMatchObject({ code: 'scanned_document', message: 'This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.' });
+    expect(await ctx.db.select().from(analyses).where(eq(analyses.tenderId, t.id))).toEqual([]);
+
+    // With a readable document next to it, the scan is skipped (noted) and the analysis runs.
+    await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services'), kind: 'atc' } });
+    const ok = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(ok.status).toBe(201);
+    expect(ok.body.notes).toEqual(['scan.pdf is a scan without text and was not read — upload the text PDF from GeM or an OCR’d copy.']);
+    expect(ok.body.documents.map((d: { fileName: string }) => d.fileName)).toEqual(['go-it-services.pdf']);
+  });
+});
+
+describe('LLM budget per analysis (008/FR-031, US4 scenario 7)', () => {
+  const calls: number[] = [];
+  const countingLlm = (impl?: () => Promise<unknown>): LlmClient => ({
+    model: 'fake',
+    complete: async () => ({ text: '', model: 'fake', stopReason: null, usage: { inputTokens: 0, outputTokens: 0 } }),
+    completeJson: async <T>(req: { system?: string; prompt: string }) => {
+      calls.push((req.system ?? '').length + req.prompt.length);
+      return (impl ? await impl() : { requirements: [] }) as T;
+    },
+  });
+  let fiveDocs: string;
+
+  beforeAll(async () => {
+    fiveDocs = (await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9400001', contentHash: 'budget' })).id;
+    const kinds = ['bid', 'atc', 'corrigendum', 'boq', 'other'] as const;
+    const keys = ['go-it-services', 'nogo-experience', 'emd-exempt-mse', 'review-hardware-oem', 'go-it-services'];
+    for (let i = 0; i < 5; i++) {
+      const r = await request(ctx.app, 'POST', `/tenders/${fiveDocs}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile(keys[i], `doc-${i + 1}.pdf`), kind: kinds[i] } });
+      expect(r.status).toBe(201);
+    }
+  });
+
+  it('5 documents → ≤ 2 LLM calls, ≤ 90,000 characters, rules for the rest, warning llm_budget_exhausted (2 of 5)', async () => {
+    calls.length = 0;
+    const app = createApp({ ...ctx.deps, llm: countingLlm() });
+    const r = await request(app, 'POST', `/tenders/${fiveDocs}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r.status).toBe(201);
+    expect(calls.length).toBe(2);
+    expect(calls.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(90_000);
+    expect(r.body.method).toBe('rules+llm');
+    expect(r.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+    // Persisted: the analysis panel reads it back.
+    const again = await request(ctx.app, 'GET', `/tenders/${fiveDocs}/analysis`, { cookie: roles.viewer.cookie });
+    expect(again.body.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+  });
+
+  it('caps the total characters across calls (a small budget gives the 2nd call only what is left)', async () => {
+    calls.length = 0;
+    const { analyseTender } = await import('../src/services/analyse');
+    const { analysis } = await analyseTender({ ...ctx.deps, llm: countingLlm() }, { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs },
+      { llmBudget: { maxChars: 12_000 } });
+    expect(calls.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(12_000);
+    expect(analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: calls.length, total: 5 }]);
+  });
+
+  it('a slow LLM call times out and falls back to rules; past the overall budget no call starts', async () => {
+    const { analyseTender } = await import('../src/services/analyse');
+    const input = { orgId: roles.orgId, userId: roles.analyst.me.user.id, tenderId: fiveDocs };
+    calls.length = 0;
+    const hang = countingLlm(() => new Promise(() => {}));
+    const t0 = Date.now();
+    const slow = await analyseTender({ ...ctx.deps, llm: hang }, input, { llmBudget: { callTimeoutMs: 50 } });
+    expect(Date.now() - t0).toBeLessThan(5_000);
+    expect(calls.length).toBe(2);
+    expect(slow.analysis).toMatchObject({ status: 'done', method: 'rules', warnings: [{ code: 'llm_budget_exhausted', covered: 0, total: 5 }] });
+
+    calls.length = 0;
+    const over = await analyseTender({ ...ctx.deps, llm: hang }, input, { llmBudget: { budgetMs: 0 } });
+    expect(calls.length).toBe(0);
+    expect(over.analysis.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 0, total: 5 }]);
+  });
+
+  it('no warning when every document fits the budget; rules-only (no LLM) never warns', async () => {
+    calls.length = 0;
+    const one = (await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9400002', contentHash: 'budget-1' })).id;
+    await request(ctx.app, 'POST', `/tenders/${one}/documents`, { cookie: roles.analyst.cookie, form: { file: pdfFile('go-it-services') } });
+    const withLlm = await request(createApp({ ...ctx.deps, llm: countingLlm() }), 'POST', `/tenders/${one}/analyse`, { cookie: roles.analyst.cookie });
+    expect(withLlm.body.warnings).toEqual([]);
+    expect(calls.length).toBe(1);
+    const rules = await request(ctx.app, 'POST', `/tenders/${fiveDocs}/analyse`, { cookie: roles.analyst.cookie });
+    expect(rules.body.warnings).toEqual([]);
+  });
+});

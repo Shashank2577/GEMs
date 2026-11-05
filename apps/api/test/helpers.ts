@@ -20,13 +20,14 @@ import { createNodeDb, type Db, type Role } from '@tp/db';
 import { runMigrations } from '@tp/db/migrate';
 import type { Me } from '@tp/core/contracts/auth';
 import { createApp, type App } from '../src/app';
-import type { AppDeps, LlmClient } from '../src/deps';
+import type { AppDeps, GemLease, LlmClient } from '../src/deps';
 import { loadConfig, loadGemConfig } from '../src/env';
 import { createFsBlobStore } from '../src/adapters/blob-fs';
 import { createFixedClock } from '../src/adapters/clock';
 import { silentLogger } from '../src/adapters/logger';
 import { createLogMailer } from '../src/adapters/mailer';
 import { createLogWhatsApp } from '../src/adapters/whatsapp';
+import { noopGemLease } from '../src/adapters/index';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://tp:tp@localhost:5433/tenderpilot_test';
 export const TEST_APP_URL = 'http://tp.test';
@@ -77,6 +78,10 @@ export interface TestContextOptions {
   databaseUrl?: string;
   /** TRUST_PROXY for client-IP rate limiting (default unset = no trusted proxy, IP limits skipped). */
   trustProxy?: 'cloudflare' | 'xff';
+  /** Cluster-wide GeM lease (008/FR-024). Default: never waits. Lease tests pass `(db) => createPgGemLease(db, …)`. */
+  gemLease?: GemLease | ((db: Db) => GemLease);
+  /** Extra env vars for loadConfig/loadGemConfig (e.g. `MANUAL_SYNC_COOLDOWN_MIN`). */
+  env?: Record<string, string>;
 }
 
 export async function createTestContext(opts: TestContextOptions = {}) {
@@ -88,7 +93,7 @@ export async function createTestContext(opts: TestContextOptions = {}) {
   const clock = createFixedClock(opts.now ?? new Date());
   const mailer = createLogMailer(silentLogger);
   const whatsapp = createLogWhatsApp(silentLogger);
-  const env = { APP_URL: TEST_APP_URL, NODE_ENV: 'test', GEM_BASE_URL: opts.gemBaseUrl ?? 'http://127.0.0.1:4010', GEM_MIN_INTERVAL_MS: '0', TRUST_PROXY: opts.trustProxy };
+  const env = { APP_URL: TEST_APP_URL, NODE_ENV: 'test', GEM_BASE_URL: opts.gemBaseUrl ?? 'http://127.0.0.1:4010', GEM_MIN_INTERVAL_MS: '0', TRUST_PROXY: opts.trustProxy, ...opts.env };
   const deps: AppDeps = {
     db,
     blobs: createFsBlobStore(blobDir),
@@ -100,6 +105,7 @@ export async function createTestContext(opts: TestContextOptions = {}) {
     config: loadConfig(env),
     logger: silentLogger,
     fetch: opts.fetch ?? ((input, init) => fetch(input, init)),
+    gemLease: typeof opts.gemLease === 'function' ? opts.gemLease(db) : opts.gemLease ?? noopGemLease,
   };
   const app = createApp(deps);
   return {

@@ -1,0 +1,29 @@
+gem-fetch.sh  base=http://localhost:8791  mock-gem=http://127.0.0.1:4014  orgs/tenders=20  min gap=980 ms  (2026-11-05T04:32:11Z)
+ingestion: HTTP 429
+calls (org: HTTP status, seconds):
+  org1   201 13.017605
+  org2   201 0.642128
+  org3   201 8.998466
+  org4   201 2.047445
+  org5   201 1.076164
+  org6   201 8.540632
+  org7   201 3.044687
+  org8   201 10.990783
+  org9   201 6.605628
+  org10  201 7.575259
+  org11  201 5.022401
+  org12  201 4.048372
+  org13  201 9.985868
+  org14  201 15.975591
+  org15  201 13.991198
+  org16  201 14.993970
+  org17  201 17.990249
+  org18  201 18.969555
+  org19  201 11.986320
+  org20  201 17.016018
+mock-gem document requests: 20
+arrival offsets (ms): 0 994 1986 2986 3988 4987 6542 7522 8519 8990 9986 10986 11986 12993 13991 14986 15986 16986 17986 18985
+inter-arrival gaps (ms): 994 992 1000 1002 999 1555 980 997 471 996 1000 1000 1007 998 995 1000 1000 1000 999
+min gap: 471 ms   mean gap: 999 ms
+wall clock: 19076 ms   503 gem_busy: 0   unexpected answers: 0
+RESULT: FAIL

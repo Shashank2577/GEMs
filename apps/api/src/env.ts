@@ -3,6 +3,7 @@
  * secrets) and by the Node server (`process.env`). Missing optional integrations degrade to
  * logged no-ops (Constitution VII).
  */
+import { MANUAL_SYNC_COOLDOWN_MIN } from '@tp/core/contracts/caps';
 
 /** All string environment variables the API understands. */
 export interface RuntimeEnv {
@@ -26,6 +27,8 @@ export interface RuntimeEnv {
   TRUST_PROXY?: string;
   /** "development" | "production" | "test" */
   NODE_ENV?: string;
+  /** Minimum minutes between manual "Sync now" runs (008/FR-026, default 10). */
+  MANUAL_SYNC_COOLDOWN_MIN?: string;
 }
 
 export interface AppConfig {
@@ -39,6 +42,7 @@ export interface AppConfig {
   llmModel: string;
   /** Proxy whose client-IP header is trusted for rate limiting (002/FR-010). */
   trustProxy: TrustProxy;
+  manualSyncCooldownMin: number;
 }
 
 export type TrustProxy = 'cloudflare' | 'xff' | 'none';
@@ -67,7 +71,13 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     mailFrom: env.MAIL_FROM || 'TenderPilot <alerts@tenderpilot.in>',
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
+    manualSyncCooldownMin: positiveInt(env.MANUAL_SYNC_COOLDOWN_MIN, MANUAL_SYNC_COOLDOWN_MIN),
   };
+}
+
+function positiveInt(v: string | undefined, dflt: number): number {
+  const n = Number(v);
+  return v != null && v !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : dflt;
 }
 
 export interface GemConfig {

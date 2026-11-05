@@ -2,10 +2,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { PDFDocument } from 'pdf-lib';
-import { packets } from '@tp/db';
+import { packets, vaultDocuments } from '@tp/db';
 import { extractPages } from '@tp/core/analyse/pdf-text';
 import { readOutline } from '@tp/core/packet/build';
 import { createTestContext, request, signup, type TestContext } from './helpers';
+import { assertPacketItemCount, assertPacketSize, packetInputBytes } from '../src/services/packet';
 import { NOW, seedApply } from './workspace-fixtures';
 
 let ctx: TestContext;
@@ -163,5 +164,59 @@ describe('packets', () => {
     const r = await request(ctx.app, 'GET', `/workspaces/${wsId}/packets`, { cookie: s.org.viewer.cookie });
     expect(r.body.total).toBe(2);
     expect(r.body.items[0].createdBy.name).toBe('Test analyst');
+  });
+});
+
+// ───────────── 008/US4 packet pre-flight (T076; FR-032, US4 scenario 10) ─────────────
+
+describe('packet pre-flight (008/FR-032)', () => {
+  const MB = 1024 * 1024;
+  const packetCount = async () => (await ctx.db.select({ id: packets.id }).from(packets)).length;
+  const blobCount = async () => {
+    const { readdir } = await import('node:fs/promises');
+    return (await readdir(ctx.blobDir, { recursive: true })).length;
+  };
+
+  it('45 MB of selected items → 413 packet_too_large before any packets row or blob is written', async () => {
+    // Stored sizes drive the pre-flight, so no 45 MB of real files is needed (nor loaded into memory).
+    await ctx.db.update(vaultDocuments).set({ sizeBytes: 25 * MB }).where(eq(vaultDocuments.id, s.docs.gst.id));
+    await ctx.db.update(vaultDocuments).set({ sizeBytes: 20 * MB }).where(eq(vaultDocuments.id, s.docs.pan.id));
+    const [rows, blobs] = [await packetCount(), await blobCount()];
+    try {
+      const items = [{ kind: 'vault', refId: s.docs.gst.id, title: 'GST' }, { kind: 'vault', refId: s.docs.pan.id, title: 'PAN' }];
+      const r = await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, { cookie: s.org.analyst.cookie, json: { items } });
+      expect(r.status).toBe(413);
+      expect(r.body.error).toEqual({
+        code: 'packet_too_large', message: 'This packet would be 45 MB (limit 40 MB). Deselect large attachments and try again.',
+        details: { bytes: 45 * MB, maxBytes: 40 * MB },
+      });
+      expect(await packetCount()).toBe(rows);
+      expect(await blobCount()).toBe(blobs);
+    } finally {
+      await ctx.db.update(vaultDocuments).set({ sizeBytes: 100 }).where(eq(vaultDocuments.id, s.docs.gst.id));
+      await ctx.db.update(vaultDocuments).set({ sizeBytes: 100 }).where(eq(vaultDocuments.id, s.docs.pan.id));
+    }
+  });
+
+  it('41 items → 413 packet_too_large "41 items (limit 40)" (not a 400), nothing written', async () => {
+    const rows = await packetCount();
+    const items = Array.from({ length: 41 }, (_, i) => ({ kind: 'cover', title: `Item ${i + 1}` }));
+    const r = await request(ctx.app, 'POST', `/workspaces/${wsId}/packets`, { cookie: s.org.analyst.cookie, json: { items } });
+    expect(r.status).toBe(413);
+    expect(r.body.error).toEqual({
+      code: 'packet_too_large', message: 'This packet has 41 items (limit 40). Deselect some items and try again.', details: { items: 41, maxItems: 40 },
+    });
+    expect(await packetCount()).toBe(rows);
+  });
+
+  it('counts generated pages at 512 KB and stops exactly above the limits', () => {
+    const sizes: Record<string, number> = { a: 39 * MB };
+    const bytes = packetInputBytes([{ kind: 'vault', refId: 'a', title: 'A' }, { kind: 'cover', title: 'Cover' }, { kind: 'annexure', refId: 'x', title: 'X', pages: 1 }],
+      (it) => sizes[it.refId ?? '']);
+    expect(bytes).toBe(40 * MB);
+    expect(() => assertPacketSize(bytes)).not.toThrow();
+    expect(() => assertPacketSize(bytes + 1)).toThrow(/limit 40 MB/);
+    expect(() => assertPacketItemCount(40)).not.toThrow();
+    expect(() => assertPacketItemCount(41)).toThrow(/41 items \(limit 40\)/);
   });
 });

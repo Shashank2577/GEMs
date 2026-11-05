@@ -19,7 +19,7 @@ import { logActivity } from '../lib/activity';
 import { HttpError, notFound } from '../lib/errors';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
-import { buildWorkspacePacket, getTenderRow, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
+import { assertPacketItemCount, buildWorkspacePacket, getTenderRow, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
 import type { AppEnv } from '../types';
 
 export const packetsRoutes = new Hono<AppEnv>();
@@ -119,6 +119,9 @@ packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), async (c) 
   const { deps } = c.var;
   const org = orgId(c);
   const w = await getWorkspace(deps, org, c.req.param('id'));
+  // 008/FR-032: > 40 items is a 413 packet_too_large (not a 400), so count before the schema caps the array.
+  const peek = await c.req.text().then((t) => { try { return JSON.parse(t) as { items?: unknown }; } catch { return null; } });
+  if (Array.isArray(peek?.items)) assertPacketItemCount(peek.items.length);
   const body = await parseJson(c, packetBuildSchema);
   const p = await buildWorkspacePacket(deps, org, userId(c), w, body.items);
   await logActivity(deps.db, {

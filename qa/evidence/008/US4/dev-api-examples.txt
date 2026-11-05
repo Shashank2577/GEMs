@@ -1,0 +1,47 @@
+# 008/US4 developer API examples — local stack http://localhost:8791 (Node API + Postgres 16 + tools/mock-gem :4014), 2026-11-05T04:22:57.401Z
+# Users are throwaway @example.in accounts; cookies omitted.
+
+## 1. 429 sync_cooldown — Sync now within 10 minutes of a finished manual sync (FR-026, scenario 3)
+$ POST /api/ingestion/run {}   # Sync now again
+→ 429 Too Many Requests  (5 ms)
+{"error":{"code":"sync_cooldown","message":"GeM was synced moments ago. Next manual sync at 9:58 am IST.","details":{"retryAt":"2026-11-05T04:28:56.476Z"}}}
+
+mock-gem requests during the refused call: 0
+
+GET /api/ingestion/runs → nextManualSyncAt=2026-11-05T04:28:56.476Z  manualSyncCooldownMin=10
+
+## 2. 422 document_too_long — 301-page upload (FR-030, scenario 8)
+$ POST /api/tenders/a0ba0750-e5c3-4fd9-9dc4-302da9300a04/documents (multipart)   # 301 pages
+→ 422 Unprocessable Entity  (19 ms)
+{"error":{"code":"document_too_long","message":"This document has 301 pages. TenderPilot reads up to 300 pages — upload the bid document and ATC separately.","details":{"pages":301,"maxPages":300}}}
+
+documents stored for that tender afterwards: 0
+
+## 3. 422 scanned_document — analyse a scan without a text layer (FR-030, scenario 9)
+$ POST /api/tenders/9f4de855-ea57-452c-8465-a05060c6dbe5/documents (multipart)   # accepted (hasText:false)
+→ 201 Created  (13 ms)
+{"id":"b926057c-47e7-4083-a9e5-c3256e7ac007","tenderId":"9f4de855-ea57-452c-8465-a05060c6dbe5","orgId":"317bf7c6-e36e-436c-bd3c-34de02d8be50","kind":"bid","fileName":"scanned-bid.pdf","sizeBytes":2357,"pageCount":4,"sourceUrl":null,"hasText":false,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T04:22:57.870Z","warnings":[]}
+
+$ POST /api/tenders/9f4de855-ea57-452c-8465-a05060c6dbe5/analyse   # Analyse
+→ 422 Unprocessable Entity  (4 ms)
+{"error":{"code":"scanned_document","message":"This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.","details":{"documents":["scanned-bid.pdf"]}}}
+
+## 4. 413 packet_too_large — 41 items, and 45 MB of selected files (FR-032, scenario 10)
+$ POST /api/workspaces/29cf5b48-0e5b-4cb5-88e1-42b15cd55e5d/packets {"items":[{"kind":"cover","title":"Item 1"},{"kind":"cover","title":"Item 2"},{"kind":"cover","title":"Item 3"},{"kind":"cover","title":"Item 4"},{"kind":"cover","title":"Item 5"},{"kind":"cover","title":"Item 6"},{"kind":"cover","title":"Item 7"},{"kind":"cover","title":"Item 8"},{"kind":"cover","title":"Item 9"},{"kind":"cover","title":"Item 10"},{"kind":"cover","title":"Item 11"},{"kind":"cover","title":"Item 12"},{"kind":"cover","title":"Item 13"},{"kind":"cover","title":"Item 14"},{"kind":"cover","title":"Item 15"},{"kind":"cover","title":"Item 16"},{"kind":"cover","title":"Item 17"},{"kind":"cover","title":"Item 18"},{"kind":"cover","title":"Item 19"},{"kind":"cover","title":"Item 20"}…   # 41 items
+→ 413 Payload Too Large  (5 ms)
+{"error":{"code":"packet_too_large","message":"This packet has 41 items (limit 40). Deselect some items and try again.","details":{"items":41,"maxItems":40}}}
+
+(uploaded 3 vault scans: 16.0 MB, 15.0 MB, 14.0 MB)
+$ POST /api/workspaces/29cf5b48-0e5b-4cb5-88e1-42b15cd55e5d/packets {"items":[{"kind":"vault","refId":"efcd92db-08ef-47f1-8391-7b3c7991abe9","title":"Signed annexure 1"},{"kind":"vault","refId":"54c9dbaa-75f8-4421-9283-611ef9ea990c","title":"Signed annexure 2"},{"kind":"vault","refId":"a4c2bfa3-3b57-4ded-9a33-0a845d74383e","title":"Signed annexure 3"}]}   # 3 vault files ≈ 45 MB
+→ 413 Payload Too Large  (15 ms)
+{"error":{"code":"packet_too_large","message":"This packet would be 45 MB (limit 40 MB). Deselect large attachments and try again.","details":{"bytes":47205820,"maxBytes":41943040}}}
+
+packets rows before/after the refused builds: 0 / 0
+
+## 5. 503 gem_busy — 30 concurrent fetch-documents; the cluster-wide lease (1 request/s) has slots for ~25 s only (FR-024, scenario 1)
+$ 30 × POST /api/tenders/:id/fetch-documents at the same instant (30 orgs, 30 bulk-fixture tenders; mock-gem answers 404 for those synthetic bids, so the granted calls end in 502 gem_unavailable — what matters is when GeM was asked)
+→ status counts: {"502 gem_unavailable":26,"503 gem_busy":4}
+→ 503 example (answered after 66 ms, no GeM request made):
+{"error":{"code":"gem_busy","message":"GeM is busy — we’ll retry shortly.","details":{"maxWaitMs":25000}}}
+slowest granted call answered after 25050 ms (lease wait ≤ 25 s)
+

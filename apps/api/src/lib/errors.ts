@@ -24,3 +24,15 @@ export const unauthorized = (message = 'Please sign in to continue') => new Http
 export const forbidden = (message = 'You do not have permission to do that') => new HttpError(403, 'forbidden', message);
 export const notFound = (what = 'Resource') => new HttpError(404, 'not_found', `${what} not found`);
 export const conflict = (message: string, details?: unknown) => new HttpError(409, 'conflict', message, details);
+
+// ───────────── Ops / plan errors (008/FR-018, FR-021, FR-040) ─────────────
+
+/** 413 `payload_too_large` (008/FR-021). */
+export const payloadTooLarge = (message = 'The request is too large.', details?: unknown) => new HttpError(413, 'payload_too_large', message, details);
+
+/** 422 with a specific code (`document_too_long`, `scanned_document`, …). */
+export const unprocessable = (code: string, message: string, details?: unknown) => new HttpError(422, code, message, details);
+
+/** 503 with a specific code (`service_unavailable`, `gem_busy`, …). */
+export const serviceUnavailable = (code = 'service_unavailable', message = 'Service temporarily unavailable. Please try again in a minute.', details?: unknown) =>
+  new HttpError(503, code, message, details);
