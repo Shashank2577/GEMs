@@ -16,7 +16,7 @@ Proposed items live in spec 008.
 | [0007](./0007-synchronous-analysis-and-packet-with-caps.md) | Synchronous analysis/packet with explicit caps; Queues on trigger | Proposed | MUST / LATER |
 | [0008](./0008-llm-cost-control.md) | LLM metering, per-org quota, shared extraction cache | Proposed | MUST / SHOULD |
 | [0009](./0009-feed-query-performance.md) | Partial open-tender indexes, column projection, tsvector search | Proposed | MUST / SHOULD |
-| [0010](./0010-plan-limits-and-billing-readiness.md) | Plan limits, trial expiry, 402 contract, usage, subscriptions | Proposed | MUST / SHOULD / LATER |
+| [0010](./0010-plan-limits-and-billing-readiness.md) | Plan limits, trial expiry, 402 contract, usage, subscriptions | Accepted | MUST / SHOULD / LATER |
 | [0011](./0011-observability.md) | Health with ingestion staleness, monitor, structured logs, Sentry | Proposed | MUST / SHOULD |
 | [0012](./0012-data-retention-and-housekeeping.md) | Retention table, housekeeping step, packet retention, R2 lifecycle | Proposed | SHOULD |
 | [0013](./0013-deployment-migrations-backups-secrets.md) | CI deploy with migrations, Neon retention, staging, domain, secrets | Proposed | MUST / SHOULD |

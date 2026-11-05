@@ -7,8 +7,8 @@
  *    reach org B, even if cache columns were somehow set on an org-owned row.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
-import { tenderDocuments, tenders } from '@tp/db';
+import { eq, inArray, sql } from 'drizzle-orm';
+import { organizations, tenderDocuments, tenders } from '@tp/db';
 import { CURRENT_EXTRACTOR_VERSION } from '@tp/core/analyse/llm';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { createApp } from '../src/app';
@@ -60,6 +60,8 @@ beforeAll(async () => {
   for (const k of ['go-it-services', 'review-hardware-oem']) pdfs[k] = await generateBidPdf(getSampleBidSpec(k)!);
   A = await seedOrgWithRoles(ctx.app, 'Cache Org A');
   B = await seedOrgWithRoles(ctx.app, 'Cache Org B');
+  // These orgs analyse many tenders; the monthly plan quotas (008/US5) are not what this file tests.
+  await ctx.db.update(organizations).set({ plan: 'enterprise', trialEndsAt: null }).where(inArray(organizations.id, [A.orgId, B.orgId]));
 });
 afterAll(() => ctx?.close());
 
@@ -152,6 +154,41 @@ describe('what is (not) cached, and who gets a cache hit (review S1, S7)', () =>
     expect(llmPrompts).toHaveLength(1);
     expect(b.body.method).toBe('rules+llm');
     expect(llmReqs(b.body)).toEqual(llmReqs(a.body));
+  });
+});
+
+describe('cache hits and the monthly AI quota (008/FR-037 × FR-072, review R2-B1)', () => {
+  it('quota used up: no llm_quota_reached warning when every document came from the cache; the warning stays when one did not', async () => {
+    const C = await seedOrgWithRoles(ctx.app, 'Cache Org C (quota used up)');
+    await ctx.db.update(organizations).set({ plan: 'starter', trialEndsAt: null }).where(eq(organizations.id, C.orgId));
+    // Use up Starter's 50 AI analyses this month (one analysis + one llm_usage row each).
+    const seedT = await gemTender('go-it-services', 'GEM/2026/B/8800200');
+    const iso = ctx.clock.now().toISOString();
+    await ctx.db.execute(sql`insert into analyses (org_id, tender_id, status, created_at, updated_at)
+      select ${C.orgId}::uuid, ${seedT.id}::uuid, 'done', ${iso}::timestamptz, ${iso}::timestamptz from generate_series(1, 50)`);
+    await ctx.db.execute(sql`insert into llm_usage (org_id, analysis_id, analysis_ref, kind, model, input_tokens, output_tokens, created_at)
+      select org_id, id, id, 'extract', 'seed', 100, 10, created_at from analyses where org_id = ${C.orgId}::uuid`);
+
+    // A (unlimited) analyses → the document is cached; C, quota used up, gets it for free and without a warning.
+    const cachedT = await gemTender('review-hardware-oem', 'GEM/2026/B/8800201');
+    llmPrompts.length = 0;
+    const a = await analyse(A.analyst.cookie, cachedT.id);
+    expect(a.status, a.text).toBe(201);
+    expect(llmPrompts).toHaveLength(1);
+    const c1 = await analyse(C.analyst.cookie, cachedT.id);
+    expect(c1.status, c1.text).toBe(201);
+    expect(llmPrompts).toHaveLength(1); // 0 new LLM calls
+    expect(c1.body.method).toBe('rules+llm');
+    expect(llmReqs(c1.body)).toEqual(llmReqs(a.body));
+    expect(c1.body.warnings).toEqual([]);
+
+    // A document nobody extracted yet: C runs on rules only and is told why.
+    const freshT = await gemTender('go-it-services', 'GEM/2026/B/8800202');
+    const c2 = await analyse(C.analyst.cookie, freshT.id);
+    expect(c2.status, c2.text).toBe(201);
+    expect(llmPrompts).toHaveLength(1);
+    expect(c2.body.method).toBe('rules');
+    expect(c2.body.warnings).toEqual([{ code: 'llm_quota_reached' }]);
   });
 });
 

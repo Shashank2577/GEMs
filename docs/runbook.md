@@ -357,6 +357,11 @@ Run `pnpm db:migrate` for this release **off-peak** (before 07:00 IST), then dep
 `select *` rows); `drizzle-kit` never drops them because it diffs its own snapshots, not the database — never run
 `drizzle-kit push` against production.
 
+The watchlist pre-filter is designed to be a superset of the keyword matcher: ASCII punctuation and the invisible
+characters U+00AD, U+200B–U+200D, U+2060, U+FEFF become spaces on both the column and every query, and the matcher never
+splits a word at a combining mark. Known, accepted gaps (case folding differs between JS and Postgres): Greek final sigma
+(σ/ς) and micro sign vs mu (µ/μ) — a keyword written with one form may miss text written with the other.
+
 ## LATER triggers
 
 Deferred decisions, each with the measurable trigger that reopens it (FR-076). Check these at the monthly ops review.

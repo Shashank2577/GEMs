@@ -1,0 +1,6 @@
+# sc4b-pro-packets — project desktop — 2026-11-05T09:31:18.771Z
+### 201st packet
+> POST /api/workspaces/f242a86b-5ca5-47e1-b9f2-54ff975ef4df/packets
+< 402
+{"error":{"code":"plan_limit_reached","message":"Your Pro plan includes 200 packets a month. You've used 200. Talk to us to upgrade, or wait until 1 Dec.","details":{"limit":"packetsPerMonth","used":200,"max":200,"plan":"pro","resetsAt":"2026-11-30T18:30:00.000Z"}}}
+

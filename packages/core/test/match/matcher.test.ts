@@ -51,6 +51,24 @@ describe('keywordRegex', () => {
     expect(keywordRegex('ups').test('Line Interactive UPS with AVR')).toBe(true);
     expect(keywordRegex('c++ (beta)').test('c++ (beta)')).toBe(true);
   });
+
+  it('review R2-S1: a combining mark belongs to its word — it is never a word boundary (Hindi matras, decomposed accents)', () => {
+    // Hindi: "ताब" is the tail of "किताब" (book) after the matra ि — not a separate word.
+    expect(keywordRegex('ताब').test('किताब की आपूर्ति')).toBe(false);
+    expect(keywordRegex('किताब').test('किताब की आपूर्ति')).toBe(true);
+    // "सोलर" (solar) on its own matches; a base letter followed by its vowel sign / virama does not.
+    expect(keywordRegex('सोलर').test('सोलर स्ट्रीट लाइट')).toBe(true);
+    expect(keywordRegex('सोलर लाइट').test('सोलर-लाइट 12W')).toBe(true);
+    expect(keywordRegex('स').test('सोलर')).toBe(false); // स followed by the vowel sign ो
+    expect(keywordRegex('क').test('क्षमता')).toBe(false); // क followed by the virama ्
+    // Decomposed Latin: "cafe" + U+0301 is "café", not "cafe".
+    expect(keywordRegex('cafe').test('Café chairs')).toBe(false);
+    expect(keywordRegex('café').test('Café chairs')).toBe(true);
+    expect(keywordRegex('e').test('é')).toBe(false);
+    // Invisible format characters (Cf) still separate words for the matcher; the FTS column maps them to spaces.
+    expect(keywordRegex('street').test('solar​street light')).toBe(true);
+    expect(keywordRegex('lamp').test('LED­lamp')).toBe(true);
+  });
 });
 
 describe('matchTender', () => {

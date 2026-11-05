@@ -178,18 +178,20 @@ export async function runHousekeeping(deps: AppDeps, opts: { force?: boolean } =
       .returning({ day: jobRuns.day });
     if (!claimed.length) return { ran: false, day, reason: 'already_ran' };
   }
+  // Finish/failure writes are fenced on our claim time (review R2-N3): if this run was presumed dead and taken over,
+  // its late write must not finish or release the new owner's claim.
+  const ours = and(eq(jobRuns.job, HOUSEKEEPING_JOB), eq(jobRuns.day, day), eq(jobRuns.startedAt, now));
   const t0 = Date.now();
   try {
     const deleted = await pruneOnce(deps, now);
     const ms = Date.now() - t0;
     deps.logger.info('housekeeping finished', { job: HOUSEKEEPING_JOB, day, deleted, ms });
     if (!opts.force) {
-      await deps.db.update(jobRuns).set({ finishedAt: deps.clock.now(), summary: { deleted, ms } })
-        .where(and(eq(jobRuns.job, HOUSEKEEPING_JOB), eq(jobRuns.day, day)));
+      await deps.db.update(jobRuns).set({ finishedAt: deps.clock.now(), summary: { deleted, ms } }).where(ours);
     }
     return { ran: true, day, deleted, ms };
   } catch (e) {
-    if (!opts.force) await deps.db.delete(jobRuns).where(and(eq(jobRuns.job, HOUSEKEEPING_JOB), eq(jobRuns.day, day))).catch(() => {});
+    if (!opts.force) await deps.db.delete(jobRuns).where(ours).catch(() => {});
     throw e;
   }
 }

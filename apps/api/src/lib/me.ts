@@ -13,6 +13,7 @@ export async function buildMe(db: Db, user: AuthUser, org: AuthOrg, role: Role):
     org: {
       id: org.id, name: org.name, slug: org.slug, plan: org.plan,
       onboardingState: org.onboardingState ?? {}, scoringWeights: org.scoringWeights ?? null,
+      trialEndsAt: org.trialEndsAt ? new Date(org.trialEndsAt).toISOString() : null,
     },
     role,
     orgs,

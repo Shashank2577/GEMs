@@ -31,6 +31,7 @@ import {
 import { DOC_TYPES, docStatus, EXPIRING_WITHIN_DAYS, guessDocType, guessFinancialYear, nextReminder, type DocType } from '@tp/core/vault/status';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
+import { assertWithinPlan } from '../lib/plan';
 import { runExpiryReminders } from '../services/reminders';
 import { badRequest, HttpError, notFound, validationError } from '../lib/errors';
 import { parseQuery, parseWith } from '../lib/validate';
@@ -304,6 +305,7 @@ vaultRoutes.post('/vault', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_LARGE), r
   }, 'form');
   const contentSha256 = await sha256Hex(file.bytes);
   await rejectDuplicate(deps, org, body, contentSha256, file.bytes.length);
+  await assertWithinPlan(deps, org, 'vaultBytes', file.bytes.length); // 008/FR-036
   const id = crypto.randomUUID();
   const fileName = safeFileName(file.name, file.mime);
   const blobKey = blobKeyFor(org, id, fileName);
@@ -361,6 +363,8 @@ vaultRoutes.put('/vault/:id/file', bodyLimit(VAULT_UPLOAD_MAX_BYTES, VAULT_TOO_L
   const uid = userId(c);
   const existing = await getDoc(deps, org, c.req.param('id'));
   const { body, file, pageCount } = await readFile(c);
+  // 008/FR-036: the previous file is kept as a version, so the new file adds its full size.
+  await assertWithinPlan(deps, org, 'vaultBytes', file.bytes.length);
   // Renewal fields (FR-064): only the ones sent are applied; '' clears, like PATCH.
   const sent = Object.fromEntries((['issueDate', 'expiryDate', 'number'] as const)
     .filter((k) => typeof body[k] === 'string').map((k) => [k, body[k] as string]));

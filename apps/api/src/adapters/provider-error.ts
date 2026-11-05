@@ -4,7 +4,8 @@
  *  - permanent: any other 4xx (bad request, auth, invalid recipient …) → do not retry.
  */
 export class ProviderError extends Error {
-  constructor(message: string, readonly transient: boolean, readonly status?: number) {
+  /** `code`: the provider's machine-readable error name when it sent one (e.g. Resend's `concurrent_idempotent_requests`). */
+  constructor(message: string, readonly transient: boolean, readonly status?: number, readonly code?: string) {
     super(message);
     this.name = 'ProviderError';
   }

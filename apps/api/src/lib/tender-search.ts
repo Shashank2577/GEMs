@@ -3,7 +3,8 @@
  * with GIN index `tenders_search_gin`; both are created by migration `*_tenders_search.sql` and intentionally not
  * declared in the Drizzle schema (a declared column would be read by every `select().from(tenders)`).
  *
- * Every ASCII punctuation character ({@link SEARCH_SEPARATORS}) becomes a space before tokenising, on the column and on
+ * Every ASCII punctuation character and the invisible format characters soft hyphen / ZWSP / ZWNJ / ZWJ / word joiner /
+ * BOM ({@link SEARCH_SEPARATORS}) become a space before tokenising, on the column and on
  * the query alike. Postgres' default parser is context-sensitive about punctuation — "IS-2062" parses as 'is' and the
  * signed number '-2062', "<cctv>" as an XML tag (dropped), "1.5kg" as a float, "a@b.in" as an e-mail — so without
  * this a search for "2062" would not find "IS-2062". With only letters, digits, spaces and non-ASCII characters left,
@@ -21,10 +22,18 @@ import { sql, type SQL } from 'drizzle-orm';
 import { tenders } from '@tp/db';
 
 /**
- * ASCII punctuation the generated column (and so every query) turns into spaces before tokenising. Must stay
- * byte-identical to the `translate(…)` set in migration `*_tenders_search.sql` (asserted by a test).
+ * Invisible format characters glibc treats as word characters (so Postgres would glue the words around them into one
+ * lexeme) but the matcher treats as word boundaries: soft hyphen, zero-width space / non-joiner / joiner, word joiner,
+ * BOM (review R2-S1). Written in the migration as `U&'\00AD\200B\200C\200D\2060\FEFF'`.
  */
-export const SEARCH_SEPARATORS = `!"#$%&'()*+,-./:;<=>?@[\\]^_\`{|}~`;
+export const SEARCH_INVISIBLES = '\u00AD\u200B\u200C\u200D\u2060\uFEFF';
+
+/**
+ * Characters the generated column (and so every query) turns into spaces before tokenising: ASCII punctuation, then
+ * {@link SEARCH_INVISIBLES}. Must stay identical to the `translate(…)` set in migration `*_tenders_search.sql`
+ * (asserted by a test).
+ */
+export const SEARCH_SEPARATORS = `!"#$%&'()*+,-./:;<=>?@[\\]^_\`{|}~${SEARCH_INVISIBLES}`;
 const SPACES = ' '.repeat(SEARCH_SEPARATORS.length);
 /** The feed keeps `"` and `-` for websearch syntax; a `-` inside a word is turned into a space in JS first. */
 const FEED_SEPARATORS = SEARCH_SEPARATORS.replace(/["-]/g, '');

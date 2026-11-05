@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
-import { notifications } from '@tp/db';
+import { notificationPrefs, notifications, tenders } from '@tp/db';
 import { RESEND_BATCH_MAX, createResendMailer } from '../src/adapters/mailer';
 import { EMAIL_BATCH_SIZE, dispatchNotifications } from '../src/services/alerts';
 import { createTestContext, signup, type SignedUp, type TestContext } from './helpers';
@@ -15,13 +15,15 @@ let owner: SignedUp;
 let calls: { url: string; body: unknown; key: string | null }[] = [];
 let failCall: number | null = null;
 let failStatus = 422;
+/** Body of the failing response (Resend sends `{"statusCode":…,"name":…,"message":…}`). */
+let failBody = '{"message":"provider refused"}';
 /** A message with this subject is "invalid": Resend rejects any call containing it with 422 (a batch as a whole). */
 let badSubject: string | null = null;
 
 const resendFetch = (async (url: string, init?: RequestInit) => {
   const body = JSON.parse(String(init?.body));
   calls.push({ url, body, key: new Headers(init?.headers).get('idempotency-key') });
-  if (failCall === calls.length) return new Response('{"message":"provider refused"}', { status: failStatus });
+  if (failCall === calls.length) return new Response(failBody, { status: failStatus });
   const subjects = (Array.isArray(body) ? body : [body]).map((m: { subject: string }) => m.subject);
   if (badSubject && subjects.includes(badSubject)) return new Response('{"message":"Invalid `to` field"}', { status: 422 });
   if (url.endsWith('/emails/batch')) return Response.json({ data: (body as unknown[]).map((_, i) => ({ id: `re_${calls.length}_${i}` })) });
@@ -45,8 +47,10 @@ beforeEach(async () => {
   calls = [];
   failCall = null;
   failStatus = 422;
+  failBody = '{"message":"provider refused"}';
   badSubject = null;
   await ctx.db.delete(notifications).where(eq(notifications.orgId, owner.me.org.id));
+  await ctx.db.delete(notificationPrefs).where(eq(notificationPrefs.orgId, owner.me.org.id));
 });
 
 describe('Resend batch sending (US7 scenario 6)', () => {
@@ -122,6 +126,87 @@ describe('Resend batch sending (US7 scenario 6)', () => {
     expect(calls).toHaveLength(2);
     expect(calls[1]!.key).toBe(calls[0]!.key); // same rows ⇒ same key ⇒ Resend does not deliver them twice
     expect(again).toMatchObject({ sent: 20, failed: 0, retried: 0 });
+  });
+
+  it('review R2-N1: 409 invalid_idempotent_request (key already settled) → sent; 409 concurrent_idempotent_requests (still in flight) → retried, then sent', async () => {
+    await queueEmails(5);
+    failStatus = 409;
+    failBody = '{"statusCode":409,"name":"concurrent_idempotent_requests","message":"Same idempotency key used while original request is still in progress."}';
+    failCall = 1;
+    const first = await dispatchNotifications(deps());
+    expect(first).toMatchObject({ sent: 0, failed: 0, retried: 5 });
+    expect(await ctx.db.select({ status: notifications.status }).from(notifications).where(eq(notifications.orgId, owner.me.org.id)))
+      .toEqual(Array.from({ length: 5 }, () => ({ status: 'pending' })));
+    await ctx.db.update(notifications).set({ nextAttemptAt: new Date(NOW.getTime() - 1000) }).where(eq(notifications.orgId, owner.me.org.id));
+    failBody = '{"statusCode":409,"name":"invalid_idempotent_request","message":"Same idempotency key used with a different request payload."}';
+    failCall = 2;
+    const again = await dispatchNotifications(deps());
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.key).toBe(calls[0]!.key);
+    expect(again).toMatchObject({ sent: 5, failed: 0, retried: 0 });
+  });
+
+  it('review R2-N1: a retried email is rendered as of its row (not the dispatch time) → the same payload under the same key', async () => {
+    const [t] = await ctx.db.insert(tenders).values({
+      bidNumber: 'GEM/2026/B/9100001', title: 'Solar street lights', endAt: new Date(NOW.getTime() + 5 * 86_400_000), status: 'open',
+      sourceUrl: 'https://bidplus.gem.gov.in/all-bids#9100001', contentHash: 'r2n1-render',
+    }).returning();
+    await ctx.db.insert(notifications).values({
+      orgId: owner.me.org.id, userId: owner.me.user.id, channel: 'email', kind: 'tender_match', status: 'pending',
+      title: 'New match: Solar street lights', body: 'Solar street lights — matched solar', link: `/tenders/${t!.id}`, dedupeKey: `r2n1-${Date.now()}`,
+      createdAt: new Date(NOW.getTime() - 60_000),
+    });
+    try {
+      failStatus = 503;
+      failCall = 1;
+      expect(await dispatchNotifications(deps())).toMatchObject({ retried: 1 });
+      // Two days later ("3 days left" instead of "5 days left" if it were rendered at dispatch time).
+      const later = new Date(NOW.getTime() + 2 * 86_400_000);
+      await ctx.db.update(notifications).set({ nextAttemptAt: new Date(later.getTime() - 1000) }).where(eq(notifications.orgId, owner.me.org.id));
+      expect(await dispatchNotifications({ ...deps(), clock: { now: () => later } })).toMatchObject({ sent: 1 });
+      expect(calls).toHaveLength(2);
+      expect(calls[1]!.key).toBe(calls[0]!.key);
+      expect(calls[1]!.body).toEqual(calls[0]!.body);
+    } finally {
+      await ctx.db.delete(notifications).where(eq(notifications.orgId, owner.me.org.id));
+      await ctx.db.delete(tenders).where(eq(tenders.id, t!.id));
+    }
+  });
+
+  it('003/US5 × US7 (review R2-B1): an instant corrigendum email goes out in the batch with its own heading and intro', async () => {
+    await queueEmails(2);
+    await ctx.db.insert(notifications).values({
+      orgId: owner.me.org.id, userId: owner.me.user.id, channel: 'email', kind: 'corrigendum', status: 'pending',
+      title: 'Bid amended: GEM/2026/B/9100002', body: 'The buyer issued a corrigendum. Changed: closing date. Re-check your analysis.',
+      link: '/tenders', dedupeKey: `r2b1-corr-${Date.now()}`, createdAt: new Date(NOW.getTime() - 500),
+    });
+    const report = await dispatchNotifications(deps());
+    expect(report).toMatchObject({ sent: 3, failed: 0 });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toMatch(/\/emails\/batch$/);
+    const corr = (calls[0]!.body as { subject: string; html: string }[]).find((m) => m.subject === 'Bid amended: GEM/2026/B/9100002')!;
+    expect(corr.html).toContain('A tracked GeM bid was amended');
+    expect(corr.html).toContain('The buyer changed this bid on GeM. Re-check your eligibility analysis before you bid.');
+    expect(corr.html).toContain('closing date'); // the "Changed:" box
+    expect(corr.html).not.toContain('A new GeM tender matches your watchlist');
+  });
+
+  it('003/US5 × US7 (review R2-B1): with a daily preference a corrigendum joins the digest, not the instant batch', async () => {
+    await ctx.db.insert(notificationPrefs).values({ orgId: owner.me.org.id, userId: owner.me.user.id, frequency: 'daily' });
+    await ctx.db.insert(notifications).values([
+      { orgId: owner.me.org.id, userId: owner.me.user.id, channel: 'email', kind: 'corrigendum', status: 'pending',
+        title: 'Bid amended: GEM/2026/B/9100003', body: 'Changed: quantity. Re-check your analysis.', link: '/tenders', dedupeKey: `r2b1-dc-${Date.now()}`, createdAt: new Date(NOW.getTime() - 500) },
+      { orgId: owner.me.org.id, userId: owner.me.user.id, channel: 'email', kind: 'system', status: 'pending',
+        title: 'System notice', body: 'Instant even for daily users', link: '/tenders', dedupeKey: `r2b1-ds-${Date.now()}`, createdAt: new Date(NOW.getTime() - 400) },
+    ]);
+    const report = await dispatchNotifications(deps());
+    expect(report).toMatchObject({ failed: 0 });
+    const batch = calls.filter((c) => c.url.endsWith('/emails/batch'));
+    const single = calls.filter((c) => c.url.endsWith('/emails'));
+    expect(batch).toHaveLength(1);
+    expect((batch[0]!.body as { subject: string }[]).map((m) => m.subject)).toEqual(['System notice']);
+    expect(single).toHaveLength(1); // the digest
+    expect((single[0]!.body as { subject: string }).subject).toBe('Daily digest: 1 tracked bid amended today');
   });
 
   it('sendMany maps the provider ids back in order', async () => {

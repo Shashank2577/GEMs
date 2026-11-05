@@ -72,7 +72,11 @@ function buildKeywordRegex(keyword: string): RegExp {
   const parts = keyword.trim().split(/\s+/).map(escapeRe);
   // Allow simple plurals on the last word ("laptop" matches "Laptops").
   const body = parts.join('[\\s\\-_/]+');
-  return new RegExp(`(?<![\\p{L}\\p{N}])${body}(?:e?s)?(?![\\p{L}\\p{N}])`, 'iu');
+  // A word boundary is anything but a letter, digit or combining mark (\p{M}: Devanagari matras/virama, decomposed Latin
+  // accents) — a mark belongs to the word it follows, as it does for Postgres' parser, so the full-text pre-filter stays
+  // a superset of these matches (review R2-S1). Known non-superset edge, by design: case folding of Greek final sigma
+  // (σ/ς) and micro sign vs mu (µ/μ) differs between JS `iu` and Postgres `lower()`.
+  return new RegExp(`(?<![\\p{L}\\p{N}\\p{M}])${body}(?:e?s)?(?![\\p{L}\\p{N}\\p{M}])`, 'iu');
 }
 
 function haystacks(t: MatchableTender) {

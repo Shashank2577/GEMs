@@ -14,6 +14,8 @@ import { canonicalState } from '@tp/core/gem/states';
 import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
+import { assertWithinPlan } from '../lib/plan';
+import { WATCHLIST_LIMIT } from '@tp/core/contracts/plans';
 import { HttpError, notFound, validationError } from '../lib/errors';
 import { visibleTenderSource } from '../lib/tender-scope';
 import { anyKeywordCondition } from '../lib/tender-search';
@@ -29,8 +31,8 @@ export const watchlistsRoutes = new Hono<AppEnv>();
 const CANDIDATE_PAGE = 2000;
 /** Rows per `tender_matches` insert / `in (…)` list. */
 const BATCH = 500;
-/** FR-027: maximum watchlists per organization, paused ones included. */
-export const WATCHLIST_LIMIT = 50;
+/** FR-027: maximum watchlists per organization, paused ones included (shared with the web meter, 008 review S5). */
+export { WATCHLIST_LIMIT };
 
 /** Only the columns the matcher reads (never `raw`), so scanning 50k open tenders stays small (NFR-003). */
 const MATCH_COLUMNS = {
@@ -236,9 +238,10 @@ watchlistsRoutes.post('/watchlists', requireRole('analyst'), async (c) => {
   requireCriteria(body.criteria);
   const org = orgId(c);
   const now = deps.clock.now();
-  // Lock the org row so concurrent creates can't both pass the count (FR-027).
+  // Lock the org row so concurrent creates can't both pass the count (FR-027) — nor the plan limit (008/FR-036).
   const w = await deps.db.transaction(async (tx) => {
     await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for('update');
+    await assertWithinPlan(deps, org, 'watchlists', 1, { db: tx });
     const [{ n }] = await tx.select({ n: count() }).from(watchlists).where(eq(watchlists.orgId, org));
     if (n >= WATCHLIST_LIMIT) {
       throw new HttpError(409, 'watchlist_limit', `You can have up to ${WATCHLIST_LIMIT} watchlists — delete one first.`, { limit: WATCHLIST_LIMIT });

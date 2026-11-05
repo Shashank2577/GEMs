@@ -10,7 +10,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
-import { anyKeywordCondition, SEARCH_SEPARATORS } from '../src/lib/tender-search';
+import { anyKeywordCondition, SEARCH_INVISIBLES, SEARCH_SEPARATORS } from '../src/lib/tender-search';
 import { byPreviewOrder, escapeLike, phraseLike, type Candidate } from '../src/routes/watchlists';
 import { dispatchNotifications } from '../src/services/alerts';
 import { matchAndNotify, runIngestion } from '../src/services/ingest';
@@ -762,6 +762,64 @@ describe('watchlist SQL helpers and batched matching', () => {
     }
   });
 
+  it('008/FR-073 (review R2-S1): invisible format characters and combining marks keep the pre-filter a superset', async () => {
+    const prefix = 'GEM/2099/B/7915';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7915${n}`, contentHash: `fts-r2s1-${n}`, ...extra,
+    });
+    const hits = async (keyword: string) => {
+      const sqlHits = (await ctx.db.select({ bidNumber: tenders.bidNumber }).from(tenders)
+        .where(and(like(tenders.bidNumber, `${prefix}%`), anyKeywordCondition([keyword])))).map((r) => r.bidNumber).sort();
+      const all = await ctx.db.select().from(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      const crit = compileCriteria({ keywords: [keyword] });
+      const matched = all.filter((t) => matchTender(t, crit, { now: ctx.clock.now() }).matched).map((t) => t.bidNumber).sort();
+      return { sql: sqlHits, matched };
+    };
+    try {
+      await ctx.db.insert(tenders).values([
+        row(1, 'Solar​street light poles'), // zero-width space
+        row(2, 'LED­lamp fittings'), // soft hyphen
+        row(3, 'Toner⁠cartridge'), // word joiner
+        row(4, 'Misc', { items: [{ name: 'Paper﻿reams' }, { name: 'A4‌paper' }, { name: 'IS‍2062 plates' }] }), // BOM, ZWNJ, ZWJ in items
+        row(5, 'किताब की आपूर्ति'), // Hindi: "ताब" after the matra ि is not a word
+        row(6, 'सोलर स्ट्रीट लाइट'),
+        row(7, 'Café chairs'), // decomposed é
+      ]);
+      const b = (...ns: number[]) => ns.map((n) => `${prefix}${n}`);
+      const cases: [string, number[]][] = [
+        ['street', [1]], ['street light', [1]], ['solar', [1]], ['lamp', [2]], ['LED', [2]], ['cartridge', [3]], ['toner', [3]],
+        ['reams', [4]], ['paper', [4]], ['2062', [4]], ['IS 2062', []], // the matcher joins words only by space - _ /
+        ['ताब', []], ['किताब', [5]], ['सोलर', [6]], ['सोलर लाइट', []], ['स्ट्रीट लाइट', [6]],
+        ['cafe', []], ['café', [7]], ['chairs', [7]],
+      ];
+      for (const [k, want] of cases) {
+        const r = await hits(k);
+        expect(r.matched, `matcher: ${JSON.stringify(k)}`).toEqual(b(...want));
+        expect(r.sql, `pre-filter: ${JSON.stringify(k)}`).toEqual(expect.arrayContaining(r.matched));
+      }
+      // The column itself: the invisible characters became separators.
+      const [lexemes] = (await ctx.db.execute(sql`select tsvector_to_array(search)::text as l from tenders where bid_number = ${`${prefix}1`}`)).rows as { l: string }[];
+      expect(lexemes.l).toBe('{2099,79151,b,gem,light,poles,solar,street}');
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
+
+  it('008/FR-073 (review R2-N2): a tender with > 1 MB of item names is stored (the item-name part of the column is capped)', async () => {
+    const bid = 'GEM/2099/B/79160001';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    // ~1.6 MB of distinct words: uncapped, to_tsvector fails with "string is too long for tsvector".
+    const items = Array.from({ length: 160 }, (_, i) => ({ name: Array.from({ length: 1000 }, (_, j) => `w${i}x${j}`).join(' ') }));
+    try {
+      await ctx.db.insert(tenders).values({ bidNumber: bid, title: 'Huge item list', endAt: end, status: 'open', sourceUrl: `${GEM}/bid/79160001`, contentHash: 'fts-r2n2', items });
+      const found = await ctx.db.select({ id: tenders.id }).from(tenders).where(and(eq(tenders.bidNumber, bid), anyKeywordCondition(['huge item list'])));
+      expect(found).toHaveLength(1);
+    } finally {
+      await ctx.db.delete(tenders).where(eq(tenders.bidNumber, bid));
+    }
+  });
+
   it('008/FR-073 property: on a generated corpus of tricky strings the keyword pre-filter is a superset of the matcher', async () => {
     const prefix = 'GEM/2099/B/7920';
     const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
@@ -769,9 +827,14 @@ describe('watchlist SQL helpers and batched matching', () => {
     const rnd = () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
     const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
     const WORDS = ['IS', '2062', 'Covid', '19', 'Grade', '43', 'RS', '232', 'M', '30', 'ABC', '123', 'DEF', 'cctv', 'laptops', 'laptop',
-      'bag', 'UPS', '1kVA', 'café', 'न्यू', 'दिल्ली', 'A4', 'paper', 'x', 'e5', '1e5', '0.5', 'amp', 'or', 'and', 'not', 'ñandú', 'Ⅳ', '²'];
+      'bag', 'UPS', '1kVA', 'café', 'न्यू', 'दिल्ली', 'A4', 'paper', 'x', 'e5', '1e5', '0.5', 'amp', 'or', 'and', 'not', 'ñandú', 'Ⅳ', '²',
+      // review R2-S1: combining marks — decomposed Latin (e + U+0301), a bare mark, Devanagari words with matras/virama
+      // (सोलर, लाइट, किताब, क्षमता), a matra standing alone.
+      'cafe\u0301', 'e\u0301', '\u0301', 'n\u0303andu', 'सोलर', 'लाइट', 'किताब', 'ताब', 'क्षमता', 'ि', 'स्ट्रीट'];
     const SEPS = [' ', ' ', '-', '/', '.', '_', '<', '>', '+', '&', ',', '(', ')', ':', '@', '"', "'", '–', '€', '\n', '#', '*', '|', '!',
-      '\\', '~', '=', '?', ';', '[', ']', '{', '}', '%', '^', '`', '$', '·', '&amp;', '://', ' -', '- '];
+      '\\', '~', '=', '?', ';', '[', ']', '{', '}', '%', '^', '`', '$', '·', '&amp;', '://', ' -', '- ',
+      // review R2-S1: invisible format characters (soft hyphen, ZWSP, ZWNJ, ZWJ, word joiner, BOM) and a bare mark.
+      '\u00AD', '\u200B', '\u200C', '\u200D', '\u2060', '\uFEFF', ' \u200B', '\u0301', '\u093F'];
     const phrase = (min: number, max: number) => {
       const n = min + Math.floor(rnd() * (max - min + 1));
       let out = rnd() < 0.3 ? pick(SEPS) : '';
@@ -788,6 +851,8 @@ describe('watchlist SQL helpers and batched matching', () => {
     const keywords = [
       'Covid 19', 'IS 2062', '2062', 'Grade 43', '43', 'RS 232', '232', '30', '123', 'cctv', 'laptop bag', '-cctv', '"laptop',
       'UPS-1kVA', 'café', 'न्यू', '1e5', '0.5', 'or', 'A4 paper', 'amp', '<cctv>',
+      // review R2-S1: keywords around invisible characters and combining marks (incl. Hindi).
+      'cafe', 'cafe\u0301', 'e', 'सोलर', 'सोलर लाइट', 'ताब', 'किताब', 'क्षमता', 'स्ट्रीट', 'laptop\u200Bbag', 'IS\u00AD2062', 'paper\uFEFF',
       ...Array.from({ length: 120 }, () => phrase(1, 3)),
     ];
     try {
@@ -815,10 +880,15 @@ describe('watchlist SQL helpers and batched matching', () => {
   it('SEARCH_SEPARATORS is exactly the translate() set of the tenders_search migration', () => {
     const file = readdirSync(MIGRATIONS).find((f) => /_tenders_search\.sql$/.test(f))!;
     const body = readFileSync(`${MIGRATIONS}/${file}`, 'utf8');
-    const m = /'(!"#[^\n]*?)', '( +)'\)\)/.exec(body);
+    // `'<ASCII punctuation>' || U&'<\XXXX escapes>', '<spaces>'` — the ASCII part byte for byte, the escapes decoded.
+    const m = /'(!"#[^\n]*?)' \|\| U&'((?:\\[0-9A-Fa-f]{4})+)', '( +)'\)\)/.exec(body);
     expect(m).not.toBeNull();
-    expect(m![1].replace(/''/g, "'")).toBe(SEARCH_SEPARATORS);
-    expect(m![2]).toHaveLength(SEARCH_SEPARATORS.length);
+    const invisibles = m![2].match(/[0-9A-Fa-f]{4}/g)!.map((h) => String.fromCharCode(parseInt(h, 16))).join('');
+    expect(invisibles).toBe(SEARCH_INVISIBLES);
+    expect(m![1].replace(/''/g, "'") + invisibles).toBe(SEARCH_SEPARATORS);
+    expect(m![3]).toHaveLength(SEARCH_SEPARATORS.length);
+    expect([...SEARCH_INVISIBLES].map((c) => c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')))
+      .toEqual(['00AD', '200B', '200C', '200D', '2060', 'FEFF']);
   });
 
   it('preview tolerates a tender whose items jsonb is not an array (no 500)', async () => {
@@ -854,6 +924,14 @@ describe('notifications ?kind validation (003/FR-049)', () => {
     expect(ok.status).toBe(200);
     expect(ok.body.items.every((i: { kind: string }) => i.kind === 'tender_match')).toBe(true);
     expect((await get('/notifications?kind=digest', team.owner)).body.total).toBe(0);
+  });
+
+  it('accepts the corrigendum and result kinds (US5)', async () => {
+    for (const kind of ['corrigendum', 'result']) {
+      const r = await get(`/notifications?kind=${kind}`, team.owner);
+      expect(r.status).toBe(200);
+      expect(r.body.items.every((i: { kind: string }) => i.kind === kind)).toBe(true);
+    }
   });
 });
 

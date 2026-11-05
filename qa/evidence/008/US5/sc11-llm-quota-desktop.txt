@@ -1,0 +1,7 @@
+# sc11-llm-quota — project desktop — 2026-11-05T09:32:01.363Z
+### analyse (AI quota exhausted)
+> POST analyse
+< 201
+{"id":"62896e59-47b4-474f-a757-e2507f4c9a22","orgId":"1398b2e7-bb9e-46aa-9525-f4d83ce92bd5","tenderId":"454910e2-803e-4e3f-a615-4c4b346db2b7","status":"done","method":"rules","requirements":[{"key":"bid_published_at","label":"Bid published on","value":"2026-11-28T00:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Dated: 28-11-2026 Bid Document Bid Details","fileName":"bid.pdf","documentId":"bd59fe8d-f379-4804-9976-4637aef70f39"},"numeric":null,"mandatory":false,"confidence":0.95},{"key":"bid_end","label":"Bid end date","value":"2026-11-28T15:00:00+05:30","method":"RULE","source":{"page":1,"quote":"Bid End Date/Time 28-11-2026 15:00:00","fileName":"bid.pdf","documentId":"bd59fe8d-f379-4804-9976-4637aef70f39"},"numeric":null,"mandatory":false,"confidence":0.95},{"key":"bid_opening","label":"Bid opening date","value":"2026-11-28T15:30:00+05:30","method":"RULE","source":{"page":1,"q
+
+analysis.method=rules, warnings=[llm_quota_reached], fake LLM calls=0, UI shows the message

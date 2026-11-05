@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { and, desc, eq } from 'drizzle-orm';
-import { activityLog, apiTokens } from '@tp/db';
+import { activityLog, apiTokens, organizations } from '@tp/db';
 import { assertWritable } from '../src/middleware/auth';
 import { errorHandler } from '../src/middleware/error';
 import type { AppEnv } from '../src/types';
@@ -79,7 +79,9 @@ describe('002/FR-037 token expiry and hint', () => {
 describe('002/FR-037 at most 10 active tokens per user per org', () => {
   it('the 11th active token is 409 token_limit; revoking or expiry frees a slot; other users/orgs unaffected', async () => {
     ctx.clock.set(START);
-    const { owner, analyst } = await seedOrgWithRoles(ctx.app, 'Limit Co');
+    const { owner, analyst, orgId } = await seedOrgWithRoles(ctx.app, 'Limit Co');
+    // A paid plan: the clock jumps past the 14-day trial below, which would make the org read-only (008/FR-038).
+    await ctx.db.update(organizations).set({ plan: 'pro', trialEndsAt: null }).where(eq(organizations.id, orgId));
     const ids: string[] = [];
     for (let i = 0; i < API_TOKEN_LIMIT; i++) {
       const r = await create(owner.cookie, { name: `t${i}`, expiresInDays: i === 0 ? 30 : 90 });

@@ -1,0 +1,3 @@
+# sc8-countdown-banners — project mobile — 2026-11-05T09:32:35.801Z
+localStorage tp-trial-banner-dismissed:27ea3ddf-f41d-49ad-a7b7-0d369190472f = "2026-11-05"
+dismissal stored for 2020-01-01 → banner shown again (dismissal is per IST day)

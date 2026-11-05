@@ -51,6 +51,11 @@ export interface LlmResult {
   usage: { inputTokens: number; outputTokens: number };
 }
 
+export interface LlmCallOptions {
+  /** Called once the provider answered, with its token usage (also when the reply is not valid JSON; 008/FR-039). */
+  onUsage?: (r: Pick<LlmResult, 'model' | 'usage'>) => void;
+}
+
 export interface LlmClient {
   readonly model: string;
   complete(req: LlmRequest): Promise<LlmResult>;
@@ -58,7 +63,7 @@ export interface LlmClient {
    * Ask for JSON and parse it (tolerates ```json fences and leading prose).
    * Throws `LlmError` when the reply is not valid JSON. Validate the result with zod.
    */
-  completeJson<T = unknown>(req: LlmRequest): Promise<T>;
+  completeJson<T = unknown>(req: LlmRequest, opts?: LlmCallOptions): Promise<T>;
 }
 
 // ───────────── Messaging ─────────────

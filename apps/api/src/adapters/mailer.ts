@@ -5,6 +5,17 @@ import { isTransientStatus, ProviderError, providerFetch } from './provider-erro
 /** Resend's `/emails/batch` accepts at most 100 messages per call (008/FR-074). */
 export const RESEND_BATCH_MAX = 100;
 
+/** Resend 409 `name` for "a request with this idempotency key is still being processed" (retry later). */
+export const RESEND_CONCURRENT_IDEMPOTENT = 'concurrent_idempotent_requests';
+
+/** The `name` field of a Resend error body (`{"statusCode":409,"name":"…","message":"…"}`), if any. */
+function resendErrorName(body: string): string | undefined {
+  try {
+    const name = (JSON.parse(body) as { name?: unknown }).name;
+    return typeof name === 'string' ? name : undefined;
+  } catch { return undefined; }
+}
+
 export function createResendMailer(opts: { apiKey: string; from: string; fetch?: typeof fetch; logger: Logger }): Mailer {
   const f = opts.fetch ?? fetch;
   const payload = (msg: EmailMessage) => ({
@@ -26,7 +37,14 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetch?:
     });
     const text = await res.text();
     // 408/429/5xx are transient (retried by the dispatcher); other 4xx (validation, auth, domain) are permanent.
-    if (!res.ok) throw new ProviderError(`Resend error ${res.status}: ${text.slice(0, 500)}`, isTransientStatus(res.status), res.status);
+    // Resend's 409 has two meanings, told apart by the error `name` (review R2-N1): `concurrent_idempotent_requests` —
+    // the first request with this key is still in flight and may yet fail → transient; `invalid_idempotent_request` —
+    // the key was already used (with a different payload) → the original request settled.
+    if (!res.ok) {
+      const code = resendErrorName(text);
+      const transient = isTransientStatus(res.status) || (res.status === 409 && code === RESEND_CONCURRENT_IDEMPOTENT);
+      throw new ProviderError(`Resend error ${res.status}: ${text.slice(0, 500)}`, transient, res.status, code);
+    }
     return text;
   };
   return {

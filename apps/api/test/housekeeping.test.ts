@@ -4,7 +4,7 @@
  * `{ job: 'housekeeping', deleted: {…} }`, runs once per IST day after 02:00 IST, and a second run deletes 0.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   bidWorkspaces, gemThrottle, invitations, jobRuns, notifications, packets, rateLimits, sessions, tenderEvents, tenders,
 } from '@tp/db';
@@ -244,6 +244,48 @@ describe('housekeeping on a fixed clock (US7 scenario 5)', () => {
     expect(run!.finishedAt).toBeInstanceOf(Date);
     // A finished run is never taken over, however old.
     expect(await runHousekeeping(at(new Date(later.getTime() + 3 * HOUR)))).toMatchObject({ ran: false, reason: 'already_ran' });
+  });
+
+  it('review R2-N3: a run whose claim was taken over neither finishes nor releases the new owner’s claim', async () => {
+    const takeover = async (d: string, startedAt: Date) => {
+      await ctx.db.update(jobRuns).set({ startedAt, finishedAt: null, summary: null }).where(and(eq(jobRuns.job, 'housekeeping'), eq(jobRuns.day, d)));
+    };
+    /** deps whose first `db.execute` (inside pruneOnce) first lets another runner take the claim over, then succeeds / throws. */
+    const slowRun = (t: Date, d: string, newOwner: Date, fail: boolean) => {
+      let first = true;
+      const db = new Proxy(ctx.db, {
+        get: (target, prop) => {
+          if (prop !== 'execute') return Reflect.get(target, prop);
+          return async (...args: unknown[]) => {
+            if (first) { first = false; await takeover(d, newOwner); if (fail) throw new Error('died late'); }
+            return (target.execute as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        },
+      }) as typeof ctx.db;
+      return { ...deps(), db, clock: { now: () => t } };
+    };
+
+    // Finishing late: the new owner's claim stays unfinished (it will write its own finish).
+    const day6 = new Date(NOW.getTime() + 5 * DAY);
+    const d6 = istDay(day6);
+    const owner6 = new Date(day6.getTime() + HOUSEKEEPING_STALE_CLAIM_MS + HOUR);
+    expect(await runHousekeeping(slowRun(day6, d6, owner6, false))).toMatchObject({ ran: true, day: d6 });
+    const [r6] = await ctx.db.select().from(jobRuns).where(eq(jobRuns.day, d6));
+    expect(r6).toMatchObject({ startedAt: owner6, finishedAt: null, summary: null });
+
+    // Failing late: the new owner's claim is not deleted.
+    const day7 = new Date(NOW.getTime() + 6 * DAY);
+    const d7 = istDay(day7);
+    const owner7 = new Date(day7.getTime() + HOUSEKEEPING_STALE_CLAIM_MS + HOUR);
+    await expect(runHousekeeping(slowRun(day7, d7, owner7, true))).rejects.toThrow('died late');
+    const [r7] = await ctx.db.select().from(jobRuns).where(eq(jobRuns.day, d7));
+    expect(r7).toMatchObject({ startedAt: owner7, finishedAt: null });
+
+    // Our own claim is still finished normally (the fence matches the claim we wrote).
+    const day8 = new Date(NOW.getTime() + 7 * DAY);
+    expect(await runHousekeeping({ ...deps(), clock: { now: () => day8 } })).toMatchObject({ ran: true });
+    const [r8] = await ctx.db.select().from(jobRuns).where(eq(jobRuns.day, istDay(day8)));
+    expect(r8).toMatchObject({ startedAt: day8, finishedAt: day8 });
   });
 
   it('review S6: packet blobs go in deleteMany calls of ≤ 1,000 keys, at most HOUSEKEEPING_MAX_PACKET_BLOBS per run', async () => {
