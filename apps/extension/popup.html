@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TenderPilot co-pilot</title>
+    <link rel="stylesheet" href="./src/popup.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#4f46e5"/><path d="M9 21.5 16 8l7 13.5-7-3.6z" fill="#fff"/><circle cx="16" cy="24" r="1.8" fill="#f59e0b"/></svg>
+        <div><strong>TenderPilot</strong><span>GeM co-pilot</span></div>
+      </div>
+      <button id="settings-btn" class="icon-btn" aria-label="Settings" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </header>
+
+    <section id="settings" class="card" hidden>
+      <h2>Connect to TenderPilot</h2>
+      <p class="muted">Create a personal API token in TenderPilot → Settings → API tokens.</p>
+      <label>TenderPilot URL<input id="api-base" type="url" placeholder="https://app.tenderpilot.in" autocomplete="off" /></label>
+      <label>API token<input id="token" type="password" placeholder="tp_…" autocomplete="off" /></label>
+      <div class="row"><button id="save" class="btn primary">Save &amp; connect</button><span id="settings-status" class="muted" role="status"></span></div>
+    </section>
+
+    <main id="main" hidden>
+      <label class="select-label">Bid workspace
+        <select id="workspace"></select>
+      </label>
+      <div id="ws-meta" class="meta"></div>
+
+      <div class="actions">
+        <button id="scan" class="btn">Highlight fields</button>
+        <button id="fill" class="btn primary">Fill allowed fields</button>
+      </div>
+      <p id="page-status" class="status" role="status" aria-live="polite"></p>
+
+      <section class="card">
+        <h3>Prepared values <span class="pill">non-financial only</span></h3>
+        <ul id="fields" class="fields"></ul>
+      </section>
+
+      <section class="card">
+        <h3>Upload in this order</h3>
+        <ol id="docs" class="docs"></ol>
+      </section>
+
+      <section class="card human">
+        <h3>Only you can do these on GeM</h3>
+        <ol id="steps" class="steps"></ol>
+      </section>
+    </main>
+
+    <p id="error" class="error" role="alert" hidden></p>
+    <footer class="foot">TenderPilot never enters prices, solves CAPTCHA, performs OTP / DSC / e-Sign or submits bids.</footer>
+    <script type="module" src="./src/popup.ts"></script>
+  </body>
+</html>

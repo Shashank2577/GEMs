@@ -1,0 +1,384 @@
+[
+  {
+    "id": "7421101",
+    "b_id": [
+      7421101
+    ],
+    "b_bid_number": [
+      "GEM/2026/B/6421101"
+    ],
+    "b_category_name": [
+      "Laptop - Notebook"
+    ],
+    "bd_category_name": [
+      "Laptop - Notebook (Q2)"
+    ],
+    "b_total_quantity": [
+      75
+    ],
+    "ba_official_details_minName": [
+      "Maharashtra"
+    ],
+    "ba_official_details_deptName": [
+      "Higher and Technical Education Department"
+    ],
+    "final_start_date_sort": [
+      "2026-11-04T12:00:00Z"
+    ],
+    "final_end_date_sort": [
+      "2026-11-19T15:00:00Z"
+    ],
+    "b_bid_type": [
+      1
+    ],
+    "b_status": [
+      1
+    ],
+    "b_buyer_status": [
+      0
+    ],
+    "b_type": [
+      0
+    ],
+    "is_high_value": [
+      false
+    ],
+    "b_is_bunch": [
+      0
+    ],
+    "b_eval_type": [
+      0
+    ],
+    "b_ra_to_bid_details": [],
+    "ba_official_details_officeName": [
+      "Directorate of Technical Education, Mumbai"
+    ],
+    "b_emd_amount": [
+      "1.5 Lakh"
+    ],
+    "b_estimated_value": [
+      "60 Lakh"
+    ],
+    "b_hsn_code": [
+      "84713010"
+    ]
+  },
+  {
+    "id": "7421102",
+    "b_id": [
+      7421102
+    ],
+    "b_bid_number": [
+      "GEM/2026/B/6421102"
+    ],
+    "b_category_name": [
+      "CCTV Camera (V2)"
+    ],
+    "bd_category_name": [
+      "CCTV Camera (V2) (Q2), Network Video Recorder (NVR) (Q2)"
+    ],
+    "b_total_quantity": [
+      220
+    ],
+    "ba_official_details_minName": [
+      "Maharashtra"
+    ],
+    "ba_official_details_deptName": [
+      "Home Department"
+    ],
+    "final_start_date_sort": [
+      "2026-11-04T13:00:00Z"
+    ],
+    "final_end_date_sort": [
+      "2026-11-22T18:00:00Z"
+    ],
+    "b_bid_type": [
+      1
+    ],
+    "b_status": [
+      1
+    ],
+    "b_buyer_status": [
+      0
+    ],
+    "b_type": [
+      0
+    ],
+    "is_high_value": [
+      false
+    ],
+    "b_is_bunch": [
+      0
+    ],
+    "b_eval_type": [
+      0
+    ],
+    "b_ra_to_bid_details": [],
+    "ba_official_details_officeName": [
+      "Commissioner of Police, Nagpur"
+    ],
+    "b_emd_amount": [
+      "2.8 Lakh"
+    ],
+    "b_estimated_value": [
+      "1.4 Crore"
+    ],
+    "b_hsn_code": [
+      "85258020"
+    ]
+  },
+  {
+    "id": "7421103",
+    "b_id": [
+      7421103
+    ],
+    "b_bid_number": [
+      "GEM/2026/B/6421103"
+    ],
+    "b_category_name": [
+      "Manpower Outsourcing Services - Fixed Remuneration - Data Entry Operator"
+    ],
+    "bd_category_name": [
+      "Manpower Outsourcing Services - Fixed Remuneration - Data Entry Operator"
+    ],
+    "b_total_quantity": [
+      30
+    ],
+    "ba_official_details_minName": [
+      "Rajasthan"
+    ],
+    "ba_official_details_deptName": [
+      "Department of Information Technology and Communication"
+    ],
+    "final_start_date_sort": [
+      "2026-11-04T14:00:00Z"
+    ],
+    "final_end_date_sort": [
+      "2026-11-16T15:00:00Z"
+    ],
+    "b_bid_type": [
+      1
+    ],
+    "b_status": [
+      1
+    ],
+    "b_buyer_status": [
+      0
+    ],
+    "b_type": [
+      1
+    ],
+    "is_high_value": [
+      false
+    ],
+    "b_is_bunch": [
+      0
+    ],
+    "b_eval_type": [
+      0
+    ],
+    "b_ra_to_bid_details": [
+      "RA enabled: Yes"
+    ],
+    "ba_official_details_officeName": [
+      "RajCOMP Info Services, Jaipur"
+    ],
+    "b_emd_amount": [
+      "1.8 Lakh"
+    ],
+    "b_estimated_value": [
+      "90 Lakh"
+    ]
+  },
+  {
+    "id": "7421104",
+    "b_id": [
+      7421104
+    ],
+    "b_bid_number": [
+      "GEM/2026/B/6421104"
+    ],
+    "b_category_name": [
+      "Solar Power Pack (Q2)"
+    ],
+    "bd_category_name": [
+      "Solar Power Pack (Q2)"
+    ],
+    "b_total_quantity": [
+      400
+    ],
+    "ba_official_details_minName": [
+      "Ministry of New and Renewable Energy"
+    ],
+    "ba_official_details_deptName": [
+      "Department of New and Renewable Energy"
+    ],
+    "final_start_date_sort": [
+      "2026-11-04T15:00:00Z"
+    ],
+    "final_end_date_sort": [
+      "2026-11-24T18:00:00Z"
+    ],
+    "b_bid_type": [
+      1
+    ],
+    "b_status": [
+      1
+    ],
+    "b_buyer_status": [
+      0
+    ],
+    "b_type": [
+      0
+    ],
+    "is_high_value": [
+      false
+    ],
+    "b_is_bunch": [
+      0
+    ],
+    "b_eval_type": [
+      0
+    ],
+    "b_ra_to_bid_details": [],
+    "ba_official_details_orgName": [
+      "Solar Energy Corporation of India"
+    ],
+    "ba_official_details_officeName": [
+      "SECI, New Delhi"
+    ],
+    "b_emd_amount": [
+      "4 Lakh"
+    ],
+    "b_estimated_value": [
+      "2 Crore"
+    ],
+    "b_hsn_code": [
+      "85414300"
+    ]
+  },
+  {
+    "id": "7421105",
+    "b_id": [
+      7421105
+    ],
+    "b_bid_number": [
+      "GEM/2026/B/6421105"
+    ],
+    "b_category_name": [
+      "Office Chair (V3)"
+    ],
+    "bd_category_name": [
+      "Office Chair (V3)"
+    ],
+    "b_total_quantity": [
+      180
+    ],
+    "ba_official_details_minName": [
+      "Karnataka"
+    ],
+    "ba_official_details_deptName": [
+      "Urban Development Department"
+    ],
+    "final_start_date_sort": [
+      "2026-11-04T16:00:00Z"
+    ],
+    "final_end_date_sort": [
+      "2026-11-15T15:00:00Z"
+    ],
+    "b_bid_type": [
+      1
+    ],
+    "b_status": [
+      1
+    ],
+    "b_buyer_status": [
+      0
+    ],
+    "b_type": [
+      0
+    ],
+    "is_high_value": [
+      false
+    ],
+    "b_is_bunch": [
+      0
+    ],
+    "b_eval_type": [
+      0
+    ],
+    "b_ra_to_bid_details": [],
+    "ba_official_details_officeName": [
+      "Bruhat Bengaluru Mahanagara Palike"
+    ],
+    "b_emd_amount": [
+      80000
+    ],
+    "b_hsn_code": [
+      "94013000"
+    ]
+  },
+  {
+    "id": "7421106",
+    "b_id": [
+      7421106
+    ],
+    "b_bid_number": [
+      "GEM/2026/B/6421106"
+    ],
+    "b_category_name": [
+      "Hiring of Vehicles - Monthly basis - SUV"
+    ],
+    "bd_category_name": [
+      "Hiring of Vehicles - Monthly basis - SUV"
+    ],
+    "b_total_quantity": [
+      12
+    ],
+    "ba_official_details_minName": [
+      "Gujarat"
+    ],
+    "ba_official_details_deptName": [
+      "Home Department"
+    ],
+    "final_start_date_sort": [
+      "2026-11-04T10:00:00Z"
+    ],
+    "final_end_date_sort": [
+      "2026-11-13T18:00:00Z"
+    ],
+    "b_bid_type": [
+      1
+    ],
+    "b_status": [
+      1
+    ],
+    "b_buyer_status": [
+      0
+    ],
+    "b_type": [
+      1
+    ],
+    "is_high_value": [
+      false
+    ],
+    "b_is_bunch": [
+      0
+    ],
+    "b_eval_type": [
+      0
+    ],
+    "b_ra_to_bid_details": [
+      "RA enabled: Yes"
+    ],
+    "ba_official_details_officeName": [
+      "Gujarat Police HQ, Gandhinagar"
+    ],
+    "b_emd_amount": [
+      "1.4 Lakh"
+    ],
+    "b_estimated_value": [
+      "70 Lakh"
+    ]
+  }
+]

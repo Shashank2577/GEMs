@@ -1,0 +1,157 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { extractCsrfToken, GemClient, GemError } from '../../src/gem/client';
+
+const FIX = join(__dirname, '../fixtures/gem');
+const page = (n: number) => readFileSync(join(FIX, `page-${n}.json`), 'utf8');
+const TOKEN = '0123456789abcdef0123456789abcdef';
+
+interface Call { url: string; method: string; headers: Record<string, string>; body?: string }
+
+/** Scriptable fake BidPlus. */
+function fakeGem(handler?: (c: Call, n: number) => Response | Promise<Response> | undefined) {
+  const calls: Call[] = [];
+  const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const c: Call = { url: String(input), method: init?.method ?? 'GET', headers: Object.fromEntries(new Headers(init?.headers).entries()), body: init?.body as string | undefined };
+    calls.push(c);
+    const custom = await handler?.(c, calls.length);
+    if (custom) return custom;
+    if (c.url.endsWith('/all-bids')) {
+      return new Response(`<html><script>var data = {'csrf_bd_gem_nk':'${TOKEN}'};</script></html>`, {
+        headers: { 'content-type': 'text/html', 'set-cookie': `csrf_gem_cookie=${TOKEN}; Path=/; HttpOnly` },
+      });
+    }
+    if (c.url.endsWith('/all-bids-data')) {
+      const form = new URLSearchParams(c.body);
+      if (form.get('csrf_bd_gem_nk') !== TOKEN) return new Response('forbidden', { status: 403 });
+      const payload = JSON.parse(form.get('payload')!);
+      return new Response(page(payload.page), { headers: { 'content-type': 'application/json' } });
+    }
+    if (c.url.includes('/showbidDocument/')) return new Response(new TextEncoder().encode('%PDF-1.7 fake'), { headers: { 'content-type': 'application/pdf' } });
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+  return { f, calls };
+}
+
+function fakeTime() {
+  let t = 1_000_000;
+  const sleeps: number[] = [];
+  return { now: () => t, sleep: async (ms: number) => { sleeps.push(ms); t += ms; }, sleeps, advance: (ms: number) => { t += ms; } };
+}
+
+describe('GemClient', () => {
+  it('bootstraps CSRF from the cookie, posts a form-encoded payload and parses the page', async () => {
+    const { f, calls } = fakeGem();
+    const time = fakeTime();
+    const gem = new GemClient(f, { baseUrl: 'http://gem.test/', minIntervalMs: 0, sleep: time.sleep, now: time.now });
+    const { tenders, numFound, rawCount } = await gem.fetchTenders({ page: 2, search: 'laptop', now: new Date('2026-11-04T00:00:00Z') });
+    expect(numFound).toBe(36);
+    expect(rawCount).toBe(10);
+    expect(tenders).toHaveLength(10);
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual(['GET http://gem.test/all-bids', 'POST http://gem.test/all-bids-data']);
+    const post = calls[1];
+    expect(post.headers['content-type']).toContain('application/x-www-form-urlencoded');
+    expect(post.headers.cookie).toBe(`csrf_gem_cookie=${TOKEN}`);
+    expect(post.headers['user-agent']).toMatch(/TenderPilot/);
+    const payload = JSON.parse(new URLSearchParams(post.body).get('payload')!);
+    expect(payload).toMatchObject({ page: 2, param: { searchBid: 'laptop', searchType: 'fullText' }, filter: { bidStatusType: 'ongoing_bids' } });
+    expect(tenders[0].sourceUrl.startsWith('http://gem.test/')).toBe(true);
+  });
+
+  it('reuses the session across pages', async () => {
+    const { f, calls } = fakeGem();
+    const time = fakeTime();
+    const gem = new GemClient(f, { minIntervalMs: 0, sleep: time.sleep, now: time.now });
+    await gem.fetchPage({ page: 1 });
+    await gem.fetchPage({ page: 2 });
+    expect(calls.filter((c) => c.url.endsWith('/all-bids'))).toHaveLength(1);
+    expect(gem.requests).toBe(3);
+  });
+
+  it('throttles to ≤ 1 request per minIntervalMs', async () => {
+    const { f } = fakeGem();
+    const time = fakeTime();
+    const gem = new GemClient(f, { minIntervalMs: 1000, sleep: time.sleep, now: time.now });
+    await Promise.all([gem.fetchPage({ page: 1 }), gem.fetchPage({ page: 2 }), gem.fetchPage({ page: 3 })]);
+    // 1 bootstrap + 3 listing requests → 3 waits of 1000 ms
+    expect(time.sleeps).toEqual([1000, 1000, 1000]);
+  });
+
+  it('retries 5xx with exponential back-off', async () => {
+    let failures = 2;
+    const { f, calls } = fakeGem((c) => {
+      if (c.url.endsWith('/all-bids-data') && failures-- > 0) return new Response('busy', { status: 503 });
+      return undefined;
+    });
+    const time = fakeTime();
+    const gem = new GemClient(f, { minIntervalMs: 0, backoffMs: 500, sleep: time.sleep, now: time.now });
+    const p = await gem.fetchPage({ page: 1 });
+    expect(p.docs).toHaveLength(10);
+    expect(time.sleeps).toEqual([500, 1000]);
+    expect(calls.filter((c) => c.url.endsWith('/all-bids-data'))).toHaveLength(3);
+  });
+
+  it('honours Retry-After on 429', async () => {
+    let once = true;
+    const { f } = fakeGem((c) => {
+      if (c.url.endsWith('/all-bids-data') && once) { once = false; return new Response('slow down', { status: 429, headers: { 'retry-after': '7' } }); }
+      return undefined;
+    });
+    const time = fakeTime();
+    const gem = new GemClient(f, { minIntervalMs: 0, sleep: time.sleep, now: time.now });
+    await gem.fetchPage();
+    expect(time.sleeps).toEqual([7000]);
+  });
+
+  it('gives up after maxRetries on network errors', async () => {
+    const f = (async () => { throw new TypeError('fetch failed'); }) as typeof fetch;
+    const time = fakeTime();
+    const gem = new GemClient(f, { minIntervalMs: 0, maxRetries: 2, backoffMs: 100, sleep: time.sleep, now: time.now });
+    await expect(gem.fetchPage()).rejects.toThrow(/unreachable/);
+    expect(time.sleeps).toEqual([100, 200]);
+  });
+
+  it('re-bootstraps once on 403 (expired CSRF)', async () => {
+    let n = 0;
+    const { f, calls } = fakeGem((c) => {
+      if (c.url.endsWith('/all-bids-data') && n++ === 0) return new Response('expired', { status: 403 });
+      return undefined;
+    });
+    const time = fakeTime();
+    const gem = new GemClient(f, { minIntervalMs: 0, sleep: time.sleep, now: time.now });
+    await gem.fetchPage();
+    expect(calls.filter((c) => c.url.endsWith('/all-bids'))).toHaveLength(2);
+  });
+
+  it('fails clearly when GeM returns HTML or no token', async () => {
+    const time = fakeTime();
+    const html = fakeGem((c) => (c.url.endsWith('/all-bids-data') ? new Response('<html>maintenance</html>', { headers: { 'content-type': 'text/html' } }) : undefined));
+    await expect(new GemClient(html.f, { minIntervalMs: 0, sleep: time.sleep, now: time.now }).fetchPage()).rejects.toThrow(/HTML/);
+    const noToken = fakeGem((c) => (c.url.endsWith('/all-bids') ? new Response('<html></html>') : undefined));
+    await expect(new GemClient(noToken.f, { minIntervalMs: 0, sleep: time.sleep, now: time.now }).fetchPage()).rejects.toBeInstanceOf(GemError);
+  });
+
+  it('downloads bid documents and validates PDF magic', async () => {
+    const { f } = fakeGem();
+    const time = fakeTime();
+    const gem = new GemClient(f, { baseUrl: 'http://gem.test', minIntervalMs: 0, sleep: time.sleep, now: time.now });
+    const doc = await gem.fetchBidDocument('7421001');
+    expect(doc.url).toBe('http://gem.test/showbidDocument/7421001');
+    expect(new TextDecoder().decode(doc.bytes.slice(0, 5))).toBe('%PDF-');
+    const bad = fakeGem((c) => (c.url.includes('showbid') ? new Response('<html>login</html>') : undefined));
+    await expect(new GemClient(bad.f, { minIntervalMs: 0, sleep: time.sleep, now: time.now }).fetchBidDocument('1')).rejects.toThrow(/PDF/);
+  });
+});
+
+describe('extractCsrfToken', () => {
+  it.each([
+    [`<script>{'csrf_bd_gem_nk':'${TOKEN}'}</script>`],
+    [`<input type="hidden" name="csrf_bd_gem_nk" value="${TOKEN}">`],
+    [`<input value="${TOKEN}" name="csrf_bd_gem_nk">`],
+    [`csrf_bd_gem_nk=${TOKEN}&x=1`],
+  ])('finds the token in %s', (html) => {
+    expect(extractCsrfToken(html)).toBe(TOKEN);
+  });
+  it('returns null when absent', () => expect(extractCsrfToken('<html/>')).toBeNull());
+});

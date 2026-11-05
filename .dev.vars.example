@@ -1,0 +1,21 @@
+# Copy to .dev.vars for `wrangler dev` (or export for `pnpm dev` / node). Never commit real values.
+DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot
+APP_URL=http://localhost:8787
+# Point at tools/mock-gem for local development and E2E; production uses https://bidplus.gem.gov.in
+GEM_BASE_URL=http://localhost:4010
+# GEM_MIN_INTERVAL_MS=1000
+# GEM_MAX_PAGES=5
+
+# Optional integrations — leave empty to run in rules-only / log-only mode.
+ANTHROPIC_API_KEY=
+LLM_MODEL=claude-sonnet-5-5
+RESEND_API_KEY=
+MAIL_FROM=TenderPilot <alerts@tenderpilot.in>
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_ID=
+
+# Node server only (apps/api/src/node.ts)
+PORT=8787
+BLOB_DIR=.data/blobs
+AUTO_MIGRATE=1
+# CRON_INTERVAL_MS=1800000

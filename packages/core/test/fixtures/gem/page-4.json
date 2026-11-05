@@ -1,0 +1,403 @@
+{
+  "code": 200,
+  "status": 1,
+  "message": "Data Found",
+  "response": {
+    "responseHeader": {
+      "status": 0,
+      "QTime": 3,
+      "params": {
+        "start": "30",
+        "rows": "10",
+        "sort": "final_start_date_sort desc"
+      }
+    },
+    "response": {
+      "numFound": 36,
+      "start": 30,
+      "numFoundExact": true,
+      "docs": [
+        {
+          "id": "7421031",
+          "b_id": [
+            7421031
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421031"
+          ],
+          "b_category_name": [
+            "School Furniture - Dual Desk (V2)"
+          ],
+          "bd_category_name": [
+            "School Furniture - Dual Desk (V2)"
+          ],
+          "b_total_quantity": [
+            2500
+          ],
+          "ba_official_details_minName": [
+            "Uttar Pradesh"
+          ],
+          "ba_official_details_deptName": [
+            "Basic Education Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-02T12:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-16T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            1
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_officeName": [
+            "Basic Shiksha Adhikari, Varanasi"
+          ],
+          "b_emd_amount": [
+            "7.5 Lakh"
+          ],
+          "b_estimated_value": [
+            "3.75 Crore"
+          ],
+          "b_hsn_code": [
+            "94036000"
+          ]
+        },
+        {
+          "id": "7421032",
+          "b_id": [
+            7421032
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421032"
+          ],
+          "b_category_name": [
+            "Hiring of Sanitation Service - Hospitals"
+          ],
+          "bd_category_name": [
+            "Hiring of Sanitation Service - Hospitals"
+          ],
+          "b_total_quantity": [
+            1
+          ],
+          "ba_official_details_minName": [
+            "Assam"
+          ],
+          "ba_official_details_deptName": [
+            "Health and Family Welfare Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T13:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-20T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Gauhati Medical College and Hospital, Guwahati"
+          ],
+          "b_emd_amount": [
+            "2.2 Lakh"
+          ],
+          "b_estimated_value": [
+            "1.1 Crore"
+          ]
+        },
+        {
+          "id": "7421033",
+          "b_id": [
+            7421033
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421033"
+          ],
+          "b_category_name": [
+            "Water Purifier / RO Plant (Q3)"
+          ],
+          "bd_category_name": [
+            "Water Purifier / RO Plant (Q3)"
+          ],
+          "b_total_quantity": [
+            140
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Jal Shakti"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Drinking Water and Sanitation"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T14:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-14T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Jal Jeevan Mission, Dehradun"
+          ],
+          "b_emd_amount": [
+            70000
+          ],
+          "b_hsn_code": [
+            "84212120"
+          ]
+        },
+        {
+          "id": "7421034",
+          "b_id": [
+            7421034
+          ],
+          "b_bid_number": [
+            "GEM/2026/R/6421034"
+          ],
+          "b_category_name": [
+            "Laptop - Notebook"
+          ],
+          "bd_category_name": [
+            "Laptop - Notebook (Q2), Wireless Keyboard and Mouse (Q3)"
+          ],
+          "b_total_quantity": [
+            64
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Defence"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Defence Production"
+          ],
+          "final_start_date_sort": [
+            "2026-11-04T15:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-22T18:00:00Z"
+          ],
+          "b_bid_type": [
+            5
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_orgName": [
+            "Bharat Electronics Limited (BEL)"
+          ],
+          "ba_official_details_officeName": [
+            "BEL Bengaluru Complex"
+          ],
+          "b_emd_amount": [
+            "1.6 Lakh"
+          ],
+          "b_estimated_value": [
+            "64 Lakh"
+          ],
+          "b_hsn_code": [
+            "84713010"
+          ]
+        },
+        {
+          "id": "7421035",
+          "b_id": [
+            7421035
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421035"
+          ],
+          "b_category_name": [
+            "Electric Vehicle - Passenger Car (Q2)"
+          ],
+          "bd_category_name": [
+            "Electric Vehicle - Passenger Car (Q2)"
+          ],
+          "b_total_quantity": [
+            20
+          ],
+          "ba_official_details_minName": [
+            "Haryana"
+          ],
+          "ba_official_details_deptName": [
+            "Transport Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-02T16:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-18T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Haryana Roadways, Gurugram"
+          ],
+          "b_emd_amount": [
+            "6 Lakh"
+          ],
+          "b_estimated_value": [
+            "3 Crore"
+          ],
+          "b_hsn_code": [
+            "87038040"
+          ]
+        },
+        {
+          "id": "7421036",
+          "b_id": [
+            7421036
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421036"
+          ],
+          "b_category_name": [
+            "Pest Control Service - Residential/Office"
+          ],
+          "bd_category_name": [
+            "Pest Control Service - Residential/Office"
+          ],
+          "b_total_quantity": [
+            1
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Housing and Urban Affairs"
+          ],
+          "ba_official_details_deptName": [
+            "Central Public Works Department (CPWD)"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T10:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-13T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "CPWD Division, Nagpur"
+          ],
+          "b_emd_amount": [
+            20000
+          ],
+          "b_estimated_value": [
+            "9.6 Lakh"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<!--
+  Test fixture that mimics a GeM BidPlus "participate in bid" form (technical + financial sections).
+  Used by unit tests (descriptor list below mirrors it) and for manual / E2E testing of the extension:
+  serve this folder (e.g. `npx serve apps/extension/test/fixtures`) and open http://localhost:3000/gem-form.html —
+  the manifest injects the content script on *gem-form* pages on localhost.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GeM — Bid participation (fixture)</title>
+  <style>
+    body { font: 14px system-ui, sans-serif; margin: 24px; max-width: 900px; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 24px; }
+    td, th { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    h2 { background: #1b4f72; color: #fff; padding: 6px 10px; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <h1>Bid No. GEM/2026/B/700001 — Supply of Laptops</h1>
+  <form id="bid-form" action="/never-submitted" method="post" onsubmit="window.__submitted = true; return false;">
+    <h2>Technical details</h2>
+    <table>
+      <tr><td><label for="make">Make</label></td><td><input id="make" name="offeredMake" type="text" /></td></tr>
+      <tr><td><label for="model">Model</label></td><td><input id="model" name="offeredModel" type="text" /></td></tr>
+      <tr><td>Brand</td><td><input name="brandName" type="text" /></td></tr>
+      <tr><td><label for="qty">Offered Quantity</label></td><td><input id="qty" name="offeredQty" type="number" /></td></tr>
+      <tr><td><label for="delivery">Delivery Period (days)</label></td><td><input id="delivery" name="deliveryDays" type="number" /></td></tr>
+      <tr><td><label for="coo">Country of Origin</label></td><td><select id="coo" name="countryOfOrigin"><option value="">-- Select --</option><option value="IN">India</option><option value="CN">China</option></select></td></tr>
+      <tr><td><label for="lc">Local Content (%)</label></td><td><input id="lc" name="localContent" type="number" /></td></tr>
+      <tr><td><label for="mse">Do you want to avail MSE purchase preference?</label></td><td><select id="mse" name="mseClaim"><option value="">--</option><option value="Y">Yes</option><option value="N">No</option></select></td></tr>
+      <tr><td><label for="spec">Compliance with technical specification</label></td><td><select id="spec" name="specCompliance"><option value="">--</option><option value="1">Yes, Complied</option><option value="0">Not complied</option></select></td></tr>
+      <tr><td><label for="remarks">Seller remarks</label></td><td><textarea id="remarks" name="remarks"></textarea></td></tr>
+    </table>
+
+    <h2>Financial details (seller enters these — never TenderPilot)</h2>
+    <table>
+      <tr><td><label for="unitPrice">Unit Price (INR, incl. GST)</label></td><td><input id="unitPrice" name="unitPrice" type="number" /></td></tr>
+      <tr><td><label for="totalValue">Total Bid Value</label></td><td><input id="totalValue" name="totalValue" type="number" /></td></tr>
+      <tr><td><label for="rate">Rate per unit</label></td><td><input id="rate" name="ratePerUnit" type="text" /></td></tr>
+    </table>
+
+    <h2>Verification</h2>
+    <table>
+      <tr><td><label for="captcha">Enter the characters shown</label> <img alt="captcha" /></td><td><input id="captcha" name="captcha" type="text" /></td></tr>
+      <tr><td><label for="otp">Enter OTP sent to Aadhaar-linked mobile</label></td><td><input id="otp" name="otp" type="text" /></td></tr>
+      <tr><td><label for="dsc">DSC PIN</label></td><td><input id="dsc" name="dscPin" type="password" /></td></tr>
+      <tr><td>Upload technical document</td><td><input name="techDoc" type="file" /></td></tr>
+    </table>
+    <button id="esign" type="button">e-Sign</button>
+    <button id="final-submit" type="submit">Final Submit</button>
+  </form>
+</body>
+</html>

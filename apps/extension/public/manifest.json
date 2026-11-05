@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "TenderPilot \u2014 GeM co-pilot",
+  "short_name": "TenderPilot",
+  "version": "0.1.0",
+  "description": "Pre-fills allow-listed, non-financial GeM bid fields from your TenderPilot workspace. Never enters prices, OTP, DSC/e-Sign or submits.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TenderPilot co-pilot",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png"
+    }
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.gem.gov.in/*",
+        "http://localhost/*gem-form*",
+        "http://127.0.0.1/*gem-form*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

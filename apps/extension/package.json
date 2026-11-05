@@ -3,7 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "build": "vite build", "typecheck": "tsc --noEmit", "test": "vitest run --passWithNoTests" },
-  "dependencies": { "@tp/core": "workspace:*" },
-  "devDependencies": { "vite": "^5.4.11", "@types/chrome": "^0.0.287" }
+  "scripts": {
+    "build": "vite build && TARGET=content vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:e2e": "node test/smoke.e2e.mjs"
+  },
+  "dependencies": {
+    "@tp/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11",
+    "@types/chrome": "^0.0.287"
+  }
 }

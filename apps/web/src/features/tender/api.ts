@@ -1,0 +1,128 @@
+/** Data hooks for the tender detail page (Identify: GET /tenders/:id; Analyse: documents, analysis, override). */
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TenderDetail } from '@tp/core/contracts/identify';
+import type { AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
+import type { ActivityItem } from '@tp/core/contracts/auth';
+import { api, ApiError } from '@/lib/api';
+
+export const tenderKeys = {
+  detail: (id: string) => ['tender', id] as const,
+  analysis: (id: string) => ['tender', id, 'analysis'] as const,
+  documents: (id: string) => ['tender', id, 'documents'] as const,
+  activity: (id: string) => ['tender', id, 'activity'] as const,
+};
+
+export function useTender(id: string) {
+  return useQuery({ queryKey: tenderKeys.detail(id), queryFn: () => api.get<TenderDetail>(`/tenders/${id}`) });
+}
+
+/** Latest analysis for this org; `null` when none exists yet (404). */
+export function useAnalysis(id: string) {
+  return useQuery({
+    queryKey: tenderKeys.analysis(id),
+    queryFn: async () => {
+      try {
+        return await api.get<AnalysisDto>(`/tenders/${id}/analysis`);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
+}
+
+export function useTenderDocuments(id: string) {
+  return useQuery({ queryKey: tenderKeys.documents(id), queryFn: () => api.get<{ items: TenderDocumentDto[]; total: number }>(`/tenders/${id}/documents`) });
+}
+
+export function useTenderActivity(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: tenderKeys.activity(id),
+    enabled,
+    queryFn: () => api.get<{ items: ActivityItem[] }>('/activity', { entityType: 'tender', entityId: id, pageSize: 50 }),
+  });
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Minimum time the "analysing" animation is shown so the steps can be read. */
+export const ANALYSE_MIN_MS = 2400;
+
+export function useAnalyse(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const [a] = await Promise.all([api.post<AnalysisDto>(`/tenders/${id}/analyse`), sleep(ANALYSE_MIN_MS)]);
+      return a;
+    },
+    onSuccess: (a) => {
+      qc.setQueryData(tenderKeys.analysis(id), a);
+      qc.invalidateQueries({ queryKey: tenderKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: tenderKeys.documents(id) });
+      qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
+      qc.invalidateQueries({ queryKey: ['tenders'] });
+    },
+  });
+}
+
+export function useUploadDocument(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, kind }: { file: File; kind: TenderDocKind }) => api.upload<TenderDocumentDto>(`/tenders/${id}/documents`, file, { kind }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tenderKeys.documents(id) });
+      qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
+    },
+  });
+}
+
+export function useFetchFromGem(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ items: TenderDocumentDto[]; total: number; fetched: number }>(`/tenders/${id}/fetch-documents`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tenderKeys.documents(id) });
+      qc.invalidateQueries({ queryKey: tenderKeys.activity(id) });
+    },
+  });
+}
+
+export function useOverride(tenderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ analysisId, ...body }: { analysisId: string; factorKey: string; status: FactorStatus; reason: string }) =>
+      api.post<AnalysisDto>(`/analyses/${analysisId}/override`, body),
+    onSuccess: (a) => {
+      qc.setQueryData(tenderKeys.analysis(tenderId), a);
+      qc.invalidateQueries({ queryKey: tenderKeys.activity(tenderId) });
+      qc.invalidateQueries({ queryKey: tenderKeys.detail(tenderId) });
+    },
+  });
+}
+
+export function useStartBid(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const r = await api.post<{ id?: string; workspace?: { id: string } }>(`/tenders/${id}/workspace`);
+      const wid = r?.id ?? r?.workspace?.id;
+      if (!wid) throw new Error('The bid workspace could not be created');
+      return wid;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tenderKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: ['workspaces'] });
+    },
+  });
+}
+
+export function useDismiss(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post(`/tenders/${id}/dismiss`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tenderKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: ['tenders'] });
+    },
+  });
+}

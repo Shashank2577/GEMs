@@ -1,0 +1,115 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type {
+  ApiTokenSummary, CreatedApiToken, CreatedInvitation, Me, MembersResponse, NotificationPrefs,
+} from '@tp/core/contracts/auth';
+import type { ScoringWeights } from '@tp/core/contracts/analyse';
+import type { IngestionRunsResponse } from '@tp/core/contracts/identify';
+import { api, type Paged } from '@/lib/api';
+import { ME_KEY } from '@/lib/auth';
+
+export const settingsKeys = {
+  members: ['org', 'members'] as const,
+  prefs: ['me', 'notification-prefs'] as const,
+  tokens: ['me', 'api-tokens'] as const,
+  weights: ['scoring-weights'] as const,
+  runs: ['ingestion', 'runs'] as const,
+};
+
+function useSetMe() {
+  const qc = useQueryClient();
+  return (me: Me) => qc.setQueryData(ME_KEY, me);
+}
+
+// ── Organization ──
+export function useUpdateOrg() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name?: string; onboardingState?: Record<string, boolean> }) => api.patch('/org', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ME_KEY }),
+  });
+}
+
+// ── Account ──
+export function useUpdateMe() {
+  const setMe = useSetMe();
+  return useMutation({ mutationFn: (body: { name?: string; phone?: string | null }) => api.patch<Me>('/me', body), onSuccess: setMe });
+}
+export function useChangePassword() {
+  return useMutation({ mutationFn: (body: { currentPassword: string; newPassword: string }) => api.post('/me/password', body) });
+}
+
+// ── Team ──
+export function useMembers() {
+  return useQuery({ queryKey: settingsKeys.members, queryFn: () => api.get<MembersResponse>('/org/members') });
+}
+function useMembersMutation<V, R = unknown>(fn: (v: V) => Promise<R>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: fn, onSuccess: () => { qc.invalidateQueries({ queryKey: settingsKeys.members }); qc.invalidateQueries({ queryKey: ['dashboard'] }); } });
+}
+export const useInvite = () => useMembersMutation((b: { email: string; role: string }) => api.post<CreatedInvitation>('/org/invitations', b));
+export const useRevokeInvite = () => useMembersMutation((id: string) => api.delete(`/org/invitations/${id}`));
+export const useChangeRole = () => useMembersMutation(({ userId, role }: { userId: string; role: string }) => api.patch(`/org/members/${userId}`, { role }));
+export const useRemoveMember = () => useMembersMutation((userId: string) => api.delete(`/org/members/${userId}`));
+
+// ── Notifications ──
+export function usePrefs() {
+  return useQuery({ queryKey: settingsKeys.prefs, queryFn: () => api.get<NotificationPrefs>('/me/notification-prefs') });
+}
+export function useSavePrefs() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (b: NotificationPrefs) => api.put<NotificationPrefs>('/me/notification-prefs', b), onSuccess: (p) => qc.setQueryData(settingsKeys.prefs, p) });
+}
+
+// ── Scoring weights ──
+export function useWeights() {
+  return useQuery({ queryKey: settingsKeys.weights, queryFn: () => api.get<ScoringWeights>('/scoring-weights') });
+}
+export function useSaveWeights() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (w: Record<string, number>) => api.put<ScoringWeights>('/scoring-weights', w),
+    onSuccess: (w) => { qc.setQueryData(settingsKeys.weights, w); qc.invalidateQueries({ queryKey: ME_KEY }); },
+  });
+}
+
+// ── API tokens ──
+export function useTokens() {
+  return useQuery({ queryKey: settingsKeys.tokens, queryFn: () => api.get<Paged<ApiTokenSummary>>('/me/api-tokens') });
+}
+export function useCreateToken() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (name: string) => api.post<CreatedApiToken>('/me/api-tokens', { name }), onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tokens }) });
+}
+export function useRevokeToken() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => api.delete(`/me/api-tokens/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tokens }) });
+}
+
+// ── Sync health ──
+export function useRuns() {
+  return useQuery({ queryKey: settingsKeys.runs, queryFn: () => api.get<IngestionRunsResponse>('/ingestion/runs'), refetchInterval: 60_000 });
+}
+export function useRunIngestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/ingestion/run', {}),
+    onSettled: () => { qc.invalidateQueries({ queryKey: settingsKeys.runs }); qc.invalidateQueries({ queryKey: ['tenders'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); },
+  });
+}
+
+/** Copy text with a graceful fallback for non-secure contexts. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch { return false; }
+  }
+}

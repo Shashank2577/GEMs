@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * TenderPilot design tokens. HSL triplets so Tailwind can apply alpha (`bg-primary/10`).
+ * Primary: deep indigo ink. Accent: saffron. Success/Go: emerald. Warning/Review: amber. Danger/No-Go: rose.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 234 30% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 234 30% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 234 30% 12%;
+    --muted: 230 25% 96.5%;
+    --muted-foreground: 232 12% 42%;
+    --subtle: 230 30% 98.4%;
+    --border: 230 20% 90%;
+    --input: 230 18% 86%;
+    --ring: 243 75% 58%;
+    --primary: 243 75% 52%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 243 90% 96.5%;
+    --accent: 33 96% 50%;
+    --accent-foreground: 26 90% 14%;
+    --accent-soft: 40 100% 95%;
+    --success: 158 72% 34%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 152 70% 95%;
+    --warning: 34 92% 42%;
+    --warning-foreground: 0 0% 100%;
+    --warning-soft: 45 100% 94%;
+    --danger: 350 74% 50%;
+    --danger-foreground: 0 0% 100%;
+    --danger-soft: 352 100% 96.5%;
+    --info: 205 85% 45%;
+    --info-soft: 205 100% 96%;
+    --sidebar: 230 30% 98.4%;
+    --sidebar-foreground: 232 18% 30%;
+    --sidebar-border: 230 20% 91%;
+    --sidebar-active: 243 75% 52%;
+    --chart-1: 243 75% 58%;
+    --chart-2: 33 96% 50%;
+    --chart-3: 158 64% 40%;
+    --chart-4: 199 89% 48%;
+    --chart-5: 330 70% 56%;
+    --shadow: 234 40% 20%;
+    --radius: 0.625rem;
+    color-scheme: light;
+  }
+
+  .dark {
+    --background: 234 28% 6.5%;
+    --foreground: 228 30% 95%;
+    --card: 234 24% 9.5%;
+    --card-foreground: 228 30% 95%;
+    --popover: 234 24% 10.5%;
+    --popover-foreground: 228 30% 95%;
+    --muted: 234 20% 14%;
+    --muted-foreground: 230 14% 66%;
+    --subtle: 234 24% 8%;
+    --border: 234 18% 17%;
+    --input: 234 16% 22%;
+    --ring: 243 90% 70%;
+    --primary: 243 82% 66%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 243 45% 18%;
+    --accent: 36 98% 58%;
+    --accent-foreground: 26 90% 10%;
+    --accent-soft: 34 60% 15%;
+    --success: 156 62% 48%;
+    --success-foreground: 160 60% 8%;
+    --success-soft: 158 45% 13%;
+    --warning: 40 94% 56%;
+    --warning-foreground: 30 80% 8%;
+    --warning-soft: 38 55% 14%;
+    --danger: 350 86% 66%;
+    --danger-foreground: 350 60% 8%;
+    --danger-soft: 350 45% 16%;
+    --info: 203 90% 62%;
+    --info-soft: 205 50% 15%;
+    --sidebar: 234 28% 7.5%;
+    --sidebar-foreground: 230 16% 72%;
+    --sidebar-border: 234 18% 14%;
+    --sidebar-active: 243 88% 72%;
+    --chart-1: 243 88% 70%;
+    --chart-2: 36 98% 58%;
+    --chart-3: 156 62% 50%;
+    --chart-4: 199 89% 60%;
+    --chart-5: 330 80% 68%;
+    --shadow: 234 60% 2%;
+    color-scheme: dark;
+  }
+
+  * { @apply border-border; }
+  html { -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    font-variant-numeric: normal;
+  }
+  ::selection { background: hsl(var(--primary) / 0.18); }
+  :focus-visible { outline: none; }
+  h1, h2, h3, h4 { letter-spacing: -0.015em; }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  .focus-ring { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background; }
+  .surface { @apply rounded-xl border bg-card text-card-foreground shadow-xs; }
+  .hairline { background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent); height: 1px; }
+  .bg-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.55) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.55) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .text-gradient { @apply bg-clip-text text-transparent; background-image: linear-gradient(120deg, hsl(var(--primary)), hsl(var(--chart-5)) 55%, hsl(var(--accent))); }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+.theme-switching *, .theme-switching *::before, .theme-switching *::after { transition: none !important; }

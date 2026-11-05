@@ -1,0 +1,667 @@
+{
+  "code": 200,
+  "status": 1,
+  "message": "Data Found",
+  "response": {
+    "responseHeader": {
+      "status": 0,
+      "QTime": 3,
+      "params": {
+        "start": "0",
+        "rows": "10",
+        "sort": "final_start_date_sort desc"
+      }
+    },
+    "response": {
+      "numFound": 36,
+      "start": 0,
+      "numFoundExact": true,
+      "docs": [
+        {
+          "id": "7421001",
+          "b_id": [
+            7421001
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421001"
+          ],
+          "b_category_name": [
+            "Laptop - Notebook"
+          ],
+          "bd_category_name": [
+            "Laptop - Notebook (Q2)"
+          ],
+          "b_total_quantity": [
+            120
+          ],
+          "ba_official_details_minName": [
+            "Maharashtra"
+          ],
+          "ba_official_details_deptName": [
+            "School Education and Sports Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T10:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-18T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_officeName": [
+            "Directorate of School Education, Pune"
+          ],
+          "b_emd_amount": [
+            "2.4 Lakh"
+          ],
+          "b_estimated_value": [
+            "96 Lakh"
+          ],
+          "b_hsn_code": [
+            "84713010"
+          ]
+        },
+        {
+          "id": "7421002",
+          "b_id": [
+            7421002
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421002"
+          ],
+          "b_category_name": [
+            "Network Video Recorder,CCTV Camera (V2)"
+          ],
+          "bd_category_name": [
+            "Network Video Recorder (NVR) (Q2), CCTV Camera (V2) (Q2), PoE Switch (Q2)"
+          ],
+          "b_total_quantity": [
+            86
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Home Affairs"
+          ],
+          "ba_official_details_deptName": [
+            "Central Reserve Police Force"
+          ],
+          "final_start_date_sort": [
+            "2026-11-02T11:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-16T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Group Centre CRPF, Bengaluru"
+          ],
+          "b_emd_amount": [
+            180000
+          ],
+          "b_estimated_value": [
+            "72 Lakh"
+          ],
+          "b_hsn_code": [
+            "85258020",
+            "85219090"
+          ]
+        },
+        {
+          "id": "7421003",
+          "b_id": [
+            7421003
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421003"
+          ],
+          "b_category_name": [
+            "Manpower Outsourcing Services - Minimum wage - Unskilled; Others; Admin"
+          ],
+          "bd_category_name": [
+            "Manpower Outsourcing Services - Minimum wage - Unskilled; Others; Admin"
+          ],
+          "b_total_quantity": [
+            45
+          ],
+          "ba_official_details_minName": [
+            "Uttar Pradesh"
+          ],
+          "ba_official_details_deptName": [
+            "Medical Health and Family Welfare Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-01T12:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-13T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Chief Medical Officer, Lucknow"
+          ],
+          "b_emd_amount": [
+            "3.6 Lakh"
+          ],
+          "b_estimated_value": [
+            "1.8 Crore"
+          ]
+        },
+        {
+          "id": "7421004",
+          "b_id": [
+            7421004
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421004"
+          ],
+          "b_category_name": [
+            "Office Chair (V3)"
+          ],
+          "bd_category_name": [
+            "Office Chair (V3) (Q2), Steel Almirah (Q2), Office Table (Q2)"
+          ],
+          "b_total_quantity": [
+            210
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Defence"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Military Affairs"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T13:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-22T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_orgName": [
+            "Indian Army"
+          ],
+          "b_emd_amount": [
+            "1.1 Lakh"
+          ],
+          "b_hsn_code": [
+            "94013000",
+            "94031000"
+          ]
+        },
+        {
+          "id": "7421005",
+          "b_id": [
+            7421005
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421005"
+          ],
+          "b_category_name": [
+            "Multiparameter Patient Monitor (V2)"
+          ],
+          "bd_category_name": [
+            "Multiparameter Patient Monitor (V2) (Q2), ECG Machine 12 Channel (Q2)"
+          ],
+          "b_total_quantity": [
+            30
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Health and Family Welfare"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Health and Family Welfare"
+          ],
+          "final_start_date_sort": [
+            "2026-10-31T14:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-11T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_orgName": [
+            "All India Institute of Medical Sciences (AIIMS)"
+          ],
+          "ba_official_details_officeName": [
+            "AIIMS Bhubaneswar"
+          ],
+          "b_emd_amount": [
+            "4 Lakh"
+          ],
+          "b_estimated_value": [
+            "1.6 Crore"
+          ],
+          "b_hsn_code": [
+            "90181930"
+          ]
+        },
+        {
+          "id": "7421006",
+          "b_id": [
+            7421006
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421006"
+          ],
+          "b_category_name": [
+            "Grid Connected Solar PV Power Plant (Rooftop) with Installation"
+          ],
+          "bd_category_name": [
+            "Grid Connected Solar PV Power Plant (Rooftop) with Installation"
+          ],
+          "b_total_quantity": [
+            1
+          ],
+          "ba_official_details_minName": [
+            "Rajasthan"
+          ],
+          "ba_official_details_deptName": [
+            "Energy Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-02T15:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-25T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            true
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Rajasthan Renewable Energy Corporation, Jaipur"
+          ],
+          "b_emd_amount": [
+            "12 Lakh"
+          ],
+          "b_estimated_value": [
+            "6.25 Crore"
+          ]
+        },
+        {
+          "id": "7421007",
+          "b_id": [
+            7421007
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421007"
+          ],
+          "b_category_name": [
+            "Monthly Basis Cab & Taxi Hiring Services - Sedan; 2500 km x 320 hours"
+          ],
+          "bd_category_name": [
+            "Monthly Basis Cab & Taxi Hiring Services - Sedan; 2500 km x 320 hours"
+          ],
+          "b_total_quantity": [
+            6
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Finance"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Revenue"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T16:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-14T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_orgName": [
+            "Central Board of Indirect Taxes and Customs (CBIC)"
+          ],
+          "ba_official_details_officeName": [
+            "Commissionerate of CGST, Chennai"
+          ],
+          "b_emd_amount": [
+            0
+          ],
+          "b_estimated_value": [
+            "28.8 Lakh"
+          ]
+        },
+        {
+          "id": "7421008",
+          "b_id": [
+            7421008
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421008"
+          ],
+          "b_category_name": [
+            "Housekeeping and Cleaning Services - Office; Mechanised"
+          ],
+          "bd_category_name": [
+            "Housekeeping and Cleaning Services - Office; Mechanised"
+          ],
+          "b_total_quantity": [
+            1
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Railways"
+          ],
+          "ba_official_details_deptName": [
+            "Indian Railways"
+          ],
+          "final_start_date_sort": [
+            "2026-10-30T10:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-10T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_orgName": [
+            "South Central Railway"
+          ],
+          "ba_official_details_officeName": [
+            "Divisional Railway Manager Office, Secunderabad"
+          ],
+          "b_emd_amount": [
+            "2.5 Lakh"
+          ],
+          "b_estimated_value": [
+            "1.25 Crore"
+          ]
+        },
+        {
+          "id": "7421009",
+          "b_id": [
+            7421009
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421009"
+          ],
+          "b_category_name": [
+            "Desktop Computers (Q2)"
+          ],
+          "bd_category_name": [
+            "Desktop Computers (Q2), Line Interactive UPS with AVR (V2) (Q2)"
+          ],
+          "b_total_quantity": [
+            150
+          ],
+          "ba_official_details_minName": [
+            "Gujarat"
+          ],
+          "ba_official_details_deptName": [
+            "Education Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T11:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-19T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Gujarat Council of School Education, Gandhinagar"
+          ],
+          "b_emd_amount": [
+            "3 Lakh"
+          ],
+          "b_estimated_value": [
+            "1.05 Crore"
+          ],
+          "b_hsn_code": [
+            "84714190"
+          ]
+        },
+        {
+          "id": "7421010",
+          "b_id": [
+            7421010
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421010"
+          ],
+          "b_category_name": [
+            "Laptop - Notebook"
+          ],
+          "bd_category_name": [
+            "Laptop - Notebook (Q2), Laptop Bag (Q4)"
+          ],
+          "b_total_quantity": [
+            40
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Electronics and Information Technology"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Electronics and Information Technology"
+          ],
+          "final_start_date_sort": [
+            "2026-11-04T12:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-15T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_orgName": [
+            "National Informatics Centre (NIC)"
+          ],
+          "ba_official_details_officeName": [
+            "NIC State Centre, Mumbai"
+          ],
+          "b_emd_amount": [
+            "1 Lakh"
+          ],
+          "b_hsn_code": [
+            "84713010"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,666 @@
+{
+  "code": 200,
+  "status": 1,
+  "message": "Data Found",
+  "response": {
+    "responseHeader": {
+      "status": 0,
+      "QTime": 3,
+      "params": {
+        "start": "10",
+        "rows": "10",
+        "sort": "final_start_date_sort desc"
+      }
+    },
+    "response": {
+      "numFound": 36,
+      "start": 10,
+      "numFoundExact": true,
+      "docs": [
+        {
+          "id": "7421011",
+          "b_id": [
+            7421011
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421011"
+          ],
+          "b_category_name": [
+            "Multifunction Machine MFM (V2)"
+          ],
+          "bd_category_name": [
+            "Multifunction Machine MFM (V2)"
+          ],
+          "b_total_quantity": [
+            25
+          ],
+          "ba_official_details_minName": [
+            "Karnataka"
+          ],
+          "ba_official_details_deptName": [
+            "Revenue Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-02T13:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-12T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Deputy Commissioner Office, Mysuru"
+          ],
+          "b_emd_amount": [
+            50000
+          ],
+          "b_estimated_value": [
+            "22 Lakh"
+          ],
+          "b_hsn_code": [
+            "84433100"
+          ]
+        },
+        {
+          "id": "7421012",
+          "b_id": [
+            7421012
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421012"
+          ],
+          "b_category_name": [
+            "Security Manpower Service (Version 2.0) - Office/Commercial/Institutions/ Residential; Unarmed Security Guard"
+          ],
+          "bd_category_name": [
+            "Security Manpower Service (Version 2.0) - Office/Commercial/Institutions/ Residential; Unarmed Security Guard"
+          ],
+          "b_total_quantity": [
+            1
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Education"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Higher Education"
+          ],
+          "final_start_date_sort": [
+            "2026-11-01T14:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-17T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_orgName": [
+            "Indian Institute of Technology (IIT)"
+          ],
+          "ba_official_details_officeName": [
+            "IIT Kharagpur"
+          ],
+          "b_emd_amount": [
+            "4.2 Lakh"
+          ],
+          "b_estimated_value": [
+            "2.1 Crore"
+          ]
+        },
+        {
+          "id": "7421013",
+          "b_id": [
+            7421013
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421013"
+          ],
+          "b_category_name": [
+            "Ambulance (Type B) (V2)"
+          ],
+          "bd_category_name": [
+            "Ambulance (Type B) (V2)"
+          ],
+          "b_total_quantity": [
+            8
+          ],
+          "ba_official_details_minName": [
+            "Bihar"
+          ],
+          "ba_official_details_deptName": [
+            "Health Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T15:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-21T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_officeName": [
+            "State Health Society, Patna"
+          ],
+          "b_emd_amount": [
+            "6 Lakh"
+          ],
+          "b_estimated_value": [
+            "2.4 Crore"
+          ],
+          "b_hsn_code": [
+            "87039000"
+          ]
+        },
+        {
+          "id": "7421014",
+          "b_id": [
+            7421014
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421014"
+          ],
+          "b_category_name": [
+            "Diesel Generator Set (V2) 125 kVA"
+          ],
+          "bd_category_name": [
+            "Diesel Generator Set (V2) 125 kVA"
+          ],
+          "b_total_quantity": [
+            4
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Power"
+          ],
+          "ba_official_details_deptName": [
+            "Central Public Sector Enterprise"
+          ],
+          "final_start_date_sort": [
+            "2026-11-02T16:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-23T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_orgName": [
+            "NTPC Limited"
+          ],
+          "ba_official_details_officeName": [
+            "NTPC Korba, Chhattisgarh"
+          ],
+          "b_emd_amount": [
+            "2 Lakh"
+          ],
+          "b_hsn_code": [
+            "85021320"
+          ]
+        },
+        {
+          "id": "7421015",
+          "b_id": [
+            7421015
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421015"
+          ],
+          "b_category_name": [
+            "Hiring of Consultants - Milestone/Deliverable Based - IT Consultants"
+          ],
+          "bd_category_name": [
+            "Hiring of Consultants - Milestone/Deliverable Based - IT Consultants"
+          ],
+          "b_total_quantity": [
+            1
+          ],
+          "ba_official_details_minName": [
+            "Telangana"
+          ],
+          "ba_official_details_deptName": [
+            "Information Technology, Electronics and Communications Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T10:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-20T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            1
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Telangana State Technology Services, Hyderabad"
+          ],
+          "b_emd_amount": [
+            "1.5 Lakh"
+          ],
+          "b_estimated_value": [
+            "75 Lakh"
+          ]
+        },
+        {
+          "id": "7421016",
+          "b_id": [
+            7421016
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421016"
+          ],
+          "b_category_name": [
+            "Hospital Bed (V3)"
+          ],
+          "bd_category_name": [
+            "Hospital Bed (V3) (Q2), Bedside Locker (Q2), Mattress for Hospital Bed (Q2)"
+          ],
+          "b_total_quantity": [
+            300
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Defence"
+          ],
+          "ba_official_details_deptName": [
+            "Department of Ex-Servicemen Welfare"
+          ],
+          "final_start_date_sort": [
+            "2026-10-29T11:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-09T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_orgName": [
+            "Armed Forces Medical Services"
+          ],
+          "ba_official_details_officeName": [
+            "Command Hospital (Southern Command), Pune"
+          ],
+          "b_emd_amount": [
+            "1.8 Lakh"
+          ],
+          "b_estimated_value": [
+            "90 Lakh"
+          ],
+          "b_hsn_code": [
+            "94029090"
+          ]
+        },
+        {
+          "id": "7421017",
+          "b_id": [
+            7421017
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421017"
+          ],
+          "b_category_name": [
+            "Solar Street Light (V2)"
+          ],
+          "bd_category_name": [
+            "Solar Street Light (V2)"
+          ],
+          "b_total_quantity": [
+            1200
+          ],
+          "ba_official_details_minName": [
+            "Madhya Pradesh"
+          ],
+          "ba_official_details_deptName": [
+            "New and Renewable Energy Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-02T12:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-24T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            true
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "MP Urja Vikas Nigam, Bhopal"
+          ],
+          "b_emd_amount": [
+            "5 Lakh"
+          ],
+          "b_estimated_value": [
+            "3.6 Crore"
+          ],
+          "b_hsn_code": [
+            "94054090"
+          ]
+        },
+        {
+          "id": "7421018",
+          "b_id": [
+            7421018
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421018"
+          ],
+          "b_category_name": [
+            "Interactive Panel (V2)"
+          ],
+          "bd_category_name": [
+            "Interactive Panel (V2) (Q2), Document Camera (Q3)"
+          ],
+          "b_total_quantity": [
+            90
+          ],
+          "ba_official_details_minName": [
+            "Delhi"
+          ],
+          "ba_official_details_deptName": [
+            "Directorate of Education"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T13:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-16T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_officeName": [
+            "Directorate of Education, GNCTD, New Delhi"
+          ],
+          "b_emd_amount": [
+            "2.7 Lakh"
+          ],
+          "b_estimated_value": [
+            "1.35 Crore"
+          ],
+          "b_hsn_code": [
+            "84716060"
+          ]
+        },
+        {
+          "id": "7421019",
+          "b_id": [
+            7421019
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421019"
+          ],
+          "b_category_name": [
+            "Fogging Machine (Q3)"
+          ],
+          "bd_category_name": [
+            "Fogging Machine (Q3)"
+          ],
+          "b_total_quantity": [
+            60
+          ],
+          "ba_official_details_minName": [
+            "West Bengal"
+          ],
+          "ba_official_details_deptName": [
+            "Urban Development and Municipal Affairs Department"
+          ],
+          "final_start_date_sort": [
+            "2026-11-01T14:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-08T15:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: Yes"
+          ],
+          "ba_official_details_officeName": [
+            "Kolkata Municipal Corporation"
+          ],
+          "b_emd_amount": [
+            30000
+          ],
+          "b_hsn_code": [
+            "84242000"
+          ]
+        },
+        {
+          "id": "7421020",
+          "b_id": [
+            7421020
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6421020"
+          ],
+          "b_category_name": [
+            "Printer Cartridge / Toner (Q3)"
+          ],
+          "bd_category_name": [
+            "Toner Cartridges / Ink Cartridges / Consumables for Printers (Q3)"
+          ],
+          "b_total_quantity": [
+            640
+          ],
+          "ba_official_details_minName": [
+            "Ministry of Coal"
+          ],
+          "ba_official_details_deptName": [
+            "Central Public Sector Enterprise"
+          ],
+          "final_start_date_sort": [
+            "2026-11-03T15:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-11-13T18:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            0
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [],
+          "ba_official_details_orgName": [
+            "Coal India Limited"
+          ],
+          "ba_official_details_officeName": [
+            "Central Coalfields Limited, Ranchi"
+          ],
+          "b_emd_amount": [
+            40000
+          ],
+          "b_hsn_code": [
+            "84439959"
+          ]
+        }
+      ]
+    }
+  }
+}
