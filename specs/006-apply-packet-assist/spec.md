@@ -100,6 +100,7 @@ technical disqualification on GeM).
    `GET /api/workspaces/{id}` returns `readiness.items` resolving gst, pan, balance_sheets → "Balance sheet 2024-25" and
    oem_authorization → "Dell MAF" with `auto: true` (4 picks; `udyam` unmatched because nothing matches); the activity log
    has `workspace.created` for both the workspace and the tender, with meta `autoMatched: 4`.
+   *Spec amendment (#527):* `stage` is `"go"` when a **Bid Manager or Owner** creates it; an **Analyst** gets `stage: "analysing"` (starting in Go is the Go/No-Go call), and the Bid Manager then moves it to Go.
 2. **Given** the workspace exists, **When** any Analyst+ calls the same endpoint again (or two calls race), **Then** the
    response is **200** with `created: false` and the same `id`; no second row exists (`workspace_org_tender_uq`).
 3. **Given** the Viewer, **When** they call `POST /api/tenders/{tenderId}/workspace`, **Then** the response is **403**
