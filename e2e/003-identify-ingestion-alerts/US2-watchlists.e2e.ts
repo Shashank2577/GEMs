@@ -510,7 +510,9 @@ test.describe('US2 watchlists', () => {
     await login(page, S.viewer!);
     const vA = await page.request.post('/api/watchlists', { data: { name: 'Nope', criteria: { keywords: ['laptop'] } } });
     expect(vA.status()).toBe(403);
-    // Analyst / Bid Manager / Owner are allowed
+    // Analyst / Bid Manager / Owner are allowed. The live previews of the earlier scenarios can use up a user's 30/min
+    // preview allowance (008/US3 watchlist.preview.user) on a fast runner; start this role check from a fresh window.
+    sql(`delete from rate_limits where key like 'watchlist.preview.user:%'`);
     for (const c of [S.analyst!, S.manager!, S.owner!]) {
       await login(page, c);
       const ok = await page.request.post('/api/watchlists/preview', { data: { criteria: { keywords: ['laptop'] } } });

@@ -64,6 +64,27 @@ export async function collectRunArtifacts(spec: string, story: string, page: Pag
   if (video) { try { copyFileSync(await video.path(), join(dir, `${slug}-${info.project.name}.webm`)); } catch { /* no video */ } }
 }
 
+/** Spec 008 shorthand for `evidence(page, '008', story, name)`. */
+export function evidence008(page: Page, story: string, name: string) {
+  return evidence(page, '008', story, name);
+}
+
+/**
+ * API-only evidence (curl transcripts, EXPLAIN output, CI log excerpts) for spec 008:
+ * a string is written as qa/evidence/008/<story>/<name>.txt, anything else as pretty-printed <name>.json.
+ */
+export function saveTranscript(story: string, name: string, content: unknown) {
+  const dir = join('qa', 'evidence', '008', story);
+  mkdirSync(dir, { recursive: true });
+  const isText = typeof content === 'string';
+  const file = join(dir, `${name.replace(/\.(txt|json)$/i, '')}.${isText ? 'txt' : 'json'}`);
+  writeFileSync(file, isText ? content : `${JSON.stringify(content, null, 2)}\n`);
+  try {
+    base.info().attach(name, { path: file, contentType: isText ? 'text/plain' : 'application/json' }).catch(() => {});
+  } catch { /* called outside a running test: file only */ }
+  return file;
+}
+
 // ───────────── 003 Identify, Ingestion & Alerts helpers (T004) ─────────────
 
 /** Restore the mock GeM to its recorded fixtures and switch any simulated outage off. */
@@ -217,6 +238,14 @@ export async function seedDemoAndGetWorkspaces(request: APIRequestContext) {
   return { seed: await seeded.json(), workspaces: body.items as { id: string; stage: string; tender: { id: string; title: string } & Record<string, unknown> }[], list: body };
 }
 
+/**
+ * Wait (max 3 s) until finite CSS/Web animations have finished, so axe does not measure colour contrast on an overlay
+ * that is still fading in (Radix menus/dialogs animate opacity; a slow CI runner audits mid-animation otherwise).
+ */
+export async function settleAnimations(page: Page) {
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity), null, { timeout: 3_000 }).catch(() => { /* audit anyway */ });
+}
+
 export const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
 type AxeResults = Awaited<ReturnType<AxeBuilder['analyze']>>;
@@ -240,6 +269,7 @@ export async function a11y(page: Page, nameOrSpec: string, optsOrStory: A11yOpts
   const folder = basename(dirname(info.file));
   const spec = opts.spec ?? folder.match(/^(\d{3})-/)?.[1] ?? folder;
   const story = opts.story ?? basename(info.file).match(/US\d+/)?.[0] ?? 'misc';
+  await settleAnimations(page);
   let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
   for (const sel of opts.include ?? []) builder = builder.include(sel);
   for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
@@ -258,6 +288,7 @@ export async function a11y(page: Page, nameOrSpec: string, optsOrStory: A11yOpts
 
 /** Lightweight axe check (WCAG 2.1 A/AA): fails the test on any serious or critical violation; no evidence file. */
 export async function checkA11y(page: Page, opts: { include?: string[]; exclude?: string[]; disableRules?: string[] } = {}) {
+  await settleAnimations(page);
   let builder = new AxeBuilder({ page }).withTags(A11Y_TAGS);
   for (const sel of opts.include ?? []) builder = builder.include(sel);
   for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);

@@ -43,6 +43,11 @@ const topOf = async (page: Page, sel: string) => page.locator(sel).first().evalu
 
 test('US6-1 signed-in users never see /, /login, /signup — they are redirected to /dashboard or a safe ?next=', async ({ page }) => {
   await signupViaApi(page); // owner session cookie on this context
+  // A brand-new org is sent from /dashboard to /onboarding once per browser session (007/US3). Take that detour first so
+  // the redirects below are not raced by it.
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('tp:onboarding-redirected'))).not.toBeNull();
   const trace: Record<string, string> = {};
   const cases: [string, RegExp, string][] = [
     ['/', /\/dashboard$/, 'plain /'],
