@@ -9,7 +9,7 @@
  *   PATCH  /past-contracts/:id     → PastContractDto                                      analyst+
  *   DELETE /past-contracts/:id     → { ok: true }                                         analyst+
  */
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { companyProfiles, pastContracts, vaultDocuments } from '@tp/db';
 import {
@@ -75,6 +75,25 @@ const profileConflict = (stored: Date | null) =>
 /** `updated_at` truncated to whole milliseconds (JS Date precision) as epoch ms; Postgres keeps microseconds. */
 const updatedAtMs = sql<number>`floor(extract(epoch from ${companyProfiles.updatedAt}) * 1000)::float8`;
 
+const OEM_DOC_MESSAGE = 'Pick an OEM authorisation from your vault';
+
+/**
+ * FR-061: every OEM `documentId` must be an `oem_authorization` document of the org — one query for all ids.
+ * Ids are lowercased in place (Postgres returns lowercase uuids) so they compare and store consistently.
+ */
+async function assertOemDocsInOrg(db: Pick<AppDeps['db'], 'select'>, org: string, rows: ProfileRow['oemAuthorizations']) {
+  for (const r of rows) if (r.documentId) r.documentId = r.documentId.toLowerCase();
+  const ids = [...new Set(rows.flatMap((r) => (r.documentId ? [r.documentId] : [])))];
+  if (!ids.length) return;
+  const found = await db.select({ id: vaultDocuments.id, type: vaultDocuments.type }).from(vaultDocuments)
+    .where(and(eq(vaultDocuments.orgId, org), inArray(vaultDocuments.id, ids)));
+  const ok = new Set(found.filter((d) => d.type === 'oem_authorization').map((d) => d.id.toLowerCase()));
+  const fields: Record<string, string> = {};
+  rows.forEach((r, i) => { if (r.documentId && !ok.has(r.documentId)) fields[`oemAuthorizations.${i}.documentId`] = OEM_DOC_MESSAGE; });
+  const first = Object.keys(fields)[0];
+  if (first) throw validationError(`${first}: ${OEM_DOC_MESSAGE}`, { fields });
+}
+
 profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
   const { db } = c.var.deps;
   const org = orgId(c);
@@ -102,6 +121,8 @@ profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
         fields: { [field]: field === 'gstin' ? `This GSTIN belongs to PAN ${merged.gstin.slice(2, 12)}, not ${merged.pan}` : `Your GSTIN is registered to PAN ${merged.gstin.slice(2, 12)}` },
       });
     }
+    // OEM documentIds must be oem_authorization documents in this org's vault (FR-061).
+    if (patch.oemAuthorizations) await assertOemDocsInOrg(tx, org, patch.oemAuthorizations);
     const { orgId: _o, updatedAt: _u, ...values } = merged as ProfileRow;
     if (existing) {
       // updated_at is the version token: always move it forward, even for two saves in the same millisecond.

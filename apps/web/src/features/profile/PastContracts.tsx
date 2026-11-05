@@ -10,7 +10,7 @@ import { errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDateIST, formatINR, formatINRCompact } from '@/lib/format';
 import { useVault } from '@/features/vault/api';
-import { serverFieldErrors } from '@/features/vault/UploadDialog';
+import { serverFieldErrors, UploadDialog } from '@/features/vault/UploadDialog';
 import { useDeletePastContract, usePastContracts, useSavePastContract } from './api';
 import { RupeeInput } from './RupeeInput';
 
@@ -26,6 +26,7 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
   const [errors, setErrors] = useState<Record<string, string>>({});
   const save = useSavePastContract();
   const docs = useVault({ category: 'Experience' });
+  const [uploading, setUploading] = useState(false);
   useEffect(() => { if (open) { setD(editing ? fromDto(editing) : empty); setErrors({}); } }, [open, editing]);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
 
@@ -44,7 +45,11 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
     });
   };
 
-  const docOptions = [{ value: '__none', label: 'Not linked' }, ...(docs.data?.items ?? []).map((x) => ({ value: x.id, label: x.title }))];
+  const docOptions = [
+    { value: '__none', label: 'Not linked' },
+    ...(docs.data?.items ?? []).map((x) => ({ value: x.id, label: x.title })),
+    { value: '__upload', label: 'Upload a new CRAC…' },
+  ];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
@@ -70,9 +75,14 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
           <Field label="Category" error={errors.category}><Input value={d.category} onChange={(e) => set('category', e.target.value)} placeholder="e.g. Desktop computers" /></Field>
           <Field label="GeM contract no." error={errors.gemContractNo}><Input value={d.gemContractNo} onChange={(e) => set('gemContractNo', e.target.value)} placeholder="GEMC-5116877…" className="font-mono text-[13px]" /></Field>
           <Field label="CRAC / completion certificate" error={errors.cracDocumentId} hint="Link the proof from your vault (Experience documents)." className="sm:col-span-2">
-            <Select value={d.cracDocumentId || '__none'} onValueChange={(v) => set('cracDocumentId', v === '__none' ? '' : v)} options={docOptions} />
+            <Select
+              value={d.cracDocumentId || '__none'} options={docOptions}
+              onValueChange={(v) => (v === '__upload' ? setUploading(true) : set('cracDocumentId', v === '__none' ? '' : v))}
+            />
           </Field>
         </form>
+        {/* FR-062: rendered inside the contract dialog so it stacks on top and the draft is kept. */}
+        <UploadDialog open={uploading} onOpenChange={setUploading} presetType="crac" onUploaded={(id) => set('cracDocumentId', id)} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="submit" form="pc-form" loading={save.isPending}>{editing ? 'Save contract' : 'Add contract'}</Button>

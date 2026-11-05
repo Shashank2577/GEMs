@@ -3,6 +3,7 @@ import { Handshake, Plus, Trash2 } from 'lucide-react';
 import type { OemAuthorizationDto } from '@tp/core/contracts/vault';
 import { docStatus } from '@tp/core/vault/status';
 import { Button, Field, Input, Select } from '@/components/ui';
+import { formatDateIST } from '@/lib/format';
 import { useVault } from '@/features/vault/api';
 import { ExpiryBadge } from '@/features/vault/doc-ui';
 
@@ -23,6 +24,9 @@ export function OemEditor({ value, onChange, errors, disabled }: {
       )}
       {value.map((r, i) => {
         const st = r.validTill ? docStatus(r.validTill, now) : null;
+        // FR-063: keep the profile and the vault in agreement when the linked MAF has an expiry.
+        const docExpiry = (r.documentId && docs.data?.items.find((d) => d.id === r.documentId)?.expiryDate) || null;
+        const offerDocExpiry = !disabled && !!docExpiry && r.validTill !== docExpiry;
         return (
           <div key={i} className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1.4fr_10rem_1fr_2.5rem] lg:items-end">
             <Field label="OEM" required error={errors[`oemAuthorizations.${i}.oem`]}>
@@ -31,10 +35,22 @@ export function OemEditor({ value, onChange, errors, disabled }: {
             <Field label="Products covered" error={errors[`oemAuthorizations.${i}.products`]}>
               <Input value={r.products} disabled={disabled} onChange={(e) => update(i, { products: e.target.value })} placeholder="e.g. Latitude laptops, OptiPlex desktops" />
             </Field>
-            <Field label="Valid till" error={errors[`oemAuthorizations.${i}.validTill`]} hint={st ? <ExpiryBadge status={st.status} days={st.daysToExpiry} /> : undefined}>
-              <Input type="date" value={r.validTill ?? ''} disabled={disabled} onChange={(e) => update(i, { validTill: e.target.value || null })} />
+            <Field
+              label="Valid till" error={errors[`oemAuthorizations.${i}.validTill`]}
+              hint={st || offerDocExpiry ? (
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {st && <ExpiryBadge status={st.status} days={st.daysToExpiry} />}
+                  {offerDocExpiry && (
+                    <Button type="button" variant="link" size="sm" className="h-auto text-xs" onClick={() => update(i, { validTill: docExpiry })}>
+                      Use document expiry ({formatDateIST(docExpiry)})
+                    </Button>
+                  )}
+                </span>
+              ) : undefined}
+            >
+              <Input type="date" value={r.validTill ?? ''} placeholder={docExpiry ?? undefined} disabled={disabled} onChange={(e) => update(i, { validTill: e.target.value || null })} />
             </Field>
-            <Field label="Vault document">
+            <Field label="Vault document" error={errors[`oemAuthorizations.${i}.documentId`]}>
               <Select value={r.documentId ?? '__none'} disabled={disabled} onValueChange={(v) => update(i, { documentId: v === '__none' ? null : v })} options={options} />
             </Field>
             <div className="flex justify-end lg:pb-0.5">
