@@ -100,7 +100,7 @@ describe('refreshResults (T071)', () => {
     expect(r.body).toEqual({
       tenderId: A.id, tenderStatus: 'closed', evaluationStatus: 'technical_evaluated', evaluationLabel: 'Technical evaluated',
       bidders: [], winner: null, lowestPrice: null, anomalies: [], categories: [], sourceUrl: null,
-      fetchedAt: REF.toISOString(), checkedAt: REF.toISOString(), lastCheckFailed: false,
+      fetchedAt: REF.toISOString(), checkedAt: REF.toISOString(), lastCheck: 'ok', lastCheckFailed: false,
       checkUntil: new Date(REF.getTime() + 28 * DAY).toISOString(),
     });
   });
@@ -195,7 +195,7 @@ describe('refreshResults (T071)', () => {
     expect((await tenderOf(B)).status).toBe('closed');
     expect(await count(resultAlerts(team.orgId))).toBe(3);
     const r = await request(ctx.app, 'GET', `/tenders/${B.id}/result`, { cookie: team.owner.cookie });
-    expect(r.body).toMatchObject({ evaluationStatus: 'financial_evaluated', lastCheckFailed: true, fetchedAt: before.fetchedAt?.toISOString() ?? null });
+    expect(r.body).toMatchObject({ evaluationStatus: 'financial_evaluated', lastCheck: 'unreadable', lastCheckFailed: true, fetchedAt: before.fetchedAt?.toISOString() ?? null });
   });
 
   it('NFR-001: a GeM failure is recorded on the tender and stops the run (no further requests)', async () => {
@@ -215,6 +215,8 @@ describe('refreshResults (T071)', () => {
     // N4: an outage does not spend the tender's daily check.
     expect(await resultOf(D)).toMatchObject({ evaluationStatus: 'not_evaluated', bidders: [], fetchedAt: null, checkedAt: null, error: expect.stringContaining('HTTP 503') });
     expect(await resultOf(B)).toEqual(before);
+    const api = await request(ctx.app, 'GET', `/tenders/${D.id}/result`, { cookie: team.viewer.cookie });
+    expect(api.body).toMatchObject({ lastCheck: 'unreachable', lastCheckFailed: true });
   });
 
   it('every GeM request takes a cluster-wide lease slot (≤ 1 req/s across isolates)', async () => {
@@ -431,6 +433,9 @@ describe('results refresh — failure handling, stage history and budget (round-
     const r = (await resultOf(t))!;
     expect(r).toMatchObject({ evaluationStatus: 'financial_evaluated', error: BID_NOT_FOUND_ERROR, fetchedAt, checkedAt: old() });
     expect((await resultCandidates(ctx.deps, ctx.clock.now())).map((c) => c.id)).toEqual([t.id]); // asked again next run
+    // GeM answered, it just doesn't list the bid: not "unreachable".
+    const api = await request(ctx.app, 'GET', `/tenders/${t.id}/result`, { cookie: team.viewer.cookie });
+    expect(api.body).toMatchObject({ lastCheck: 'not_listed', lastCheckFailed: true });
 
     // GeM later reports an earlier stage: the stored one stands (never backwards), no event, the check is spent.
     const back = await refreshResults(ctx.deps, { client: fake([doc(t, 1)]) });

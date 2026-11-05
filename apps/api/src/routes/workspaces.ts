@@ -439,8 +439,9 @@ workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (
   });
   let hint: BidResultHint;
   try {
-    const page = await client.fetchBidResultHtml(t.gemBidId);
-    const r = page ? parseBidResult(page.html) : null;
+    const page = await client.fetchBidResult(t.gemBidId);
+    // A body cut off at the byte cap is never parsed as if it were the whole table: treat as not published.
+    const r = page && !page.truncated ? parseBidResult(page.html) : null;
     hint = r && r.bidders.length
       ? { available: true, l1Price: r.l1Price, bidders: r.bidders.map(({ rank, level, price }) => ({ rank, level, price })), sourceUrl: page!.url, fetchedAt: now.toISOString() }
       : { available: false, reason: 'not_published' };

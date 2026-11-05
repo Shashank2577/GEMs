@@ -351,6 +351,8 @@ export const tenderDocuments = pgTable('tender_documents', {
  *   submitted-bids search does not advance it, so the tender is asked again on the next run.
  * - `error`: why the last attempt failed (network, unreadable result page, bid not in the search); a failure never
  *   touches `evaluation_status`, `bidders`, `categories`, `source_url` or `fetched_at` (US6 scenario 6).
+ * - `updated_at` drives the daily candidate ordering (oldest first), so every write path — including recordFailure
+ *   in services/results.ts — must keep touching it.
  * - `evaluation_status` only moves forward (not → technical → financial → awarded), never back.
  */
 export const tenderResults = pgTable('tender_results', {

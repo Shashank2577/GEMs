@@ -201,7 +201,15 @@ async function storeResult(
   return next;
 }
 
-const UNREADABLE = 'GeM result page could not be read (format changed?)';
+export const UNREADABLE = 'GeM result page could not be read (format changed?)';
+
+/** Why the last check failed, for the Result tab: GeM answered but doesn't list the bid / page unreadable / GeM unreachable. */
+export function classifyResultError(error: string | null | undefined): 'ok' | 'not_listed' | 'unreadable' | 'unreachable' {
+  if (!error) return 'ok';
+  if (error === BID_NOT_FOUND_ERROR) return 'not_listed';
+  if (error.startsWith(UNREADABLE)) return 'unreadable';
+  return 'unreachable';
+}
 
 /** Check one tender against GeM and store what we learn. GeM/transport (and DB) errors propagate (the run stops). */
 async function checkTender(deps: AppDeps, client: ResultsClient, t: Candidate): Promise<Outcome> {

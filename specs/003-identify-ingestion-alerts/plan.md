@@ -163,7 +163,7 @@ All endpoints are under `/api`, cookie-session (or `tp_` API token) authenticate
 | `GET /views` *(gap)* | any | — | `200 {items: SavedViewDto[]}` | — |
 | `POST /views` *(gap)* | any | `{name≤40, params: string (URLSearchParams)}` | `201 SavedViewDto` | `400`; `409 view_limit` (> 20) |
 | `PATCH /views/:id` / `DELETE /views/:id` *(gap)* | owner of view | `{name?, params?, position?}` | `200` | `404` |
-| `GET /tenders/:id/result` *(built, US6 API)* | any | — | `200 TenderResultDto {tenderId, tenderStatus, evaluationStatus, evaluationLabel, bidders:[{rank,seller,price,level,awarded}], winner, lowestPrice, anomalies, categories, sourceUrl, fetchedAt, checkedAt, lastCheckFailed, checkUntil}` | `404` |
+| `GET /tenders/:id/result` *(built, US6 API)* | any | — | `200 TenderResultDto {tenderId, tenderStatus, evaluationStatus, evaluationLabel, bidders:[{rank,seller,price,level,awarded}], winner, lowestPrice, anomalies, categories, sourceUrl, fetchedAt, checkedAt, lastCheck, lastCheckFailed, checkUntil}` | `404` |
 | `GET /insights/competitors` *(built, US6 API)* | any | `category?, state?, page, pageSize` | `200 CompetitorsResponse {items:[{seller, wins, awardedValue, bids, categories[], anomalies, lastWinAt}], total, tenders, flaggedAwards, facets:{categories, states}}` (org's tracked tenders only) | `400` |
 
 mock-gem additions *(gap)*: `POST /__admin/cancel/<bidNumber>`; `POST /__admin/corrigendum/<bidNumber> {quantity?, emd?}`;

@@ -221,7 +221,12 @@ export interface TenderResultDto {
   fetchedAt: string | null;
   /** Last check attempt (null = never checked). */
   checkedAt: string | null;
-  /** The last check failed (GeM unreachable or an unreadable page); the data shown is from `fetchedAt`. */
+  /**
+   * Outcome of the last check: `ok`; `not_listed` (GeM answered but doesn't list this bid's evaluation yet);
+   * `unreadable` (the result page couldn't be parsed); `unreachable` (GeM down / transport / busy).
+   */
+  lastCheck: 'ok' | 'not_listed' | 'unreadable' | 'unreachable';
+  /** Compatibility: `lastCheck !== 'ok'`; the data shown is from `fetchedAt`. */
   lastCheckFailed: boolean;
   /** Daily checks run until this time (closing + 30 days); null when the tender has no closing date. */
   checkUntil: string | null;

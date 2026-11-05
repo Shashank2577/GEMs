@@ -3,6 +3,7 @@
  * Tenders are global public GeM data; everything org-specific (matches, analyses, workspaces,
  * seen/dismissed) is joined and filtered by the caller's org (Constitution IV).
  */
+import { classifyResultError } from '../services/results';
 import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
@@ -340,6 +341,7 @@ export function tenderResultDto(
     sourceUrl: r?.sourceUrl ?? null,
     fetchedAt: r?.fetchedAt?.toISOString() ?? null,
     checkedAt: r?.checkedAt?.toISOString() ?? null,
+    lastCheck: classifyResultError(r?.error),
     lastCheckFailed: !!r?.error,
     checkUntil: t.endAt ? new Date(t.endAt.getTime() + RESULT_CHECK_DAYS * 86_400_000).toISOString() : null,
   };

@@ -26,11 +26,15 @@ export function checkWindowCopy(checkUntil: string | null, now = new Date()): st
 }
 
 /** Notice shown when the latest check failed; says how fresh the data on screen is. */
-export function lastCheckFailedCopy(r: Pick<TenderResultDto, 'lastCheckFailed' | 'fetchedAt'>): string | null {
-  if (!r.lastCheckFailed) return null;
-  return r.fetchedAt
-    ? `We couldn’t reach GeM on the last check. Showing the result from ${formatDateIST(r.fetchedAt, { time: true })}; we’ll try again tomorrow.`
-    : 'We couldn’t reach GeM on the last check. We’ll try again tomorrow.';
+export function lastCheckFailedCopy(r: Pick<TenderResultDto, 'lastCheck' | 'fetchedAt'>): string | null {
+  if (r.lastCheck === 'ok') return null;
+  const [head, tail] = r.lastCheck === 'not_listed'
+    ? ['GeM doesn’t list this bid’s evaluation yet.', 'we’ll check again tomorrow.']
+    : r.lastCheck === 'unreadable'
+      ? ['GeM’s result page couldn’t be read.', 'we’ll try again tomorrow.']
+      : ['We couldn’t reach GeM on the last check.', 'we’ll try again tomorrow.'];
+  if (!r.fetchedAt) return `${head} ${tail[0].toUpperCase()}${tail.slice(1)}`;
+  return `${head} Showing the result from ${formatDateIST(r.fetchedAt, { time: true })}; ${tail}`;
 }
 
 /** How much more the winner quoted than the lowest bidder (rupees), or null when there is no gap. */

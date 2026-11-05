@@ -20,9 +20,13 @@ describe('result helpers', () => {
     expect(checkWindowCopy('2026-10-01T06:30:00Z', now)).toBe('The 30-day checking window ended on 01 Oct 2026.');
   });
   it('explains a failed check', () => {
-    expect(lastCheckFailedCopy({ lastCheckFailed: false, fetchedAt: null })).toBeNull();
-    expect(lastCheckFailedCopy({ lastCheckFailed: true, fetchedAt: null })).toMatch(/couldn’t reach GeM/);
-    expect(lastCheckFailedCopy({ lastCheckFailed: true, fetchedAt: '2026-11-01T06:30:00Z' })).toMatch(/01 Nov 2026/);
+    expect(lastCheckFailedCopy({ lastCheck: 'ok', fetchedAt: null })).toBeNull();
+    expect(lastCheckFailedCopy({ lastCheck: 'unreachable', fetchedAt: null })).toBe('We couldn’t reach GeM on the last check. We’ll try again tomorrow.');
+    expect(lastCheckFailedCopy({ lastCheck: 'not_listed', fetchedAt: null })).toBe('GeM doesn’t list this bid’s evaluation yet. We’ll check again tomorrow.');
+    expect(lastCheckFailedCopy({ lastCheck: 'unreadable', fetchedAt: null })).toBe('GeM’s result page couldn’t be read. We’ll try again tomorrow.');
+    expect(lastCheckFailedCopy({ lastCheck: 'unreachable', fetchedAt: '2026-11-01T06:30:00Z' })).toMatch(/couldn’t reach GeM.*01 Nov 2026/);
+    expect(lastCheckFailedCopy({ lastCheck: 'not_listed', fetchedAt: '2026-11-01T06:30:00Z' })).toMatch(/doesn’t list.*01 Nov 2026.*check again tomorrow/);
+    expect(lastCheckFailedCopy({ lastCheck: 'unreadable', fetchedAt: '2026-11-01T06:30:00Z' })).toMatch(/couldn’t be read.*01 Nov 2026/);
   });
   it('computes the winner premium in rupees', () => {
     expect(winnerPremium({ winner: b({ price: 150000 }), lowestPrice: 100000 })).toBe(50000);

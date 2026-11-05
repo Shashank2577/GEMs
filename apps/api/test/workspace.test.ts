@@ -781,6 +781,30 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
       }
     });
 
+    it('X2: a result page cut off at the byte cap is never parsed — reported as not_published', async () => {
+      const t = await tenderOf('submitted');
+      await ctx.db.delete(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId!));
+      await reset(ctx.db, t.gemBidId!, 'gem_result_bid');
+      const big = '<html><body>' + 'x'.repeat(1024 * 1024 + 4096) + '</body></html>';
+      const cut = await createTestContext({
+        now: NOW, keepData: true, gemBaseUrl: GEM,
+        fetch: async (input, init) => {
+          const res = await mock.app.fetch(new Request(input as string, init));
+          if (!String(input).includes('getBidResultView')) return res;
+          const real = await res.text(); // a valid table, but followed by padding so the capped read truncates it
+          return new Response(real + big, { status: 200, headers: { 'content-type': 'text/html' } });
+        },
+      });
+      try {
+        const r = await hint(t.id, demo.analyst.cookie, cut.app);
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({ available: false, reason: 'not_published' });
+      } finally {
+        await cut.close();
+        await ctx.db.delete(gemResultHints).where(eq(gemResultHints.gemBidId, t.gemBidId!));
+      }
+    });
+
     it('degrades to { available: false } when GeM is down (slot given back) or the tender has no GeM id', async () => {
       const t = await tenderOf('won');
       mock.state.failMode = 'down';
