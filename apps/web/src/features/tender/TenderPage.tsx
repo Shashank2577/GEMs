@@ -5,7 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Bot, CheckCircle2, FileSearch, FileText, Gauge, History, ListChecks, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react';
+import { ArrowLeft, Bot, CheckCircle2, FileSearch, FileText, Gauge, History, ListChecks, Trophy, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react';
 import type { AnalysisDto } from '@tp/core/contracts/analyse';
 import {
   Badge, Button, Card, EmptyState, ErrorState, Skeleton, SkeletonText, Tabs, TabsContent, TabsList, TabsTrigger, toast,
@@ -18,11 +18,12 @@ import { AnalysisPanel } from './AnalysisPanel';
 import { DocumentsTab } from './DocumentsTab';
 import { HistoryTab } from './HistoryTab';
 import { RequirementsTab } from './RequirementsTab';
+import { ResultTab } from './ResultTab';
 import { TenderHero } from './TenderHero';
 import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
 import { canRescoreFor, isAnalysisRunning, staleReasonCopy, staleSinceCopy } from './labels';
 
-const TABS = ['analysis', 'requirements', 'documents', 'history'] as const;
+const TABS = ['analysis', 'requirements', 'documents', 'result', 'history'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function TenderPage() {
@@ -139,6 +140,7 @@ export default function TenderPage() {
           <TabsTrigger value="analysis"><Gauge /> Analysis</TabsTrigger>
           <TabsTrigger value="requirements"><ListChecks /> Requirements {analysis?.requirements.length ? <Badge size="sm" className="tabular">{analysis.requirements.length}</Badge> : null}</TabsTrigger>
           <TabsTrigger value="documents"><FileText /> Documents {docCount ? <Badge size="sm" className="tabular">{docCount}</Badge> : null}</TabsTrigger>
+          <TabsTrigger value="result"><Trophy /> Result</TabsTrigger>
           <TabsTrigger value="history"><History /> History {t.hasCorrigendum && <span className="size-1.5 rounded-full bg-warning" aria-label="corrigendum" />}</TabsTrigger>
         </TabsList>
 
@@ -175,6 +177,9 @@ export default function TenderPage() {
         </TabsContent>
         <TabsContent value="documents">
           <DocumentsTab tenderId={id} hasGemLink={hasGemLink} hasAnalysis={!!analysis} onReanalyse={runAnalyse} />
+        </TabsContent>
+        <TabsContent value="result">
+          <ResultTab tenderId={id} />
         </TabsContent>
         <TabsContent value="history">
           <HistoryTab tenderId={id} events={t.events} />

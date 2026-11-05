@@ -166,8 +166,8 @@ All endpoints are under `/api`, cookie-session (or `tp_` API token) authenticate
 | `GET /views` *(built)* | any | — | `200 {items: SavedViewDto[], total, limit}` | — |
 | `POST /views` *(built)* | any | `{name≤40, params: Record<string,string[]>}` | `201 SavedViewDto` | `400`; `409 view_limit` (20 reached); `409 view_exists` |
 | `PATCH /views/:id` / `DELETE /views/:id` *(built)* | owner of view | `{name?, params?}` | `200 SavedViewDto` / `200 {ok:true}` | `404`; `409 view_exists` |
-| `GET /tenders/:id/result` *(US6 planned)* | any | — | `200 {evaluationStatus, bidders:[{rank,seller,price,level}], sourceUrl, fetchedAt}` | `404` |
-| `GET /insights/competitors` *(US6 planned)* | any | `category?, state?, page` | `200 {items:[{seller, wins, awardedValue, categories[], anomalies}], total}` | `400` |
+| `GET /tenders/:id/result` *(built, US6 API)* | any | — | `200 TenderResultDto {tenderId, tenderStatus, evaluationStatus, evaluationLabel, bidders:[{rank,seller,price,level,awarded}], winner, lowestPrice, anomalies, categories, sourceUrl, fetchedAt, checkedAt, lastCheck, lastCheckFailed, checkUntil}` | `404` |
+| `GET /insights/competitors` *(built, US6 API)* | any | `category?, state?, page, pageSize` | `200 CompetitorsResponse {items:[{seller, wins, awardedValue, bids, categories[], anomalies, lastWinAt}], total, tenders, flaggedAwards, facets:{categories, states}}` (org's tracked tenders only) | `400` |
 
 mock-gem additions: `POST /__admin/cancel/<bidNumber>` and `POST /__admin/corrigendum/<bidNumber> {days?, endAt?, quantity?, emd?}` (US5, delivered); US6 *(planned)*:
 `POST /all-bids-data` honouring `bidStatusType:"bidrastatus"` + `byStatus`; `GET /bidding/bid/getBidResultView/:id` serving a
@@ -178,14 +178,14 @@ recorded HTML fixture; `POST /__admin/award/<bidNumber>` to move a bid into the 
 | Table (schema.ts) | Columns used | Change |
 |---|---|---|
 | `tenders` | `source, bid_number (uq with source), gem_bid_id, bid_type, title, items, category, quantity, ministry, department, organisation, buyer_office, state, city, start_at, end_at (idx), opening_at, emd_amount, estimated_value, epbg_percent, hsn_codes, status, document_url, source_url, raw, content_hash, fetched_at, created_at, updated_at` | none (US6 sets `status='awarded'`) |
-| `tender_events` | `tender_id, kind (created/updated/corrigendum/closed/cancelled), changes, created_at` | *(gap)* add kinds `awarded`, `result` (TS union only) |
-| `ingestion_runs` | `trigger, status, pages_fetched, tenders_seen/created/updated, matches_created, error, started_at, finished_at` | *(gap)* optional `kind text default 'listing'` (`listing`/`results`) so results refresh runs are visible |
+| `tender_events` | `tender_id, kind (created/updated/corrigendum/closed/cancelled), changes, created_at` | *(built, US6)* kinds `awarded`, `technical_evaluated`, `financial_evaluated` (TS union only; no separate `result` event — the alert and `tender_results` carry it) |
+| `ingestion_runs` | `trigger, status, pages_fetched, tenders_seen/created/updated, matches_created, error, started_at, finished_at` | *(built, US6, migration 0025)* `kind text not null default 'listing'` (`listing`/`results`); `ingestion_runs_one_running_uq` is now per kind |
 | `watchlists` | `org_id, name, criteria (WatchlistCriteria JSON), active, created_by` | none |
 | `tender_matches` | `org_id, tender_id, watchlist_id (uq triple), reasons, relevance, seen, dismissed, created_at` | none |
 | `notifications` | `org_id, user_id, channel, kind, title, body, link, dedupe_key (uq user+channel+key), status, error, sent_at, read_at` | `attempts` and `next_attempt_at` *(built, migration 0021)*; kind union + `corrigendum`, `result` *(built; `result` is emitted only once US6 lands)* |
 | `notification_prefs` | `org_id, user_id (pk), in_app, email, whatsapp, frequency, expiry_reminders` | none (unsubscribe flips `email=false`) |
 | `saved_views` *(built, migration 0015)* | `id, org_id, user_id, name, params jsonb Record<string,string[]>, position int, created_at, updated_at`; uq `(org_id, user_id, name)` | built |
-| `tender_results` *(US6 planned, not in schema.ts)* | `tender_id pk/fk, evaluation_status text, bidders jsonb [{rank,seller,price,level}], source_url, fetched_at, error` | new table |
+| `tender_results` *(built, US6, migration 0025)* | `tender_id pk/fk, evaluation_status text, bidders jsonb [{rank,seller,price,level,awarded}], categories jsonb, source_url, fetched_at, checked_at, error` | new table (`checked_at` = last attempt for the 24 h window; `fetched_at` = last success) |
 
 ## Key Flows
 
@@ -231,13 +231,22 @@ build body with `summariseChanges(changes)` (core, unit-tested) and create rows 
 per prefs, kind `corrigendum`, dedupe `corrigendum:<tenderId>:<contentHash>:<orgId>` ─▶ dispatcher sends instantly (daily users:
 included in digest with a "Changed" section).
 
-### 5. Results refresh (US6, planned)
+### 5. Results refresh (built, US6 — `apps/api/src/services/results.ts`)
 
 Daily tick (first scheduled run ≥ 10:00 IST) ─▶ `refreshResults(deps)`: select ≤ 50 tracked tenders (`tender_matches` ∪
 `analyses` ∪ `bid_workspaces`) with `status in ('closed','awarded')` and `end_at` within 30 days whose `tender_results.fetched_at`
 is null or > 24 h old ─▶ `GemClient.fetchSubmittedPage({search: bidNumber, status:'closed'})` to read `b_buyer_status`
 ─▶ when awarded, `GemClient.fetchBidResult(gemBidId)` ─▶ `parseBidResultHtml` ─▶ upsert `tender_results`, set
 `tenders.status='awarded'`, event `awarded`, in-app "Result published" alert ─▶ record an `ingestion_runs` row of kind `results`.
+As built: candidates also exclude cancelled tenders and tenders already final (awarded with a bidder table); the run
+holds the per-kind single-running slot (`ResultsBusyError` on overlap) and the daily `job_runs ('results', day)` claim;
+an unreadable result page records `tender_results.error` and leaves stored data untouched; a GeM failure stops the run.
+Round-1 review: `evaluation_status` only moves forward (a bid missing from the search records
+"Bid not found in GeM submitted-bids search" and never writes `not_evaluated`); stage advances add
+`technical_evaluated` / `financial_evaluated` tender events; result alerts commit in the same transaction as the row;
+a truncated/oversized result page is unreadable; outages and not-found do not advance `checked_at` (migration 0026 makes it
+nullable), candidates are ordered by last touch; the scheduled step's budget is capped to what is left of the 15-minute
+invocation.
 
 ## What to Port from the Reference Repos
 

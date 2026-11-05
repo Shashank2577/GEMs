@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { extractCsrfToken, GemClient, GemError } from '../../src/gem/client';
+import { extractCsrfToken, GemClient, GemError, MAX_RESULT_BYTES } from '../../src/gem/client';
 
 const FIX = join(__dirname, '../fixtures/gem');
 const page = (n: number) => readFileSync(join(FIX, `page-${n}.json`), 'utf8');
@@ -141,6 +141,73 @@ describe('GemClient', () => {
     expect(new TextDecoder().decode(doc.bytes.slice(0, 5))).toBe('%PDF-');
     const bad = fakeGem((c) => (c.url.includes('showbid') ? new Response('<html>login</html>') : undefined));
     await expect(new GemClient(bad.f, { minIntervalMs: 0, sleep: time.sleep, now: time.now }).fetchBidDocument('1')).rejects.toThrow(/PDF/);
+  });
+});
+
+describe('GemClient submitted bids and results (spec 003 US6, FR-060)', () => {
+  const RES = join(FIX, 'results');
+  const mk = (handler: Parameters<typeof fakeGem>[0]) => {
+    const { f, calls } = fakeGem(handler);
+    const time = fakeTime();
+    return { gem: new GemClient(f, { baseUrl: 'http://gem.test', minIntervalMs: 0, sleep: time.sleep, now: time.now }), calls };
+  };
+  const payloadOf = (c: Call) => JSON.parse(new URLSearchParams(c.body).get('payload')!);
+
+  it('fetchSubmittedPage posts bidStatusType bidrastatus with filter.byStatus and parses the awarded page', async () => {
+    const { gem, calls } = mk((c) => (c.url.endsWith('/all-bids-data') ? new Response(readFileSync(join(RES, 'bidrastatus-awarded.json'), 'utf8')) : undefined));
+    const p = await gem.fetchSubmittedPage({ search: 'GEM/2026/B/6812345', byStatus: 'bid_awarded', page: 2 });
+    expect(p.numFound).toBe(2);
+    expect(p.docs[0]).toMatchObject({ b_buyer_status: [3] });
+    expect(payloadOf(calls[1])).toMatchObject({
+      page: 2,
+      param: { searchBid: 'GEM/2026/B/6812345' },
+      filter: { bidStatusType: 'bidrastatus', byStatus: 'bid_awarded' },
+    });
+  });
+
+  it('omits byStatus when not given and handles the tech-evaluated page', async () => {
+    const { gem, calls } = mk((c) => (c.url.endsWith('/all-bids-data') ? new Response(readFileSync(join(RES, 'bidrastatus-tech-evaluated.json'), 'utf8')) : undefined));
+    const p = await gem.fetchSubmittedPage();
+    expect(p.docs[0]).toMatchObject({ b_buyer_status: [1] });
+    const filter = payloadOf(calls[1]).filter;
+    expect(filter.bidStatusType).toBe('bidrastatus');
+    expect('byStatus' in filter).toBe(false);
+    expect(payloadOf(calls[1]).page).toBe(1);
+  });
+
+  it('fetchBidResult GETs /bidding/bid/getBidResultView/<id>; 404 -> null; 5xx -> GemError', async () => {
+    const html = readFileSync(join(RES, 'bid-result-awarded.html'), 'utf8');
+    const { gem, calls } = mk((c) => (c.url.includes('getBidResultView/8100037') ? new Response(html) : undefined));
+    const r = await gem.fetchBidResult('8100037');
+    expect(r?.url).toBe('http://gem.test/bidding/bid/getBidResultView/8100037');
+    expect(r?.html).toBe(html);
+    expect(r?.truncated).toBe(false);
+    expect(calls.map((c) => c.method)).toEqual(['GET']);
+    expect(await gem.fetchBidResult('1')).toBeNull();
+    const down = mk((c) => (c.url.includes('getBidResultView') ? new Response('down', { status: 503 }) : undefined));
+    await expect(down.gem.fetchBidResult('2')).rejects.toBeInstanceOf(GemError);
+  });
+
+  it('fetchBidResult flags a body cut off at MAX_RESULT_BYTES as truncated; a declared oversize is a too_large GemError', async () => {
+    const endless = () => new Response(new ReadableStream<Uint8Array>({ pull(ctrl) { ctrl.enqueue(new TextEncoder().encode('<tr>'.repeat(4096))); } }));
+    const { gem } = mk((c) => (c.url.includes('getBidResultView') ? endless() : undefined));
+    const r = await gem.fetchBidResult('8100037');
+    expect(r?.truncated).toBe(true);
+    expect(r?.html).toHaveLength(MAX_RESULT_BYTES);
+    const declared = mk((c) => (c.url.includes('getBidResultView') ? new Response('x', { headers: { 'content-length': String(MAX_RESULT_BYTES + 1) } }) : undefined));
+    const err = await declared.gem.fetchBidResult('1').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(GemError);
+    expect((err as GemError).code).toBe('too_large');
+  });
+
+  it('spaces submitted-page and result requests by minIntervalMs (<= 1 req/s)', async () => {
+    const { f } = fakeGem((c) => (c.url.endsWith('/all-bids-data') ? new Response(readFileSync(join(RES, 'bidrastatus-awarded.json'), 'utf8')) : undefined));
+    const time = fakeTime();
+    const gem = new GemClient(f, { baseUrl: 'http://gem.test', sleep: time.sleep, now: time.now });
+    await gem.fetchSubmittedPage({ byStatus: 'bid_awarded' });
+    await gem.fetchBidResult('8100037');
+    expect(time.sleeps.length).toBeGreaterThanOrEqual(2);
+    expect(time.sleeps.every((ms) => ms <= 1000)).toBe(true);
   });
 });
 

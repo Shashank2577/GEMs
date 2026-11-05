@@ -21,6 +21,7 @@ const WorkspacePage = lazy(() => import('@/features/workspace/WorkspacePage'));
 const VaultPage = lazy(() => import('@/features/vault/VaultPage'));
 const ProfilePage = lazy(() => import('@/features/profile/ProfilePage'));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
+const CompetitorsPage = lazy(() => import('@/features/insights/CompetitorsPage'));
 const NotificationsPage = lazy(() => import('@/features/notifications/NotificationsPage'));
 const NotFoundPage = lazy(() => import('./NotFoundPage'));
 const UiGallery = import.meta.env.DEV ? lazy(() => import('./UiGallery')) : null;
@@ -78,6 +79,7 @@ export const routes: RouteObject[] = [
           { path: '/watchlists', element: <WatchlistsPage /> },
           { path: '/pipeline', element: <PipelinePage /> },
           { path: '/workspaces/:id', element: <WorkspacePage /> },
+          { path: '/competitors', element: <CompetitorsPage /> },
           { path: '/vault', element: <VaultPage /> },
           { path: '/profile', element: <ProfilePage /> },
           { path: '/settings/*', element: <SettingsPage /> },

@@ -1,0 +1,82 @@
+{
+  "code": 200,
+  "status": 1,
+  "message": "Data Found",
+  "response": {
+    "responseHeader": {
+      "status": 0,
+      "QTime": 3,
+      "params": {
+        "start": "0",
+        "rows": "10"
+      }
+    },
+    "response": {
+      "numFound": 1,
+      "start": 0,
+      "numFoundExact": true,
+      "docs": [
+        {
+          "id": "8100205",
+          "b_id": [
+            8100205
+          ],
+          "b_bid_number": [
+            "GEM/2026/B/6812511"
+          ],
+          "b_category_name": [
+            "Laptop - Notebook"
+          ],
+          "bd_category_name": [
+            "Laptop - Notebook (Q2)"
+          ],
+          "b_total_quantity": [
+            100
+          ],
+          "ba_official_details_minName": [
+            "Tamil Nadu"
+          ],
+          "ba_official_details_deptName": [
+            "Directorate of School Education"
+          ],
+          "final_start_date_sort": [
+            "2026-10-05T10:00:00Z"
+          ],
+          "final_end_date_sort": [
+            "2026-10-24T10:00:00Z"
+          ],
+          "b_bid_type": [
+            1
+          ],
+          "b_status": [
+            1
+          ],
+          "b_buyer_status": [
+            1
+          ],
+          "b_type": [
+            0
+          ],
+          "is_high_value": [
+            false
+          ],
+          "b_is_bunch": [
+            0
+          ],
+          "b_eval_type": [
+            0
+          ],
+          "b_ra_to_bid_details": [
+            "RA enabled: No"
+          ],
+          "ba_official_details_officeName": [
+            "Chief Educational Office, Chennai"
+          ],
+          "b_estimated_value": [
+            "54 Lakh"
+          ]
+        }
+      ]
+    }
+  }
+}

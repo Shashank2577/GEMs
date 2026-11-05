@@ -69,14 +69,16 @@ export async function buildHealth(deps: AppDeps, timeoutMs = HEALTH_QUERY_TIMEOU
   };
   try {
     const q = <T>(p: PromiseLike<T>) => withTimeout(p, timeoutMs);
+    // Ingestion health is about listing runs; the daily results refresh (kind 'results', 003/US6) is separate.
+    const listing = eq(ingestionRuns.kind, 'listing');
     const isDigestRow = sql`coalesce(${notificationPrefs.frequency} = 'daily' and ${notifications.kind} = 'tender_match', false)`;
     const [, [lastOk], [lastRun], [firstRun], [backlog]] = await Promise.all([
       q(deps.db.execute(sql`select 1`)),
       q(deps.db.select({ at: ingestionRuns.finishedAt }).from(ingestionRuns)
-        .where(inArray(ingestionRuns.status, ['success', 'partial']))
+        .where(and(listing, inArray(ingestionRuns.status, ['success', 'partial'])))
         .orderBy(desc(ingestionRuns.finishedAt)).limit(1)),
-      q(deps.db.select({ status: ingestionRuns.status }).from(ingestionRuns).orderBy(desc(ingestionRuns.startedAt)).limit(1)),
-      q(deps.db.select({ at: ingestionRuns.startedAt }).from(ingestionRuns).orderBy(asc(ingestionRuns.startedAt)).limit(1)),
+      q(deps.db.select({ status: ingestionRuns.status }).from(ingestionRuns).where(listing).orderBy(desc(ingestionRuns.startedAt)).limit(1)),
+      q(deps.db.select({ at: ingestionRuns.startedAt }).from(ingestionRuns).where(listing).orderBy(asc(ingestionRuns.startedAt)).limit(1)),
       // Only outbound channels the dispatcher sends (in-app rows stay pending until read). Uses notifications_pending_idx.
       q(deps.db.select({ n: sql<number>`count(*)::int` }).from(notifications)
         .leftJoin(notificationPrefs, and(eq(notificationPrefs.orgId, notifications.orgId), eq(notificationPrefs.userId, notifications.userId)))

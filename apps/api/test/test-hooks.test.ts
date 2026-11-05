@@ -31,3 +31,15 @@ describe('E2E mail capture hook', () => {
     expect((await app.request(`${TEST_APP_URL}/api/__test/mail`)).status).toBe(404);
   });
 });
+
+describe('E2E results-refresh hook (003/US6)', () => {
+  it('is absent by default and in production; when enabled it runs one results refresh', async () => {
+    expect((await ctx.app.request(`${TEST_APP_URL}/api/__test/results/refresh`, { method: 'POST' })).status).toBe(404);
+    const prod = createApp({ ...ctx.deps, config: { ...ctx.deps.config, environment: 'production' } }, { testHooks: true });
+    expect((await prod.request(`${TEST_APP_URL}/api/__test/results/refresh`, { method: 'POST' })).status).toBe(404);
+    const app = createApp(ctx.deps, { testHooks: true });
+    const r = await app.request(`${TEST_APP_URL}/api/__test/results/refresh`, { method: 'POST' });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ status: 'success', checked: 0, stored: 0, awarded: 0, error: null });
+  });
+});

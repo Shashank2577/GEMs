@@ -61,6 +61,10 @@ listed here with its licence.
    gem.py: the bid-result view route /bidding/bid/getBidResultView/<b_id> and the bidder-row / categories
    regular expressions), with the test fixture packages/core/test/fixtures/gem/bid-result.html built to the
    same markup (spec 007, T004/T032).
+   Spec 003 US6 (2026-11-05): packages/core/src/gem/client.ts fetchSubmittedPage (search_bids: bidStatusType
+   "bidrastatus" + filter.byStatus) and fetchBidResult (get_bid_result route), and packages/core/src/gem/result.ts
+   parseBidResultHtml (same result-view markup: bidder rows, bid_price span, L-level cell, categoris variable;
+   re-implemented), with fixtures in packages/core/test/fixtures/gem/results/ built to that markup.
    Verified against upstream commit 315a968f381eb233100af1e17222c930c946b2cc (2026-08-16).
    Licence text: https://opensource.org/license/mit
 
@@ -110,6 +114,10 @@ in #537 and remains in git history. Add an entry above before copying from any o
   packages/core/src/analyse/rules.ts; asserted in packages/core/test/analyse/corpus.test.ts).
 - Giri-Aayush/gem — https://github.com/Giri-Aayush/gem
 - rounittxx/gem-bid-scraper — https://github.com/rounittxx/gem-bid-scraper
+
+IshanMaheshwari-777/GEM-SCRAPER (no licence) is also used for one idea only, no code or text copied: flagging an
+award where the winner is not the lowest price (packages/core/src/gem/result.ts detectAnomalies, spec 003 FR-064),
+re-implemented from the requirement.
 
 Test fixtures packages/core/test/fixtures/bids/real-*.pdf embed subsets of GNU FreeSans
 (https://www.gnu.org/software/freefont/), GPLv3 with the font exception, which permits embedding the

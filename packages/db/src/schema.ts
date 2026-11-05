@@ -4,7 +4,8 @@
  */
 import { sql } from 'drizzle-orm';
 import type { AnalysisWarning } from '@tp/core/contracts/analyse';
-import type { NotificationKind } from '@tp/core/contracts/identify';
+import type { EvaluationStatus, NotificationKind } from '@tp/core/contracts/identify';
+import type { ResultBidder } from '@tp/core/gem/result';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -309,7 +310,7 @@ export const tenders = pgTable('tenders', {
 export const tenderEvents = pgTable('tender_events', {
   id: id(),
   tenderId: uuid('tender_id').notNull().references(() => tenders.id, { onDelete: 'cascade' }),
-  kind: text('kind').$type<'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled'>().notNull(),
+  kind: text('kind').$type<'created' | 'updated' | 'corrigendum' | 'closed' | 'cancelled' | 'awarded' | 'technical_evaluated' | 'financial_evaluated'>().notNull(),
   changes: jsonb('changes').$type<Record<string, { from: unknown; to: unknown }>>().notNull().default({}),
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_events_tender_idx').on(t.tenderId) }));
@@ -340,8 +341,39 @@ export const tenderDocuments = pgTable('tender_documents', {
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_docs_tender_idx').on(t.tenderId) }));
 
+/**
+ * Public GeM result per tender (003/US6, FR-061): evaluation status and the bidder table of the public result view.
+ * Global like `tenders` (no org_id): one row per tender serves every org; org scoping happens where it is read
+ * (routes/insights.ts only aggregates tenders the caller's org tracks). Written only by services/results.ts.
+ * - `fetched_at`: last time GeM was read successfully (status, and bidders when published); null until then.
+ * - `checked_at`: last completed check — GeM answered, readable or not; the daily refresh skips rows checked in the
+ *   last 24 h. Null until one completes. A GeM outage (transport, 5xx, lease busy) or a bid missing from the
+ *   submitted-bids search does not advance it, so the tender is asked again on the next run.
+ * - `error`: why the last attempt failed (network, unreadable result page, bid not in the search); a failure never
+ *   touches `evaluation_status`, `bidders`, `categories`, `source_url` or `fetched_at` (US6 scenario 6).
+ * - `updated_at` drives the daily candidate ordering (oldest first), so every write path — including recordFailure
+ *   in services/results.ts — must keep touching it.
+ * - `evaluation_status` only moves forward (not → technical → financial → awarded), never back.
+ */
+export const tenderResults = pgTable('tender_results', {
+  tenderId: uuid('tender_id').primaryKey().references(() => tenders.id, { onDelete: 'cascade' }),
+  evaluationStatus: text('evaluation_status').$type<EvaluationStatus>().notNull().default('not_evaluated'),
+  /** `[{rank, seller, price (rupees), level, awarded}]` from parseBidResultHtml; [] until GeM publishes the result. */
+  bidders: jsonb('bidders').$type<ResultBidder[]>().notNull().default([]),
+  /** GeM categories named on the result page (`var categoris`). */
+  categories: jsonb('categories').$type<string[]>().notNull().default([]),
+  sourceUrl: text('source_url'),
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }),
+  checkedAt: timestamp('checked_at', { withTimezone: true }),
+  error: text('error'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 export const ingestionRuns = pgTable('ingestion_runs', {
   id: id(),
+  /** `listing` = BidPlus listing ingestion (runIngestion); `results` = daily results refresh (services/results.ts). */
+  kind: text('kind').$type<'listing' | 'results'>().notNull().default('listing'),
   trigger: text('trigger').$type<'cron' | 'manual' | 'seed'>().notNull(),
   status: text('status').$type<'running' | 'success' | 'partial' | 'failed'>().notNull().default('running'),
   pagesFetched: integer('pages_fetched').notNull().default(0),
@@ -357,9 +389,10 @@ export const ingestionRuns = pgTable('ingestion_runs', {
   error: text('error'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
-}, () => ({
-  // 008/FR-025: at most one running ingestion, cluster-wide (cron ticks, manual syncs, every isolate).
-  oneRunningUq: uniqueIndex('ingestion_runs_one_running_uq').on(sql`(true)`).where(sql`status = 'running'`),
+}, (t) => ({
+  // 008/FR-025: at most one running run per kind, cluster-wide (cron ticks, manual syncs, every isolate). Per kind
+  // (003/US6) so the daily results refresh neither blocks nor is blocked by a listing sync; both share the GeM lease.
+  oneRunningUq: uniqueIndex('ingestion_runs_one_running_uq').on(t.kind).where(sql`status = 'running'`),
 }));
 
 /**
