@@ -4,7 +4,8 @@
  *
  *   pnpm exec tsx scripts/e2e-summary.ts [path/to/results.json]   (default qa/.runs/${E2E_PORT:-8788}/results.json)
  *
- * A test is "flaky" when its final attempt passed after at least one failed attempt (Playwright retries).
+ * A test is "flaky" when its final attempt passed after at least one failed attempt (Playwright retries); Playwright's
+ * per-test `status` (expected/unexpected/flaky/skipped) is used first, the attempt list only as a fallback.
  * Never fails the job: a missing/unreadable report is reported in the summary and exits 0.
  */
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
@@ -33,6 +34,23 @@ function testTitle(path: string[], spec: PwSpec, test: PwTest) {
   return `${test.projectName ? `[${test.projectName}] ` : ''}${parts.join(' › ')}`;
 }
 
+/**
+ * Playwright's own per-test outcome (`expected` / `unexpected` / `flaky` / `skipped`) is authoritative; the attempt
+ * list is only used when it is absent: final attempt passed after a failed one → flaky.
+ */
+export function classify(test: PwTest, results: PwResult[]): 'passed' | 'failed' | 'flaky' | 'skipped' {
+  switch (test.status) {
+    case 'expected': return 'passed';
+    case 'unexpected': return 'failed';
+    case 'flaky': return 'flaky';
+    case 'skipped': return 'skipped';
+  }
+  const final = results[results.length - 1];
+  if (!final || final.status === 'skipped') return 'skipped';
+  if (!PASSED.has(final.status ?? '')) return 'failed';
+  return results.slice(0, -1).some((r) => !PASSED.has(r.status ?? '') && r.status !== 'skipped') ? 'flaky' : 'passed';
+}
+
 /** Pure: classify every test (spec × project) of a Playwright JSON report by its final attempt. */
 export function summarize(report: PwReport): E2eSummary {
   const s: E2eSummary = { total: 0, passed: 0, failed: 0, flaky: 0, skipped: 0, failedTitles: [], flakyTitles: [] };
@@ -45,18 +63,15 @@ export function summarize(report: PwReport): E2eSummary {
         const results = test.results ?? [];
         const final = results[results.length - 1];
         const title = testTitle(here, spec, test);
-        if (!final || final.status === 'skipped' || test.status === 'skipped') {
-          s.skipped += 1;
-        } else if (PASSED.has(final.status ?? '')) {
-          if (results.slice(0, -1).some((r) => !PASSED.has(r.status ?? '') && r.status !== 'skipped')) {
-            s.flaky += 1;
-            s.flakyTitles.push(title);
-          } else {
-            s.passed += 1;
-          }
+        const outcome = classify(test, results);
+        if (outcome === 'skipped') s.skipped += 1;
+        else if (outcome === 'passed') s.passed += 1;
+        else if (outcome === 'flaky') {
+          s.flaky += 1;
+          s.flakyTitles.push(title);
         } else {
           s.failed += 1;
-          s.failedTitles.push(`${title} (${final.status})`);
+          s.failedTitles.push(`${title} (${final?.status ?? 'failed'})`);
         }
       }
     }

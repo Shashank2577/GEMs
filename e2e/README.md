@@ -13,8 +13,9 @@ and the QA verdict `VERDICT.md` (template `.aisdlc/qa/verdict-comment.md`). Raw 
 - **CI / any external Postgres**: set `E2E_DATABASE_URL`, e.g.
   `E2E_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_e2e pnpm e2e`. `scripts/local-pg.sh` is not called; the
   database named in the URL is dropped and recreated with `psql` through the same server's `postgres` maintenance
-  database (override with `E2E_ADMIN_DATABASE_URL`). As a safety net the name must contain `e2e` or `test`
-  (`E2E_ALLOW_ANY_DB=1` overrides). `psql` must be on `PATH` (it is on GitHub's `ubuntu-latest`).
+  database (override with `E2E_ADMIN_DATABASE_URL`). As a safety net the name (also `E2E_DB_NAME` locally) must
+  have an `e2e`/`test` segment (`(^|_)(e2e|test)(_|$)`, e.g. `tenderpilot_e2e`) and the host must be `localhost` or
+  `127.0.0.1` (`E2E_ALLOW_ANY_DB=1` overrides both). `psql` must be on `PATH` (it is on GitHub's `ubuntu-latest`).
 - The `e2e` job in `.github/workflows/ci.yml` runs `CI=1 pnpm e2e` this way against a `postgres:16` service, writes a
   pass/fail/flaky summary with `scripts/e2e-summary.ts`, and uploads `qa/evidence/**` + `qa/.runs/**` as artifact
   `e2e-evidence-<run_id>` (30 days).

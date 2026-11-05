@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
-  buildStoryIndex, checkTrailers, checkVerdict, evaluate, formatOutcome, issueRefs, parseGitLog, parseLabels, resolveStory,
+  buildStoryIndex, checkTrailers, checkVerdict, verdictOf, evaluate, formatOutcome, issueRefs, parseGitLog, parseLabels, resolveStory,
   type Commit, type DodInput, type PrInfo,
 } from './dod-check';
 
@@ -82,16 +84,41 @@ describe('dod rules (scenario 6)', () => {
     expect(failed(o)).toEqual(['QA verdict is not approved']);
   });
 
-  it('accepts the bold "**Verdict:** approved" form', () => {
-    expect(checkVerdict('**Verdict:** approved')[0].ok).toBe(true);
-    expect(checkVerdict('qa:approved')[0].ok).toBe(false);
+  it('accepts every approval form of the QA template; rejection wins', () => {
+    expect(verdictOf('**Verdict:** approved')).toBe('approved');
+    expect(verdictOf('Verdict: approved')).toBe('approved');
+    expect(verdictOf('## QA verdict — APPROVED\n')).toBe('approved');
+    expect(verdictOf('### QA verdict - approved')).toBe('approved');
+    expect(verdictOf('`qa:approved` — every criterion met')).toBe('approved');
+    expect(verdictOf('## QA verdict — REJECTED\nVerdict: approved')).toBe('rejected');
+    expect(verdictOf('## QA verdict — APPROVED\n`qa:rejected`')).toBe('rejected');
+    expect(verdictOf('**Verdict:** approved | rejected')).toBe('rejected');
+    expect(verdictOf('## QA verdict — <APPROVED | REJECTED>')).toBe('rejected');
+    expect(verdictOf('<!-- qa:rejected in a comment -->\nVerdict: approved')).toBe('approved');
+    expect(verdictOf('nothing here')).toBe('missing');
   });
 
   it('fails when any criterion row is "not met"', () => {
     const o = evaluate(input({ readVerdict: () => APPROVED.replace('| artifact uploaded | met |', '| artifact uploaded | **not met** |') }));
     expect(o.ok).toBe(false);
     expect(o.results.find((r) => r.rule === 'criteria-met')).toMatchObject({ ok: false });
-    expect(checkVerdict('| 1 | x | met | y |\n| 2 | not metric | met | z |')[1].ok).toBe(true);
+  });
+
+  it.each(['not met', '**not met**', 'not met ❌', 'unverifiable', '**unverifiable**', '', 'partially met'])(
+    'fails criteria-met for a "%s" criterion cell',
+    (v) => {
+      const r = checkVerdict(`| # | Criterion | Verdict | Evidence |\n|---|---|---|---|\n| 1 | a | met | x |\n| 2 | b | ${v} | y |`)[1];
+      expect(r).toMatchObject({ rule: 'criteria-met', ok: false });
+    },
+  );
+
+  it('accepts "met" with markup or a check mark, reading only the Verdict column', () => {
+    const t = '| # | Criterion | **Verdict** | Evidence |\n|:-:|---|---|---|\n| 1 | not met before the fix | **met** | x |\n| 2 | b | met ✅ | y |';
+    expect(checkVerdict(t)[1]).toMatchObject({ ok: true, message: 'all 2 acceptance criteria met' });
+  });
+
+  it('fails criteria-met without a criteria table', () => {
+    expect(checkVerdict('Verdict: approved')[1].ok).toBe(false);
   });
 
   it('requires at least one .png and one .webm in the folder, linked from the verdict', () => {
@@ -130,6 +157,39 @@ describe('dod rules (scenario 6)', () => {
     const o = evaluate(input({ pr: { title: 'Something', body: '', labels: ['type:story'] }, commits: [{ sha: 'f'.repeat(40), message: 'x' }] }));
     expect(o.ok).toBe(false);
     expect(o.results[0].rule).toBe('story-resolved');
+  });
+});
+
+describe('.aisdlc/qa/verdict-comment.md template (B1)', () => {
+  const template = readFileSync(join(__dirname, '..', '.aisdlc', 'qa', 'verdict-comment.md'), 'utf8');
+  const filled = (verdict: 'APPROVED' | 'REJECTED') => {
+    const ok = verdict === 'APPROVED';
+    return template
+      .replace('<APPROVED | REJECTED>', verdict)
+      .replace('| 1 | <quoted `Then` / `And` clause> | met | <command output, line ref, link> |', '| 1 | ci starts four jobs | met | [png](qa/evidence/008/US1/green-run.png) |')
+      .replace('| 2 | <quoted clause> | **not met** | <what was observed instead> |', `| 2 | artifact uploaded | ${ok ? 'met' : '**not met**'} | [video](qa/evidence/008/US1/us1-desktop.webm) |`)
+      .replace('| 3 | <quoted clause> | **unverifiable** | <why, and what would have satisfied it> |', '| 3 | summary lists counts | met | summary.txt |')
+      .replace('**Verdict:** approved | rejected', `**Verdict:** ${ok ? 'approved' : 'rejected'}`)
+      .replace(ok ? /^<`qa:rejected`.*\n/m : /^<`qa:approved`.*\n/m, '')
+      .replace(/^<(`qa:(?:approved|rejected)`.*)>$/m, '$1');
+  };
+
+  it('passes evaluate() when filled in as APPROVED', () => {
+    const text = filled('APPROVED');
+    expect(text.replace(/<!--[\s\S]*?-->/g, '')).not.toMatch(/qa:rejected|not met|unverifiable/);
+    const o = evaluate(input({ readVerdict: () => text }));
+    expect(failed(o)).toEqual([]);
+    expect(o.ok).toBe(true);
+  });
+
+  it('fails evaluate() when filled in as REJECTED', () => {
+    const o = evaluate(input({ readVerdict: () => filled('REJECTED') }));
+    expect(o.results.filter((r) => !r.ok).map((r) => r.rule)).toEqual(['verdict-approved', 'criteria-met']);
+  });
+
+  it('fails evaluate() for the unfilled template', () => {
+    const o = evaluate(input({ readVerdict: () => template }));
+    expect(o.results.filter((r) => !r.ok).map((r) => r.rule)).toEqual(['verdict-approved', 'criteria-met', 'evidence-media']);
   });
 });
 

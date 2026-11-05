@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkSql, migrationFiles } from './check-migrations';
+import { checkSql, migrationFiles, parseNameStatus } from './check-migrations';
 
 const rules = (sql: string) => checkSql('m.sql', sql).map((v) => v.rule);
 
@@ -31,12 +31,27 @@ describe('check-migrations', () => {
     ['ALTER TABLE "tenders" RENAME COLUMN "a" TO "b";', 'RENAME'],
     ['ALTER TABLE "tenders" RENAME TO "bids";', 'RENAME'],
     ['ALTER TABLE "tenders" ALTER COLUMN "org_id" SET NOT NULL;', 'SET NOT NULL without DEFAULT'],
+    ['ALTER TABLE "t" ALTER COLUMN "a" SET DEFAULT 0, ALTER COLUMN "b" SET NOT NULL;', 'SET NOT NULL without DEFAULT'],
+    ['ALTER TABLE "t" ADD COLUMN "org_id" uuid NOT NULL;', 'ADD COLUMN NOT NULL without DEFAULT'],
+    ['ALTER TABLE t ADD org_id uuid NOT NULL REFERENCES orgs(id);', 'ADD COLUMN NOT NULL without DEFAULT'],
+    ['ALTER TABLE "t" ADD COLUMN "a" int DEFAULT 1 NOT NULL, ADD COLUMN "b" int NOT NULL;', 'ADD COLUMN NOT NULL without DEFAULT'],
+    ['DROP TYPE "public"."plan";', 'DROP TYPE'],
+    ['DROP SCHEMA legacy CASCADE;', 'DROP SCHEMA'],
+    ['TRUNCATE "usage";', 'TRUNCATE'],
   ])('flags %s', (sql, rule) => {
     expect(rules(sql)).toContain(rule);
   });
 
-  it('allows SET NOT NULL with a default in the same statement', () => {
+  it('allows SET NOT NULL when the same column gets a DEFAULT in the same statement', () => {
     expect(rules('ALTER TABLE "t" ALTER COLUMN "c" SET DEFAULT 0, ALTER COLUMN "c" SET NOT NULL;')).toEqual([]);
+  });
+
+  it('allows NOT NULL columns with a default or generated value, and constraint additions', () => {
+    expect(rules('ALTER TABLE "t" ADD COLUMN "n" integer DEFAULT 0 NOT NULL;')).toEqual([]);
+    expect(rules('ALTER TABLE "t" ADD COLUMN "id2" integer GENERATED ALWAYS AS IDENTITY NOT NULL;')).toEqual([]);
+    expect(rules('ALTER TABLE "t" ADD CONSTRAINT "c" CHECK ("x" IS NOT NULL);')).toEqual([]);
+    expect(rules('ALTER TABLE "t" ADD COLUMN "note" text;')).toEqual([]);
+    expect(rules('CREATE TABLE "t" ("id" uuid NOT NULL, "n" int NOT NULL);')).toEqual([]);
   });
 
   it('ignores keywords inside comments and string literals', () => {
@@ -58,6 +73,14 @@ describe('check-migrations', () => {
     expect(migrationFiles(['packages/db/migrations/0001_x.sql', 'packages/db/migrations/meta/_journal.json', 'packages/db/src/schema.ts', ''])).toEqual([
       'packages/db/migrations/0001_x.sql',
     ]);
+  });
+
+  it('separates deleted migrations (always a violation) from added/modified ones', () => {
+    const out = 'A\tpackages/db/migrations/0002_new.sql\nM\tpackages/db/migrations/0001_x.sql\nD\tpackages/db/migrations/0000_old.sql\nM\tpackages/db/migrations/meta/_journal.json\n';
+    expect(parseNameStatus(out)).toEqual({
+      changed: ['packages/db/migrations/0002_new.sql', 'packages/db/migrations/0001_x.sql'],
+      deleted: ['packages/db/migrations/0000_old.sql'],
+    });
   });
 
   it('does not flag the migrations already on main', () => {

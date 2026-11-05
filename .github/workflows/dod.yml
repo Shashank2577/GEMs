@@ -1,7 +1,8 @@
 # Definition-of-Done gate for story PRs (spec 008 US1 FR-004): QA verdict exists and is approved, no criterion
 # "not met", screenshot + video evidence present and linked, commit trailers present. Pattern adapted from ai-sdlc
 # dod-check.yml (MIT, NOTICE §3); the check itself is scripts/dod-check.ts (no remote script fetch).
-# Docs-only PRs skip the `dod` job (a skipped job satisfies the required check).
+# Docs-only PRs skip the check; `dod` itself always runs (if: always()) so it fails when `dod-changes` errors instead of
+# being skipped (a skipped job would satisfy the required check).
 name: dod
 
 on:
@@ -18,8 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changes:
-    name: changes
+  dod-changes:
+    name: dod-changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -34,26 +35,42 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          echo "code=$([ "$(git diff --name-only "$BASE_SHA...$HEAD_SHA" | scripts/docs-only.sh)" = "true" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+          # --no-renames: moving code into docs/ lists the old path too, so it is not docs-only.
+          docs="$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA" | scripts/docs-only.sh)"
+          echo "code=$([ "$docs" = "true" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
 
   dod:
     name: dod
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
+    needs: dod-changes
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      CHANGES_RESULT: ${{ needs.dod-changes.result }}
+      CODE: ${{ needs.dod-changes.outputs.code }}
     steps:
+      - name: Path filter result
+        id: gate
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then echo "::error::dod-changes did not succeed ($CHANGES_RESULT)"; exit 1; fi
+          if [ "$CODE" != "true" ]; then echo "Docs-only PR: Definition-of-Done check skipped." | tee -a "$GITHUB_STEP_SUMMARY"; fi
+          echo "run=$CODE" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.run == 'true'
       - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
         with:
           node-version: '22'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: steps.gate.outputs.run == 'true'
       - name: Definition-of-Done check
+        if: steps.gate.outputs.run == 'true'
         env:
           # Event data via env (never interpolated into the script); refreshed from the API with the read-only token.
           GH_TOKEN: ${{ github.token }}

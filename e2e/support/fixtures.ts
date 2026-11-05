@@ -78,7 +78,7 @@ export function saveTranscript(story: string, name: string, content: unknown) {
   const file = join(dir, `${name.replace(/\.(txt|json)$/i, '')}.${isText ? 'txt' : 'json'}`);
   writeFileSync(file, isText ? content : `${JSON.stringify(content, null, 2)}\n`);
   try {
-    void base.info().attach(name, { path: file, contentType: isText ? 'text/plain' : 'application/json' });
+    base.info().attach(name, { path: file, contentType: isText ? 'text/plain' : 'application/json' }).catch(() => {});
   } catch { /* called outside a running test: file only */ }
   return file;
 }

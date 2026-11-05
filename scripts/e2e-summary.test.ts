@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { formatSummary, summarize, type PwReport } from './e2e-summary';
+import { classify, formatSummary, summarize, type PwReport } from './e2e-summary';
 
 const fixturePath = join(__dirname, 'fixtures', 'e2e-results.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8')) as PwReport;
@@ -26,6 +26,21 @@ describe('e2e-summary', () => {
     expect(md).toContain('- [desktop] 008-operations-scale/US1-ci-evidence.e2e.ts › summary parses its own results (timedOut)');
     expect(md).toContain('| 5 | 2 | 1 | 1 | 1 |');
     expect(md).toMatch(/E2E results: FAILED/);
+  });
+
+  it("uses Playwright's test.status first", () => {
+    // e.g. a test.fail() test: final attempt "failed" is expected → passed; a skipped status wins over results.
+    expect(classify({ status: 'expected' }, [{ status: 'failed' }])).toBe('passed');
+    expect(classify({ status: 'unexpected' }, [{ status: 'passed' }])).toBe('failed');
+    expect(classify({ status: 'flaky' }, [{ status: 'passed' }])).toBe('flaky');
+    expect(classify({ status: 'skipped' }, [{ status: 'passed' }])).toBe('skipped');
+  });
+
+  it('falls back to the attempt list when test.status is absent', () => {
+    expect(classify({}, [{ status: 'failed' }, { status: 'passed' }])).toBe('flaky');
+    expect(classify({}, [{ status: 'passed' }])).toBe('passed');
+    expect(classify({}, [{ status: 'passed' }, { status: 'timedOut' }])).toBe('failed');
+    expect(classify({}, [])).toBe('skipped');
   });
 
   it('handles an empty report', () => {

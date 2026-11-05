@@ -2,11 +2,15 @@
 # Structure (minimal permissions, per-job timeouts, prod dependency audit) adapted from erenmyeager15 ci.yml (Apache-2.0).
 #
 #   typecheck ─────────────────────────────── always
-#   changes ─┬─ unit ── api ── e2e            skipped for docs-only PRs (skipped = success for required checks)
+#   changes ─┬─ unit ── api ── e2e            skipped for docs-only PRs
 #            └─ migrations-additive
+#   ci-gate ── always; fails if any job above failed or was cancelled (incl. `changes` erroring, which would
+#              otherwise skip every gated job, and skipped counts as passing for required checks)
 #
-# Branch protection on main requires: typecheck, unit, api, e2e, migrations-additive, dod (see docs/runbook.md § CI).
-# deploy.yml (US2) listens for this workflow ("ci") completing successfully on main.
+# Branch protection on main requires `ci-gate` and `dod` (see docs/runbook.md § CI).
+# Deploy gating (US2): `workflow_run` only fires for workflow files on the repository's DEFAULT branch, which is
+# currently not `main`, so a deploy must not rely on `workflow_run: [ci]` unless the default branch is switched to main
+# (alternatives: deploy as a job in this workflow with `needs: ci-gate`, or check the commit's ci-gate status first).
 name: ci
 
 on:
@@ -47,7 +51,8 @@ jobs:
           if [ "$EVENT" != "pull_request" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"; echo "push: run everything"; exit 0
           fi
-          git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
+          # --no-renames: a file moved from code into docs/ lists its old path too, so it is not docs-only.
+          git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
           cat "$RUNNER_TEMP/changed.txt"
           if [ "$(scripts/docs-only.sh < "$RUNNER_TEMP/changed.txt")" = "true" ]; then
             echo "code=false" >> "$GITHUB_OUTPUT"; echo "docs-only PR: only typecheck runs"
@@ -71,7 +76,8 @@ jobs:
       - name: Typecheck scripts/ and e2e/
         run: pnpm typecheck:scripts
       - name: Audit production dependencies (high+)
-        # Advisory until the existing high/critical findings on main are resolved (17 open when this gate was added).
+        # Advisory until the advisories on main are resolved: 17 open when this gate was added (6 moderate, 10 high,
+        # 1 critical), tracked in Shashank2577/GEMs#479. Remove continue-on-error when #479 is closed.
         continue-on-error: true
         run: pnpm audit --prod --audit-level high
 
@@ -147,7 +153,6 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      CI: '1'
       # start-api.sh drops/recreates this database via psql (no scripts/local-pg.sh in CI).
       E2E_DATABASE_URL: postgres://tp:tp@localhost:5433/tenderpilot_e2e
     steps:
@@ -212,3 +217,19 @@ jobs:
             echo "::error title=schema drift::packages/db/src/schema.ts differs from the committed migrations; run 'cd packages/db && pnpm exec drizzle-kit generate' and commit the result"
             exit 1
           fi
+
+  ci-gate:
+    name: ci-gate
+    needs: [changes, typecheck, unit, api, e2e, migrations-additive]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All CI jobs passed or were skipped by the docs-only filter
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+          CHANGES: ${{ needs.changes.result }}
+        run: |
+          echo "job results: $RESULTS"
+          if [ "$CHANGES" != "success" ]; then echo "::error::changes job did not succeed ($CHANGES)"; exit 1; fi
+          if echo "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then echo "::error::a required CI job failed or was cancelled"; exit 1; fi

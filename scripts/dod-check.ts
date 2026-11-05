@@ -13,7 +13,11 @@
  * Rules (each reported by name): verdict-exists, verdict-approved, criteria-met, evidence-media, commit-trailers.
  *
  * Inputs (env): PR_TITLE, PR_BODY, PR_LABELS (JSON array or comma list), BASE_SHA, HEAD_SHA (default HEAD).
- * When GH_TOKEN, PR_NUMBER and GITHUB_REPOSITORY are set, title/body/labels are refreshed from the GitHub API.
+ * When GH_TOKEN, PR_NUMBER and GITHUB_REPOSITORY are set, title/body/labels and the PR's commits come from the GitHub
+ * API; otherwise commits are `git log <merge-base(BASE_SHA, HEAD_SHA)>..HEAD_SHA`.
+ *
+ * A verdict counts as approved via the .aisdlc/qa/verdict-comment.md heading `## QA verdict — APPROVED`, `qa:approved`
+ * or a `Verdict: approved` line; any REJECTED / `qa:rejected` / `Verdict: rejected` signal wins.
  *
  *   pnpm exec tsx scripts/dod-check.ts
  */
@@ -73,23 +77,72 @@ export function resolveStory(pr: PrInfo, commits: Commit[], index: StoryIndex): 
   return null;
 }
 
-const cell = (c: string) => c.replace(/[*_`]/g, '').trim().toLowerCase();
+/** Normalise a table cell: drop markdown emphasis/code markers, emoji and surrounding space. */
+const cell = (c: string) => c.replace(/[*_`]/g, '').replace(/[^\p{L}\p{N}\s#:./-]/gu, '').trim().toLowerCase();
+const splitRow = (l: string) => {
+  const parts = l.trim().split('|');
+  return parts.slice(1, parts[parts.length - 1].trim() === '' ? -1 : undefined);
+};
+const isSeparator = (l: string) => l.trim().startsWith('|') && splitRow(l).every((c) => /^\s*:?-+:?\s*$/.test(c));
 
-/** Pure: verdict-approved + criteria-met rules over VERDICT.md text. */
+/**
+ * Pure: acceptance-criterion rows of every table whose header has a "Verdict" column, with that column's value.
+ * Rows outside such tables are ignored.
+ */
+export function criterionRows(text: string): { row: string; verdict: string }[] {
+  const lines = text.split('\n');
+  const rows: { row: string; verdict: string }[] = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (!lines[i].trim().startsWith('|') || !isSeparator(lines[i + 1])) continue;
+    const col = splitRow(lines[i]).findIndex((h) => cell(h) === 'verdict');
+    if (col < 0) continue;
+    let j = i + 2;
+    for (; j < lines.length && lines[j].trim().startsWith('|'); j++) {
+      rows.push({ row: lines[j].trim(), verdict: cell(splitRow(lines[j])[col] ?? '') });
+    }
+    i = j - 1;
+  }
+  return rows;
+}
+
+const stripComments = (t: string) => t.replace(/<!--[\s\S]*?-->/g, '');
+
+/** Pure: the overall verdict signalled by a VERDICT.md (template heading, `qa:` label, or a `Verdict:` line). */
+export function verdictOf(text: string): 'approved' | 'rejected' | 'missing' {
+  const t = stripComments(text);
+  const verdictLines = [...t.matchAll(/\bVerdict[*_]*[ \t]*:[*_` \t]*([^\n]*)/gi)].map((m) => m[1].toLowerCase());
+  const rejected =
+    /^#{1,3}\s*QA verdict\s*[—–-].*\bREJECTED\b/im.test(t) ||
+    /\bqa:rejected\b/i.test(t) ||
+    verdictLines.some((v) => /\brejected\b/.test(v));
+  if (rejected) return 'rejected';
+  const approved =
+    /^#{1,3}\s*QA verdict\s*[—–-]\s*APPROVED\b/im.test(t) ||
+    /\bqa:approved\b/i.test(t) ||
+    verdictLines.some((v) => /^approved\b/.test(v));
+  return approved ? 'approved' : 'missing';
+}
+
+/** Pure: verdict-approved + criteria-met rules over VERDICT.md text. Rejection signals win over approval. */
 export function checkVerdict(text: string): RuleResult[] {
-  const approved = /\bVerdict[*_]*\s*:\s*[*_`]*\s*approved\b/i.test(text);
-  const rejected = /\bVerdict[*_]*\s*:\s*[*_`]*\s*rejected\b/i.test(text);
-  const notMet = text
-    .split('\n')
-    .filter((l) => l.trim().startsWith('|') && l.split('|').some((c) => cell(c) === 'not met'))
-    .map((l) => l.trim());
+  const verdict = verdictOf(text);
+  const rows = criterionRows(stripComments(text));
+  // Every criterion must be exactly "met" (an emoji/markup suffix is tolerated); "not met", "unverifiable", blanks fail.
+  const bad = rows.filter((r) => /^\s*not met\b/.test(r.verdict) || !/^met\b/.test(r.verdict));
+  let criteria: RuleResult;
+  if (!rows.length) criteria = { rule: 'criteria-met', ok: false, message: 'No acceptance-criteria table with a "Verdict" column in VERDICT.md' };
+  else if (bad.length) {
+    criteria = {
+      rule: 'criteria-met',
+      ok: false,
+      message: `Acceptance criteria not "met" (not met / unverifiable / blank): ${bad.length}\n${bad.map((r) => `    ${r.row}`).join('\n')}`,
+    };
+  } else criteria = { rule: 'criteria-met', ok: true, message: `all ${rows.length} acceptance criteria met` };
   return [
-    approved && !rejected
-      ? { rule: 'verdict-approved', ok: true, message: 'VERDICT.md says "Verdict: approved"' }
+    verdict === 'approved'
+      ? { rule: 'verdict-approved', ok: true, message: 'VERDICT.md is approved' }
       : { rule: 'verdict-approved', ok: false, message: 'QA verdict is not approved' },
-    notMet.length
-      ? { rule: 'criteria-met', ok: false, message: `Acceptance criteria marked "not met": ${notMet.length}\n${notMet.map((r) => `    ${r}`).join('\n')}` }
-      : { rule: 'criteria-met', ok: true, message: 'no acceptance criterion marked "not met"' },
+    criteria,
   ];
 }
 
@@ -207,10 +260,30 @@ async function loadPr(): Promise<PrInfo> {
   return pr;
 }
 
-function loadCommits(): Commit[] {
-  const head = process.env.HEAD_SHA || 'HEAD';
-  const base = process.env.BASE_SHA || 'origin/main';
-  const out = execFileSync('git', ['log', '--no-merges', '--format=%H%x1f%B%x1e', `${base}..${head}`], { encoding: 'utf8' });
+async function loadCommits(): Promise<Commit[]> {
+  const env = process.env;
+  if (env.GH_TOKEN && env.PR_NUMBER && env.GITHUB_REPOSITORY) {
+    try {
+      const commits: Commit[] = [];
+      for (let page = 1; page <= 3; page++) {
+        const res = await fetch(`${env.GITHUB_API_URL ?? 'https://api.github.com'}/repos/${env.GITHUB_REPOSITORY}/pulls/${env.PR_NUMBER}/commits?per_page=100&page=${page}`, {
+          headers: { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const batch = (await res.json()) as { sha: string; commit: { message: string }; parents?: unknown[] }[];
+        commits.push(...batch.filter((c) => (c.parents?.length ?? 1) < 2).map((c) => ({ sha: c.sha, message: c.commit.message.trim() })));
+        if (batch.length < 100) return commits;
+      }
+      return commits;
+    } catch (err) {
+      console.warn(`dod-check: could not list PR commits from the GitHub API (${(err as Error).message}); using git`);
+    }
+  }
+  // Only the PR's own commits: from the merge-base of base and head, so commits that landed on main later are excluded.
+  const head = env.HEAD_SHA || 'HEAD';
+  const base = env.BASE_SHA || 'origin/main';
+  const mergeBase = execFileSync('git', ['merge-base', base, head], { encoding: 'utf8' }).trim();
+  const out = execFileSync('git', ['log', '--no-merges', '--format=%H%x1f%B%x1e', `${mergeBase}..${head}`], { encoding: 'utf8' });
   return parseGitLog(out);
 }
 
@@ -237,7 +310,7 @@ function listFiles(dir: string): string[] {
 async function main() {
   const outcome = evaluate({
     pr: await loadPr(),
-    commits: loadCommits(),
+    commits: await loadCommits(),
     index: loadIndex(),
     readVerdict: (p) => (existsSync(p) ? readFileSync(p, 'utf8') : null),
     listEvidence: listFiles,
