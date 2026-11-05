@@ -9,9 +9,9 @@ The skill's prerequisite script could not resolve a feature directory (no `.cair
 | Metric | Value |
 |---|---|
 | Functional requirements | 56 (FR-001 to FR-056) |
-| Non-functional requirements | 11 (NFR-001 to NFR-011) |
+| Non-functional requirements | 10 (NFR-001 to NFR-010) |
 | Success criteria | 8 |
-| Tasks | 100 plus T035a |
+| Tasks | 101 (T001 to T100 plus T035a) |
 | FRs referenced by at least one task | 56 of 56 (100 %) |
 | Critical issues | 0 |
 
