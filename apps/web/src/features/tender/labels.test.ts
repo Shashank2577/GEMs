@@ -111,5 +111,10 @@ describe('Re-score vs Re-analyse (004/FR-037)', () => {
     expect(['profile_changed', 'vault_changed', 'weights_changed'].map((r) => canRescoreFor(r as never))).toEqual([true, true, true]);
     expect(['corrigendum', 'document_added', 'document_removed', null, undefined].map((r) => canRescoreFor(r as never))).toEqual([false, false, false, false, false]);
     expect(staleReasonCopy('weights_changed')).toMatch(/^Scoring weights changed/);
+    // Same set as the API, which answers 409 reanalysis_required for the others.
+    const { isRescorableReason, STALE_REASONS } = await import('@tp/core/contracts/analyse');
+    expect(STALE_REASONS.map((r) => canRescoreFor(r))).toEqual(STALE_REASONS.map((r) => isRescorableReason(r)));
+    expect(staleReasonCopy('profile_changed')).toMatch(/Re-score to update the score\.$/);
+    expect(staleReasonCopy('vault_changed')).toMatch(/Re-score to update the score\.$/);
   });
 });

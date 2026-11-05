@@ -77,14 +77,26 @@ describe('markStale', () => {
     expect((await row(otherOrg)).stale).toBe(false);
   });
 
-  it('without orgId reaches every org (corrigendum); the newest reason wins', async () => {
+  it('without orgId reaches every org (corrigendum); a re-scorable reason never replaces one needing re-analysis', async () => {
     const a = await analysis(orgA, openT);
     const b = await analysis(orgB, openT);
     expect(await markStale(ctx.db, { tenderIds: [openT] }, 'corrigendum', now)).toBe(2);
     const later = new Date(now.getTime() + 60_000);
     await markStale(ctx.db, { orgId: orgA, tenderIds: [openT] }, 'weights_changed', later);
-    expect(await row(a)).toMatchObject({ staleReason: 'weights_changed', staleAt: later });
+    // The corrigendum is kept (Re-score cannot fix it, FR-037); the time moves to the latest change.
+    expect(await row(a)).toMatchObject({ staleReason: 'corrigendum', staleAt: later });
     expect(await row(b)).toMatchObject({ staleReason: 'corrigendum', staleAt: now });
+  });
+
+  it('the newest reason wins otherwise (re-scorable → anything, re-analysis → re-analysis)', async () => {
+    const a = await analysis(orgA, openT);
+    await markStale(ctx.db, { orgId: orgA, tenderIds: [openT] }, 'profile_changed', now);
+    await markStale(ctx.db, { orgId: orgA, tenderIds: [openT] }, 'weights_changed', now);
+    expect(await row(a)).toMatchObject({ staleReason: 'weights_changed' });
+    await markStale(ctx.db, { orgId: orgA, tenderIds: [openT] }, 'document_added', now);
+    expect(await row(a)).toMatchObject({ staleReason: 'document_added' });
+    await markStale(ctx.db, { orgId: orgA, tenderIds: [openT] }, 'corrigendum', now);
+    expect(await row(a)).toMatchObject({ staleReason: 'corrigendum' });
   });
 
   it('an empty tender list matches nothing; an unscoped call is refused', async () => {

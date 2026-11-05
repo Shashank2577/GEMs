@@ -20,7 +20,7 @@ import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
-  MAX_EXTRACT_PAGES, MAX_TENDER_DOC_BYTES, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
+  MAX_EXTRACT_PAGES, MAX_TENDER_DOC_BYTES, isRescorableReason, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type StaleReason, type TenderDocKind, type TenderDocumentDto,
   type TenderDocumentWarning,
 } from '@tp/core/contracts/analyse';
 import { GemClient, GemError } from '@tp/core/gem/client';
@@ -229,14 +229,13 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
 
 const KIND_ORDER: Record<TenderDocKind, number> = { bid: 0, atc: 1, boq: 2, other: 3, corrigendum: 4 };
 
-async function loadCompany(deps: AppDeps, orgId: string) {
-  const [[profile], pcs, vault, [org]] = await Promise.all([
-    deps.db.select().from(companyProfiles).where(eq(companyProfiles.orgId, orgId)),
-    deps.db.select().from(pastContracts).where(eq(pastContracts.orgId, orgId)),
-    deps.db.select({ id: vaultDocuments.id, type: vaultDocuments.type, title: vaultDocuments.title, expiryDate: vaultDocuments.expiryDate, tags: vaultDocuments.tags })
-      .from(vaultDocuments).where(eq(vaultDocuments.orgId, orgId)),
-    deps.db.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, orgId)),
-  ]);
+async function loadCompany(db: AppDeps['db'] | Tx, orgId: string) {
+  // Sequential: a transaction runs on one connection, so parallel queries would only queue anyway.
+  const [profile] = await db.select().from(companyProfiles).where(eq(companyProfiles.orgId, orgId));
+  const pcs = await db.select().from(pastContracts).where(eq(pastContracts.orgId, orgId));
+  const vault = await db.select({ id: vaultDocuments.id, type: vaultDocuments.type, title: vaultDocuments.title, expiryDate: vaultDocuments.expiryDate, tags: vaultDocuments.tags })
+    .from(vaultDocuments).where(eq(vaultDocuments.orgId, orgId));
+  const [org] = await db.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, orgId));
   return { profile: profile ?? null, pastContracts: pcs, vault, weights: org?.scoringWeights ?? null };
 }
 
@@ -267,6 +266,13 @@ async function latestDoneIn(db: AppDeps['db'] | Tx, tenderId: string, orgId: str
  */
 const lockAnalyses = (tx: Tx, orgId: string, tenderId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${orgId}:${tenderId}`}, 0))`);
+
+/** Under the lifecycle lock: `running` rows of this org+tender older than the timeout become failed "timed out" (FR-028). */
+async function expireTimedOutRuns(tx: Tx, orgId: string, tenderId: string, now: Date) {
+  const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
+  await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
+    .where(and(eq(analyses.orgId, orgId), eq(analyses.tenderId, tenderId), eq(analyses.status, 'running'), lte(analyses.createdAt, cutoff)));
+}
 
 /** A `running` analysis older than this is treated as failed ("timed out") (FR-028). */
 export const ANALYSIS_RUNNING_TIMEOUT_MS = 2 * 60 * 1000;
@@ -354,10 +360,8 @@ export async function analyseTender(
   // for the same org+tender until commit, so the check and the insert cannot interleave.
   const row = await deps.db.transaction(async (tx) => {
     await lockAnalyses(tx, input.orgId, tender.id);
-    const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
+    await expireTimedOutRuns(tx, input.orgId, tender.id, now);
     const scope = and(eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'));
-    await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
-      .where(and(scope, lte(analyses.createdAt, cutoff)));
     const [running] = await tx.select({ id: analyses.id }).from(analyses).where(scope).limit(1);
     if (running) throw new HttpError(409, 'analysis_running', 'An analysis is already running for this tender');
     const [inserted] = await tx.insert(analyses).values({
@@ -398,7 +402,7 @@ export async function analyseTender(
     }
     const ts0 = performance.now();
     const requirements = combineRequirements(perDoc, requirementsFromListing(tender));
-    const company = await loadCompany(deps, input.orgId);
+    const company = await loadCompany(deps.db, input.orgId);
     const checklist = buildChecklist(requirements, company.profile);
     const prefix = documentCheckPrefix(ordered, tender.bidNumber);
     // Overrides are read under the lifecycle lock, right before the write, from the latest DONE
@@ -493,6 +497,12 @@ export async function overrideFactor(
  * Recomputes factors and checklist of a completed analysis from its stored requirements against the
  * CURRENT profile, vault and weights, without re-reading documents. Overrides are kept, the stale flag
  * is cleared. Same lifecycle lock as a run / an override, so it never interleaves with either.
+ *
+ * Only a company-side change (profile/vault/weights) can be fixed this way: an analysis stale for a
+ * corrigendum or a document change (or with no recorded reason) answers 409 `reanalysis_required`.
+ * The row is read FOR UPDATE: markStale (which does not take the advisory lock) then either committed
+ * before our read, so we see its reason, or waits for our commit and re-flags the row afterwards, so a
+ * change racing with the re-score is never lost (S3).
  */
 export async function rescoreAnalysis(
   deps: AppDeps,
@@ -504,20 +514,20 @@ export async function rescoreAnalysis(
   const now = deps.clock.now();
   const { a, updated } = await deps.db.transaction(async (tx) => {
     await lockAnalyses(tx, input.orgId, tender.id);
-    const [a] = await tx.select().from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId)));
+    await expireTimedOutRuns(tx, input.orgId, tender.id, now);
+    const [a] = await tx.select().from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId))).for('update');
     if (!a) throw notFound('Analysis');
     if (a.status !== 'done') throw new HttpError(409, 'conflict', 'Only a completed analysis can be re-scored');
-    const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
     const [running] = await tx.select({ id: analyses.id }).from(analyses).where(and(
-      eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'),
-      gt(analyses.createdAt, a.createdAt), gt(analyses.createdAt, cutoff),
+      eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'), gt(analyses.createdAt, a.createdAt),
     )).limit(1);
     if (running) throw new HttpError(409, 'analysis_running', 'An analysis is running for this tender. Wait for it to finish.');
     const [newer] = await tx.select({ id: analyses.id }).from(analyses).where(and(
       eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'done'), gt(analyses.createdAt, a.createdAt),
     )).limit(1);
     if (newer) throw new HttpError(409, 'analysis_replaced', 'A newer analysis has replaced this one. Reload to see it.');
-    const company = await loadCompany(deps, input.orgId);
+    if (a.stale && !isRescorableReason(a.staleReason)) throw reanalysisRequired(a.staleReason);
+    const company = await loadCompany(tx, input.orgId);
     const result = scoreTender({
       requirements: a.requirements, profile: company.profile, pastContracts: company.pastContracts, vaultDocs: company.vault,
       tender: { endAt: tender.endAt, state: tender.state, emdAmount: tender.emdAmount, title: tender.title, category: tender.category, items: tender.items },
@@ -537,19 +547,38 @@ export async function rescoreAnalysis(
   return updated;
 }
 
+const REANALYSIS_COPY: Partial<Record<StaleReason, string>> = {
+  corrigendum: 'A corrigendum changed this bid after it was analysed.',
+  document_added: 'A document was added since this analysis.',
+  document_removed: 'A document was removed since this analysis.',
+};
+
+function reanalysisRequired(reason: StaleReason | null): HttpError {
+  const why = (reason && REANALYSIS_COPY[reason]) ?? 'This analysis is out of date.';
+  return new HttpError(409, 'reanalysis_required', `${why} Re-score cannot pick that up; re-analyse the tender instead.`);
+}
+
 // ───────────── Scoring weights ─────────────
 
 export function weightsResponse(stored: Record<string, number> | null | undefined): ScoringWeights {
   return { weights: resolveWeights(stored), defaults: { ...DEFAULT_WEIGHTS }, custom: !!stored && Object.keys(stored).length > 0 };
 }
 
+function sameWeights(a: Record<string, number>, b: Record<string, number>): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].every((k) => a[k] === b[k]);
+}
+
 export async function saveWeights(deps: AppDeps, input: { orgId: string; userId: string; weights: Record<string, number | undefined> }): Promise<ScoringWeights> {
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(input.weights)) if (typeof v === 'number') clean[k] = v;
   const stored = Object.keys(clean).length ? resolveWeights(clean) : null;
+  const [before] = await deps.db.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, input.orgId));
+  const changed = !sameWeights(resolveWeights(before?.scoringWeights), resolveWeights(stored));
   await deps.db.update(organizations).set({ scoringWeights: stored }).where(eq(organizations.id, input.orgId));
   await logActivity(deps.db, { orgId: input.orgId, userId: input.userId, action: 'org.scoring_weights_updated', entityType: 'organization', entityId: input.orgId, meta: { weights: stored } });
-  // Existing results were scored with the old weights (FR-043): flag them so the banner offers Re-score.
-  await markStale(deps.db, { orgId: input.orgId }, 'weights_changed', deps.clock.now());
+  // Existing results of open tenders were scored with the old weights (FR-044): flag them so the banner
+  // offers Re-score. Closed tenders keep their historical result; a save that changes nothing flags nothing.
+  if (changed) await markStale(deps.db, { orgId: input.orgId, openOnly: true }, 'weights_changed', deps.clock.now());
   return weightsResponse(stored);
 }

@@ -9,7 +9,7 @@
  *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis; 409 analysis_running / analysis_superseded  analyst+
  *   GET  /tenders/:id/analysis                        latest done Analysis (+lastAttempt) or 404  viewer+
  *   POST /analyses/:id/override                       {factorKey,status,reason}      bid_manager+
- *   POST /analyses/:id/rescore                        recompute with current profile/vault/weights; 409 analysis_running / analysis_replaced  analyst+
+ *   POST /analyses/:id/rescore                        recompute with current profile/vault/weights; 409 analysis_running / analysis_replaced / reanalysis_required  analyst+
  *   GET  /scoring-weights                             {weights, defaults, custom}    viewer+
  *   PUT  /scoring-weights                             partial weights ({} = reset)   bid_manager+
  */
