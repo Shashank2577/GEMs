@@ -11,7 +11,7 @@ import {
 import type { Logger } from '../src/deps';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import {
-  HOUSEKEEPING_BATCH, HOUSEKEEPING_HOUR_IST, RETENTION, istDay, pruneOnce, runHousekeeping,
+  HOUSEKEEPING_BATCH, HOUSEKEEPING_HOUR_IST, HOUSEKEEPING_MAX_PACKET_BLOBS, HOUSEKEEPING_STALE_CLAIM_MS, RETENTION, istDay, pruneOnce, runHousekeeping,
 } from '../src/services/housekeeping';
 import { createTestContext, signup, type SignedUp, type TestContext } from './helpers';
 
@@ -211,5 +211,66 @@ describe('housekeeping on a fixed clock (US7 scenario 5)', () => {
     await expect(runHousekeeping(throwing)).rejects.toThrow('db gone');
     expect((await ctx.db.select().from(jobRuns).where(eq(jobRuns.day, istDay(day3))))).toEqual([]);
     await ctx.db.delete(packets).where(inArray(packets.id, extra));
+  });
+  it('review S4: raw is never nulled on a demo row whose source was lost (raw.demo marker / demo- content hash)', async () => {
+    const closed = ago(RETENTION.tenderRawAfterCloseDays + 10);
+    const rows = await ctx.db.insert(tenders).values([
+      { bidNumber: 'GEM/2026/B/S4-1', title: 'marker', status: 'closed', endAt: closed, source: 'gem', sourceUrl: 'https://x/s41', contentHash: 's4-1', raw: { demo: true, b_id: 1 } },
+      { bidNumber: 'GEM/2026/B/S4-2', title: 'hash', status: 'closed', endAt: closed, source: 'gem', sourceUrl: 'https://x/s42', contentHash: 'demo-GEM/2026/B/S4-2', raw: { b_id: 2 } },
+      { bidNumber: 'GEM/2026/B/S4-3', title: 'real', status: 'closed', endAt: closed, source: 'gem', sourceUrl: 'https://x/s43', contentHash: 's4-3', raw: { b_id: 3 } },
+    ]).returning({ id: tenders.id, bidNumber: tenders.bidNumber });
+    try {
+      await pruneOnce(deps(), NOW);
+      const after = await ctx.db.select({ bid: tenders.bidNumber, raw: tenders.raw }).from(tenders).where(inArray(tenders.id, rows.map((r) => r.id)));
+      const byBid = Object.fromEntries(after.map((r) => [r.bid, r.raw]));
+      expect(byBid['GEM/2026/B/S4-1']).toEqual({ demo: true, b_id: 1 });
+      expect(byBid['GEM/2026/B/S4-2']).toEqual({ b_id: 2 });
+      expect(byBid['GEM/2026/B/S4-3']).toBeNull();
+    } finally {
+      await ctx.db.delete(tenders).where(inArray(tenders.id, rows.map((r) => r.id)));
+    }
+  });
+
+  it('review S5: an unfinished claim older than an hour (run died) is taken over the same day; a fresh one is not', async () => {
+    const day5 = new Date(NOW.getTime() + 4 * DAY);
+    const d = istDay(day5);
+    await ctx.db.insert(jobRuns).values({ job: 'housekeeping', day: d, startedAt: new Date(day5.getTime() - HOUSEKEEPING_STALE_CLAIM_MS / 2) });
+    const at = (t: Date) => ({ ...deps(), clock: { now: () => t } });
+    expect(await runHousekeeping(at(day5))).toEqual({ ran: false, day: d, reason: 'already_ran' }); // 30 min old: maybe still running
+    const later = new Date(day5.getTime() + HOUSEKEEPING_STALE_CLAIM_MS);
+    expect(await runHousekeeping(at(later))).toMatchObject({ ran: true, day: d });
+    const [run] = await ctx.db.select().from(jobRuns).where(eq(jobRuns.day, d));
+    expect(run!.startedAt).toEqual(later);
+    expect(run!.finishedAt).toBeInstanceOf(Date);
+    // A finished run is never taken over, however old.
+    expect(await runHousekeeping(at(new Date(later.getTime() + 3 * HOUR)))).toMatchObject({ ran: false, reason: 'already_ran' });
+  });
+
+  it('review S6: packet blobs go in deleteMany calls of ≤ 1,000 keys, at most HOUSEKEEPING_MAX_PACKET_BLOBS per run', async () => {
+    expect(HOUSEKEEPING_MAX_PACKET_BLOBS).toBe(1_000);
+    const org = owner.me.org.id;
+    const [w] = await ctx.db.select({ id: bidWorkspaces.id }).from(bidWorkspaces).limit(1);
+    const total = HOUSEKEEPING_MAX_PACKET_BLOBS + 300;
+    const rows = Array.from({ length: total + RETENTION.packetsKeepPerWorkspace }, (_, i) => ({
+      orgId: org, workspaceId: w!.id, status: 'ready' as const, blobKey: `org/${org}/packets/s6-${i}.pdf`, createdAt: new Date(NOW.getTime() - (i + 10) * HOUR),
+    }));
+    const inserted = await ctx.db.insert(packets).values(rows).returning({ id: packets.id });
+    const calls: string[][] = [];
+    const single: string[] = [];
+    const blobs = { ...ctx.deps.blobs, delete: async (k: string) => { single.push(k); }, deleteMany: async (keys: string[]) => { calls.push(keys); } };
+    try {
+      const first = await pruneOnce({ ...deps(), blobs }, NOW);
+      expect(single).toEqual([]);
+      expect(calls.every((c) => c.length <= 1_000)).toBe(true);
+      expect(calls.flat()).toHaveLength(HOUSEKEEPING_MAX_PACKET_BLOBS);
+      expect(first).toMatchObject({ packetBlobs: HOUSEKEEPING_MAX_PACKET_BLOBS, packets: HOUSEKEEPING_MAX_PACKET_BLOBS });
+      const second = await pruneOnce({ ...deps(), blobs }, NOW); // the rest the next run
+      expect(second.packetBlobs).toBeGreaterThanOrEqual(300);
+      expect(second.packets).toBe(second.packetBlobs);
+      const left = await ctx.db.select({ id: packets.id }).from(packets).where(inArray(packets.id, inserted.map((r) => r.id)));
+      expect(left.length).toBeLessThanOrEqual(RETENTION.packetsKeepPerWorkspace);
+    } finally {
+      await ctx.db.delete(packets).where(inArray(packets.id, inserted.map((r) => r.id)));
+    }
   });
 });

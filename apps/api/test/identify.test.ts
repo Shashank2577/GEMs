@@ -6,13 +6,18 @@ import { and, eq, inArray, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { analyses, bidWorkspaces, ingestionRuns, memberships, notificationPrefs, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
 import type { NormalizedTender } from '@tp/core/gem/parse';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
+import { anyKeywordCondition, SEARCH_SEPARATORS } from '../src/lib/tender-search';
 import { byPreviewOrder, escapeLike, phraseLike, type Candidate } from '../src/routes/watchlists';
 import { dispatchNotifications } from '../src/services/alerts';
 import { matchAndNotify, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z');
+const MIGRATIONS = fileURLToPath(new URL('../../../packages/db/migrations', import.meta.url));
 const GEM = 'http://mock-gem.test';
 const TEST_APP = 'http://tp.test';
 
@@ -148,6 +153,7 @@ describe('GET /tenders', () => {
       mk('GEM/2026/B/7770001', 'Solar Street Light poles with LED', { state: 'Kerala' }),
       mk('GEM/2026/B/7770002', 'Street light maintenance (sodium vapour)'),
       mk('GEM/2026/B/7780003', 'Supply of solar water heater', { items: [{ name: 'Light fittings' }] }),
+      mk('GEM/2026/B/7780004', 'IS-2062 steel plates and OPC Grade-43 cement <bundle>'),
     ]);
     const bids = async (q: string) => ((await get(`/tenders?q=${encodeURIComponent(q)}&pageSize=100`)).body.items as { bidNumber: string }[])
       .map((t) => t.bidNumber).filter((b) => /^GEM\/2026\/B\/77[78]/.test(b)).sort();
@@ -161,6 +167,13 @@ describe('GET /tenders', () => {
       expect(await bids('GEM/2026/B/777')).toEqual(['GEM/2026/B/7770001', 'GEM/2026/B/7770002']); // bid-number prefix
       expect(await bids('gem/2026/b/7780003')).toEqual(['GEM/2026/B/7780003']);
       expect(await bids('7780003')).toEqual(['GEM/2026/B/7780003']); // the bid number's digits alone
+      // Hyphenated codes and bracketed words (review B1): the default parser would read "-2062" as a signed number.
+      expect(await bids('2062')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('IS-2062')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('"IS 2062"')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('grade 43')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('bundle')).toEqual(['GEM/2026/B/7780004']);
+      expect(await bids('steel -2062')).toEqual([]); // a leading "-" is still the websearch exclusion
       expect(await bids('%')).toEqual([]);
       expect((await get(`/tenders?q=${encodeURIComponent('"')}`)).status).toBe(200); // malformed websearch input never errors
       // The feed DTO never carries the tsvector.
@@ -168,7 +181,7 @@ describe('GET /tenders', () => {
       expect(one.body.items[0]).not.toHaveProperty('search');
       expect((await get(`/tenders/${one.body.items[0].id}`)).body).not.toHaveProperty('search');
     } finally {
-      await ctx.db.delete(tenders).where(inArray(tenders.bidNumber, ['GEM/2026/B/7770001', 'GEM/2026/B/7770002', 'GEM/2026/B/7780003']));
+      await ctx.db.delete(tenders).where(inArray(tenders.bidNumber, ['GEM/2026/B/7770001', 'GEM/2026/B/7770002', 'GEM/2026/B/7780003', 'GEM/2026/B/7780004']));
     }
   });
 
@@ -703,6 +716,109 @@ describe('watchlist SQL helpers and batched matching', () => {
     } finally {
       await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
     }
+  });
+
+  it('008/FR-073 (review B1): hyphenated codes, bracketed words and operator-like keywords stay in the pre-filter', async () => {
+    const prefix = 'GEM/2099/B/7910';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string, extra: Partial<typeof tenders.$inferInsert> = {}) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7910${n}`, contentHash: `fts-b1-${n}`, ...extra,
+    });
+    // Both the matcher and the SQL pre-filter, restricted to this test's rows.
+    const hits = async (keyword: string) => {
+      const sqlHits = (await ctx.db.select({ bidNumber: tenders.bidNumber }).from(tenders)
+        .where(and(like(tenders.bidNumber, `${prefix}%`), anyKeywordCondition([keyword])))).map((r) => r.bidNumber).sort();
+      const all = await ctx.db.select().from(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      const crit = compileCriteria({ keywords: [keyword] });
+      const matched = all.filter((t) => matchTender(t, crit, { now: ctx.clock.now() }).matched).map((t) => t.bidNumber).sort();
+      return { sql: sqlHits, matched };
+    };
+    try {
+      await ctx.db.insert(tenders).values([
+        row(1, 'COVID-19 kits'),
+        row(2, 'IS-2062 steel plates'),
+        row(3, 'OPC Grade-43 cement'),
+        row(4, 'RS-232 cables'),
+        row(5, 'M-30 concrete'),
+        row(6, 'ABC-123-DEF spares'),
+        row(7, 'Dome <cctv> camera'),
+        row(8, 'Misc', { items: [{ name: '<laptop bag>' }, { name: 'line\nToner' }] }),
+        row(9, 'Type -cctv unit with "laptop bag'),
+      ]);
+      const b = (...ns: number[]) => ns.map((n) => `${prefix}${n}`);
+      const cases: [string, number[]][] = [
+        ['Covid 19', [1]], ['IS 2062', [2]], ['2062', [2]], ['Grade 43', [3]], ['43', [3]], ['RS 232', [4]], ['232', [4]],
+        ['30', [5]], ['123', [6]], ['cctv', [7, 9]], ['laptop bag', [8, 9]], ['toner', [8]],
+        // Keywords are plain text for the matcher: no websearch NOT / phrase operators in the pre-filter.
+        ['-cctv', [9]], ['"laptop bag', [9]], ['<cctv>', [7]],
+      ];
+      for (const [k, want] of cases) {
+        const r = await hits(k);
+        expect(r.matched, `matcher: ${k}`).toEqual(b(...want));
+        expect(r.sql, `pre-filter: ${k}`).toEqual(expect.arrayContaining(r.matched));
+      }
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
+
+  it('008/FR-073 property: on a generated corpus of tricky strings the keyword pre-filter is a superset of the matcher', async () => {
+    const prefix = 'GEM/2099/B/7920';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    let seed = 0x5eed;
+    const rnd = () => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed / 2_147_483_648; };
+    const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
+    const WORDS = ['IS', '2062', 'Covid', '19', 'Grade', '43', 'RS', '232', 'M', '30', 'ABC', '123', 'DEF', 'cctv', 'laptops', 'laptop',
+      'bag', 'UPS', '1kVA', 'café', 'न्यू', 'दिल्ली', 'A4', 'paper', 'x', 'e5', '1e5', '0.5', 'amp', 'or', 'and', 'not', 'ñandú', 'Ⅳ', '²'];
+    const SEPS = [' ', ' ', '-', '/', '.', '_', '<', '>', '+', '&', ',', '(', ')', ':', '@', '"', "'", '–', '€', '\n', '#', '*', '|', '!',
+      '\\', '~', '=', '?', ';', '[', ']', '{', '}', '%', '^', '`', '$', '·', '&amp;', '://', ' -', '- '];
+    const phrase = (min: number, max: number) => {
+      const n = min + Math.floor(rnd() * (max - min + 1));
+      let out = rnd() < 0.3 ? pick(SEPS) : '';
+      for (let i = 0; i < n; i++) out += (i ? pick(SEPS) : '') + pick(WORDS);
+      return out + (rnd() < 0.3 ? pick(SEPS) : '');
+    };
+    const rows = Array.from({ length: 250 }, (_, i) => ({
+      bidNumber: `${prefix}${String(i).padStart(4, '0')}`, title: phrase(1, 6), endAt: end, status: 'open' as const,
+      sourceUrl: `${GEM}/bid/7920${i}`, contentHash: `fts-prop-${i}`,
+      items: rnd() < 0.4 ? [{ name: phrase(1, 4) }] : [],
+      category: rnd() < 0.2 ? phrase(1, 3) : null,
+      organisation: rnd() < 0.2 ? phrase(1, 3) : null,
+    }));
+    const keywords = [
+      'Covid 19', 'IS 2062', '2062', 'Grade 43', '43', 'RS 232', '232', '30', '123', 'cctv', 'laptop bag', '-cctv', '"laptop',
+      'UPS-1kVA', 'café', 'न्यू', '1e5', '0.5', 'or', 'A4 paper', 'amp', '<cctv>',
+      ...Array.from({ length: 120 }, () => phrase(1, 3)),
+    ];
+    try {
+      const ids = (await ctx.db.insert(tenders).values(rows).returning({ id: tenders.id, bidNumber: tenders.bidNumber })) as { id: string; bidNumber: string }[];
+      const stored = await ctx.db.select().from(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      expect(stored).toHaveLength(ids.length);
+      let matcherHits = 0;
+      const misses: string[] = [];
+      for (const k of keywords) {
+        const crit = compileCriteria({ keywords: [k] });
+        const want = stored.filter((t) => matchTender(t, crit, { now: ctx.clock.now() }).matched).map((t) => t.bidNumber);
+        if (!want.length) continue;
+        matcherHits += want.length;
+        const got = new Set((await ctx.db.select({ bidNumber: tenders.bidNumber }).from(tenders)
+          .where(and(like(tenders.bidNumber, `${prefix}%`), anyKeywordCondition([k])))).map((r) => r.bidNumber));
+        for (const bid of want) if (!got.has(bid)) misses.push(`${JSON.stringify(k)} ⊄ ${JSON.stringify(stored.find((t) => t.bidNumber === bid)!.title)}`);
+      }
+      expect(misses).toEqual([]);
+      expect(matcherHits).toBeGreaterThan(200); // the corpus really exercises the matcher
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  });
+
+  it('SEARCH_SEPARATORS is exactly the translate() set of the tenders_search migration', () => {
+    const file = readdirSync(MIGRATIONS).find((f) => /_tenders_search\.sql$/.test(f))!;
+    const body = readFileSync(`${MIGRATIONS}/${file}`, 'utf8');
+    const m = /'(!"#[^\n]*?)', '( +)'\)\)/.exec(body);
+    expect(m).not.toBeNull();
+    expect(m![1].replace(/''/g, "'")).toBe(SEARCH_SEPARATORS);
+    expect(m![2]).toHaveLength(SEARCH_SEPARATORS.length);
   });
 
   it('preview tolerates a tender whose items jsonb is not an array (no 500)', async () => {

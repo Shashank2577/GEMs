@@ -66,8 +66,9 @@ export const byPreviewOrder = (a: Candidate, b: Candidate) =>
   || b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
- * Open tenders that match the criteria: a cheap SQL pre-filter (state, value, bid type, keyword / category /
- * ministry ILIKE — always a superset of what the matcher accepts) followed by the exact matcher in JS.
+ * Open tenders that match the criteria: a cheap SQL pre-filter (state, value, bid type, keyword full-text match via
+ * `anyKeywordCondition`, category / ministry ILIKE — each a superset of what the matcher accepts; the keyword one is
+ * property-tested against the matcher in identify.test.ts) followed by the exact matcher in JS.
  * Scans keyset pages ordered by `id` until exhausted (FR-028) and keeps only `{id, relevance, reasons, endAt,
  * createdAt}` per match (NFR-003).
  */

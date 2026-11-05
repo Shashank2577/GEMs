@@ -210,8 +210,10 @@ Spec 008 US7, FR-070, ADR-0012. The single source of truth is `RETENTION` in
 How it runs: the `housekeeping` step of `runScheduledJobs` (after `rate-limit-cleanup`) runs on the first cron tick at
 or after **02:00 IST** each IST day. It claims the day in `job_runs (job='housekeeping', day)` — every other tick and
 isolate that day skips. Deletes run in batches of 1,000 rows, at most 50 batches per rule per run (the rest is picked
-up the next day). A failed R2 delete keeps that packet row for the next run (no orphaned objects); a run that throws
-deletes its claim, so the next tick retries. Every rule is idempotent (a second run deletes 0).
+up the next day). Packet R2 objects are deleted with R2's multi-key delete (≤ 1,000 keys per call), at most 1,000
+packet objects per run. A failed R2 delete keeps those packet rows for the next run (no orphaned objects); a run that
+throws deletes its claim, so the next tick retries. Every rule is idempotent (a second run deletes 0). `tenders.raw` is
+only nulled on real tenders (`REAL_ONLY`): the demo marker in `raw` is what keeps demo tenders out of other orgs' feeds.
 
 Check it ran (one JSON line per day in Workers Logs / `wrangler tail`):
 
@@ -222,8 +224,23 @@ wrangler tail --format json | grep '"housekeeping finished"'
 psql "$DATABASE_URL" -c "select day, started_at, finished_at, summary from job_runs where job='housekeeping' order by day desc limit 7"
 ```
 
-A claim with `finished_at IS NULL` older than an hour means the run died mid-way (Worker CPU limit or eviction): delete
-that row and the next cron tick re-runs it. To re-run a day on purpose, do the same — there is no manual endpoint.
+A claim with `finished_at IS NULL` older than an hour means the run died mid-way (Worker CPU limit or eviction): the
+first cron tick after that hour takes the claim over and re-runs the day by itself (`HOUSEKEEPING_STALE_CLAIM_MS`) —
+nothing to do. To re-run a day on purpose, delete that day's row
+(`delete from job_runs where job = 'housekeeping' and day = '<YYYY-MM-DD>'`) and the next tick runs it; there is no
+manual endpoint.
+
+### Shared LLM extraction cache (FR-072)
+
+GeM-fetched documents (`tender_documents.org_id IS NULL`) keep the LLM's requirements in `requirements`, with
+`extracted_method = 'LLM'` and `extractor_version` = `CURRENT_EXTRACTOR_VERSION` (packages/core/src/analyse/llm.ts);
+every org's analysis reuses them without an LLM call. An org's own uploads are never cached. Empty or malformed LLM
+replies are never cached. Bumping `CURRENT_EXTRACTOR_VERSION` re-extracts every document once, lazily. To drop one bad
+entry (the next analysis of that document calls the LLM again):
+
+```sh
+psql "$DATABASE_URL" -c "update tender_documents set extractor_version = null where id = '<documentId>' and org_id is null"
+```
 
 ## R2 lifecycle for packets
 
@@ -232,7 +249,9 @@ above. **Constraint (spec conflict, raised on the US7 PR):** R2 lifecycle rules 
 packet keys are `org/<orgId>/packets/<packetId>/<file>.pdf` (pinned by spec 006 tests), so `org/*/packets/` cannot be
 expressed, and a rule on `org/` would also expire **vault** files (customer data, never lifecycle-expired). Until the
 architect decides between (a) moving new packets under a top-level `packets/` prefix (offboarding then purges both
-prefixes) or (b) one rule per org, the DB-driven housekeeping is the only packet expiry. Per-org rule (b), at most
+prefixes) or (b) one rule per org — tracked in #552 — the DB-driven housekeeping is the only packet expiry. **No
+lifecycle rule is configured today.** If a packet's object is ever missing (lifecycle, manual purge), its download answers
+404, never 500 (`apps/api/test/packet.test.ts`). Per-org rule (b), at most
 1,000 rules per bucket:
 
 ```sh
@@ -277,18 +296,35 @@ of the confirmed request; public tender data (`tenders`, GeM-fetched `tender_doc
 
 ## Hyperdrive
 
-FR-075, ADR-0002. The Worker connects with one driver (`pg`) through the `HYPERDRIVE` binding:
-`createNodeDb(env.HYPERDRIVE.connectionString, { max: 5 })`. `DATABASE_URL` (Neon pooled `-pooler` URL) stays as the
-secret `pnpm db:migrate` uses, and the Worker falls back to it only when no binding is configured (break-glass).
+FR-075, ADR-0002. The Worker connects with one driver (`pg`): `createNodeDb(url, { max: 5 })`, where `url` is the
+`HYPERDRIVE` binding's `connectionString` when the binding exists, else the `DATABASE_URL` secret (Neon pooled
+`-pooler` URL — also what `pnpm db:migrate` uses). The pool fails a connection attempt after 10 s
+(`connectionTimeoutMillis`).
 
-Setup (once per environment; needs a Cloudflare API token with Hyperdrive edit):
+**Current state: the binding is NOT enabled.** `wrangler.toml` ships the `[[hyperdrive]]` table commented out, because
+it needs a real config id that only an operator can create; until then production runs on `DATABASE_URL` (exactly the
+pre-FR-075 connection path, minus the second driver) and `wrangler deploy` needs no Hyperdrive config.
+
+### Enable Hyperdrive (operator, once per environment; Cloudflare API token with Hyperdrive edit)
 
 ```sh
 wrangler hyperdrive create tenderpilot-db --connection-string="$NEON_POOLED_URL" --caching-disabled
-wrangler hyperdrive create tenderpilot-db-staging --connection-string="$NEON_STAGING_POOLED_URL" --caching-disabled
-# paste the ids into wrangler.toml ([[hyperdrive]] and [[env.staging.hyperdrive]]), deploy staging first
 wrangler hyperdrive get <id>            # caching.disabled must be true
+# wrangler.toml: uncomment the [[hyperdrive]] table and paste <id>; deploy staging first, then production
+wrangler deploy --dry-run | grep HYPERDRIVE   # the bindings table lists env.HYPERDRIVE
 ```
+
+Staging (spec 008 US2 owns `[env.staging]`; bindings are not inherited by environments): once `[env.staging]` exists,
+add to it
+
+```toml
+[[env.staging.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "<id from: wrangler hyperdrive create tenderpilot-db-staging --connection-string=$NEON_STAGING_POOLED_URL --caching-disabled>"
+```
+
+— never as a bare `[[env.staging.hyperdrive]]` table without the rest of `[env.staging]` (that silently creates a
+staging environment with no vars and no R2 bucket).
 
 Caching stays **disabled**: Hyperdrive's query cache would serve stale reads right after writes (correctness first).
 

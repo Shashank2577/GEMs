@@ -122,6 +122,39 @@ describe('shared extraction cache for GeM documents (US7 scenario 1)', () => {
   });
 });
 
+describe('what is (not) cached, and who gets a cache hit (review S1, S7)', () => {
+  const llmReplying = (reply: unknown): LlmClient => ({ ...fakeLlm, completeJson: async <T>(req: { prompt: string }) => { llmPrompts.push(req.prompt); return reply as T; } });
+
+  it('an empty or malformed LLM reply is used for this analysis but never cached for every org', async () => {
+    for (const [i, reply] of ([{ requirements: [] }, { nope: true }, 'garbage', { requirements: [{ bogus: 1 }] }] as unknown[]).entries()) {
+      const t = await gemTender('go-it-services', `GEM/2026/B/880010${i}`);
+      llmPrompts.length = 0;
+      const r = await request(createApp({ ...ctx.deps, llm: llmReplying(reply) }), 'POST', `/tenders/${t.id}/analyse`, { cookie: A.analyst.cookie });
+      expect(r.status, r.text).toBe(201);
+      expect(llmPrompts).toHaveLength(1);
+      const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+      expect(doc, JSON.stringify(reply)).toMatchObject({ requirements: null, extractorVersion: null, extractedMethod: null });
+      // The next analysis asks the LLM again instead of reusing nothing.
+      expect((await analyse(B.analyst.cookie, t.id)).status).toBe(201);
+      expect(llmPrompts).toHaveLength(2);
+    }
+  });
+
+  it('a cache hit is free: an org with no LLM access (no client / quota exhausted) still receives the cached requirements', async () => {
+    const t = await gemTender('review-hardware-oem', 'GEM/2026/B/8800110');
+    llmPrompts.length = 0;
+    const a = await analyse(A.analyst.cookie, t.id);
+    expect(a.status).toBe(201);
+    expect(llmPrompts).toHaveLength(1);
+    // B analyses on a deployment / plan where no LLM may be called at all.
+    const b = await request(createApp({ ...ctx.deps, llm: null }), 'POST', `/tenders/${t.id}/analyse`, { cookie: B.analyst.cookie });
+    expect(b.status, b.text).toBe(201);
+    expect(llmPrompts).toHaveLength(1);
+    expect(b.body.method).toBe('rules+llm');
+    expect(llmReqs(b.body)).toEqual(llmReqs(a.body));
+  });
+});
+
 describe('tenant isolation of the extraction cache (FR-072, 008/FR-016)', () => {
   it("an org's own upload is never cached: each org's analysis of its own document calls the LLM, and B never sees A's requirements", async () => {
     const [t] = await ctx.db.insert(tenders).values({

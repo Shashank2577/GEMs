@@ -1,5 +1,8 @@
 /** 008/US6: Worker entry wiring (FR-044, FR-046) without a database or SENTRY_DSN. */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CONNECT_TIMEOUT_MS, createNodeDb } from '@tp/db/client';
 import worker, { NO_DATABASE_MESSAGE, WORKER_DB_POOL_MAX, workerDatabaseUrl, type WorkerEnv } from '../src/worker';
 
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
@@ -56,6 +59,29 @@ describe('worker default export (withSentry-wrapped)', () => {
     expect(body).toMatchObject({ db: true, version: '9.9.9' });
     await Promise.all(waits); // the per-request pool is closed after the response
     expect(waits.length).toBeGreaterThan(0);
+  });
+
+  it('review S3: without a Hyperdrive binding the Worker runs on the DATABASE_URL secret (the shipped wrangler.toml state)', async () => {
+    const waits: Promise<unknown>[] = [];
+    const res = await worker.fetch(new Request('https://app.example.in/api/health'),
+      env({ DATABASE_URL: process.env.TEST_DATABASE_URL! }), { waitUntil: (p: Promise<unknown>) => { waits.push(p); }, passThroughOnException: () => {} });
+    expect(await res.json()).toMatchObject({ db: true, version: '9.9.9' });
+    await Promise.all(waits);
+  });
+
+  it('review S3: the pg pool fails a connection attempt after CONNECT_TIMEOUT_MS instead of hanging', async () => {
+    expect(CONNECT_TIMEOUT_MS).toBe(10_000);
+    const { db, close } = await createNodeDb(process.env.TEST_DATABASE_URL!, { max: 1 });
+    expect((db as unknown as { $client: { options: { connectionTimeoutMillis: number } } }).$client.options.connectionTimeoutMillis).toBe(10_000);
+    await close();
+  });
+
+  it('review S3: wrangler.toml deploys without an operator-created Hyperdrive id (no placeholder binding, no bare env.staging)', () => {
+    const toml = readFileSync(fileURLToPath(new URL('../../../wrangler.toml', import.meta.url)), 'utf8');
+    const active = toml.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
+    expect(active).not.toMatch(/\[\[hyperdrive\]\]/); // enable per docs/runbook.md § Hyperdrive, with a real id
+    expect(active).not.toMatch(/\[\[env\.staging\./); // staging belongs to [env.staging] (spec 008 US2)
+    expect(active).not.toMatch(/id = "0{32}"/);
   });
 
   it('bootstrap failure on other /api routes → 503 service_unavailable', async () => {

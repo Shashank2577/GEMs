@@ -420,6 +420,11 @@ export const MATCH_INSERT_BATCH = 500;
 /**
  * Insert match rows in statements of at most `MATCH_INSERT_BATCH` rows (Postgres' 65,535 bind-parameter limit and
  * bounded statement size); returns the pairs that were new.
+ *
+ * Known gap (pre-existing, unchanged by 008/US7 — the single INSERT had it too): the statements are not one
+ * transaction with the notification inserts in `matchAndNotify`. If the process dies after a batch commits but before
+ * its notifications are queued, those matches exist without an alert, and a re-run sees them as "not new" (ON CONFLICT
+ * DO NOTHING) so it never alerts for them. The match itself is still listed in the feed.
  */
 export async function insertMatchesBatched(
   db: AppDeps['db'], rows: (typeof tenderMatches.$inferInsert)[],

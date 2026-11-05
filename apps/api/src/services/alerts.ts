@@ -17,8 +17,10 @@
  */
 import { and, eq, inArray, lte, sql } from 'drizzle-orm';
 import { notificationPrefs, notifications, organizations, tenders, users } from '@tp/db';
-import { isTransientSendError } from '../adapters/provider-error';
+import { istDay, istHour } from '@tp/core/time';
+import { isTransientSendError, ProviderError } from '../adapters/provider-error';
 import type { AppDeps, EmailMessage, SendResult } from '../deps';
+import { sha256Hex } from '../lib/crypto';
 import { unsubscribeHeaders } from '../lib/unsubscribe';
 
 type NotificationRow = typeof notifications.$inferSelect;
@@ -48,8 +50,6 @@ export const DIGEST_HOUR_IST = 8;
 export const WHATSAPP_TEMPLATE = 'tender_alert';
 
 const IST_MS = 330 * 60_000;
-const istDay = (d: Date) => new Date(d.getTime() + IST_MS).toISOString().slice(0, 10);
-const istHour = (d: Date) => new Date(d.getTime() + IST_MS).getUTCHours();
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500);
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -304,30 +304,41 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   // Instant emails: ≤ EMAIL_BATCH_SIZE per provider call via Mailer.sendMany. A failed call fails (or schedules a retry
   // for) exactly the rows of that call, with the same transient/permanent rules as a single send; the next batch still
   // goes. A mailer without sendMany (test doubles) keeps the one-send-per-row path, lease check before every send.
+  //  - Idempotency (review S2): every call carries a key derived from its notification ids (`tp-batch-<sha256>` /
+  //    `tp-notif-<id>`), stable across retries, so a retry of a call Resend accepted but whose response was lost
+  //    (timeout → transient → retried) is not delivered again. Resend answers 409 when it already holds that key; the
+  //    rows were accepted then, so they are settled as sent.
+  //  - Resend validates a batch as a whole: one invalid recipient makes the call 400/422. Then the chunk is retried one
+  //    message per call, so only the bad row(s) fail.
+  const sendSingly = async (rows: Claimed[]) => {
+    for (const p of rows) {
+      if (!leaseHeld()) { deferred.push(p.n.id); continue; }
+      let r: SendResult;
+      try {
+        const msg = await instantEmail(deps, p, tenderById, now);
+        r = await mailer.send(msg, { idempotencyKey: `tp-notif-${p.n.id}` });
+      } catch (e) {
+        if (isIdempotentReplay(e)) { await record('send outcome', [p.n.id], () => settle([p.n.id], 'sent')); continue; }
+        logger.warn('notification send failed', { id: p.n.id, channel: 'email', attempt: p.n.attempts + 1, transient: isTransientSendError(e), error: errMsg(e) });
+        await record('send failure', [p.n.id], () => fail([p.n.id], e));
+        continue;
+      }
+      await record('send outcome', [p.n.id], () => settle([p.n.id], r.skipped ? 'skipped' : 'sent', r.skipped ? EMAIL_NOT_CONFIGURED : null));
+    }
+  };
   for (let i = 0; i < instantEmails.length; i += EMAIL_BATCH_SIZE) {
     const chunk = instantEmails.slice(i, i + EMAIL_BATCH_SIZE);
-    if (!mailer.sendMany) {
-      for (const p of chunk) {
-        if (!leaseHeld()) { deferred.push(p.n.id); continue; }
-        let r: SendResult;
-        try {
-          r = await mailer.send(await instantEmail(deps, p, tenderById, now));
-        } catch (e) {
-          logger.warn('notification send failed', { id: p.n.id, channel: 'email', attempt: p.n.attempts + 1, transient: isTransientSendError(e), error: errMsg(e) });
-          await record('send failure', [p.n.id], () => fail([p.n.id], e));
-          continue;
-        }
-        await record('send outcome', [p.n.id], () => settle([p.n.id], r.skipped ? 'skipped' : 'sent', r.skipped ? EMAIL_NOT_CONFIGURED : null));
-      }
-      continue;
-    }
+    if (!mailer.sendMany) { await sendSingly(chunk); continue; }
     const ids = chunk.map((p) => p.n.id);
     if (!leaseHeld()) { deferred.push(...ids); continue; }
     let results: SendResult[];
     try {
-      results = await mailer.sendMany(await Promise.all(chunk.map((p) => instantEmail(deps, p, tenderById, now))));
+      const msgs = await Promise.all(chunk.map((p) => instantEmail(deps, p, tenderById, now)));
+      results = await mailer.sendMany(msgs, { idempotencyKey: `tp-batch-${await sha256Hex([...ids].sort().join(','))}` });
     } catch (e) {
+      if (isIdempotentReplay(e)) { await record('email batch outcome', ids, () => settle(ids, 'sent')); continue; }
       logger.warn('email batch send failed', { count: ids.length, transient: isTransientSendError(e), error: errMsg(e) });
+      if (chunk.length > 1 && isBatchValidationError(e)) { await sendSingly(chunk); continue; }
       await record('email batch failure', ids, () => fail(ids, e));
       continue;
     }
@@ -412,6 +423,11 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
 
 /** Most messages one `Mailer.sendMany` call is given (= Resend's batch limit, adapters/mailer.ts). */
 export const EMAIL_BATCH_SIZE = 100;
+
+/** Resend 409: a request with this idempotency key was already accepted (or is in flight) — its messages went out. */
+const isIdempotentReplay = (e: unknown) => e instanceof ProviderError && e.status === 409;
+/** Resend 400/422: the request (for a batch: any one of its messages) failed validation — permanent for that message. */
+const isBatchValidationError = (e: unknown) => e instanceof ProviderError && (e.status === 400 || e.status === 422);
 const EMAIL_NOT_CONFIGURED = 'Email is not configured (RESEND_API_KEY)';
 
 /** The email for one instant (non-digest) notification row. */

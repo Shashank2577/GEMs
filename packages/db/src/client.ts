@@ -11,10 +11,14 @@ export { schema };
  * `max` is the pool size: 10 for the long-lived Node server; the Worker opens a small per-request pool (5) because
  * Hyperdrive, not the isolate, owns the pool of origin connections to Neon.
  * `logger` sees every query (e.g. query counting in tests, 002/NFR-001).
+ * `connectionTimeoutMillis` (default {@link CONNECT_TIMEOUT_MS}): an unreachable database fails fast — the health check
+ * reports `db: false` and the request errors — instead of hanging until the Worker's wall-clock limit.
  */
-export async function createNodeDb(url: string, opts: { logger?: Logger; max?: number } = {}): Promise<{ db: Db; close: () => Promise<void> }> {
+export const CONNECT_TIMEOUT_MS = 10_000;
+
+export async function createNodeDb(url: string, opts: { logger?: Logger; max?: number; connectionTimeoutMillis?: number } = {}): Promise<{ db: Db; close: () => Promise<void> }> {
   const pg = await import('pg');
-  const pool = new pg.default.Pool({ connectionString: url, max: opts.max ?? 10 });
+  const pool = new pg.default.Pool({ connectionString: url, max: opts.max ?? 10, connectionTimeoutMillis: opts.connectionTimeoutMillis ?? CONNECT_TIMEOUT_MS });
   const db = drizzlePg(pool, { schema, logger: opts.logger });
   return { db, close: () => pool.end() };
 }

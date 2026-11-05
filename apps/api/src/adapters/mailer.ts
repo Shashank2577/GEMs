@@ -1,5 +1,5 @@
 /** Email via the Resend HTTP API; logs and skips when RESEND_API_KEY is absent. */
-import type { EmailMessage, Logger, Mailer, SendResult } from '../deps';
+import type { EmailMessage, Logger, Mailer, SendOptions, SendResult } from '../deps';
 import { isTransientStatus, ProviderError, providerFetch } from './provider-error';
 
 /** Resend's `/emails/batch` accepts at most 100 messages per call (008/FR-074). */
@@ -15,10 +15,13 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetch?:
     ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
     ...(msg.headers ? { headers: msg.headers } : {}),
   });
-  const post = async (path: string, body: unknown): Promise<string> => {
+  const post = async (path: string, body: unknown, idempotencyKey?: string): Promise<string> => {
     const res = await providerFetch('Resend', f, `https://api.resend.com${path}`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${opts.apiKey}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${opts.apiKey}`, 'content-type': 'application/json',
+        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
+      },
       body: JSON.stringify(body),
     });
     const text = await res.text();
@@ -28,16 +31,22 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetch?:
   };
   return {
     configured: true,
-    async send(msg: EmailMessage): Promise<SendResult> {
-      const body = await post('/emails', payload(msg));
+    async send(msg: EmailMessage, sendOpts: SendOptions = {}): Promise<SendResult> {
+      const body = await post('/emails', payload(msg), sendOpts.idempotencyKey);
       try { return { id: (JSON.parse(body) as { id?: string }).id }; } catch { return {}; }
     },
-    /** 008/FR-074: `/emails/batch`, ≤ 100 messages per call; a failed call rejects (the caller fails that batch). */
-    async sendMany(msgs: EmailMessage[]): Promise<SendResult[]> {
+    /**
+     * 008/FR-074: `/emails/batch`, ≤ 100 messages per call; a failed call rejects (the caller fails that batch, or
+     * falls back to single sends on a validation error — Resend rejects the WHOLE batch for one bad message).
+     * With an idempotency key, call n of a multi-call send uses `<key>:<n>`.
+     */
+    async sendMany(msgs: EmailMessage[], sendOpts: SendOptions = {}): Promise<SendResult[]> {
       const out: SendResult[] = [];
+      const multi = msgs.length > RESEND_BATCH_MAX;
       for (let i = 0; i < msgs.length; i += RESEND_BATCH_MAX) {
         const chunk = msgs.slice(i, i + RESEND_BATCH_MAX);
-        const body = await post('/emails/batch', chunk.map(payload));
+        const key = sendOpts.idempotencyKey && (multi ? `${sendOpts.idempotencyKey}:${i / RESEND_BATCH_MAX}` : sendOpts.idempotencyKey);
+        const body = await post('/emails/batch', chunk.map(payload), key);
         let ids: { id?: string }[] = [];
         try { ids = (JSON.parse(body) as { data?: { id?: string }[] }).data ?? []; } catch { /* ids are informational */ }
         chunk.forEach((_, j) => out.push(ids[j]?.id ? { id: ids[j]!.id } : {}));

@@ -92,5 +92,17 @@ describe('shared extraction cache version (008/FR-072)', () => {
     expect(r.requirements.map((x) => x.key)).toEqual(['emd', 'certificate']);
     const failed = await enrichWithLlm(['p1'], [], async () => { throw new Error('x'); });
     expect(failed.llm).toBeUndefined();
+    expect(r.cacheable).toBe(true);
+    expect(failed.cacheable).toBeFalsy();
+  });
+
+  it('an empty or malformed reply is used but not cacheable (review S1)', async () => {
+    const good = { key: 'certificate', label: 'ISO 9001', value: 'ISO 9001', confidence: 0.8 };
+    for (const reply of [{ requirements: [] }, [], { nope: 1 }, 'text', null, { requirements: [{ bogus: true }] }]) {
+      const r = await enrichWithLlm(['p1'], [], async () => reply);
+      expect(r.used).toBe(true);
+      expect(r.cacheable, JSON.stringify(reply)).toBe(false);
+    }
+    expect((await enrichWithLlm(['p1'], [], async () => [good])).cacheable).toBe(true);
   });
 });

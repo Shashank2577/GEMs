@@ -489,15 +489,30 @@ export function cachedExtraction(d: Pick<DocRow, 'orgId' | 'requirements' | 'ext
   return d.requirements;
 }
 
+/** Longest the analysis waits for the cache write; past it the write may still land, but the analysis goes on. */
+export const STORE_EXTRACTION_TIMEOUT_MS = 2_000;
+
+/**
+ * Write the shared extraction (org-null documents only). Concurrent misses on the same document — two orgs analysing
+ * it at once — both call the LLM and both write; the last write wins. Both replies were produced from the same public
+ * text at the same extractor version, so either is a valid cache entry; the race only costs one extra LLM call.
+ */
 async function storeExtraction(deps: AppDeps, d: DocRow, llmRequirements: Requirement[]): Promise<void> {
   if (d.orgId !== null) return; // never cache an org's own document (see cachedExtraction)
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await deps.db.update(tenderDocuments).set({
+    const write = deps.db.update(tenderDocuments).set({
       requirements: llmRequirements, extractorVersion: CURRENT_EXTRACTOR_VERSION, extractedAt: deps.clock.now(), extractedMethod: 'LLM',
-    }).where(and(eq(tenderDocuments.id, d.id), isNull(tenderDocuments.orgId)));
+    }).where(and(eq(tenderDocuments.id, d.id), isNull(tenderDocuments.orgId))).execute();
+    write.catch(() => {}); // a rejection after the timeout below is not unhandled
+    await Promise.race([write, new Promise<never>((_r, reject) => {
+      timer = setTimeout(() => reject(new Error(`cache write took longer than ${STORE_EXTRACTION_TIMEOUT_MS} ms`)), STORE_EXTRACTION_TIMEOUT_MS);
+    })]);
   } catch (e) {
     // The cache is an optimisation: failing to write it must not fail the analysis.
     deps.logger.warn('analyse: could not store the shared extraction', { documentId: d.id, error: (e as Error).message });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -596,10 +611,12 @@ export async function analyseTender(
       const meta = { documentId: d.id, fileName: d.fileName, estimatedValue: tender.estimatedValue };
       const rules = extractRequirementsRules(pages, meta);
       extractMs += performance.now() - tx0;
-      if (!deps.llm) { perDoc.push(rules); continue; }
-      // 008/FR-072: a GeM-public document already extracted at the current version is reused — no LLM call.
+      // 008/FR-072: a GeM-public document already extracted at the current version is reused — no LLM call. This runs
+      // BEFORE the "is an LLM available" check on purpose: a cache hit costs nothing and is public data, so it is never
+      // metered or quota-gated — an org without LLM access (no client, or a plan quota exhausted: US5) still gets it.
       const cached = cachedExtraction(d);
       if (cached) { perDoc.push(mergeRequirements(rules, cached)); usedLlm = true; llmUse.covered++; llmUse.cached++; continue; }
+      if (!deps.llm) { perDoc.push(rules); continue; }
       const llm = deps.llm;
       const elapsed = elapsedSince(started);
       const remaining = limits.maxChars - llmUse.chars;
@@ -619,8 +636,10 @@ export async function analyseTender(
       llmUse.chars += r.inputChars;
       if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
       if (r.used) llmUse.covered++;
-      // Only a whole-document extraction is shared: one cut short by this analysis' character budget is not.
-      if (r.used && r.llm && promptChars(buildLlmPrompt(pages, rules, docBudget)) === promptChars(buildLlmPrompt(pages, rules))) {
+      // Only a whole-document extraction is shared: one cut short by this analysis' character budget is not, and
+      // neither is an empty or malformed reply (`cacheable`) — it would otherwise be served to every org until the
+      // extractor version changes (runbook § Extraction cache: invalidate one document).
+      if (r.used && r.cacheable && r.llm && promptChars(buildLlmPrompt(pages, rules, docBudget)) === promptChars(buildLlmPrompt(pages, rules))) {
         await storeExtraction(deps, d, r.llm);
       }
       usedLlm ||= r.used;

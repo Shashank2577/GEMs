@@ -8,7 +8,7 @@ Proposed items live in spec 008.
 | ADR | Title | Status | Priority |
 |---|---|---|---|
 | [0001](./0001-single-worker-monolith.md) | One Worker serves API, SPA and cron; Workers Paid + `cpu_ms` | Accepted + amendment | MUST |
-| [0002](./0002-neon-connection-handling.md) | Pooled Neon endpoint now; Hyperdrive + single `pg` driver next | Proposed | MUST / SHOULD |
+| [0002](./0002-neon-connection-handling.md) | Pooled Neon endpoint now; Hyperdrive + single `pg` driver next | Implemented (Hyperdrive binding: operator step) | MUST / SHOULD |
 | [0003](./0003-shared-global-ingestion-and-gem-politeness.md) | Shared global ingestion, cluster-wide GeM throttle, cooldown, atomic lock | Accepted + Proposed | MUST / SHOULD |
 | [0004](./0004-tenant-isolation-application-level.md) | Application-level tenancy; demo data isolation; sweep test; RLS later | Accepted + Proposed | MUST / LATER |
 | [0005](./0005-auth-and-session-security.md) | Hashed opaque sessions + PBKDF2; spec 002 hardening; headers; custom domain | Accepted + Proposed | MUST / SHOULD |
