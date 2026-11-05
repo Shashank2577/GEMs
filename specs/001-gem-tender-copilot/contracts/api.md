@@ -7,6 +7,9 @@ The active organization comes from the session (`sessions.active_org_id`). Roles
 `owner > bid_manager > analyst > viewer`. "W" = requires at least analyst (write), "M" = bid_manager+, "O" = owner.
 List endpoints return `{ items, total }` and accept `page` (1-based) and `pageSize` (default 25, max 100).
 Money is integer rupees. Dates are ISO-8601 strings; the UI renders IST.
+`Me` (`packages/core/src/contracts/auth.ts`; returned by sign-up, login, accept-invite and `GET /auth/me`) carries
+`{user, org:{id,name,slug,plan,onboardingState,scoringWeights,trialEndsAt}, role, orgs}`. `org.trialEndsAt` (ISO string,
+008/FR-035) is set at sign-up to created + 14 days and is `null` for paid plans; `GET /org` returns the same field.
 
 Shared DTO zod schemas live in `packages/core/src/contracts/<area>.ts` (owned by the area's module).
 
@@ -44,7 +47,7 @@ A read-only token (`scope:"read"`, 006/FR-074) may only `GET`/`HEAD`: every othe
 | DELETE (S) | /org/members/me | – | `{ok:true,nextOrgId}`: leave the active org (FR-027); 409 `last_owner` |
 | PATCH (M) | /org | `{name?, onboardingState?, scoringWeights?}` | org |
 | GET | /activity | `entityType?` (one or a comma-separated list, max 12), `entityId?, userId?, page?, pageSize?` | `{items:[{id,user:{id,name}\|null,action,entityType,entityId,meta,createdAt,target?:{label,href}\|null}], total}` (`target` = the entity's display name and link, resolved server-side); `user` is null when the actor no longer exists; newest first, paginated by `page`/`pageSize`. Includes `auth.password_changed` (`POST /me/password`, meta `{otherSessionsRevoked}`) and `auth.sessions_revoked` (`POST /me/sessions/revoke-others` when ≥1 revoked, `DELETE /me/sessions/:id`; meta `{scope:'others'\|'one'\|'current',count}`), both `entityType:'user'` in the active org (002/FR-042) |
-| GET | /health | – | `{ok, db, version}` (no auth) |
+| GET | /health | – | Health v2 (008/FR-044; no auth, platform-wide aggregates only, never org data): `{ok, db, version, ingestion:{lastSuccessAt, ageMinutes, lastStatus, state:'ok'\|'stale'\|'never'}, alerts:{pendingOlderThan30m}, reasons:HealthReason[]}`. `reasons` ⊆ `db_unreachable`, `ingestion_stale` (last successful sync, success or partial runs, older than `HEALTH_INGESTION_MAX_AGE_MIN`, default 120), `alerts_backlog` (email/WhatsApp rows pending > 30 min; held daily-digest rows count only once their slot is overdue). **200** when `reasons` is empty, **503** with the same body otherwise, so an external uptime monitor needs no body parsing. `ingestion_stale` is also raised when runs exist but none succeeded and the first run is older than the threshold. Each query has a 3 s budget; if any query is slow or fails, the whole body is the unreachable report (`db:false`, `reasons:["db_unreachable"]`, `ingestion.state:'never'`, `alerts.pendingOlderThan30m` 0), not just `db:false`. A fresh stack with no ingestion run yet is `state:'never'` and healthy. Exempt from the `api.ip` rate limit |
 
 ### Platform error codes
 
@@ -67,20 +70,45 @@ and `conflict` (409):
 Security headers on every response (FR-050): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (`SAMEORIGIN`
 for inline document previews), `Referrer-Policy: no-referrer`, `Strict-Transport-Security` on https, and a CSP for the SPA.
 
-## Identify — owner: Identify module (`routes/tenders.ts`, `routes/watchlists.ts`, `routes/ingestion.ts`, `routes/notifications.ts`)
+## Identify — owner: Identify module (`routes/tenders.ts`, `routes/watchlists.ts`, `routes/views.ts`, `routes/ingestion.ts`, `routes/notifications.ts`)
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | /tenders | `q,state,ministry,category,status,closingWithinDays,minValue,maxValue,matched(0/1),watchlistId,verdict,stage,sort(endAt|-createdAt|score|value),page,pageSize` → `{items: TenderListItem[], total, facets:{states,ministries,categories}}`. `TenderListItem` = tender core fields + `{matches:[{watchlistId,watchlistName,reasons}], analysis?:{score,verdict}, workspace?:{id,stage}, seen, isNew}` |
-| GET | /tenders/:id | `TenderDetail` = tender + `events` + `documents` + `matches` + `analysis` (latest for org) + `workspace` |
-| POST | /tenders/:id/seen, /tenders/:id/dismiss | – |
-| GET/POST | /watchlists | criteria per `WatchlistCriteria` |
+| GET | /tenders | `q` is full-text over bid number, title, category, ministry, department, organisation, buyer office, state, city and item names (008/FR-073; `websearch_to_tsquery` syntax: `"phrase"`, `or`, leading `-word`; every word is a prefix match; ASCII punctuation separates words, so `2062` finds `IS-2062`; bid numbers also match by prefix, and a query shaped like a bid number, e.g. `GEM/2026/B/12`, uses only the prefix match). Other params: `q,state,ministry,category` (comma-separated or repeated),`status(open\|closed\|cancelled\|awarded\|all),closingWithinDays,minValue,maxValue,matched(0/1),watchlistId,verdict(go\|review\|no_go\|none),stage,bidType,unseen(0/1),includeDismissed(0/1),sort(endAt\|-endAt\|-createdAt\|score\|-score\|value\|-value\|relevance),page,pageSize(≤100, default 25)` → `{items: TenderListItem[], total, facets:{states,ministries,categories}}`; a facet ignores its own filter. `TenderListItem` = tender core fields (never `raw` or `content_hash`) + `{isDemo, matches:[{watchlistId,watchlistName,reasons,relevance,createdAt}], analysis?:{score,verdict}, workspace?:{id,stage}, seen, isNew}`. Tenders are global; matches, analysis, workspace and seen/dismissed are the caller's org only |
+| GET | /tenders/:id | `TenderDetail` = tender + `events` + `documents` + `matches` + `analysis` (latest for org) + `workspace`; 404 for an unknown id (and for demo tenders in an org that never loaded the demo) |
+| POST | /tenders/:id/seen, /tenders/:id/dismiss | seen marks this org's matches seen and clears the user's related in-app alerts; dismiss takes `{undo?: boolean}` and hides the tender from the org's feed (`includeDismissed=1` shows it) |
+| GET/POST | /watchlists | criteria per `WatchlistCriteria`; POST (Analyst+) → 201. At most 50 watchlists per org, paused ones included, and fewer on a plan with a lower limit (`starter`: 5, `PLAN_LIMITS` in `packages/core/src/contracts/plans.ts`; over a plan limit POST answers 402 `plan_limit_reached`): 409 `watchlist_limit` "You can have up to 50 watchlists — delete one first." (`details:{limit}`) (003/FR-027) |
 | PATCH/DELETE (W) | /watchlists/:id | – |
-| POST | /watchlists/preview | `{criteria}` → `{count, sample: TenderListItem[]}` |
-| POST (M) | /ingestion/run | `{pages?}` → `IngestionRun` (runs inline, matches, queues alerts) |
-| GET | /ingestion/runs | latest runs + `lastSuccessAt` |
-| GET | /notifications | `unread?` → `{items, unreadCount}` |
+| POST | /watchlists/preview | `{criteria}` → `{count, sample: TenderListItem[] + previewReasons}`; every candidate is scanned (no silent cap, 003/FR-028); 30 requests/min/user then 429 `rate_limited` |
+| GET | /views | Saved feed views of the caller (personal: scoped to org + user) → `{items: SavedView[], total, limit}` (`limit` = 20), ordered by `position` (003/FR-035) |
+| POST | /views | `{name (1–40 chars), params: Record<string,string[]>}` → 201 `SavedView = {id,name,params,position,createdAt,updatedAt}`. 409 `view_exists` for a duplicate name (per user), 409 `view_limit` (`details:{limit:20}`) at 20 views |
+| PATCH/DELETE | /views/:id | PATCH `{name?, params?}` → `SavedView` (409 `view_exists`); DELETE → `{ok:true}`. Another user's or org's view is 404, never 403 |
+| POST (M) | /ingestion/run | `{pages?, search?}` → `IngestionRun` (runs inline, matches, queues alerts, then dispatches instant alerts). 429 `sync_cooldown` (`details:{retryAt}`, message "GeM was synced moments ago. Next manual sync at <time> IST.") for `MANUAL_SYNC_COOLDOWN_MIN` minutes (default 10; 008/FR-026 raised the 2 minutes of 003/FR-013) after a finished manual run of any org, with no request to GeM. 409 `ingestion_running` (`details.run`) when a sync is already running (also a run held by cron or another isolate: single running slot, 008/FR-025). |
+| GET | /ingestion/runs | `{items: IngestionRun[] (latest 20), lastSuccessAt, lastRun, totalTenders, openTenders (both real tenders only, no demo rows; 008/FR-016), nextManualSyncAt \| null, manualSyncCooldownMin}` |
+| GET | /notifications | `unread?(0/1), kind?, page?, pageSize?` → `{items, unreadCount, total}`; `kind` is one of `tender_match, expiry, deadline, assignment, mention, digest, system, corrigendum, result` (`NOTIFICATION_KINDS`; `?kind=corrigendum` is accepted), anything else is 400 `validation_error` (003/FR-049). Each in-app row carries its email/WhatsApp `deliveries` |
 | POST | /notifications/:id/read, /notifications/read-all | – |
+| GET | /notifications/unsubscribe?token= | Public, no side effect: confirmation page whose button POSTs back (RFC 8058, 003/FR-048) |
+| POST | /notifications/unsubscribe?token= | Public; the signed `token` (HMAC of user, org, `email_matches`; does not expire) is the credential. Sets that user's `notification_prefs.email = false` for the org and marks their queued email rows `skipped` ("unsubscribed"). Idempotent. One-click mail clients (`List-Unsubscribe=One-Click`) get `{ok:true,email:false}`, the page's form gets HTML. Tampered token, or the user left the org: 400 `invalid_token`. Alert emails carry `List-Unsubscribe` and `List-Unsubscribe-Post` headers |
+
+Delivered: 003 US5 (corrigendum and cancellation alerts, FR-052..055, T060–T065). Planned, not built yet (003 US6, tasks T066–T076; no route, table or column exists on `main`: `tender_results`, `ingestion_runs.kind`):
+
+- `GET /tenders/:id/result` *(planned, US6, FR-062)*: the stored GeM result for the tender, or `evaluationStatus` with an empty bidder list; reads `tender_results`.
+- `GET /insights/competitors?category=&state=` *(planned, US6, FR-064)*: wins, awarded value and categories per competitor aggregated from `tender_results`.
+
+### Identify error codes
+
+| Code | Status | When |
+|---|---|---|
+| `sync_cooldown` | 429 | A manual sync was requested within the cooldown after a finished manual run; `details.retryAt` is the ISO time the next one is allowed (003/FR-013, 008/FR-026) |
+| `ingestion_running` | 409 | A sync is already running (cluster-wide single flight) |
+| `watchlist_limit` | 409 | The org already has 50 watchlists (003/FR-027) |
+| `view_limit` | 409 | The user already has 20 saved views (003/FR-035) |
+| `view_exists` | 409 | The user already has a saved view with that name |
+| `invalid_token` | 400 | Unsubscribe token tampered, unknown, or the user is no longer in the org (003/FR-048) |
+
+Notification kinds (`NOTIFICATION_KINDS`, all 9): `tender_match, expiry, deadline, assignment, mention, digest, system, corrigendum, result`.
+`corrigendum` is delivered (003/FR-053, US5): amendment and cancellation alerts. `result` is accepted by the filter and the enum but nothing
+emits it until US6 (planned).
 
 ## Analyse — owner: Analyse module (`routes/analysis.ts`, `services/analyse.ts`, `services/staleness.ts`)
 
@@ -266,11 +294,28 @@ Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/
 |---|---|---|---|
 | 402 | `plan_limit_reached` | a plan limit (seats, watchlists, analyses, vault bytes, packets) is reached; `enterprise` is never limited (`PLAN_LIMITS`, `packages/core/src/contracts/plans.ts`) | `{limit, used, max, plan, resetsAt?}` (`resetsAt` = next IST month start, monthly limits only) |
 | 402 | `plan_expired` | the free trial has ended: every write except the FR-038 allow-list (auth, own account/sessions, revoking an API token, marking notifications read, notification prefs, `DELETE /demo`, `POST /tenders/:id/seen`, leaving the org `DELETE /org/members/me`, revoking an invitation `DELETE /org/invitations/:id`, and the operator-only `/admin/*`); reads keep working | `{plan:'trial', trialEndsAt}` |
+| 409 | `ingestion_running` | `POST /ingestion/run` while another ingestion run is `running` (unique partial index `ingestion_runs_one_running_uq`) | `{run}` |
 | 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
-| 413 | `packet_too_large` | packet would exceed 40 MB or 40 items | – |
-| 422 | `document_too_long` | tender document over 300 pages (refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning) | – |
-| 422 | `scanned_document` | tender document has no extractable text | – |
-| 429 | `rate_limited` | a rate-limit rule is over its limit; header `Retry-After: <s>` | `{rule, retryAfter}` |
-| 429 | `sync_cooldown` | manual "Sync now" within the cooldown | `{retryAt}` |
-| 503 | `gem_busy` | the cluster-wide GeM slot could not be had in time | – |
+| 413 | `packet_too_large` | the packet has more than 40 items (`PACKET_MAX_ITEMS`), or the stored sizes of the selected documents exceed `PACKET_MAX_INPUT_BYTES` (40 MB on the Worker; 006/FR-056's 60 MB code default on Node). Checked before any document is loaded | item count: `{items, maxItems}`; size: `{totalBytes, limitBytes, items:[{title,sizeBytes}]}` (10 largest) |
+| 422 | `document_too_long` | tender document over 300 pages (`MAX_TENDER_DOC_PAGES`; refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning); on upload, GeM fetch and analyse's auto-fetch | `{pages, maxPages}` |
+| 422 | `scanned_document` | every document of the tender is a scan without a text layer (analyse only; an upload of one is accepted with `hasText:false`) | `{documents}` (file names) |
+| 429 | `rate_limited` | a rate-limit rule is over its limit; header `Retry-After: <s>`. Rules live in one table, `apps/api/src/lib/rate-limit-rules.ts` (exception: `POST /me/notifications/test`, 1/min per user, spec 002 limiter `lib/rate-limit.ts`; its 429 currently reports `details.rule: "auth.fail.email"`, issue #559): `auth.fail.email` 10/15 min, `auth.fail.ip` 30/15 min, `auth.signup.ip` 20/h, `auth.reset.email` 3/h, `auth.reset.ip` 20/h, `watchlist.preview.user` 30/min, `upload.org` 120/h, `gem.fetch.org` 30/h, `analyse.user` 30/h, `packet.org` 30/h, `api.user` 600/min (token or user), `api.ip` 300/min (unauthenticated). Aligned fixed windows (a client can burst up to twice a limit across a boundary); per-IP rules apply only when the client IP is known (`TRUST_PROXY`). When several counters are over, the binding one (longest `Retry-After`) is named | `{rule, retryAfter}` |
+| 429 | `sync_cooldown` | manual "Sync now" within the cooldown (`MANUAL_SYNC_COOLDOWN_MIN`, default 10 min, cluster-wide); no GeM request is made | `{retryAt}` |
+| 503 | `gem_busy` | the cluster-wide GeM request slot (`gem_throttle`, 1 request/s across all isolates) was not free within 25 s; also surfaced by analyse's auto-fetch | `{maxWaitMs}` |
 | 503 | `service_unavailable` | an auth rate limiter could not be checked (auth rules fail closed) | `{reason}` |
+
+### Plan limits (`PLAN_LIMITS`, `packages/core/src/contracts/plans.ts`; 008/FR-034)
+
+Returned as `limits` by `GET /org/usage`; `null` = no plan limit. Monthly counters reset at 00:00 IST on the 1st.
+
+| Plan | seats¹ | watchlists² | analyses / month | AI analyses / month | vault | packets / month | WhatsApp |
+|---|---|---|---|---|---|---|---|
+| `trial` (14 days) | 10 | no plan limit | 10 | 10 | 1 GB | 10 | yes |
+| `starter` | 3 | 5 | 100 | 50 | 2 GB | 30 | no |
+| `pro` | 10 | no plan limit | 500 | 250 | 10 GB | 200 | yes |
+| `enterprise` | – | – | – | – | – | – | yes |
+
+¹ Members plus pending invitations. ² Every org is still capped at 50 watchlists (003/FR-027, 409 `watchlist_limit`).
+Beyond the AI quota analyses run rules-only and carry the `llm_quota_reached` warning (`analyses.warnings`); an exhausted
+LLM budget adds `llm_budget_exhausted`. An expired trial answers every write outside the FR-038 allow-list with 402
+`plan_expired` while reads keep working; the operator moves an org with `POST /admin/orgs/:id/plan`.

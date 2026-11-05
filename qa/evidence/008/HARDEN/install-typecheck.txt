@@ -1,0 +1,14 @@
+$ pnpm install --frozen-lockfile
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 6.6s using pnpm v10.28.0
+$ pnpm -r typecheck
+packages/db typecheck$ tsc --noEmit
+tools/mock-gem typecheck$ tsc --noEmit
+tools/mock-gem typecheck: Done
+apps/extension typecheck: Done
+packages/db typecheck: Done
+apps/web typecheck: Done
+apps/api typecheck$ tsc --noEmit
+apps/api typecheck: Done

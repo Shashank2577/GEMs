@@ -13,9 +13,13 @@ PACKET_MAX_INPUT_BYTES=41943040
 ANTHROPIC_API_KEY=
 LLM_MODEL=claude-sonnet-5-5
 RESEND_API_KEY=
-MAIL_FROM=TenderPilot <alerts@tenderpilot.in>
+MAIL_FROM="TenderPilot <alerts@tenderpilot.in>"
 WHATSAPP_TOKEN=
 WHATSAPP_PHONE_ID=
+# Worker secrets (wrangler secret put); all optional.
+# UNSUBSCRIBE_SECRET=    # HMAC key of one-click unsubscribe links; needed together with RESEND_API_KEY
+# SENTRY_DSN=
+# ADMIN_TOKEN=           # 32+ characters; without it POST /api/admin/orgs/:id/plan answers 404
 
 # Node server only (apps/api/src/node.ts)
 # Which proxy header carries the client IP, used by the per-IP auth rate limits (002/FR-010).

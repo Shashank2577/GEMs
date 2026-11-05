@@ -1,0 +1,53 @@
+$ package.json scripts
+10:    "db:migrate": "pnpm --filter @tp/db run migrate",
+11:    "db:seed": "pnpm --filter @tp/db run seed",
+12:    "dev": "pnpm --filter @tp/api run dev",
+13:    "e2e": "playwright test",
+14:    "deploy": "pnpm --filter @tp/web run build && wrangler deploy"
+11:    "generate": "drizzle-kit generate",
+12:    "migrate": "tsx src/migrate.ts",
+$ AUTO_MIGRATE
+apps/api/src/node.ts:6: *      AUTO_MIGRATE=1 (run migrations on boot), CRON_INTERVAL_MS (in-process scheduler; 0/unset = off).
+apps/api/src/node.ts:41:  if (env.AUTO_MIGRATE === '1' || env.AUTO_MIGRATE === 'true') {
+$ rate-limit test-alert
+apps/api/src/routes/notifications.ts:16:import { TEST_ALERT_LIMIT, hit, rateLimited } from '../lib/rate-limit';
+apps/api/src/routes/notifications.ts:145:  const limit = await hit(db, userId(c), 'test_alert', TEST_ALERT_LIMIT, now);
+apps/api/src/lib/rate-limit.ts:51:export const TEST_ALERT_LIMIT: LimitOptions = { limit: 1, windowMs: 60 * 1000 };
+ * `lib/rate-limit-rules.ts` that tripped (008/FR-018, US3 scenario 5).
+ */
+export function rateLimited(retryAfterSec: number, rule = 'auth.fail.email'): HttpError {
+  return tooManyRequests(rule, retryAfterSec);
+}
+$ trial migration 0022
+packages/db/migrations/0022_plans_metering.sql
+1:-- 008/US5: plans and metering — subscriptions (FR-042), llm_usage (FR-039), organizations.trial_ends_at (FR-035),
+36:ALTER TABLE "organizations" ADD COLUMN "trial_ends_at" timestamp with time zone;--> statement-breakpoint
+68:   SET "trial_ends_at" = greatest("created_at" + interval '14 days', now() + interval '7 days')
+69: WHERE "plan" = 'trial' AND "trial_ends_at" IS NULL;
+$ nextManualSyncAt
+apps/api/src/routes/ingestion.ts:36:export async function nextManualSyncAt(deps: AppDeps): Promise<Date | null> {
+apps/api/src/routes/ingestion.ts:41:  const retryAt = new Date(lastManual.finishedAt.getTime() + deps.config.manualSyncCooldownMin * 60_000);
+apps/api/src/routes/ingestion.ts:49:  const retryAt = await nextManualSyncAt(deps);
+$ admin plan route
+apps/api/src/routes/admin.ts:4: *   POST /admin/orgs/:id/plan  {plan, note, trialEndsAt?}   Authorization: Bearer <ADMIN_TOKEN>
+apps/api/src/routes/admin.ts:40:adminRoutes.post('/admin/orgs/:id/plan', async (c) => {
+$ UNSUBSCRIBE_SECRET/SENTRY_DSN/ADMIN_TOKEN in env.ts
+36:  ADMIN_TOKEN?: string;
+41:  UNSUBSCRIBE_SECRET?: string;
+45:  SENTRY_DSN?: string;
+69:  /** Null when ADMIN_TOKEN is unset or shorter than ADMIN_TOKEN_MIN_LENGTH. */
+71:  /** UNSUBSCRIBE_SECRET; when unset: null in production, a random per-process key in development, a fixed key in test. */
+73:  /** Null when SENTRY_DSN is unset. */
+110:/** ADMIN_TOKEN shorter than this is treated as unset: the operator endpoint must not hang off a guessable token (review N4). */
+111:export const ADMIN_TOKEN_MIN_LENGTH = 32;
+114:  return v && v.length >= ADMIN_TOKEN_MIN_LENGTH ? v : null;
+117:/** The startup warning for a set-but-too-short ADMIN_TOKEN (createDeps logs it once per process/isolate). */
+119:  const v = env.ADMIN_TOKEN;
+120:  return v && v.length < ADMIN_TOKEN_MIN_LENGTH
+121:    ? `ADMIN_TOKEN is shorter than ${ADMIN_TOKEN_MIN_LENGTH} characters and is ignored: POST /api/admin/* stays disabled`
+136:    adminToken: parseAdminToken(env.ADMIN_TOKEN),
+137:    unsubscribeSecret: env.UNSUBSCRIBE_SECRET || fallbackUnsubscribeSecret(environment),
+138:    sentryDsn: env.SENTRY_DSN || null,
+146:export const TEST_UNSUBSCRIBE_SECRET = 'tp-test-unsubscribe-secret';
+150: * Unsubscribe key when UNSUBSCRIBE_SECRET is unset: none in production (no List-Unsubscribe headers), the fixed test
+156:  if (environment === 'test') return TEST_UNSUBSCRIBE_SECRET;

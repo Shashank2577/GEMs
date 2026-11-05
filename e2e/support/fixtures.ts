@@ -1,6 +1,7 @@
 import { test as base, expect, request as playwrightRequest, type Page, type APIRequestContext, type Browser, type BrowserContext } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { basename, dirname, join } from 'node:path';
 
 export const GEM_URL = `http://127.0.0.1:${process.env.E2E_GEM_PORT || 4011}`;
@@ -61,6 +62,71 @@ export async function collectRunArtifacts(spec: string, story: string, page: Pag
   const video = page.video();
   await page.close();
   if (video) { try { copyFileSync(await video.path(), join(dir, `${slug}-${info.project.name}.webm`)); } catch { /* no video */ } }
+}
+
+// ───────────── 003 Identify, Ingestion & Alerts helpers (T004) ─────────────
+
+/** Restore the mock GeM to its recorded fixtures and switch any simulated outage off. */
+export async function resetGem(request: APIRequestContext) {
+  await mockGem(request, '/__admin/reset');
+  await mockGem(request, '/__admin/fail', { mode: 'off' });
+}
+
+/**
+ * Make a 003 spec file start from a clean ingestion state so the whole directory can run in one invocation on one DB
+ * (each spec expects an empty `tenders` table and no earlier manual syncs): truncates `tenders`, `ingestion_runs`, `notifications` and `watchlists` (specs count them globally and earlier specs' watchlists would match new tenders; cascades to events and matches; TRUNCATE rather than DELETE so
+ * the heap is as fresh as a new database and tie-ordered sorts are reproducible) via psql, then restores the mock GeM. Refuses a database whose name does not
+ * contain "e2e". Call it from `test.beforeAll` (desktop project only, so the mobile project keeps the desktop state).
+ */
+export async function resetIngestionData(request: APIRequestContext) {
+  const url = process.env.E2E_DATABASE_URL || 'postgres://tp:tp@localhost:5433/tenderpilot_e2e';
+  if (!/e2e/i.test(new URL(url).pathname)) throw new Error(`resetIngestionData refuses to touch ${url} (database name must contain "e2e")`);
+  execFileSync('psql', [url, '-qtAX', '-v', 'ON_ERROR_STOP=1', '-c', 'truncate tenders, ingestion_runs, notifications, watchlists cascade'], { encoding: 'utf8' });
+  await resetGem(request);
+}
+
+/** Publish `count` new bids on the mock GeM (simulates fresh tenders); resolves to the mock's reply. */
+export async function publishOnGem(request: APIRequestContext, count = 1) {
+  return mockGem(request, '/__admin/publish', { count });
+}
+
+/** Issue a corrigendum on one mock bid, e.g. `gemCorrigendum(req, 'GEM/2026/B/6421101', { days: 7 })`. */
+export async function gemCorrigendum(request: APIRequestContext, bidNumber: string, body: { days?: number; endAt?: string; quantity?: number; emd?: number } = {}) {
+  return mockGem(request, `/__admin/corrigendum/${encodeURIComponent(bidNumber)}`, body);
+}
+
+/** Cancel one mock bid on GeM (`b_is_cancelled`), e.g. `gemCancel(req, 'GEM/2026/B/6421101')`. */
+export async function gemCancel(request: APIRequestContext, bidNumber: string) {
+  return mockGem(request, `/__admin/cancel/${encodeURIComponent(bidNumber)}`, {});
+}
+
+/** Simulate a GeM outage: 'down' (5xx), 'html' (format drift) or 'off' (healthy). */
+export async function gemFail(request: APIRequestContext, mode: 'down' | 'html' | 'off') {
+  return mockGem(request, '/__admin/fail', { mode });
+}
+
+/**
+ * Run a sync now (`POST /api/ingestion/run`, Bid Manager+). The 008/FR-026 manual cooldown (429 `sync_cooldown`)
+ * is waited out via `error.details.retryAt` and retried (at most 2 waits); it fails fast when the wait would exceed
+ * 60 s (the default cooldown is 10 minutes: age earlier runs in SQL first, as the 003 US3-US5 specs do). Any other status is returned as is.
+ */
+export async function syncNow(request: APIRequestContext, data: { pages?: number; search?: string } = { pages: 5 }) {
+  for (let i = 0; i < 3; i++) {
+    const res = await request.post('/api/ingestion/run', { data });
+    if (res.status() !== 429) return res;
+    const body = await res.json().catch(() => ({}));
+    const retryAt = Date.parse(body?.error?.details?.retryAt ?? '');
+    if (body?.error?.code !== 'sync_cooldown' || Number.isNaN(retryAt)) return res;
+    const waitMs = Math.max(0, retryAt - Date.now()) + 1500;
+    if (waitMs > 60_000) throw new Error(`manual sync cooldown is ${Math.round(waitMs / 1000)}s: age earlier ingestion_runs in SQL before syncNow()`);
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+  throw new Error('manual sync cooldown never cleared');
+}
+
+/** Evidence screenshot for spec 003: writes `qa/evidence/003/<story>/<name>.png` (story = 'US1' … 'US6'). */
+export function evidence003(page: Page, story: string, name: string) {
+  return evidence(page, '003', story, name);
 }
 
 // ───────────── 007 Experience & Growth helpers (T002, T003) ─────────────
