@@ -8,6 +8,8 @@ import { spaCspFor } from '@tp/core/security/headers';
 import { createApp } from './app';
 import { createDeps } from './adapters/index';
 import { createSentryReporter, sentryOptions } from './adapters/errors';
+import { createJsonLogger } from './adapters/logger';
+import { unreachableHealth } from './routes/health';
 import { createR2BlobStore, type R2BucketLike } from './adapters/blob-r2';
 import { loadConfig, type RuntimeEnv } from './env';
 import { runScheduledJobs } from './lib/scheduled';
@@ -64,6 +66,21 @@ export async function withSecurityHeaders(request: Request, res: Response): Prom
   return out;
 }
 
+/**
+ * The per-request bootstrap (DB pool, deps) failed before the Hono app could run: JSON log line, Sentry event when a DSN
+ * is set (withSentry has initialised the client), and for /api/health the same `db_unreachable` body the route returns.
+ */
+export function bootstrapFailed(e: unknown, url: URL, env: WorkerEnv): Response {
+  const config = loadConfig(envVars(env));
+  createJsonLogger({ level: config.logLevel }).error('worker bootstrap failed', { path: url.pathname, error: (e as Error)?.message });
+  if (env.SENTRY_DSN) {
+    try { Sentry.captureException(e, { tags: { route: url.pathname === '/api/health' ? '/api/health' : 'bootstrap' } }); } catch { /* never mask the 503 */ }
+  }
+  const headers = { 'cache-control': 'no-store' };
+  if (/^\/api\/health\/?$/.test(url.pathname)) return Response.json(unreachableHealth(config.version), { status: 503, headers });
+  return Response.json({ error: { code: 'service_unavailable', message: 'Service temporarily unavailable' } }, { status: 503, headers });
+}
+
 const handler = {
   async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContextLike): Promise<Response> {
     const url = new URL(request.url);
@@ -71,8 +88,7 @@ const handler = {
       try {
         return await withDeps(env, ctx, async (deps) => createApp(deps).fetch(request, env, ctx as never));
       } catch (e) {
-        console.error('[tp] worker bootstrap failed', (e as Error).message);
-        return Response.json({ error: { code: 'service_unavailable', message: 'Service temporarily unavailable' } }, { status: 503 });
+        return bootstrapFailed(e, url, env);
       }
     }
     return withSecurityHeaders(request, await env.ASSETS.fetch(request));

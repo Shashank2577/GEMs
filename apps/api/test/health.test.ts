@@ -1,19 +1,20 @@
 /** 008/US6: health v2 (FR-044), request logs (FR-045), error reporter (FR-046). */
 import { Hono } from 'hono';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ingestionRuns, notifications, organizations, users } from '@tp/db';
+import { ingestionRuns, notificationPrefs, notifications, organizations, users } from '@tp/db';
 import { createApp } from '../src/app';
 import type { AppDeps, ErrorReporter, Logger } from '../src/deps';
 import { loadConfig } from '../src/env';
 import { createJsonLogger } from '../src/adapters/logger';
-import { createSentryReporter } from '../src/adapters/errors';
+import { createSentryReporter, noopErrorReporter, scrubEvent, sentryOptions } from '../src/adapters/errors';
+import { createDeps, createMemoryBlobStore } from '../src/adapters/index';
 import { HttpError } from '../src/lib/errors';
 import { errorHandler } from '../src/middleware/error';
 import { requireAuth } from '../src/middleware/auth';
 import { injectDeps } from '../src/middleware/request';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import type { AppEnv } from '../src/types';
-import { buildHealth } from '../src/routes/health';
+import { buildHealth, dailyDigestCutoff } from '../src/routes/health';
 import { createTestContext, request, signup, TEST_APP_URL, truncateAll, type TestContext } from './helpers';
 
 const NOW = new Date('2026-06-01T12:00:00.000Z');
@@ -27,10 +28,17 @@ beforeEach(async () => { await truncateAll(ctx.db); ctx.deps.config = loadConfig
 const run = (status: 'success' | 'partial' | 'failed' | 'running', finishedMinAgo: number | null, startedMinAgo = (finishedMinAgo ?? 1) + 1) =>
   ctx.db.insert(ingestionRuns).values({ trigger: 'cron', status, startedAt: minutesAgo(startedMinAgo), finishedAt: finishedMinAgo == null ? null : minutesAgo(finishedMinAgo) });
 
-async function pendingNotification(createdMinAgo: number) {
+async function pendingNotification(
+  createdMinAgo: number,
+  opts: { channel?: 'email' | 'whatsapp' | 'in_app'; kind?: 'system' | 'tender_match'; frequency?: 'instant' | 'daily' } = {},
+) {
   const [org] = await ctx.db.insert(organizations).values({ name: 'O', slug: `o-${Math.random().toString(36).slice(2)}` }).returning();
   const [user] = await ctx.db.insert(users).values({ email: `u${Math.random().toString(36).slice(2)}@example.in`, name: 'U', passwordHash: 'x' }).returning();
-  await ctx.db.insert(notifications).values({ orgId: org!.id, userId: user!.id, channel: 'email', kind: 'system', title: 't', body: 'b', status: 'pending', createdAt: minutesAgo(createdMinAgo) });
+  if (opts.frequency) await ctx.db.insert(notificationPrefs).values({ orgId: org!.id, userId: user!.id, frequency: opts.frequency });
+  await ctx.db.insert(notifications).values({
+    orgId: org!.id, userId: user!.id, channel: opts.channel ?? 'email', kind: opts.kind ?? 'system',
+    title: 't', body: 'b', status: 'pending', createdAt: minutesAgo(createdMinAgo),
+  });
 }
 
 describe('GET /api/health v2 (FR-044)', () => {
@@ -74,12 +82,20 @@ describe('GET /api/health v2 (FR-044)', () => {
     expect((await request(ctx.app, 'GET', '/api/health')).body.ingestion).toMatchObject({ state: 'ok', lastStatus: 'partial' });
   });
 
-  it('only failed/running runs ever → state never, 200', async () => {
-    await run('failed', 400);
+  it('fresh stack whose first runs failed recently → still never, 200', async () => {
+    await run('failed', 30);
     await run('running', null, 2);
     const r = await request(ctx.app, 'GET', '/api/health');
     expect(r.status).toBe(200);
-    expect(r.body.ingestion).toMatchObject({ state: 'never', lastSuccessAt: null });
+    expect(r.body.ingestion).toMatchObject({ state: 'never', lastSuccessAt: null, lastStatus: 'running' });
+  });
+
+  it('never succeeded and the first run is older than the threshold → stale, 503 ingestion_stale', async () => {
+    await run('failed', 400);
+    await run('running', null, 2);
+    const r = await request(ctx.app, 'GET', '/api/health');
+    expect(r.status).toBe(503);
+    expect(r.body).toMatchObject({ ok: false, ingestion: { state: 'stale', lastSuccessAt: null, ageMinutes: null }, reasons: ['ingestion_stale'] });
   });
 
   it('alert backlog: pending notification older than 30 min → 503 alerts_backlog; younger is fine', async () => {
@@ -89,6 +105,44 @@ describe('GET /api/health v2 (FR-044)', () => {
     const r = await request(ctx.app, 'GET', '/api/health');
     expect(r.status).toBe(503);
     expect(r.body).toMatchObject({ ok: false, alerts: { pendingOlderThan30m: 1 }, reasons: ['alerts_backlog'] });
+  });
+
+  it('in-app notifications are not a dispatch backlog', async () => {
+    await pendingNotification(240, { channel: 'in_app' });
+    expect((await request(ctx.app, 'GET', '/api/health')).status).toBe(200);
+  });
+
+  it('daily-digest tender_match rows held for the 08:00 IST slot are not a backlog until that slot is 30 min past', async () => {
+    // NOW = 12:00Z = 17:30 IST; today's slot was 02:30Z (08:00 IST).
+    await pendingNotification(120, { kind: 'tender_match', frequency: 'daily' }); // created after today's slot: held
+    await pendingNotification(120, { kind: 'tender_match', frequency: 'daily', channel: 'whatsapp' });
+    let r = await request(ctx.app, 'GET', '/api/health');
+    expect(r.status).toBe(200);
+    expect(r.body.alerts).toEqual({ pendingOlderThan30m: 0 });
+    // An instant-frequency tender_match of the same age is overdue.
+    await pendingNotification(120, { kind: 'tender_match', frequency: 'instant' });
+    r = await request(ctx.app, 'GET', '/api/health');
+    expect(r.body).toMatchObject({ alerts: { pendingOlderThan30m: 1 }, reasons: ['alerts_backlog'] });
+  });
+
+  it('a daily-digest row created before the last 08:00 IST slot and still pending is a backlog', async () => {
+    await pendingNotification(600, { kind: 'tender_match', frequency: 'daily' }); // 02:00Z, before the 02:30Z slot
+    const r = await request(ctx.app, 'GET', '/api/health');
+    expect(r.status).toBe(503);
+    expect(r.body).toMatchObject({ alerts: { pendingOlderThan30m: 1 }, reasons: ['alerts_backlog'] });
+  });
+
+  it('dailyDigestCutoff: last 08:00 IST slot, or the one before while within 30 min of it', () => {
+    const yesterdaySlot = '2026-05-31T02:30:00.000Z';
+    expect(dailyDigestCutoff(new Date('2026-06-01T12:00:00Z')).toISOString()).toBe('2026-06-01T02:30:00.000Z');
+    expect(dailyDigestCutoff(new Date('2026-06-01T03:00:00Z')).toISOString()).toBe('2026-06-01T02:30:00.000Z');
+    expect(dailyDigestCutoff(new Date('2026-06-01T02:45:00Z')).toISOString()).toBe(yesterdaySlot);
+    expect(dailyDigestCutoff(new Date('2026-06-01T01:00:00Z')).toISOString()).toBe(yesterdaySlot);
+    expect(dailyDigestCutoff(new Date('2026-05-31T20:00:00Z')).toISOString()).toBe(yesterdaySlot); // 01:30 IST next day
+  });
+
+  it('is never cached', async () => {
+    expect((await request(ctx.app, 'GET', '/api/health')).headers.get('cache-control')).toBe('no-store');
   });
 
   it('multiple reasons are all listed', async () => {
@@ -116,7 +170,9 @@ describe('GET /api/health v2 (FR-044)', () => {
 
   it('each query has a 3 s timeout: a hanging database answers 503 instead of hanging', async () => {
     const hang = new Promise(() => {});
-    const slow = { execute: () => hang, select: () => ({ from: () => ({ where: () => ({ orderBy: () => ({ limit: () => hang }) }), orderBy: () => ({ limit: () => hang }) }) }) } as unknown as typeof ctx.db;
+    const slow = { execute: () => hang, select: () => ({ from: () => ({
+      where: () => ({ orderBy: () => ({ limit: () => hang }) }), orderBy: () => ({ limit: () => hang }), leftJoin: () => ({ where: () => hang }),
+    }) }) } as unknown as typeof ctx.db;
     const t0 = Date.now();
     const report = await buildHealth({ ...ctx.deps, db: slow }, 50);
     expect(report).toMatchObject({ ok: false, db: false, reasons: ['db_unreachable'] });
@@ -192,9 +248,11 @@ describe('error reporter (FR-046)', () => {
   it('captures unhandled errors with rid/orgId/userId/route, matching the x-request-id of the 500', async () => {
     const owner = await signup(ctx.app);
     const { errors, calls } = fakeReporter();
+    const lines: Record<string, unknown>[] = [];
+    const logger = createJsonLogger({ write: (l) => lines.push(JSON.parse(l)) });
     const app = new Hono<AppEnv>();
     app.onError(errorHandler);
-    app.use('*', injectDeps({ ...ctx.deps, errors, logger: silent }));
+    app.use('*', injectDeps({ ...ctx.deps, errors, logger }));
     app.get('/boom/:id', requireAuth, () => { throw new Error('kaboom'); });
     const res = await app.request(`${TEST_APP_URL}/boom/42`, { headers: { cookie: owner.cookie, 'x-request-id': 'rid-boom' } });
     expect(res.status).toBe(500);
@@ -203,6 +261,10 @@ describe('error reporter (FR-046)', () => {
     expect((calls[0]!.error as Error).message).toBe('kaboom');
     expect(calls[0]!.context).toEqual({ rid: 'rid-boom', orgId: owner.me.org!.id, userId: owner.me.user.id, route: '/boom/:id' });
     expect(((await res.json()) as { error: { details: { requestId: string } } }).error.details.requestId).toBe('rid-boom');
+    // Scenario 7: the unhandled-error log line carries rid, orgId, userId and the stack.
+    const line = lines.find((l) => l.msg === 'unhandled error')!;
+    expect(line).toMatchObject({ level: 'error', rid: 'rid-boom', orgId: owner.me.org!.id, userId: owner.me.user.id, path: '/boom/42', error: 'kaboom' });
+    expect(String(line.stack)).toContain('kaboom');
   });
 
   it('does not capture HttpError (expected 4xx/5xx), and a throwing reporter does not break the 500', async () => {
@@ -236,5 +298,52 @@ describe('error reporter (FR-046)', () => {
     r.capture(err, { rid: 'r', orgId: 'o', userId: 'u', route: '/x/:id', job: 'ingestion', email: 'a@b.in', cookie: 'c', body: { password: 'p' } });
     expect(seen).toEqual([{ e: err, hint: { tags: { rid: 'r', orgId: 'o', route: '/x/:id', job: 'ingestion' }, user: { id: 'u' } } }]);
     expect(() => createSentryReporter({ captureException() { throw new Error('sdk'); } }).capture(err)).not.toThrow();
+  });
+});
+
+describe('error reporter wiring and Sentry options (FR-046, NFR-008)', () => {
+  it('createDeps without `errors` uses the no-op reporter', () => {
+    const deps = createDeps({ env: { APP_URL: TEST_APP_URL, NODE_ENV: 'test' }, db: ctx.db, blobs: createMemoryBlobStore() });
+    expect(deps.errors).toBe(noopErrorReporter);
+    expect(() => deps.errors.capture(new Error('x'), { rid: 'r' })).not.toThrow();
+  });
+
+  it('sentryOptions: release = APP_VERSION, environment from NODE_ENV or SENTRY_ENVIRONMENT, no PII, no trace propagation', () => {
+    const prod = sentryOptions(loadConfig({ NODE_ENV: 'production', APP_VERSION: '1.2.3', SENTRY_DSN: 'https://k@o.ingest.sentry.io/1' }));
+    expect(prod).toMatchObject({ dsn: 'https://k@o.ingest.sentry.io/1', release: '1.2.3', environment: 'production', sendDefaultPii: false, tracePropagationTargets: [] });
+    expect(prod).not.toHaveProperty('tracesSampleRate');
+    expect(sentryOptions(loadConfig({ NODE_ENV: 'production' }), 'staging').environment).toBe('staging');
+    expect(sentryOptions(loadConfig({ NODE_ENV: 'test' })).environment).toBe('development');
+    expect(sentryOptions(loadConfig({})).dsn).toBeUndefined();
+  });
+
+  it('sentryOptions drops the RequestData integration', () => {
+    const integ = sentryOptions(loadConfig({})).integrations;
+    expect(integ([{ name: 'Dedupe' }, { name: 'RequestData' }, { name: 'Fetch' }]).map((i) => i.name)).toEqual(['Dedupe', 'Fetch']);
+  });
+
+  it('beforeSend strips headers, cookies, body and query string; breadcrumb URLs lose their query', () => {
+    const { beforeSend, beforeBreadcrumb } = sentryOptions(loadConfig({}));
+    const event = {
+      message: 'boom',
+      request: {
+        url: 'https://app.example.in/api/tenders?q=secret-search&token=tp_abcdefghijklmnopqrstuvwxyz',
+        method: 'GET',
+        headers: { authorization: 'Bearer tp_abcdefghijklmnopqrstuvwxyz', 'x-admin-token': 'adm' },
+        cookies: { tp_session: 'sess' },
+        query_string: 'q=secret-search&token=tp_abcdefghijklmnopqrstuvwxyz',
+        data: { password: 'p' },
+      },
+      breadcrumbs: [{ category: 'fetch', data: { url: 'https://graph.facebook.com/v20/x?access_token=meta' } }],
+      tags: { rid: 'r1' },
+    };
+    const out = beforeSend(event);
+    expect(out.request).toEqual({ url: 'https://app.example.in/api/tenders', method: 'GET' });
+    expect(out.breadcrumbs[0]!.data.url).toBe('https://graph.facebook.com/v20/x');
+    expect(out.tags).toEqual({ rid: 'r1' });
+    const json = JSON.stringify(out);
+    for (const s of ['tp_abc', 'secret-search', 'Bearer', 'adm', 'sess', 'access_token']) expect(json).not.toContain(s);
+    expect(beforeBreadcrumb({ data: { url: 'https://x.in/a?k=v' } }).data!.url).toBe('https://x.in/a');
+    expect(scrubEvent({})).toEqual({});
   });
 });

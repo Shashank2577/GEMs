@@ -6,6 +6,7 @@ import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const id = () => uuid('id').primaryKey().defaultRandom();
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
@@ -520,6 +521,8 @@ export const notifications = pgTable('notifications', {
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
+  // 008/FR-044: /api/health counts the pending backlog on every monitor poll.
+  pendingIdx: index('notifications_pending_idx').on(t.createdAt).where(sql`status = 'pending'`),
 }));
 
 export const activityLog = pgTable('activity_log', {

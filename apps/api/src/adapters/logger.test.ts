@@ -55,4 +55,26 @@ describe('JSON-line logger (008/FR-045)', () => {
     expect(redact('token')).toBe('token');
     expect(redact(null)).toBeNull();
   });
+
+  it('redacts api key / DSN / database URL keys and scrubs credential-shaped values', () => {
+    const c = capture();
+    c.log.error('connect failed postgres://tp:hunter2@db:5432/x', {
+      RESEND_API_KEY: 're_1', sentryDsn: 'https://k@sentry', DATABASE_URL: 'postgres://a:b@h/d', databaseUrl: 'x',
+      error: 'connect ECONNREFUSED postgres://tp:secretpw@db:5432/tp',
+      header: 'Bearer abc.def', note: 'token tp_AbCdEfGhIjKlMnOpQrSt-_9 leaked', cookieName: 'tp_session', dedupeKey: 'digest:1',
+    });
+    const out = c.lines[0]!;
+    for (const s of ['re_1', 'https://k@sentry', 'a:b@h', 'hunter2', 'secretpw', 'abc.def', 'tp_AbCd']) expect(out).not.toContain(s);
+    const o = c.parsed()[0] as any;
+    expect(o).toMatchObject({ RESEND_API_KEY: '[redacted]', sentryDsn: '[redacted]', DATABASE_URL: '[redacted]', databaseUrl: '[redacted]', dedupeKey: 'digest:1' });
+    expect(o.msg).toBe('connect failed postgres://[redacted]@db:5432/x');
+    expect(o.error).toBe('connect ECONNREFUSED postgres://[redacted]@db:5432/tp');
+    expect(o.header).toBe('Bearer [redacted]');
+    expect(o.note).toBe('token tp_[redacted] leaked');
+  });
+
+  it('copies an object shared by two fields instead of truncating it (only real cycles are cut)', () => {
+    const shared = { id: 'x' };
+    expect(redact({ a: shared, b: shared, list: [shared, shared] })).toEqual({ a: { id: 'x' }, b: { id: 'x' }, list: [{ id: 'x' }, { id: 'x' }] });
+  });
 });

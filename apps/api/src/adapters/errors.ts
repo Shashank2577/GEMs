@@ -32,8 +32,51 @@ export function createSentryReporter(sdk: SentryLike): ErrorReporter {
   };
 }
 
-/** Sentry init options shared by both runtimes: release = APP_VERSION, environment = production|staging|development. */
+/** The parts of a Sentry event that can carry request data (structural, so both SDKs' event types fit). */
+export interface ScrubbableEvent {
+  request?: { url?: string; headers?: unknown; cookies?: unknown; query_string?: unknown; data?: unknown; env?: unknown };
+  breadcrumbs?: { data?: Record<string, unknown> }[];
+}
+
+const stripQuery = (url: string) => url.replace(/[?#].*$/, '');
+
+/**
+ * NFR-008 / ADR-0011: nothing from the request may reach Sentry except the path. Drops headers (Authorization: Bearer
+ * tp_… extension tokens, ADMIN_TOKEN), cookies, body, env and the query string (`?q=` search text, `?token=`), and
+ * strips queries from breadcrumb URLs (outbound fetches to GeM / Resend / Meta).
+ */
+export function scrubEvent<E extends ScrubbableEvent>(event: E): E {
+  const req = event.request;
+  if (req) {
+    delete req.headers; delete req.cookies; delete req.query_string; delete req.data; delete req.env;
+    if (typeof req.url === 'string') req.url = stripQuery(req.url);
+  }
+  for (const b of event.breadcrumbs ?? []) {
+    if (b.data && typeof b.data.url === 'string') b.data.url = stripQuery(b.data.url);
+  }
+  return event;
+}
+
+/**
+ * Sentry init options shared by both runtimes: release = APP_VERSION, environment = SENTRY_ENVIRONMENT or
+ * production|development from NODE_ENV (the Worker forces NODE_ENV=production, so staging must set SENTRY_ENVIRONMENT).
+ * No tracing and no trace propagation: `sentry-trace`/`baggage` headers are never added to calls to third parties.
+ */
 export function sentryOptions(config: Pick<AppConfig, 'sentryDsn' | 'version' | 'environment'>, environmentOverride?: string) {
   const environment = environmentOverride || (config.environment === 'production' ? 'production' : 'development');
-  return { dsn: config.sentryDsn ?? undefined, release: config.version, environment, sendDefaultPii: false, tracesSampleRate: 0 };
+  return {
+    dsn: config.sentryDsn ?? undefined,
+    release: config.version,
+    environment,
+    sendDefaultPii: false,
+    tracePropagationTargets: [] as string[],
+    // The RequestData integration copies headers/URL/query onto every event; drop it (scrubEvent is the backstop).
+    integrations: <I extends { name: string }>(defaults: I[]): I[] => defaults.filter((i) => i.name !== 'RequestData'),
+    beforeSend: scrubEvent,
+    beforeSendTransaction: scrubEvent,
+    beforeBreadcrumb: <B extends { data?: Record<string, unknown> }>(b: B): B => {
+      if (b.data && typeof b.data.url === 'string') b.data.url = stripQuery(b.data.url);
+      return b;
+    },
+  };
 }

@@ -13,8 +13,8 @@
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@hono/zod-validator": "^0.4.2",
-    "@sentry/cloudflare": "^9.47.2",
-    "@sentry/node": "^9.47.2",
+    "@sentry/cloudflare": "9.47.2",
+    "@sentry/node": "9.47.2",
     "@tp/core": "workspace:*",
     "@tp/db": "workspace:*",
     "drizzle-orm": "^0.36.4",

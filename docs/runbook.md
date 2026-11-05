@@ -83,25 +83,34 @@ Source of truth: `GET https://<APP_DOMAIN>/api/health` (008/FR-044). No auth; no
 
 | Field | Meaning |
 |---|---|
-| `ingestion.state` | `ok` (last success within `HEALTH_INGESTION_MAX_AGE_MIN`, default 120), `stale` (older), `never` (no success yet; HTTP 200 so a fresh stack is not paged). While `db` is false the ingestion and alert fields are placeholders. |
+| `ingestion.state` | `ok` (last success within `HEALTH_INGESTION_MAX_AGE_MIN`, default 120), `stale` (older, or no success ever although the first run started more than the threshold ago), `never` (no success yet and no run older than the threshold; HTTP 200 so a fresh stack is not paged). While `db` is false the ingestion and alert fields are placeholders. |
 | `ingestion.lastStatus` | status of the most recent run (`success`, `partial`, `failed`, `running`). A `failed` latest run does not page by itself; staleness does. |
-| `alerts.pendingOlderThan30m` | notifications still `pending` 30 minutes after creation (the dispatcher runs every cron tick). |
+| `alerts.pendingOlderThan30m` | email/WhatsApp notifications still `pending` 30 minutes after creation (the dispatcher runs every cron tick; in-app rows are excluded). Daily-digest `tender_match` rows are held until 08:00 IST on purpose and count only once that slot is more than 30 minutes past. |
 | `reasons[]` | `db_unreachable`, `ingestion_stale`, `alerts_backlog`. HTTP 503 whenever non-empty. Each query has a 3 s timeout, so a hung database answers 503 rather than hanging the monitor. |
 
 External uptime monitor (FR-047; the vendor and account are set up by the operator, see T099 in the spec tasks):
 
 - Production: poll `https://<APP_DOMAIN>/api/health` every 5 minutes, alert the on-call email/phone after 2 consecutive
-  non-200 results (worst-case detection about 10 minutes plus the stale threshold for ingestion problems).
+  non-200 results. Detection: about 10 minutes for `db_unreachable` and `alerts_backlog`; for an ingestion stall the
+  health check only turns red once the last success is older than `HEALTH_INGESTION_MAX_AGE_MIN` (default 120), so
+  it is **not** the 15-minute path of SC-009 on its own. Cron failures inside that window are caught by Sentry: every
+  failed cron step is reported immediately with tag `job` (`ingestion`, `alerts`, `reminders`, ...). Configure a Sentry
+  alert rule "any event with tag `job`" that notifies on-call; together with the monitor that meets SC-009.
 - Staging: a separate monitor on the staging URL that alerts only the team channel.
 - Keyword check (optional): response contains `"ok":true`.
 
 Logs and errors:
 
 - Logs are JSON lines (`ts`, `level`, `msg`, fields). `LOG_LEVEL` = `debug|info|warn|error` (default `info`). Keys named
-  like `password|token|secret|cookie|authorization` are redacted. Health polls log at `debug` only.
+  like `password|token|secret|cookie|authorization|api_key|dsn|database_url` are redacted, and string values have URL
+  passwords (`://user:pass@`), `Bearer …` and `tp_…` tokens scrubbed. Health polls log at `debug` only.
 - Every API response carries `x-request-id`; the same value is the `rid` field on the request log line and on Sentry events.
 - Sentry is active only when `SENTRY_DSN` is set (`SENTRY_ENVIRONMENT` = `production|staging|development`; release is
-  `APP_VERSION`). Unhandled API errors and failed cron steps (tag `job`) are reported; expected `HttpError`s are not.
+  `APP_VERSION`). The Worker always runs with `NODE_ENV=production`, so the **staging deploy must set
+  `SENTRY_ENVIRONMENT=staging`** or its events are tagged `production`. Unhandled API errors, Worker bootstrap failures
+  and failed cron steps (tag `job`) are reported; expected `HttpError`s are not. Events carry only `rid`, `orgId`,
+  `userId`, the route pattern and the path: request headers, cookies, body and query string are stripped before
+  sending, and no trace headers are added to outbound calls.
 
 ## First 10 minutes
 
@@ -125,7 +134,7 @@ Start with `curl -s https://<APP_DOMAIN>/api/health`, note the time, and look at
    not firing: check the Cloudflare dashboard, Worker, Triggers, Cron (`*/30 * * * *`) and Workers Logs for
    `msg:"scheduled run finished"`.
 3. `failed` rows: read `error`. HTML instead of JSON, 403 or 429 means GeM is blocking us, see "GeM 403/429".
-4. After the cause is fixed, run **Sync now** from Settings (cooldown `MANUAL_SYNC_COOLDOWN_MIN`, default 10) or wait for
+4. After the cause is fixed, run **Sync now** from Settings (2-minute cooldown after the last manual run) or wait for
    the next tick; `/api/health` returns 200 once a `success` or `partial` run finishes.
 
 ### `alerts_backlog`
@@ -163,4 +172,20 @@ Start with `curl -s https://<APP_DOMAIN>/api/health`, note the time, and look at
 2. Not resolved at minute 10, or customer data may be affected: page the owner of the area (database: platform lead;
    GeM: ingestion lead) and open an incident issue with the timeline.
 3. Anything that looks like data exposure (a log line with a secret, cross-org data): stop, rotate the secret, and
-   follow the Secrets section (FR-048, documented by its own task).
+   follow the secret-rotation procedure (FR-048). That section is not written yet (task T039); until then rotate with
+   `wrangler secret put <NAME>`, redeploy, and revoke the old credential at the provider.
+
+## Monitor configuration and fire-drill record
+
+Filled in by the operator (T099). Story #361 stays open until this table and the QA evidence (T100) are complete.
+
+| Item | Production | Staging |
+|---|---|---|
+| Vendor / account | _TBD_ | _TBD_ |
+| URL monitored | `https://<APP_DOMAIN>/api/health` | `https://<STAGING_DOMAIN>/api/health` |
+| Interval / failures before alert | 5 min / 2 | 5 min / 2 |
+| Alert routing | _TBD (on-call email + phone)_ | _TBD (team channel only)_ |
+| Sentry `job` alert rule | _TBD_ | _TBD_ |
+| Fire drill date | n/a | _TBD_ |
+| Drill method | n/a | _TBD (stop cron, or point `GEM_BASE_URL` at a dead host)_ |
+| Measured detection time (failure to notification) | n/a | _TBD (SC-009: at most 15 min)_ |
