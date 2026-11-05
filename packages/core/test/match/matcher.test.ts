@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseBidPlusDoc, parseBidPlusResponse } from '../../src/gem/parse';
-import { hasPositiveCriteria, keywordRegex, matchTender, matchWatchlists, type MatchableTender } from '../../src/match/matcher';
+import { compileCriteria, hasPositiveCriteria, keywordRegex, matchTender, matchWatchlists, type MatchableTender } from '../../src/match/matcher';
 
 const NOW = new Date('2026-11-04T04:30:00.000Z');
 const inDays = (d: number) => new Date(NOW.getTime() + d * 86_400_000);
@@ -131,5 +131,57 @@ describe('matchWatchlists over fixtures', () => {
     expect(hits('cctv-mh')).toEqual(['GEM/2026/B/6421002', 'GEM/2026/B/6421022']);
     expect(hits('services').length).toBeGreaterThanOrEqual(5);
     expect(hits('defence').sort()).toEqual(['GEM/2026/B/6421004', 'GEM/2026/B/6421016', 'GEM/2026/R/6421034']);
+  });
+});
+
+describe('compileCriteria (008/FR-074, US7 scenario 4)', () => {
+  const STATES = ['Maharashtra', 'Karnataka', 'Delhi', 'Tamil Nadu', 'Gujarat'];
+  const WORDS = ['laptop', 'cctv camera', 'ups', 'office chair', 'printer', 'led light', 'water purifier', 'diesel generator', 'a4 paper', 'network switch'];
+  const tenders: MatchableTender[] = Array.from({ length: 500 }, (_, i) => ({
+    title: `Supply of ${WORDS[i % WORDS.length]} lot ${i}`,
+    items: [{ name: `${WORDS[(i * 3) % WORDS.length]} accessories` }],
+    category: WORDS[(i * 7) % WORDS.length], ministry: i % 2 ? 'Ministry of Defence' : 'Ministry of Railways',
+    department: `Department ${i % 13}`, organisation: `Org ${i % 31}`, state: STATES[i % STATES.length],
+    hsnCodes: [String(84710000 + (i % 50))], estimatedValue: i % 9 ? 100_000 * (i % 200) : null,
+    endAt: new Date(NOW.getTime() + (1 + (i % 30)) * 86_400_000), bidType: i % 4 ? 'bid' : 'ra', status: 'open',
+  }));
+  const watchlists = Array.from({ length: 1000 }, (_, i) => ({
+    id: `w${i}`,
+    criteria: {
+      keywords: [WORDS[i % WORDS.length]!, WORDS[(i + 3) % WORDS.length]!],
+      excludeKeywords: i % 5 === 0 ? ['refurbished'] : [],
+      states: i % 3 === 0 ? [STATES[i % STATES.length]!] : [],
+      ministries: i % 7 === 0 ? ['Defence'] : [],
+      hsnCodes: i % 11 === 0 ? ['8471'] : [],
+      minValue: i % 4 === 0 ? 1_000_000 : null,
+      minDaysToClose: i % 6 === 0 ? 5 : null,
+    },
+  }));
+
+  it('gives exactly the same results as matching the raw criteria', () => {
+    for (const w of watchlists.slice(0, 100)) {
+      const c = compileCriteria(w.criteria);
+      for (const t of tenders.slice(0, 100)) expect(matchTender(t, c, { now: NOW })).toEqual(matchTender(t, w.criteria, { now: NOW }));
+    }
+  });
+
+  it('a compiled watchlist is reused as is: its regexes are built once and are stateless (no g flag)', () => {
+    const c = compileCriteria({ keywords: ['laptop', 'cctv camera'], excludeKeywords: ['refurbished'] });
+    const before = [...c.keywords.map((k) => k.re), ...c.exclude];
+    for (const t of tenders) matchTender(t, c, { now: NOW });
+    expect([...c.keywords.map((k) => k.re), ...c.exclude]).toEqual(before);
+    expect(before.every((re) => !re.global)).toBe(true);
+    expect(compileCriteria({ keywords: ['  '], states: [] }).positive).toBe(false);
+  });
+
+  it('benchmark: 1,000 watchlists × 500 tenders, compiled once per run, finish in < 5 s', () => {
+    const t0 = performance.now();
+    const compiled = watchlists.map((w) => ({ w, c: compileCriteria(w.criteria) }));
+    let hits = 0;
+    for (const t of tenders) for (const { c } of compiled) if (matchTender(t, c, { now: NOW }).matched) hits++;
+    const ms = performance.now() - t0;
+    console.log(JSON.stringify({ benchmark: 'match 1000 watchlists x 500 tenders', pairs: 500_000, hits, ms: Math.round(ms) }));
+    expect(hits).toBeGreaterThan(1000);
+    expect(ms).toBeLessThan(5000);
   });
 });

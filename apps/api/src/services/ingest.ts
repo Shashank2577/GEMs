@@ -24,7 +24,7 @@ import {
 import { INGESTION_RUN_BUDGET_MS } from '@tp/core/contracts/caps';
 import { GemClient } from '@tp/core/gem/client';
 import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
-import { matchTender } from '@tp/core/match/matcher';
+import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { REAL_ONLY } from '../lib/tender-scope';
 
@@ -400,6 +400,24 @@ export function tenderAlertBody(t: Pick<TenderRow, 'ministry' | 'department' | '
   return `${parts.join(' · ')}${watchlistNames.length ? ` — matched “${watchlistNames.join('”, “')}”` : ''}`;
 }
 
+/** 008/FR-074: most rows one `INSERT … ON CONFLICT DO NOTHING` into tender_matches may carry. */
+export const MATCH_INSERT_BATCH = 500;
+
+/**
+ * Insert match rows in statements of at most `MATCH_INSERT_BATCH` rows (Postgres' 65,535 bind-parameter limit and
+ * bounded statement size); returns the pairs that were new.
+ */
+export async function insertMatchesBatched(
+  db: AppDeps['db'], rows: (typeof tenderMatches.$inferInsert)[],
+): Promise<{ tenderId: string; watchlistId: string }[]> {
+  const out: { tenderId: string; watchlistId: string }[] = [];
+  for (let i = 0; i < rows.length; i += MATCH_INSERT_BATCH) {
+    out.push(...await db.insert(tenderMatches).values(rows.slice(i, i + MATCH_INSERT_BATCH)).onConflictDoNothing()
+      .returning({ tenderId: tenderMatches.tenderId, watchlistId: tenderMatches.watchlistId }));
+  }
+  return out;
+}
+
 /**
  * Match the given tenders against all active watchlists (every org), store new matches and queue
  * notifications for each new (org, tender) pair. Safe to call repeatedly (unique indexes).
@@ -424,22 +442,20 @@ export async function matchAndNotify(
     rows.push(...(await db.select().from(tenders).where(and(REAL_ONLY, inArray(tenders.id, tenderIds.slice(i, i + 500))))));
   }
 
+  // 008/FR-074: each watchlist's regexes are compiled once per run, not once per (tender, watchlist) pair.
+  const compiled = lists.map((w) => ({ w, c: compileCriteria(w.criteria as WatchlistCriteria) }));
   const hits: { t: TenderRow; w: (typeof lists)[number]; reasons: string[]; relevance: number }[] = [];
   for (const t of rows) {
-    for (const w of lists) {
-      const r = matchTender(t, w.criteria as WatchlistCriteria, { now });
+    for (const { w, c } of compiled) {
+      const r = matchTender(t, c, { now });
       if (r.matched) hits.push({ t, w, reasons: r.reasons, relevance: r.relevance });
     }
   }
-  // Insert in batches; only pairs that were actually new (not already stored) count and notify.
+  // Insert in batches of ≤ MATCH_INSERT_BATCH rows per statement; only pairs that were actually new (not already
+  // stored) count and notify.
   const inserted = new Set<string>();
-  for (let i = 0; i < hits.length; i += 500) {
-    const ins = await db.insert(tenderMatches)
-      .values(hits.slice(i, i + 500).map((h) => ({ orgId: h.w.orgId, tenderId: h.t.id, watchlistId: h.w.id, reasons: h.reasons, relevance: h.relevance, createdAt: now })))
-      .onConflictDoNothing()
-      .returning({ tenderId: tenderMatches.tenderId, watchlistId: tenderMatches.watchlistId });
-    for (const x of ins) inserted.add(`${x.watchlistId}:${x.tenderId}`);
-  }
+  const rowsToInsert = hits.map((h) => ({ orgId: h.w.orgId, tenderId: h.t.id, watchlistId: h.w.id, reasons: h.reasons, relevance: h.relevance, createdAt: now }));
+  for (const x of await insertMatchesBatched(db, rowsToInsert)) inserted.add(`${x.watchlistId}:${x.tenderId}`);
 
   // (orgId, tenderId) → watchlist names that newly matched
   const fresh = new Map<string, { orgId: string; tender: TenderRow; names: string[]; reasons: string[] }>();

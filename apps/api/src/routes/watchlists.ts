@@ -11,7 +11,7 @@ import {
 } from '@tp/core/contracts/identify';
 import { uuidSchema } from '@tp/core/contracts/common';
 import { canonicalState } from '@tp/core/gem/states';
-import { matchTender } from '@tp/core/match/matcher';
+import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, notFound, validationError } from '../lib/errors';
@@ -108,6 +108,7 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
     return p;
   };
   const out: Candidate[] = [];
+  const compiled = compileCriteria(criteria); // 008/FR-074: regexes built once, not once per candidate row
   let next = page(null);
   for (;;) {
     const rows = await next;
@@ -115,7 +116,7 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
     const more = rows.length === CANDIDATE_PAGE;
     if (more) next = page(rows[rows.length - 1].id);
     for (const row of rows) {
-      const r = matchTender(row, criteria, { now });
+      const r = matchTender(row, compiled, { now });
       if (r.matched) out.push({ id: row.id, relevance: r.relevance, reasons: r.reasons, endAt: row.endAt, createdAt: row.createdAt });
     }
     if (!more) break;
@@ -137,10 +138,11 @@ async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect, 
   const existing = await deps.db.select({ id: tenderMatches.id, tenderId: tenderMatches.tenderId }).from(tenderMatches)
     .where(eq(tenderMatches.watchlistId, w.id));
   const stale: string[] = [];
+  const compiled = compileCriteria(w.criteria);
   for (let i = 0; i < existing.length; i += BATCH) {
     const chunk = existing.slice(i, i + BATCH);
     const rows = await deps.db.select(MATCH_COLUMNS).from(tenders).where(and(scope, inArray(tenders.id, chunk.map((e) => e.tenderId))));
-    const keep = new Set(rows.filter((t) => t.status !== 'open' || matchTender(t, w.criteria, { now: new Date(0) }).matched).map((t) => t.id));
+    const keep = new Set(rows.filter((t) => t.status !== 'open' || matchTender(t, compiled, { now: new Date(0) }).matched).map((t) => t.id));
     for (const e of chunk) if (!keep.has(e.tenderId)) stale.push(e.id);
   }
   for (let i = 0; i < stale.length; i += BATCH) await deps.db.delete(tenderMatches).where(inArray(tenderMatches.id, stale.slice(i, i + BATCH)));
