@@ -17,6 +17,7 @@ import type {
   DashboardActivity, DashboardExpiringDoc, DashboardMatch, DashboardResponse, DashboardStage, DashboardTenderRef, DashboardVerdict, SetupStep,
 } from '@tp/core/contracts/experience';
 import { docStatus, istDate } from '@tp/core/vault/status';
+import { enrichActivity } from '../lib/activity-target';
 import { visibleTenderSource } from '../lib/tender-scope';
 import { orgId, requireAuth } from '../middleware/auth';
 import type { AppEnv } from '../types';
@@ -54,36 +55,6 @@ async function tenderRefs(db: Db, org: string, ids: string[]): Promise<Map<strin
 }
 
 const buyerOf = (t: { organisation: string | null; department: string | null; ministry: string | null }) => t.organisation ?? t.department ?? t.ministry;
-
-/** Resolve a readable label + link for activity entries (batched per entity type). */
-async function enrichActivity(db: Db, org: string, items: Omit<DashboardActivity, 'target'>[]): Promise<DashboardActivity[]> {
-  const ids = (type: string) => [...new Set(items.filter((i) => i.entityType === type && i.entityId).map((i) => i.entityId!))].filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-  const wsIds = ids('workspace'), tIds = ids('tender'), vIds = ids('vault_document'), wlIds = ids('watchlist');
-  const [wsRows, tRows, vRows, wlRows] = await Promise.all([
-    wsIds.length ? db.select({ id: bidWorkspaces.id, title: tenders.title }).from(bidWorkspaces).innerJoin(tenders, eq(tenders.id, bidWorkspaces.tenderId))
-      .where(and(eq(bidWorkspaces.orgId, org), inArray(bidWorkspaces.id, wsIds))) : [],
-    tIds.length ? db.select({ id: tenders.id, title: tenders.title }).from(tenders).where(inArray(tenders.id, tIds)) : [],
-    vIds.length ? db.select({ id: vaultDocuments.id, title: vaultDocuments.title }).from(vaultDocuments).where(and(eq(vaultDocuments.orgId, org), inArray(vaultDocuments.id, vIds))) : [],
-    wlIds.length ? db.select({ id: watchlists.id, title: watchlists.name }).from(watchlists).where(and(eq(watchlists.orgId, org), inArray(watchlists.id, wlIds))) : [],
-  ]);
-  const ws = new Map(wsRows.map((r) => [r.id, r.title]));
-  const ts = new Map(tRows.map((r) => [r.id, r.title]));
-  const vs = new Map(vRows.map((r) => [r.id, r.title]));
-  const wl = new Map(wlRows.map((r) => [r.id, r.title]));
-  return items.map((i) => {
-    const id = i.entityId ?? '';
-    const metaTitle = typeof i.meta.title === 'string' ? i.meta.title : typeof i.meta.name === 'string' ? i.meta.name : null;
-    let target: DashboardActivity['target'] = null;
-    if (i.entityType === 'workspace' && ws.has(id)) target = { label: ws.get(id)!, href: `/workspaces/${id}` };
-    else if (i.entityType === 'tender' && ts.has(id)) target = { label: ts.get(id)!, href: `/tenders/${id}` };
-    else if (i.entityType === 'vault_document') target = { label: vs.get(id) ?? metaTitle ?? 'a document', href: '/vault' };
-    else if (i.entityType === 'watchlist') target = { label: wl.get(id) ?? metaTitle ?? 'a watchlist', href: '/watchlists' };
-    else if (i.entityType === 'company_profile' || i.action.startsWith('profile.')) target = { label: 'company profile', href: '/profile' };
-    else if (i.action.startsWith('member.')) target = { label: typeof i.meta.email === 'string' ? i.meta.email : 'team', href: '/settings/team' };
-    else if (metaTitle) target = { label: metaTitle, href: '/dashboard' };
-    return { ...i, target };
-  });
-}
 
 dashboardRoutes.get('/dashboard', requireAuth, async (c) => {
   const { db, clock } = c.var.deps;

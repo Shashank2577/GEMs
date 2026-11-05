@@ -324,11 +324,14 @@ authRoutes.post('/me/password', requireSession, async (c) => {
     throw new HttpError(400, 'invalid_credentials', 'Current password is incorrect', { fields: { currentPassword: 'Incorrect password' } });
   }
   await limiter.succeed();
-  await db.update(users).set({ passwordHash: await hashPassword(body.newPassword) }).where(eq(users.id, userId(c)));
-  // Sign out other sessions.
-  const others = await db.delete(sessions).where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!))).returning({ id: sessions.id });
-  // Activity (002/FR-042): never any password material; only how many other sessions were signed out.
-  await logActivity(db, { orgId: orgId(c), userId: userId(c), action: 'auth.password_changed', entityType: 'user', entityId: userId(c), meta: { otherSessionsRevoked: others.length } });
+  const passwordHash = await hashPassword(body.newPassword);
+  // One transaction: the new password, the other sessions' sign-out and its audit entry land together or not at all.
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ passwordHash }).where(eq(users.id, userId(c)));
+    const others = await tx.delete(sessions).where(and(eq(sessions.userId, userId(c)), ne(sessions.id, c.var.sessionId!))).returning({ id: sessions.id });
+    // Activity (002/FR-042): never any password material; only how many other sessions were signed out.
+    await logActivity(tx, { orgId: orgId(c), userId: userId(c), action: 'auth.password_changed', entityType: 'user', entityId: userId(c), meta: { otherSessionsRevoked: others.length } });
+  });
   return c.json({ ok: true as const });
 });
 

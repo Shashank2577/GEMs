@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, History } from 'lucide-react';
-import { Avatar, Button, EmptyState, ErrorState, Select, SkeletonList, Tooltip } from '@/components/ui';
+import { Avatar, Button, EmptyState, ErrorState, Label, Select, SkeletonList, Tooltip } from '@/components/ui';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { useNow } from '@/lib/hooks';
 import { describeActivity, SELF_CONTAINED } from '@/features/dashboard/activity';
@@ -15,9 +15,13 @@ export default function ActivitySection() {
   const [member, setMember] = useState(ALL);
   const [type, setType] = useState(ALL);
   const members = useMembers();
+  const lastPage = useRef(1);
   const q = useActivity(activityParams({ page, member, type }));
   const filtered = member !== ALL || type !== ALL;
   const total = q.data?.total ?? 0;
+  // While the next page loads (keepPreviousData) the list still belongs to the previous page.
+  const shownPage = q.isPlaceholderData ? lastPage.current : page;
+  if (!q.isPlaceholderData) lastPage.current = page;
   const pages = pageCount(total);
 
   const change = (set: (v: string) => void) => (v: string) => { set(v); setPage(1); };
@@ -27,15 +31,25 @@ export default function ActivitySection() {
     <Panel title="Activity log" description="Who changed what in your organization, newest first. Times are shown in IST."
       aside={
         <div className="grid grid-cols-2 gap-2 sm:flex">
-          <Select aria-label="Filter by member" className="sm:w-44" value={member} onValueChange={change(setMember)} options={memberOptions} />
-          <Select aria-label="Filter by type" className="sm:w-48" value={type} onValueChange={change(setType)} options={ACTIVITY_TYPES} />
+          <div className="grid gap-1">
+            <Label htmlFor="activity-member">Member</Label>
+            <Select id="activity-member" className="sm:w-44" value={member} onValueChange={change(setMember)} options={memberOptions} />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="activity-type">Type</Label>
+            <Select id="activity-type" className="sm:w-48" value={type} onValueChange={change(setType)} options={ACTIVITY_TYPES} />
+          </div>
         </div>
       }
-      footer={q.data && total > 0 ? (
+      footer={q.data ? (
         <>
-          <span className="mr-auto text-[13px] text-muted-foreground" aria-live="polite">{rangeLabel(page, q.data.items.length, total)}</span>
-          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}><ChevronLeft /> Previous</Button>
-          <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next <ChevronRight /></Button>
+          <span className="mr-auto text-[13px] text-muted-foreground" aria-live="polite">{rangeLabel(shownPage, q.data.items.length, total)}</span>
+          {total > 0 && (
+            <>
+              <Button variant="secondary" size="sm" disabled={page <= 1 || q.isPlaceholderData} onClick={() => setPage(page - 1)}><ChevronLeft /> Previous</Button>
+              <Button variant="secondary" size="sm" disabled={page >= pages || q.isPlaceholderData} onClick={() => setPage(page + 1)}>Next <ChevronRight /></Button>
+            </>
+          )}
         </>
       ) : undefined}>
       {q.isError ? <ErrorState compact error={q.error} onRetry={() => q.refetch()} />
@@ -44,7 +58,7 @@ export default function ActivitySection() {
           <EmptyState compact icon={History} title="No activity yet"
             body={filtered ? 'Nothing matches these filters.' : 'Changes made by your team will appear here.'} />
         ) : (
-          <ol className="grid divide-y" aria-label={`Activity, page ${page} of ${pages}, ${ACTIVITY_PAGE_SIZE} per page`}>
+          <ol className={`grid divide-y transition-opacity ${q.isPlaceholderData ? 'opacity-60' : ''}`} aria-busy={q.isPlaceholderData} aria-label={`Activity, page ${shownPage} of ${pages}, ${ACTIVITY_PAGE_SIZE} per page`}>
             {q.data.items.map((a) => {
               const obj = SELF_CONTAINED.has(a.action) ? null : activityObject(a);
               return (
@@ -57,7 +71,7 @@ export default function ActivitySection() {
                       {obj && <>{' '}<span className="font-medium text-foreground">{obj}</span></>}
                     </p>
                     <Tooltip content={formatDateIST(a.createdAt, { time: true })}>
-                      <time className="text-2xs text-muted-foreground" dateTime={a.createdAt}>{relativeTime(a.createdAt, now)}</time>
+                      <time tabIndex={0} title={formatDateIST(a.createdAt, { time: true })} className="rounded-sm text-2xs text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" dateTime={a.createdAt}>{relativeTime(a.createdAt, now)}</time>
                     </Tooltip>
                   </div>
                 </li>

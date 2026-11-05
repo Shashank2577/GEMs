@@ -199,4 +199,33 @@ describe('FR-042 activity entries', () => {
     expect(r.body.items[0]).toMatchObject({ action: 'auth.password_changed', entityType: 'user', user: { id: owner.me.user.id } });
     expect(r.body.items.every((i: any) => i.entityType === 'user')).toBe(true);
   });
+
+  it('revoking the current session logs once with scope "current" and signs you out', async () => {
+    const owner = await signup(ctx.app);
+    const org = owner.me.org.id;
+    const list = await request(ctx.app, 'GET', '/api/me/sessions', { cookie: owner.cookie });
+    const current = list.body.items.find((s: any) => s.current);
+    const r = await delta(org, 'auth.sessions_revoked', async () => {
+      expect((await request(ctx.app, 'DELETE', `/api/me/sessions/${current.id}`, { cookie: owner.cookie })).status).toBe(200);
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0].meta).toMatchObject({ scope: 'current', count: 1 });
+    expect((await request(ctx.app, 'GET', '/api/me/sessions', { cookie: owner.cookie })).status).toBe(401);
+  });
+
+  it('GET /api/activity: userId of another org yields nothing; entityType accepts a comma list and never crosses orgs', async () => {
+    const a = await signup(ctx.app);
+    const b = await signup(ctx.app);
+    await request(ctx.app, 'POST', '/api/me/password', { cookie: b.cookie, json: { currentPassword: TEST_PASSWORD, newPassword: 'brand-new-pass-9' } });
+    const foreign = await request(ctx.app, 'GET', `/api/activity?userId=${b.me.user.id}`, { cookie: a.cookie });
+    expect(foreign.status).toBe(200);
+    expect(foreign.body.total).toBe(0);
+    expect(foreign.body.items).toEqual([]);
+    const cross = await request(ctx.app, 'GET', '/api/activity?entityType=user,organization,tender', { cookie: a.cookie });
+    expect(cross.body.items.length).toBeGreaterThan(0);
+    expect(cross.body.items.every((i: any) => ['user', 'organization', 'tender'].includes(i.entityType))).toBe(true);
+    expect(cross.body.items.some((i: any) => i.action === 'auth.password_changed')).toBe(false);
+    const one = await request(ctx.app, 'GET', '/api/activity?entityType=organization', { cookie: a.cookie });
+    expect(one.body.items.every((i: any) => i.entityType === 'organization')).toBe(true);
+  });
 });

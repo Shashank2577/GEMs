@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { describeActivity, KNOWN_ACTIONS, SELF_CONTAINED } from '@/features/dashboard/activity';
 import { activityObject, activityParams, ACTIVITY_TYPES, pageCount, rangeLabel } from './activity-log';
 
 describe('activity log helpers', () => {
@@ -16,6 +17,24 @@ describe('activity log helpers', () => {
     expect(activityObject({ meta: { name: 'CI', token: 'x' } })).toBe('CI');
     expect(activityObject({ meta: { email: 'a@b.in' } })).toBe('a@b.in');
     expect(activityObject({ meta: {} })).toBeNull();
+  });
+  it('prefers the server target, then meta, then a generic noun', () => {
+    expect(activityObject({ action: 'workspace.created', meta: { workspaceId: 'x' }, target: { label: 'Road repairs' } })).toBe('Road repairs');
+    expect(activityObject({ action: 'vault.uploaded', meta: { fileName: 'gst.pdf' } })).toBe('gst.pdf');
+    expect(activityObject({ action: 'profile.updated', meta: {} })).toBe('company profile');
+  });
+  it('FR-044: every known non-self-contained action reads as "Actor verb object" even with empty meta and no target', () => {
+    for (const action of KNOWN_ACTIONS) {
+      if (SELF_CONTAINED.has(action)) continue;
+      expect(activityObject({ action, meta: {}, target: null }), action).toBeTruthy();
+      expect(describeActivity({ action, meta: {} }).length, action).toBeGreaterThan(0);
+    }
+  });
+  it('type groups cover every entityType the API writes', () => {
+    const covered = new Set(ACTIVITY_TYPES.flatMap((t) => t.value.split(',')));
+    for (const t of ['workspace', 'tender', 'vault_document', 'watchlist', 'profile', 'past_contract', 'annexure_template', 'user', 'invitation', 'api_token', 'organization', 'ingestion_run']) {
+      expect(covered.has(t), t).toBe(true);
+    }
   });
   it('has unique type values', () => { expect(new Set(ACTIVITY_TYPES.map((t) => t.value)).size).toBe(ACTIVITY_TYPES.length); });
 });

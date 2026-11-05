@@ -225,7 +225,8 @@ export interface CreatedInvitation { id: string; email: string; role: RoleName; 
 // ───────────── Activity ─────────────
 
 export const activityQuerySchema = paginationQuerySchema.extend({
-  entityType: z.string().max(60).optional(),
+  /** One entity type, or several comma-separated (e.g. `user,invitation`; at most 12 used). */
+  entityType: z.string().max(400).optional(),
   entityId: z.string().max(100).optional(),
   userId: z.string().uuid().optional(),
 });
@@ -239,4 +240,6 @@ export interface ActivityItem {
   entityId: string | null;
   meta: Record<string, unknown>;
   createdAt: string;
+  /** Human label + in-app link for the entity, resolved server-side when possible (GET /activity, dashboard). */
+  target?: { label: string; href: string } | null;
 }
