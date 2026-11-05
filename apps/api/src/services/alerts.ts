@@ -9,6 +9,8 @@
  *  - rows are claimed atomically (FOR UPDATE SKIP LOCKED + a lease on next_attempt_at), so concurrent runs never send
  *    the same row twice and re-running is idempotent; a daily digest is reserved as a `pending` row under the same
  *    lease and promoted to `sent` only after the provider accepted it;
+ *  - a run starts a send only while more than LEASE_SAFETY_MARGIN_MS of its lease is left; past that it stops and
+ *    hands the rest of its batch back, so a slow run never sends a row another dispatcher may have re-claimed;
  *  - rows for a channel the user switched off (e.g. one-click unsubscribe) are `skipped`.
  * Email via deps.mailer (Resend), WhatsApp via deps.whatsapp (Meta Cloud API, pre-approved template).
  */
@@ -122,6 +124,12 @@ export const RETRY_BACKOFF_MS = [5 * 60_000, 25 * 60_000] as const;
  * A daily-digest reservation (a `pending` digest row) carries the same lease and is deleted once it has expired.
  */
 export const CLAIM_LEASE_MS = 15 * 60_000;
+/**
+ * A run only starts a send while at least this much of its lease is left (checked against `clock.now()` before every
+ * send). A run that is slower than that stops and hands the rest of its batch back (due at once), so a row is never
+ * sent by a run whose lease another dispatcher may already have taken over.
+ */
+export const LEASE_SAFETY_MARGIN_MS = 60_000;
 /** Rows claimed per dispatch (FR-047; ADR-0006 pending partial index `notifications_pending_idx`). */
 export const DISPATCH_BATCH = 500;
 
@@ -233,17 +241,27 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   const switchedOff = (p: Claimed) =>
     p.n.channel === 'email' ? p.emailOn === false : p.n.channel === 'whatsapp' ? p.whatsappOn === false : false;
 
+  // Lease check before every send: once less than the margin is left, stop and leave the rest for the next run.
+  const deferred: string[] = [];
+  let stopped = false;
+  const leaseHeld = () => {
+    if (!stopped && lease.getTime() - clock.now().getTime() <= LEASE_SAFETY_MARGIN_MS) stopped = true;
+    return !stopped;
+  };
+
   // Group: instant → one message per row; daily → one digest per (user, org, channel).
   const digestGroups = new Map<string, Claimed[]>();
   const digestDue = istHour(now) >= DIGEST_HOUR_IST;
   const toHold: string[] = [];
   for (const p of pending) {
+    if (stopped) { deferred.push(p.n.id); continue; }
     if (switchedOff(p)) {
       await record('switched off', [p.n.id], () => settle([p.n.id], 'skipped', p.n.channel === 'email' ? 'Email alerts are turned off' : 'WhatsApp alerts are turned off'));
       continue;
     }
     const daily = p.frequency === 'daily' && p.n.kind === 'tender_match';
     if (!daily) {
+      if (!leaseHeld()) { deferred.push(p.n.id); continue; }
       let r: Awaited<ReturnType<typeof sendOne>>;
       try {
         r = await sendOne(deps, p, tenderById, now);
@@ -267,6 +285,7 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
     const [userId, orgId, channel] = key.split('|') as [string, string, 'email' | 'whatsapp'];
     const dedupeKey = `digest:${orgId}:${istDay(now)}`;
     const ids = group.map((g) => g.n.id);
+    if (!leaseHeld()) { deferred.push(...ids); continue; }
     const first = group[0];
     const count = group.length;
     const title = `${count} new GeM tender${count === 1 ? '' : 's'} matched today`;
@@ -323,6 +342,11 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
       report.digests++;
       await settle(ids, skipped ? 'skipped' : 'sent', reason);
     });
+  }
+  if (deferred.length) {
+    // Due again at once; `owned` makes this a no-op for any row another dispatcher has taken over since.
+    logger.warn('notification dispatch stopped near the end of its lease', { deferred: deferred.length });
+    await record('lease margin release', deferred, () => db.update(notifications).set({ nextAttemptAt: clock.now() }).where(owned(deferred)));
   }
   logger.info('notifications dispatched', { ...report });
   return report;

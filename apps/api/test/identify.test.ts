@@ -617,6 +617,29 @@ describe('one-click email unsubscribe (003/FR-048)', () => {
     expect(await prefsEmail()).toBe(false);
   });
 
+  it('the confirmation POST from a signed-in browser (Origin: null under no-referrer, or APP_URL) is not blocked by the origin check, and ignores the cookie', async () => {
+    const { userId, orgId } = ids();
+    const token = await tokenFor(userId, orgId);
+    // Signed in as a *different* user: the token alone decides whose email is switched off.
+    const signedIn = team.owner;
+    const ownerPrefs = async () => (await get('/me/notification-prefs', signedIn)).body.email;
+    const ownerBefore = await ownerPrefs();
+    for (const origin of ['null', TEST_APP]) {
+      await setPrefsEmail(true);
+      const r = await request(ctx.app, 'POST', `/notifications/unsubscribe?token=${token}`, { cookie: signedIn.cookie, form: {}, headers: { origin } });
+      expect(r.status, origin).toBe(200);
+      expect(r.text).toMatch(/You are unsubscribed/);
+      expect(await prefsEmail()).toBe(false);
+      expect(await ownerPrefs()).toBe(ownerBefore);
+    }
+    // The exemption is that exact path, POST only: other methods there and other routes are still refused.
+    for (const [method, path] of [['PUT', `/notifications/unsubscribe?token=${token}`], ['POST', '/notifications/unsubscribe/x'], ['PATCH', '/org']]) {
+      const r = await request(ctx.app, method, path, { cookie: signedIn.cookie, json: { name: 'X' }, headers: { origin: 'null' } });
+      expect(r.status, `${method} ${path}`).toBe(403);
+      expect(r.body.error.code).toBe('bad_origin');
+    }
+  });
+
   it('RFC 8058 one-click POST turns email off without signing in and skips already-queued emails', async () => {
     const { userId, orgId } = ids();
     await setPrefsEmail(true);

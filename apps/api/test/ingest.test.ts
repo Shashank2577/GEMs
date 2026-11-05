@@ -10,7 +10,7 @@ import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { createResendMailer } from '../src/adapters/mailer';
 import { isTransientSendError, isTransientStatus, PROVIDER_TIMEOUT_MS, ProviderError } from '../src/adapters/provider-error';
 import { createMetaWhatsApp } from '../src/adapters/whatsapp';
-import { CLAIM_LEASE_MS, DISPATCH_BATCH, dispatchNotifications } from '../src/services/alerts';
+import { CLAIM_LEASE_MS, DISPATCH_BATCH, LEASE_SAFETY_MARGIN_MS, dispatchNotifications } from '../src/services/alerts';
 import type { AppDeps } from '../src/deps';
 import { IngestionBusyError, planPages, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
@@ -679,6 +679,25 @@ describe('alert delivery retries (FR-047, SC-006)', () => {
       await dispatchNotifications(ctx.deps);
       expect(mine).toHaveLength(1);
       expect(await rowOf(row.id)).toMatchObject({ status: 'sent', attempts: 1 });
+    });
+  });
+
+  it('a slow run stops sending once less than the safety margin of its lease is left and hands the rest back', async () => {
+    const rows = await Promise.all([1, 2, 3].map((i) => addRow(`Slow-${i}`, { createdAt: new Date(ctx.clock.now().getTime() - 10 * MIN + i) })));
+    // Each send takes 7 minutes of (fake) clock time: sends start at +0, +7, then +14 min — only 1 min of the
+    // 15-min lease left, which is within the margin, so the third row is not sent by this run.
+    expect(LEASE_SAFETY_MARGIN_MS).toBe(MIN);
+    await withMailer('Slow-', async (m) => { ctx.clock.advance(7 * MIN); return { id: m.subject }; }, async (mine) => {
+      const t0 = ctx.clock.now();
+      await dispatchNotifications(ctx.deps);
+      expect(mine.map((m) => m.subject)).toEqual(['Slow-1', 'Slow-2']);
+      expect(await rowOf(rows[0].id)).toMatchObject({ status: 'sent', attempts: 1 });
+      expect(await rowOf(rows[1].id)).toMatchObject({ status: 'sent', attempts: 1 });
+      // Handed back, due at once, not counted as an attempt.
+      expect(await rowOf(rows[2].id)).toMatchObject({ status: 'pending', attempts: 0, nextAttemptAt: new Date(t0.getTime() + 14 * MIN) });
+      await dispatchNotifications(ctx.deps);
+      expect(mine.map((m) => m.subject)).toEqual(['Slow-1', 'Slow-2', 'Slow-3']);
+      expect(await rowOf(rows[2].id)).toMatchObject({ status: 'sent', attempts: 1, nextAttemptAt: null });
     });
   });
 

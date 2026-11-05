@@ -413,6 +413,8 @@ verify the tender page shows "Awarded", the bidder table with L1 highlighted, an
 - **Creating/editing a watchlist** never sends alerts for existing bids (silent back-fill).
 - **User without phone but WhatsApp on** (phone removed later): WhatsApp row `skipped` with a reason.
 - **Daily digest timing** uses the IST calendar day; rows created before 08:00 IST wait for that day's digest.
+  Rows already held for the digest stay held until the next 08:00 IST even if the user switches Daily → Instant meanwhile
+  (only rows queued after the switch go out instantly).
 - **Notification for a deleted tender**: email falls back to a plain card with title/body.
 - **Large feed**: pagination 25 per page (max 100); facets limited to 60 values per dimension.
 - **Org isolation**: tenders are global public data; matches, seen/dismissed, analyses, notifications are always scoped to
