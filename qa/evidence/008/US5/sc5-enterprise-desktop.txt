@@ -1,0 +1,3 @@
+# sc5-enterprise — project desktop — 2026-11-05T09:31:21.730Z
+GET /api/org/usage → plan=enterprise, usage={"seats":104,"watchlists":0,"analysesThisMonth":5001,"llmAnalysesThisMonth":2500,"vaultBytes":109374187337,"packetsThisMonth":2000,"llmTokensThisMonth":{"input":250000,"output":50000}}, limits={"seats":null,"watchlists":null,"analysesPerMonth":null,"llmAnalysesPerMonth":null,"vaultBytes":null,"packetsPerMonth":null,"whatsapp":true}
+statuses: {"analyse":201,"invite":201,"vault":201,"packet":201,"watchlist":201}
