@@ -526,8 +526,9 @@ further 7/1-day reminders arrive for the old expiry.
   `cache-control: private, no-store` and `x-content-type-options: nosniff`.
 - **FR-031**: `PATCH /api/vault/:id` (analyst+) MUST update metadata, re-check issue ≤ expiry against stored values, reset
   `last_reminder_days` when the expiry date changes, bump `updated_at` and log `vault.updated`.
-- **FR-032**: `PUT /api/vault/:id/file` (analyst+) MUST replace the file with the same checks as upload, keep metadata,
-  delete the old blob when the key changed and log `vault.file_replaced`.
+- **FR-032**: `PUT /api/vault/:id/file` (analyst+) MUST replace the file with the same checks as upload, keep metadata
+  (unless renewal fields are sent, FR-064), keep the old file as a version instead of deleting its blob (FR-065; amended
+  by US6) and log `vault.file_replaced`.
 - **FR-033**: `DELETE /api/vault/:id` (analyst+) MUST unlink past contracts' CRAC references, delete the row and the blob,
   and log `vault.deleted`. *(gap)* The web app MUST check the 20 MB limit on every file-selection path (dropzone, page
   drop, **Change**, **Replace file**) before uploading.

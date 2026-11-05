@@ -73,6 +73,29 @@ export const CORRIGENDUM_FIELDS: readonly TrackedField[] = [
   'endAt', 'openingAt', 'quantity', 'items', 'emdAmount', 'estimatedValue', 'epbgPercent', 'documentUrl', 'title',
 ];
 
+/** Prefix of every error raised when GeM's listing response no longer looks like what we parse (FR-014). */
+export const FORMAT_DRIFT_PREFIX = 'GeM response format changed:';
+
+/** True when an error (or message) signals GeM format drift (FR-014). */
+export function isFormatDriftError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.startsWith(FORMAT_DRIFT_PREFIX);
+}
+
+/**
+ * Format-drift guard (FR-014): fail when more than half of a listing page's raw docs lack `b_bid_number`
+ * (non-object entries count as missing). An empty page (GeM "no results") is fine.
+ * Throws `GeM response format changed: <detail>`. `parseBidPlusResponse` runs it on the unfiltered docs.
+ */
+export function assertPageShape(page: { docs: readonly unknown[] }): void {
+  const total = page.docs.length;
+  if (!total) return;
+  const missing = page.docs.filter((d) => !d || typeof d !== 'object' || Array.isArray(d) || !firstText(d as BidPlusDoc, ['b_bid_number'])).length;
+  if (missing * 2 > total) {
+    throw new Error(`${FORMAT_DRIFT_PREFIX} ${missing} of ${total} listing docs lack b_bid_number`);
+  }
+}
+
 /** Validate and unwrap a BidPlus `/all-bids-data` JSON response. Throws on an unexpected shape. */
 export function parseBidPlusResponse(data: unknown): BidPlusPage {
   const d = data as { code?: unknown; status?: unknown; message?: unknown; response?: { response?: { docs?: unknown; numFound?: unknown; start?: unknown } } };
@@ -82,7 +105,10 @@ export function parseBidPlusResponse(data: unknown): BidPlusPage {
   if (code === 404) return { docs: [], numFound: 0, start: 0 };
   if (code !== 200) throw new Error(`GeM returned code ${Number.isFinite(code) ? code : 'unknown'}${d.message ? `: ${String(d.message)}` : ''}`);
   const page = d.response?.response;
-  if (!page || !Array.isArray(page.docs)) throw new Error('GeM returned an incomplete search-result shape');
+  if (!page || !Array.isArray(page.docs)) {
+    throw new Error(`${FORMAT_DRIFT_PREFIX} incomplete search-result shape (response.response.docs missing)`);
+  }
+  assertPageShape({ docs: page.docs }); // before dropping non-object entries, so they count as missing
   const docs = page.docs.filter((x): x is BidPlusDoc => !!x && typeof x === 'object' && !Array.isArray(x));
   const numFound = Number(page.numFound ?? docs.length);
   const start = Number(page.start ?? 0);

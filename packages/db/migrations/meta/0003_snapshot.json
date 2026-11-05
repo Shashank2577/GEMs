@@ -1,6 +1,6 @@
 {
-  "id": "a181fb7e-d3f6-483f-9a8e-47cca46ecf65",
-  "prevId": "7f69e6ec-fe38-4e41-9640-b4f6232c347f",
+  "id": "36a43f03-48c2-4fcb-bea4-209ce73affc8",
+  "prevId": "d5654a64-334b-443e-8800-7790e232a07e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -211,6 +211,25 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "stale_reason": {
+          "name": "stale_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stale_at": {
+          "name": "stale_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "created_by": {
           "name": "created_by",
@@ -646,27 +665,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "bid_workspaces_org_stage_idx": {
-          "name": "bid_workspaces_org_stage_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "stage",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -1023,37 +1021,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.gem_result_hints": {
-      "name": "gem_result_hints",
-      "schema": "",
-      "columns": {
-        "gem_bid_id": {
-          "name": "gem_bid_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "hint": {
-          "name": "hint",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fetched_at": {
-          "name": "fetched_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.ingestion_runs": {
       "name": "ingestion_runs",
       "schema": "",
@@ -1112,6 +1079,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "listing_stop": {
+          "name": "listing_stop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "error": {
           "name": "error",
@@ -2187,6 +2160,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "text_source": {
+          "name": "text_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pdf'"
         },
         "created_at": {
           "name": "created_at",

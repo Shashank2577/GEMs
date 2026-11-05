@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import { injectDeps, noStore } from './middleware/request';
+import { originCheck } from './middleware/security';
 import { analysisRoutes } from './routes/analysis';
 import { assistRoutes } from './routes/assist';
 import { authRoutes } from './routes/auth';
@@ -55,6 +56,7 @@ export function createApp(deps: AppDeps) {
   const api = new Hono<AppEnv>();
   api.use('*', injectDeps(deps));
   api.use('*', noStore);
+  api.use('*', originCheck); // 002/FR-028: before any handler
 
   api.get('/health', async (c) => {
     let db = false;

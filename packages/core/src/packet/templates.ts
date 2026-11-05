@@ -15,6 +15,11 @@ import { PDFDocument } from 'pdf-lib';
 import { ANNEXURE_KEYS } from '../analyse/checklist';
 import { inr } from '../analyse/format';
 import { A4, INK, MARGIN, MUTED, RULE, dateIST, dateTimeIST, embedFonts, sanitize, text, textCenter, textRight, wrap } from './pdf-utils';
+import { placeholdersOf } from './placeholders';
+
+export {
+  TEMPLATE_PLACEHOLDERS, TEMPLATE_PLACEHOLDER_PATHS, placeholdersOf, unknownPlaceholders, unknownPlaceholderMessage, type TemplatePlaceholder,
+} from './placeholders';
 
 export const BLANK = '__________';
 
@@ -324,11 +329,6 @@ function lookup(ctx: TemplateContext, path: string): string {
 /** Replace `{{a.b}}` placeholders; empty or unknown values become "__________". */
 export function renderTemplate(body: string, ctx: TemplateContext): string {
   return body.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_m, path: string) => lookup(ctx, path) || BLANK);
-}
-
-/** Placeholders used in a template body. */
-export function placeholdersOf(body: string): string[] {
-  return [...new Set([...body.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)].map((m) => m[1]))];
 }
 
 /** Placeholders that would render blank with this context (shown as "fill your profile" hints). */

@@ -19,6 +19,8 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   phone: text('phone'), // E.164, for WhatsApp alerts
+  // Org the user last worked in; survives sign-out so the next sign-in resumes there (002/FR-021, US2 scenario 14).
+  lastOrgId: uuid('last_org_id').references(() => organizations.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
 }, (t) => ({ emailUq: uniqueIndex('users_email_uq').on(t.email) }));
 
@@ -94,9 +96,16 @@ export const apiTokens = pgTable('api_tokens', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   tokenHash: text('token_hash').notNull(),
+  /** Last 4 characters of the secret, shown in the list as `tp_…a1B2` (002/FR-037). Null for tokens created before it existed. */
+  tokenHint: text('token_hint'),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  /** Null = never expires (002/FR-037). Expired tokens are rejected by resolveAuth. */
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: createdAt(),
-}, (t) => ({ tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash) }));
+}, (t) => ({
+  tokenUq: uniqueIndex('api_tokens_token_uq').on(t.tokenHash),
+  orgUserIdx: index('api_tokens_org_user_idx').on(t.orgId, t.userId),
+}));
 
 export const notificationPrefs = pgTable('notification_prefs', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -186,9 +195,29 @@ export const vaultDocuments = pgTable('vault_documents', {
   pageCount: integer('page_count'),
   uploadedBy: uuid('uploaded_by').references(() => users.id),
   lastReminderDays: integer('last_reminder_days'),
+  /** Hex SHA-256 of the current file for duplicate detection (FR-067); null = unknown (pre-existing rows). */
+  contentSha256: text('content_sha256'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type) }));
+}, (t) => ({
+  orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type),
+  shaIdx: index('vault_org_sha_idx').on(t.orgId, t.contentSha256),
+}));
+
+/** Previous files of a vault document, kept on renewal/replace (FR-065; at most 5 per document). */
+export const vaultDocumentVersions = pgTable('vault_document_versions', {
+  id: id(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  documentId: uuid('document_id').notNull().references(() => vaultDocuments.id, { onDelete: 'cascade' }),
+  blobKey: text('blob_key').notNull(),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  pageCount: integer('page_count'),
+  expiryDate: date('expiry_date'),
+  replacedBy: uuid('replaced_by').references(() => users.id),
+  replacedAt: timestamp('replaced_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({ orgIdx: index('vault_versions_org_idx').on(t.orgId), docIdx: index('vault_versions_doc_idx').on(t.documentId, t.replacedAt.desc()) }));
 
 // ───────────── Tenders (global, public GeM data) ─────────────
 
@@ -249,6 +278,7 @@ export const tenderDocuments = pgTable('tender_documents', {
   pageCount: integer('page_count'),
   text: text('text'), // extracted text, pages separated by \f
   sourceUrl: text('source_url'),
+  textSource: text('text_source').$type<'pdf' | 'ocr'>().notNull().default('pdf'), // FR-052
   createdAt: createdAt(),
 }, (t) => ({ tenderIdx: index('tender_docs_tender_idx').on(t.tenderId) }));
 
@@ -261,6 +291,11 @@ export const ingestionRuns = pgTable('ingestion_runs', {
   tendersCreated: integer('tenders_created').notNull().default(0),
   tendersUpdated: integer('tenders_updated').notNull().default(0),
   matchesCreated: integer('matches_created').notNull().default(0),
+  /**
+   * Why the listing phase stopped (003/FR-011): `all_known` page reached, `end` of results, page `cap` used up,
+   * `explicit` page count fetched, or `error`. Null for runs that never got that far (or predate the column).
+   */
+  listingStop: text('listing_stop').$type<'all_known' | 'end' | 'cap' | 'explicit' | 'error'>(),
   error: text('error'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
@@ -315,7 +350,7 @@ export interface Requirement {
   value?: string | number | boolean | null;
   numeric?: number | null; // normalised rupees / years / days / percent
   mandatory: boolean;
-  source: { documentId?: string; fileName?: string; page?: number; quote?: string };
+  source: { documentId?: string; fileName?: string; page?: number; quote?: string; ocr?: boolean };
   method: 'RULE' | 'LLM' | 'MANUAL';
   confidence: number; // 0..1
 }
@@ -340,6 +375,9 @@ export interface ChecklistItem {
   generated?: string; // annexure template key if it is generated, not uploaded
 }
 
+export type StaleReason =
+  | 'corrigendum' | 'document_added' | 'document_removed' | 'profile_changed' | 'vault_changed' | 'weights_changed';
+
 export const analyses = pgTable('analyses', {
   id: id(),
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -354,7 +392,10 @@ export const analyses = pgTable('analyses', {
   verdict: text('verdict').$type<'go' | 'review' | 'no_go'>(),
   summary: text('summary'),
   error: text('error'),
-  stale: boolean('stale').notNull().default(false), // corrigendum after analysis
+  stale: boolean('stale').notNull().default(false), // inputs changed after analysis (FR-043)
+  staleReason: text('stale_reason').$type<StaleReason>(),
+  staleAt: timestamp('stale_at', { withTimezone: true }),
+  notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -435,6 +476,10 @@ export const packets = pgTable('packets', {
   blobKey: text('blob_key'),
   sizeBytes: integer('size_bytes'),
   pageCount: integer('page_count'),
+  /** Snapshot of the computed default item uids (`kind:refId`) at build time (006/FR-055): items of a later
+   *  computed default whose uid is not in here are "newly required" and appended to the proposed order.
+   *  NULL = built before FR-055: append nothing. Never backfill with [] (that would re-append every item). */
+  defaultUids: jsonb('default_uids').$type<string[]>(),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
 }, (t) => ({ wsIdx: index('packets_ws_idx').on(t.workspaceId) }));

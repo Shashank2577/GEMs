@@ -4,6 +4,7 @@
  *
  *   uploadTenderDocument → store PDF under tenders/<tenderId>/<orgId>/…, extract text per page
  *   fetchGemDocuments    → download /showbidDocument/<gemBidId> once (public, org_id null)
+ *   removeTenderDocument → delete the org's own upload (blob + row), mark the analysis stale
  *   analyseTender        → rules (+ LLM when configured) → score → checklist → analyses row
  *   overrideFactor       → audited manual status change + re-score
  */
@@ -15,15 +16,17 @@ import {
 import { buildChecklist } from '@tp/core/analyse/checklist';
 import { enrichWithLlm } from '@tp/core/analyse/llm';
 import { PdfTextError, extractPages, isPdf, joinPages, looksScanned, splitPages } from '@tp/core/analyse/pdf-text';
-import { combineRequirements, extractRequirementsRules, requirementsFromListing } from '@tp/core/analyse/rules';
+import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
   MAX_TENDER_DOC_BYTES, type AnalysisDto, type OverrideFactorInput, type ScoringWeights, type TenderDocKind, type TenderDocumentDto,
+  type TenderDocumentWarning,
 } from '@tp/core/contracts/analyse';
 import { GemClient, GemError } from '@tp/core/gem/client';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
-import { HttpError, notFound } from '../lib/errors';
+import { HttpError, forbidden, notFound } from '../lib/errors';
+import { markStale } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
 type DocRow = typeof tenderDocuments.$inferSelect;
@@ -31,12 +34,29 @@ type AnalysisRow = typeof analyses.$inferSelect;
 
 const iso = (d: Date | string) => (d instanceof Date ? d.toISOString() : d);
 
-export function toDocumentDto(d: DocRow): TenderDocumentDto {
+/**
+ * The bid number printed on the document when it differs from the tender's (FR-010), else null.
+ * Computed from the stored text (page 1 only), so no schema column is needed.
+ */
+export function bidNumberMismatch(d: Pick<DocRow, 'text'>, tenderBidNumber: string | null | undefined): string | null {
+  const found = detectBidNumber(splitPages(d.text).slice(0, 1));
+  const expected = normalizeBidNumber(tenderBidNumber);
+  return found && expected && found !== expected ? found : null;
+}
+
+/** `tenderBidNumber` enables `bidNumberFound`; without it the field is null. */
+export function toDocumentDto(d: DocRow, tenderBidNumber?: string | null): TenderDocumentDto {
   return {
     id: d.id, tenderId: d.tenderId, orgId: d.orgId, kind: d.kind, fileName: d.fileName, sizeBytes: d.sizeBytes,
     pageCount: d.pageCount, sourceUrl: d.sourceUrl, hasText: !!d.text && d.text.replace(/\s+/g, '').length > 0,
-    source: d.orgId ? 'upload' : 'gem', createdAt: iso(d.createdAt),
+    source: d.orgId ? 'upload' : 'gem', textSource: d.textSource, bidNumberFound: bidNumberMismatch(d, tenderBidNumber),
+    createdAt: iso(d.createdAt),
   };
+}
+
+/** Upload warnings (non-blocking): currently only a bid-number mismatch. */
+export function uploadWarnings(dto: TenderDocumentDto): TenderDocumentWarning[] {
+  return dto.bidNumberFound ? [{ code: 'bid_number_mismatch', found: dto.bidNumberFound }] : [];
 }
 
 export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
@@ -44,6 +64,7 @@ export function toAnalysisDto(a: AnalysisRow, docs?: DocRow[]): AnalysisDto {
     id: a.id, orgId: a.orgId, tenderId: a.tenderId, status: a.status, method: a.method,
     requirements: a.requirements, factors: a.factors, checklist: a.checklist,
     score: a.score, confidence: a.confidence, verdict: a.verdict, summary: a.summary, error: a.error, stale: a.stale,
+    staleReason: a.staleReason ?? null, staleAt: a.staleAt ? iso(a.staleAt) : null, notes: a.notes ?? [],
     createdBy: a.createdBy, createdAt: iso(a.createdAt), updatedAt: iso(a.updatedAt),
     ...(docs ? { documents: docs.map((d) => ({ id: d.id, fileName: d.fileName, kind: d.kind, pageCount: d.pageCount })) } : {}),
   };
@@ -91,8 +112,8 @@ export interface UploadInput {
   file: { name: string; type?: string; bytes: Uint8Array };
 }
 
-export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): Promise<DocRow> {
-  await getTender(deps, input.tenderId);
+export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): Promise<{ doc: DocRow; tender: TenderRow }> {
+  const tender = await getTender(deps, input.tenderId);
   const { bytes } = input.file;
   if (bytes.length === 0) throw new HttpError(400, 'bad_request', 'The file is empty');
   if (bytes.length > MAX_TENDER_DOC_BYTES) throw new HttpError(413, 'payload_too_large', 'The file is larger than 25 MB');
@@ -110,29 +131,57 @@ export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): P
     orgId: input.orgId, userId: input.userId, action: 'tender.document_uploaded', entityType: 'tender', entityId: input.tenderId,
     meta: { documentId: id, fileName, kind: input.kind, pages: pages.length, scanned: looksScanned(pages) },
   });
-  return doc;
+  await markStale(deps.db, { orgId: input.orgId, tenderIds: [input.tenderId] }, 'document_added', deps.clock.now());
+  return { doc, tender };
+}
+
+// ───────────── Remove (FR-009) ─────────────
+
+export async function removeTenderDocument(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; docId: string }): Promise<void> {
+  await getTender(deps, input.tenderId);
+  const doc = await getTenderDocument(deps, input.tenderId, input.docId, input.orgId);
+  if (doc.orgId === null) throw forbidden('Documents fetched from GeM are shared and cannot be removed');
+  const deleted = await deps.db.delete(tenderDocuments)
+    .where(and(eq(tenderDocuments.id, doc.id), eq(tenderDocuments.orgId, input.orgId)))
+    .returning({ id: tenderDocuments.id });
+  // A concurrent delete already removed it: only one request logs and marks the analysis stale.
+  if (!deleted.length) throw notFound('Document');
+  try {
+    await deps.blobs.delete(doc.blobKey);
+  } catch (e) {
+    // The row is gone, so the file is unreachable; log and keep going rather than failing the user.
+    deps.logger.warn('analyse: blob delete failed after document removal', { tenderId: input.tenderId, blobKey: doc.blobKey, error: (e as Error).message });
+  }
+  await logActivity(deps.db, {
+    orgId: input.orgId, userId: input.userId, action: 'tender.document_removed', entityType: 'tender', entityId: input.tenderId,
+    meta: { documentId: doc.id, fileName: doc.fileName, kind: doc.kind },
+  });
+  await markStale(deps.db, { orgId: input.orgId, tenderIds: [input.tenderId] }, 'document_removed', deps.clock.now());
 }
 
 // ───────────── Fetch from GeM ─────────────
 
-export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }): Promise<{ documents: DocRow[]; fetched: number }> {
+export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
   const tender = await getTender(deps, input.tenderId);
   const existing = (await listTenderDocuments(deps, tender.id, input.orgId)).filter((d) => d.orgId === null);
-  if (existing.length) return { documents: existing, fetched: 0 };
+  if (existing.length) return { documents: existing, fetched: 0, tender };
   const ref = tender.gemBidId ?? tender.documentUrl;
   if (!ref) throw new HttpError(422, 'no_gem_document', 'This tender has no GeM document link. Download the bid PDF from GeM and upload it here.');
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
     maxRetries: 2, backoffMs: Math.min(1000, Math.max(10, deps.gem.minIntervalMs)), timeoutMs: 45_000,
+    maxDocumentBytes: MAX_TENDER_DOC_BYTES,
   });
   let got: { bytes: Uint8Array; url: string };
   try {
     got = await client.fetchBidDocument(ref);
   } catch (e) {
     deps.logger.warn('analyse: GeM document fetch failed', { tenderId: tender.id, error: (e as Error).message });
-    const msg = e instanceof GemError && e.status === 404
-      ? 'GeM no longer serves this bid document. Upload the PDF instead.'
-      : 'Could not download the bid document from GeM right now. Try again in a few minutes or upload the PDF.';
+    const msg = e instanceof GemError && e.code === 'too_large'
+      ? 'The GeM document is larger than 25 MB — download it from GeM and upload it here.'
+      : e instanceof GemError && e.status === 404
+        ? 'GeM no longer serves this bid document. Upload the PDF instead.'
+        : 'Could not download the bid document from GeM right now. Try again in a few minutes or upload the PDF.';
     throw new HttpError(502, 'gem_unavailable', msg);
   }
   const pages = await extractOrThrow(got.bytes);
@@ -149,7 +198,7 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
     orgId: input.orgId, userId: input.userId, action: 'tender.document_fetched', entityType: 'tender', entityId: tender.id,
     meta: { documentId: id, pages: pages.length, sourceUrl: got.url },
   });
-  return { documents: [doc], fetched: 1 };
+  return { documents: [doc], fetched: 1, tender };
 }
 
 // ───────────── Analyse ─────────────

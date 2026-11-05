@@ -1,5 +1,5 @@
 {
-  "id": "7f69e6ec-fe38-4e41-9640-b4f6232c347f",
+  "id": "d5654a64-334b-443e-8800-7790e232a07e",
   "prevId": "509eb29b-7228-4adb-b904-e9493fffb983",
   "version": "7",
   "dialect": "postgresql",
@@ -646,27 +646,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "bid_workspaces_org_stage_idx": {
-          "name": "bid_workspaces_org_stage_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "stage",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -1081,6 +1060,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "listing_stop": {
+          "name": "listing_stop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "error": {
           "name": "error",

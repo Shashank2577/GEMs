@@ -2,16 +2,16 @@
  * Auth & current-user routes (FR-030): /auth/*, /me, /me/notification-prefs, /me/api-tokens.
  * Mounted at /api. Rate limiting: 002/FR-010; password reset: 002/FR-011. Sessions: routes/sessions.ts.
  */
-import { and, desc, eq, gt, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import {
   apiTokens, invitations, memberships, notificationPrefs, organizations, passwordResets, sessions, users, type Db,
 } from '@tp/db';
 import {
-  API_TOKEN_PREFIX, PASSWORD_RESET_TTL_MINUTES, acceptInviteInputSchema, changePasswordInputSchema, createApiTokenInputSchema,
+  API_TOKEN_LIMIT, API_TOKEN_PREFIX, PASSWORD_RESET_TTL_MINUTES, acceptInviteInputSchema, changePasswordInputSchema, createApiTokenInputSchema,
   forgotPasswordInputSchema, loginInputSchema, notificationPrefsSchema, passwordSchema, resetPasswordInputSchema,
   signupInputSchema, switchOrgInputSchema, updateMeInputSchema,
-  type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
+  DEFAULT_NOTIFICATION_PREFS, type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
 } from '@tp/core/contracts/auth';
 import { requireAuth, requireSession, orgId, userId } from '../middleware/auth';
 import { logActivity } from '../lib/activity';
@@ -20,7 +20,7 @@ import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/
 import { buildMe } from '../lib/me';
 import { defer } from '../lib/defer';
 import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reset } from '../lib/rate-limit';
-import { clearSessionCookie, firstMembership, loadMembership, loadUser, resolveAuth, startSession } from '../lib/session';
+import { clearSessionCookie, firstMembership, loadMembership, loadUser, rememberOrg, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
 import { parseJson, parseWith } from '../lib/validate';
 import type { AppEnv } from '../types';
@@ -29,7 +29,7 @@ export const authRoutes = new Hono<AppEnv>();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const DEFAULT_PREFS: NotificationPrefs = { inApp: true, email: true, whatsapp: false, frequency: 'instant', expiryReminders: true };
+const DEFAULT_PREFS: NotificationPrefs = DEFAULT_NOTIFICATION_PREFS;
 
 async function uniqueSlug(db: Db, name: string): Promise<string> {
   const base = slugify(name);
@@ -85,11 +85,13 @@ authRoutes.post('/auth/signup', async (c) => {
 
 const NO_ORGANIZATION = () => new HttpError(403, 'no_organization', 'You are not a member of any organization. Ask an owner to invite you.');
 
-/** The org to sign into: the most recently used one the user is still a member of, else the oldest membership. */
+/**
+ * The org to sign into: the last one the user worked in (`users.last_org_id`, kept across sign-outs and updated by
+ * sign-in, switch-org and accept-invite in any session) if still a member, else the oldest membership.
+ */
 async function pickSignInOrg(db: Db, uid: string) {
-  const [last] = await db.select({ orgId: sessions.activeOrgId }).from(sessions)
-    .where(eq(sessions.userId, uid)).orderBy(desc(sessions.createdAt)).limit(1);
-  let m = last?.orgId ? await loadMembership(db, uid, last.orgId) : null;
+  const [u] = await db.select({ orgId: users.lastOrgId }).from(users).where(eq(users.id, uid));
+  let m = u?.orgId ? await loadMembership(db, uid, u.orgId) : null;
   if (!m) m = await firstMembership(db, uid);
   return m;
 }
@@ -130,6 +132,7 @@ authRoutes.post('/auth/switch-org', requireSession, async (c) => {
   const m = await loadMembership(db, c.var.user.id, target);
   if (!m) throw notFound('Organization');
   await db.update(sessions).set({ activeOrgId: target }).where(eq(sessions.id, c.var.sessionId!));
+  await rememberOrg(db, c.var.user.id, target);
   return respondMe(c, c.var.user.id, target);
 });
 
@@ -264,6 +267,10 @@ authRoutes.post('/auth/accept-invite', async (c) => {
   let uid: string;
   let needsSession = true;
   if (current && current.kind === 'session') {
+    // 002/FR-018: an invitation is bound to its email; a different signed-in account cannot redeem it.
+    if (current.user.email.toLowerCase() !== inv.email.toLowerCase()) {
+      throw new HttpError(403, 'invite_email_mismatch', `This invitation was sent to ${inv.email}. Sign out and continue as that account.`);
+    }
     uid = current.user.id;
     needsSession = false;
   } else {
@@ -293,7 +300,10 @@ authRoutes.post('/auth/accept-invite', async (c) => {
   await logActivity(db, { orgId: inv.orgId, userId: uid, action: 'member.joined', entityType: 'user', entityId: uid, meta: { role: inv.role, email: inv.email } });
 
   if (needsSession) await startSession(c, uid, inv.orgId);
-  else await db.update(sessions).set({ activeOrgId: inv.orgId }).where(eq(sessions.id, current!.sessionId!));
+  else {
+    await db.update(sessions).set({ activeOrgId: inv.orgId }).where(eq(sessions.id, current!.sessionId!));
+    await rememberOrg(db, uid, inv.orgId);
+  }
   return respondMe(c, uid, inv.orgId);
 });
 
@@ -347,7 +357,10 @@ authRoutes.put('/me/notification-prefs', requireAuth, async (c) => {
 
 const tokenSummary = (t: typeof apiTokens.$inferSelect): ApiTokenSummary => ({
   id: t.id, name: t.name, lastUsedAt: t.lastUsedAt?.toISOString() ?? null, createdAt: t.createdAt.toISOString(),
+  expiresAt: t.expiresAt?.toISOString() ?? null, hint: t.tokenHint,
 });
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 authRoutes.get('/me/api-tokens', requireAuth, async (c) => {
   const rows = await c.var.deps.db.select().from(apiTokens)
@@ -355,12 +368,33 @@ authRoutes.get('/me/api-tokens', requireAuth, async (c) => {
   return c.json({ items: rows.map(tokenSummary), total: rows.length });
 });
 
+/** 002/FR-037: optional expiry (default 90 days), 4-char hint, at most API_TOKEN_LIMIT active tokens per user per org. */
 authRoutes.post('/me/api-tokens', requireSession, async (c) => {
   const body = await parseJson(c, createApiTokenInputSchema);
-  const { db } = c.var.deps;
+  const { db, clock } = c.var.deps;
+  const oid = orgId(c);
+  const uid = userId(c);
+  const now = clock.now();
   const token = API_TOKEN_PREFIX + randomToken();
-  const [row] = await db.insert(apiTokens).values({ orgId: orgId(c), userId: userId(c), name: body.name, tokenHash: await sha256Hex(token) }).returning();
-  await logActivity(db, { orgId: orgId(c), userId: userId(c), action: 'api_token.created', entityType: 'api_token', entityId: row.id, meta: { name: body.name } });
+  const expiresAt = body.expiresInDays === null ? null : new Date(now.getTime() + body.expiresInDays * DAY_MS);
+  const row = await db.transaction(async (tx) => {
+    // Lock order matches org.ts assertNotLastOwner (organizations, then memberships) to avoid deadlocks.
+    // The org row SHARE lock waits for an in-flight member removal; the membership FOR UPDATE then serialises
+    // concurrent creates for this user+org so the limit cannot be overshot.
+    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, oid)).for('share');
+    const member = await tx.select({ userId: memberships.userId }).from(memberships)
+      .where(and(eq(memberships.orgId, oid), eq(memberships.userId, uid))).for('update');
+    // Removed from the org while this request waited: mint nothing.
+    if (!member.length) throw NO_ORGANIZATION();
+    const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(apiTokens)
+      .where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid), or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, now))));
+    if (n >= API_TOKEN_LIMIT) throw new HttpError(409, 'token_limit', `You already have ${API_TOKEN_LIMIT} tokens. Revoke one first.`);
+    const [inserted] = await tx.insert(apiTokens).values({
+      orgId: oid, userId: uid, name: body.name, tokenHash: await sha256Hex(token), tokenHint: token.slice(-4), expiresAt,
+    }).returning();
+    return inserted;
+  });
+  await logActivity(db, { orgId: oid, userId: uid, action: 'api_token.created', entityType: 'api_token', entityId: row.id, meta: { name: body.name, expiresInDays: body.expiresInDays } });
   return c.json({ ...tokenSummary(row), token }, 201);
 });
 

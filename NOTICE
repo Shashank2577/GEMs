@@ -12,6 +12,18 @@ listed here with its licence.
    packages/core/src/gem/normalize.ts (Solr response unwrapping approach), packages/core/src/vault/status.ts
    (GeM seller-document label vocabulary: the buildEligibilitySummary eligibility labels in src/routes.ts, used
    in GEM_SELLER_DOC_LABELS and DOC_TYPES keywords).
+   Spec 004 Analyse (ported at commit 46925c6, 2026-11-04):
+   - packages/core/test/fixtures/bids/synthetic-tender.pdf — copied unchanged from
+     test/fixtures/synthetic-tender.pdf.
+   - packages/core/test/analyse/pdf-text.test.ts — the pooled-Buffer byte-safety case and the
+     invalid "%PDF-1.7" rejection case, adapted from src/pdf.test.ts (node:test → vitest).
+   - packages/core/src/gem/client.ts fetchBidDocument byte cap (25 MB, GemError code 'too_large') —
+     approach adapted from src/http.ts fetchBoundedResource({maxBytes}) (content-length check, then
+     streamed byte count with cancel), with its test idea from src/http.test.ts.
+   Spec 006 Apply (ported at commit 46925c6, 2026-11-05):
+   - apps/api/src/services/packet.ts buildWorkspacePacket loadBytes — the "independent Uint8Array copy before
+     PDF load" hardening (Uint8Array.from(bytes) before parsing) adapted from src/pdf.ts parseGemPdfText.
+   Licence text: https://www.apache.org/licenses/LICENSE-2.0
 
 2. gem-search — https://github.com/arush15june/gem-search
    Licence: MIT License, Copyright (c) 2026 Aarush Jain
@@ -21,6 +33,7 @@ listed here with its licence.
    gem.py: the bid-result view route /bidding/bid/getBidResultView/<b_id> and the bidder-row / categories
    regular expressions), with the test fixture packages/core/test/fixtures/gem/bid-result.html built to the
    same markup (spec 007, T004/T032).
+   Licence text: https://opensource.org/license/mit
 
 3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
    Licence: MIT License
@@ -30,3 +43,7 @@ Other reference repositories in the owner's reference set (Giridar33/gem-tender-
 PranavTamada/Tender_Scraper, IshanMaheshwari-777/GEM-SCRAPER, Mujahid-Alam/gem-tender-pdf-extractor,
 Giri-Aayush/gem, rounittxx/gem-bid-scraper) were consulted for portal behaviour but no code or text from
 them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.
+
+Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
+copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for our own label table
+(spec 004, packages/core/src/analyse/rules.ts).

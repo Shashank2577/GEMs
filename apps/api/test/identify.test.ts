@@ -2,11 +2,13 @@
  * T038 — Identify routes: tender feed filters/facets/sort/pagination, detail, seen/dismiss, watchlists CRUD +
  * preview + roles, ingestion run/runs roles, notifications, and org isolation.
  */
-import { eq } from 'drizzle-orm';
+import { eq, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, bidWorkspaces, tenders } from '@tp/db';
+import { analyses, bidWorkspaces, ingestionRuns, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
+import type { NormalizedTender } from '@tp/core/gem/parse';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
-import { runIngestion } from '../src/services/ingest';
+import { byPreviewOrder, escapeLike, phraseLike, type Candidate } from '../src/routes/watchlists';
+import { matchAndNotify, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z');
@@ -234,6 +236,10 @@ describe('ingestion routes', () => {
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.viewer.cookie, json: {} })).status).toBe(403);
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 99 } })).status).toBe(400);
     ctx.clock.advance(60_000);
+    // FR-013: the setup's manual run finished < 2 min ago → cooldown; allowed again from retryAt.
+    const cool = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.owner.cookie, json: { pages: 1 } });
+    expect(cool.status).toBe(429);
+    ctx.clock.set(new Date(cool.body.error.details.retryAt));
     const ok = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.owner.cookie, json: { pages: 1 } });
     expect(ok.body).toMatchObject({ status: 'success', pagesFetched: 1, tendersCreated: 0 });
     const runs = await get('/ingestion/runs', team.viewer);
@@ -241,6 +247,44 @@ describe('ingestion routes', () => {
     expect(runs.body).toMatchObject({ totalTenders: 36, openTenders: 36, lastRun: { trigger: 'manual', status: 'success' } });
     expect(runs.body.lastSuccessAt).toBeTruthy();
     expect(runs.body.items[0].durationMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('manual sync cooldown (FR-013)', () => {
+  const runCount = async () => Number((await ctx.db.select({ n: sql<number>`count(*)::int` }).from(ingestionRuns))[0].n);
+
+  it('rejects a manual sync within 2 min of a finished manual run with 429 sync_cooldown and retryAt', async () => {
+    // Own fixture: a manual run that finished just now (later than any earlier one), so order doesn't matter.
+    ctx.clock.advance(60_000);
+    const finishedAt = ctx.clock.now();
+    await ctx.db.insert(ingestionRuns).values({ trigger: 'manual', status: 'success', startedAt: new Date(finishedAt.getTime() - 5_000), finishedAt });
+    const baseline = await runCount();
+    const retryAt = new Date(finishedAt.getTime() + 2 * 60_000);
+
+    ctx.clock.set(new Date(retryAt.getTime() - 1_000));
+    const r = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
+    expect(r.status).toBe(429);
+    expect(r.body.error).toMatchObject({ code: 'sync_cooldown', details: { retryAt: retryAt.toISOString() } });
+    const ist = retryAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+    expect(r.body.error.message).toBe(`GeM was synced moments ago. Next manual sync at ${ist} IST.`);
+    expect(await runCount()).toBe(baseline); // nothing was started
+    // Role checks still come first.
+    expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.analyst.cookie, json: {} })).status).toBe(403);
+
+    // A scheduled run neither starts nor extends the cooldown.
+    ctx.clock.set(retryAt);
+    const cron = await runIngestion(ctx.deps, { trigger: 'cron', pages: 1 });
+    expect(cron.status).toBe('success');
+    const ok = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 1 } });
+    expect(ok.status).toBe(200);
+    expect(ok.body.trigger).toBe('manual');
+    expect(await runCount()).toBe(baseline + 2);
+    // …but this finished manual run does — across orgs (GeM is shared by every tenant).
+    const rival = await request(ctx.app, 'POST', '/ingestion/run', { cookie: other.cookie, json: {} });
+    expect(rival.status).toBe(429);
+    expect(rival.body.error.code).toBe('sync_cooldown');
+    expect(await runCount()).toBe(baseline + 2);
+    ctx.clock.advance(2 * 60_000);
   });
 });
 
@@ -281,5 +325,229 @@ describe('end-to-end: new bid published on GeM → matched → alert', () => {
     expect(feed.body.items[0]).toMatchObject({ bidNumber: 'GEM/2026/B/6421101', isNew: true });
     expect((await get('/tenders?matched=1', team.owner)).body.total).toBe(before + 1);
     expect((await get('/notifications?unread=1', team.owner)).body.items[0].title).toMatch(/Laptop/);
+  });
+});
+
+// The tests below seed their own org (and tenders, removed afterwards) so they don't depend on — or disturb — the
+// shared fixture state used by the tests above.
+describe('watchlists: silent back-fill, pause, limit, volume (T025, T030, T031)', () => {
+  const countNotifications = async (org?: string) => Number((await ctx.db.select({ n: sql<number>`count(*)::int` }).from(notifications)
+    .where(org ? eq(notifications.orgId, org) : undefined))[0].n);
+  const matchesOf = async (watchlistId: string) => Number((await ctx.db.select({ n: sql<number>`count(*)::int` }).from(tenderMatches)
+    .where(eq(tenderMatches.watchlistId, watchlistId)))[0].n);
+
+  it('creating, editing criteria and resuming a watchlist create zero notifications (FR-025)', async () => {
+    const org = await signup(ctx.app, { orgName: 'Silent Backfill Traders' });
+    // Expected counts come from preview, so they hold whatever earlier tests ingested.
+    const previewCount = async (criteria: object) =>
+      (await request(ctx.app, 'POST', '/watchlists/preview', { cookie: org.cookie, json: { criteria } })).body.count as number;
+    const laptops = await previewCount({ keywords: ['laptop'] });
+    const cameras = await previewCount({ keywords: ['cctv', 'camera'] });
+    expect(laptops).toBeGreaterThan(0);
+    expect(cameras).toBeGreaterThan(0);
+    const before = await countNotifications();
+    const created = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Laptops', criteria: { keywords: ['laptop'] } } });
+    expect(created.status).toBe(201);
+    expect(created.body.matchCount).toBe(laptops); // back-filled…
+    expect(await countNotifications(org.me.org.id)).toBe(0); // …silently
+    const id = created.body.id;
+
+    const edited = await request(ctx.app, 'PATCH', `/watchlists/${id}`, { cookie: org.cookie, json: { criteria: { keywords: ['cctv', 'camera'] } } });
+    expect(edited.status).toBe(200);
+    expect(edited.body.matchCount).toBe(cameras);
+    expect(await countNotifications(org.me.org.id)).toBe(0);
+
+    expect((await request(ctx.app, 'PATCH', `/watchlists/${id}`, { cookie: org.cookie, json: { active: false } })).body.active).toBe(false);
+    // Drop the back-filled matches so resuming has something to back-fill.
+    await ctx.db.delete(tenderMatches).where(eq(tenderMatches.watchlistId, id));
+    const resumed = await request(ctx.app, 'PATCH', `/watchlists/${id}`, { cookie: org.cookie, json: { active: true } });
+    expect(resumed.body).toMatchObject({ active: true, matchCount: cameras });
+    expect(await countNotifications(org.me.org.id)).toBe(0);
+    expect(await countNotifications()).toBe(before); // no other org was notified either
+  });
+
+  it('a paused watchlist gets no matches from a later ingestion (FR-025)', async () => {
+    const org = await signup(ctx.app, { orgName: 'Paused Watch Co' });
+    const criteria = { keywords: ['hydrofoil'] };
+    const live = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Hydrofoils (live)', criteria } });
+    const paused = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Hydrofoils (paused)', criteria } });
+    expect((await request(ctx.app, 'PATCH', `/watchlists/${paused.body.id}`, { cookie: org.cookie, json: { active: false } })).body.active).toBe(false);
+    expect(live.body.matchCount).toBe(0);
+
+    const now = ctx.clock.now();
+    const bidNumber = 'GEM/2099/B/7700001';
+    const bid: NormalizedTender = {
+      source: 'gem', bidNumber, gemBidId: null, bidType: 'bid', title: 'Hydrofoil survey boat', items: [{ name: 'Hydrofoil survey boat', quantity: 1 }],
+      category: 'Boats', quantity: 1, ministry: 'Ministry of Ports, Shipping and Waterways', department: null, organisation: null, buyerOffice: null,
+      state: 'Goa', city: 'Panaji', startAt: now, endAt: new Date(now.getTime() + 20 * 86_400_000), openingAt: null, emdAmount: null,
+      estimatedValue: null, epbgPercent: null, hsnCodes: [], status: 'open', documentUrl: null, sourceUrl: `${GEM}/bid/7700001`, raw: {}, contentHash: 'hydrofoil-1',
+    };
+    const client = { fetchTenders: async () => ({ tenders: [bid], numFound: 1, rawCount: 1 }) };
+    let runId: string | undefined;
+    try {
+      const run = await runIngestion(ctx.deps, { trigger: 'seed', pages: 1, client });
+      runId = run.id;
+      expect(run).toMatchObject({ status: 'success', tendersCreated: 1, matchesCreated: 1 });
+      expect(await matchesOf(live.body.id)).toBe(1);
+      expect(await matchesOf(paused.body.id)).toBe(0);
+      expect(await countNotifications(org.me.org.id)).toBeGreaterThan(0); // the live one alerted (control)
+      const list = await get('/watchlists', org);
+      expect(list.body.items.find((w: { id: string }) => w.id === paused.body.id)).toMatchObject({ active: false, matchCount: 0 });
+    } finally {
+      await ctx.db.delete(tenders).where(eq(tenders.bidNumber, bidNumber));
+      if (runId) await ctx.db.delete(ingestionRuns).where(eq(ingestionRuns.id, runId));
+      await ctx.db.delete(notifications).where(eq(notifications.orgId, org.me.org.id));
+    }
+  });
+
+  it('caps an org at 50 watchlists with 409 watchlist_limit — paused ones count, other orgs unaffected (FR-027)', async () => {
+    const org = await signup(ctx.app, { orgName: 'Fifty Lists Ltd' });
+    const orgId = org.me.org.id;
+    await ctx.db.insert(watchlists).values(Array.from({ length: 49 }, (_, i) => ({
+      orgId, name: `Seeded ${i + 1}`, criteria: { keywords: [`zqx${i}`] } as never, active: i % 2 === 0,
+    })));
+    const body = (name: string) => ({ name, criteria: { keywords: ['zqxnothing'] } });
+    const fiftieth = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: body('Number 50') });
+    expect(fiftieth.status).toBe(201);
+    const over = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: body('Number 51') });
+    expect(over.status).toBe(409);
+    expect(over.body.error).toMatchObject({ code: 'watchlist_limit', message: 'You can have up to 50 watchlists — delete one first.' });
+    expect((await get('/watchlists', org)).body.total).toBe(50);
+    // The limit is per org: another org can still create.
+    const second = await signup(ctx.app, { orgName: 'Second Lists Ltd' });
+    expect((await request(ctx.app, 'POST', '/watchlists', { cookie: second.cookie, json: body('Their first') })).status).toBe(201);
+    // Deleting one frees a slot.
+    expect((await request(ctx.app, 'DELETE', `/watchlists/${fiftieth.body.id}`, { cookie: org.cookie })).status).toBe(200);
+    expect((await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: body('Number 50 again') })).status).toBe(201);
+  });
+
+  it('preview and back-fill find every match beyond 5,000 candidates, with escaped category/ministry pre-filters (FR-028)', async () => {
+    const N = 6000;
+    const prefix = 'GEM/2099/B/88';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const rows = Array.from({ length: N }, (_, i) => ({
+      bidNumber: `${prefix}${String(i).padStart(5, '0')}`, title: `Flux capacitor module ${i}`, items: [{ name: 'Flux capacitor module', quantity: 2 }],
+      category: 'Flux capacitor spares — 100% A\\B grade', ministry: 'Ministry of Temporal Affairs', department: 'Department of Clocks',
+      state: 'Kerala', endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/88${i}`, contentHash: `flux-${i}`,
+    }));
+    // Hyphenated phrase: only the `%flux%capacitor%` phrase pre-filter lets the matcher see this one.
+    rows.push({ ...rows[0], bidNumber: `${prefix}99999`, title: 'Flux-capacitor module (hyphenated)', items: [{ name: 'Flux-capacitor module', quantity: 1 }],
+      category: 'Flux-capacitor spares — 100% A\\B grade', sourceUrl: `${GEM}/bid/8899999`, contentHash: 'flux-hyphen' });
+    try {
+      for (let i = 0; i < rows.length; i += 1000) await ctx.db.insert(tenders).values(rows.slice(i, i + 1000));
+      const criteria = { keywords: ['flux capacitor'], categories: ['100% A\\B grade'], ministries: ['temporal affairs'], states: ['kerala'] };
+      const t0 = Date.now();
+      const p = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria } });
+      const previewMs = Date.now() - t0;
+      expect(p.status).toBe(200);
+      expect(p.body.count).toBe(N + 1);
+      expect(p.body.sample).toHaveLength(5);
+      // Pinpoint the hyphenated one: it is found, and its own preview has exactly it.
+      const hyphen = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { keywords: ['flux capacitor module'], categories: ['flux-capacitor'] } } });
+      expect(hyphen.body.count).toBe(1);
+      expect(hyphen.body.sample[0].title).toBe('Flux-capacitor module (hyphenated)');
+      expect(previewMs).toBeLessThan(10_000); // generous CI bound; NFR-003 is measured separately
+      // LIKE wildcards in criteria are literal: "_" must not match the space.
+      const literal = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { ministries: ['temporal_affairs'] } } });
+      expect(literal.body.count).toBe(0);
+
+      const org = await signup(ctx.app, { orgName: 'Flux Volume Corp' });
+      const w = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Flux capacitors', criteria } });
+      expect(w.status).toBe(201);
+      expect(w.body).toMatchObject({ matchCount: N + 1, openCount: N + 1 });
+      expect(await countNotifications(org.me.org.id)).toBe(0);
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
+  }, 180_000);
+});
+
+describe('watchlist SQL helpers and batched matching', () => {
+  it('escapes LIKE wildcards and the escape character; phrases allow any separator', () => {
+    expect(escapeLike('100%')).toBe('100\\%');
+    expect(escapeLike('a_b')).toBe('a\\_b');
+    expect(escapeLike('A\\B')).toBe('A\\\\B');
+    expect(escapeLike('plain text')).toBe('plain text');
+    expect(phraseLike('flux capacitor')).toBe('%flux%capacitor%');
+    expect(phraseLike('  patient   monitor ')).toBe('%patient%monitor%');
+    expect(phraseLike('50% off_cut\\x')).toBe('%50\\%%off\\_cut\\\\x%');
+  });
+
+  it('orders preview candidates deterministically, by id when everything else ties', () => {
+    const at = new Date('2026-11-10T00:00:00Z');
+    const c = (id: string, relevance = 0.5, endAt: Date | null = at): Candidate => ({ id, relevance, reasons: [], endAt, createdAt: at });
+    const sorted = [c('b'), c('c'), c('a'), c('z', 0.9), c('y', 0.5, new Date('2026-11-09T00:00:00Z'))].sort(byPreviewOrder);
+    expect(sorted.map((x) => x.id)).toEqual(['z', 'y', 'a', 'b', 'c']);
+  });
+
+  it('matchAndNotify inserts more than one batch of matches once, then nothing on a re-run (FR-023, FR-040)', async () => {
+    const org = await signup(ctx.app, { orgName: 'Batch Match Pvt Ltd' });
+    const w = await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Gyroscopes', criteria: { keywords: ['gyroscope'] } } });
+    expect(w.body.matchCount).toBe(0);
+    const prefix = 'GEM/2099/B/66';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const values = Array.from({ length: 1100 }, (_, i) => ({
+      bidNumber: `${prefix}${String(i).padStart(5, '0')}`, title: `Gyroscope assembly ${i}`, endAt: end, status: 'open' as const,
+      sourceUrl: `${GEM}/bid/66${i}`, contentHash: `gyro-${i}`,
+    }));
+    try {
+      const ids = (await ctx.db.insert(tenders).values(values).returning({ id: tenders.id })).map((r) => r.id);
+      const first = await matchAndNotify(ctx.deps, ids, ctx.clock.now(), { orgId: org.me.org.id });
+      expect(first.matchesCreated).toBe(1100);
+      expect(first.notificationsCreated).toBeGreaterThanOrEqual(1100); // one per tender per channel for the owner
+      const again = await matchAndNotify(ctx.deps, ids, ctx.clock.now(), { orgId: org.me.org.id });
+      expect(again).toEqual({ matchesCreated: 0, notificationsCreated: 0 });
+      const stored = (await get('/watchlists', org)).body.items[0];
+      expect(stored.matchCount).toBe(1100);
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+      await ctx.db.delete(notifications).where(eq(notifications.orgId, org.me.org.id));
+    }
+  });
+
+  it('matchAndNotify dedupes repeated tender ids: one match, the watchlist name once in the alert', async () => {
+    const org = await signup(ctx.app, { orgName: 'Dedupe Match Pvt Ltd' });
+    await request(ctx.app, 'POST', '/watchlists', { cookie: org.cookie, json: { name: 'Ornithopters', criteria: { keywords: ['ornithopter'] } } });
+    const bid = 'GEM/2099/B/7700001';
+    try {
+      const [{ id }] = await ctx.db.insert(tenders).values({
+        bidNumber: bid, title: 'Ornithopter wing set', endAt: new Date(ctx.clock.now().getTime() + 30 * 86_400_000), status: 'open',
+        sourceUrl: `${GEM}/bid/7700001`, contentHash: 'ornithopter-1',
+      }).returning({ id: tenders.id });
+      // 501 copies span two `in (…)` chunks of 500, so without the dedupe the tender row is loaded twice.
+      const r = await matchAndNotify(ctx.deps, Array(501).fill(id), ctx.clock.now(), { orgId: org.me.org.id });
+      expect(r.matchesCreated).toBe(1);
+      const alerts = await ctx.db.select({ body: notifications.body, channel: notifications.channel }).from(notifications)
+        .where(eq(notifications.orgId, org.me.org.id));
+      expect(alerts.length).toBe(r.notificationsCreated);
+      const inApp = alerts.find((a) => a.channel === 'in_app')!;
+      expect(inApp.body.match(/Ornithopters/g)).toHaveLength(1);
+    } finally {
+      await ctx.db.delete(tenders).where(eq(tenders.bidNumber, bid));
+      await ctx.db.delete(notifications).where(eq(notifications.orgId, org.me.org.id));
+    }
+  });
+
+  it('preview tolerates a tender whose items jsonb is not an array (no 500)', async () => {
+    const prefix = 'GEM/2099/B/7800';
+    const end = new Date(ctx.clock.now().getTime() + 30 * 86_400_000);
+    const row = (n: number, title: string) => ({
+      bidNumber: `${prefix}${n}`, title, endAt: end, status: 'open' as const, sourceUrl: `${GEM}/bid/7800${n}`, contentHash: `quokka-${n}`,
+    });
+    try {
+      await ctx.db.insert(tenders).values([row(1, 'Quokka feeder'), row(2, 'Unrelated stationery'), row(3, 'Another unrelated lot')]);
+      // Title matches but items is an object; the others only reach the item scan, with an object and a scalar.
+      await ctx.db.execute(sql`update tenders set items = '{"name":"quokka feeder"}'::jsonb where bid_number in (${`${prefix}1`}, ${`${prefix}2`})`);
+      await ctx.db.execute(sql`update tenders set items = '"quokka"'::jsonb where bid_number = ${`${prefix}3`}`);
+      const p = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { keywords: ['quokka'] } } });
+      expect(p.status).toBe(200);
+      expect(p.body.count).toBe(1);
+      expect(p.body.sample[0].title).toBe('Quokka feeder');
+      const cat = await request(ctx.app, 'POST', '/watchlists/preview', { cookie: team.viewer.cookie, json: { criteria: { categories: ['quokka'] } } });
+      expect(cat.status).toBe(200);
+      expect(cat.body.count).toBe(1);
+    } finally {
+      await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
+    }
   });
 });
