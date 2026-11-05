@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,6 +14,10 @@ import { hashPassword, verifyPassword, sha256Hex, randomToken } from '../src/lib
 import { slugify } from '../src/lib/slug';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import type { BlobStore } from '../src/deps';
+import { Hono } from 'hono';
+import { createApp, type AppEnv } from '../src/app';
+import { securityHeaders } from '../src/middleware/request';
+import { HSTS, isHttpsRequest, parseHeadersFile, staticHeadersFor } from '../src/lib/security-headers';
 
 describe('crypto', () => {
   it('hashes and verifies passwords with PBKDF2', async () => {
@@ -130,5 +135,79 @@ describe('provider adapters', () => {
     const deps = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     const report = await runScheduledJobs(deps);
     expect(report.map((r) => r.step)).toEqual(['ingestion', 'alerts', 'reminders', 'auth-cleanup']);
+  });
+});
+
+// ───────────── 008 FR-013: security headers (T032, T033) ─────────────
+
+describe('security headers (008 FR-013)', () => {
+  const BASE = {
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'strict-origin-when-cross-origin',
+    'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  };
+  const failingDb = { execute: async () => { throw new Error('down'); } } as never;
+  const appWith = (env: Record<string, string> = {}) =>
+    createApp(createDeps({ env: { NODE_ENV: 'test', ...env }, db: failingDb, blobs: createMemoryBlobStore(), logger: silentLogger }));
+  const expectBase = (h: Headers) => { for (const [k, v] of Object.entries(BASE)) expect(h.get(k), k).toBe(v); };
+
+  it('every API response (2xx/4xx/5xx, JSON) carries nosniff, referrer and permissions policy; no HSTS over http', async () => {
+    const app = appWith();
+    for (const [path, status] of [['/api/health', 503], ['/api/nope', 404], ['/api/auth/me', 401]] as const) {
+      const res = await app.request(`http://tp.test${path}`);
+      expect(res.status, path).toBe(status);
+      expectBase(res.headers);
+      expect(res.headers.get('strict-transport-security'), path).toBeNull();
+      expect(res.headers.get('content-security-policy'), path).toBeNull(); // JSON is not framed or rendered
+    }
+  });
+
+  it('adds HSTS on https, and behind a trusted proxy that forwarded https only', async () => {
+    const direct = await appWith().request('https://app.tenderpilot.in/api/nope');
+    expect(direct.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains');
+    expectBase(direct.headers);
+    const spoofed = await appWith().request('http://tp.test/api/nope', { headers: { 'x-forwarded-proto': 'https' } });
+    expect(spoofed.headers.get('strict-transport-security')).toBeNull();
+    const proxied = await appWith({ TRUST_PROXY: 'xff' }).request('http://tp.test/api/nope', { headers: { 'x-forwarded-proto': 'https' } });
+    expect(proxied.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains');
+  });
+
+  it('file streams (PDF preview/download) may only be framed same-origin', async () => {
+    const app = new Hono<AppEnv>();
+    app.use('*', securityHeaders);
+    app.get('/pdf', () => new Response('%PDF-1.7', { headers: { 'content-type': 'application/pdf', 'content-disposition': 'inline; filename="a.pdf"' } }));
+    app.get('/own', () => new Response('x', { headers: { 'content-disposition': 'attachment', 'content-security-policy': "frame-ancestors 'none'" } }));
+    const pdf = await app.request('https://app.tenderpilot.in/pdf');
+    expect(pdf.headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+    expect(pdf.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains');
+    expectBase(pdf.headers);
+    expect((await app.request('http://x/own')).headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
+  });
+
+  it('parses the Cloudflare _headers file the SPA ships and resolves headers per path (Node static server parity)', () => {
+    const text = readFileSync(join(__dirname, '../../web/public/_headers'), 'utf8');
+    const rules = parseHeadersFile(text);
+    expect(rules.map((r) => r.pattern)).toEqual(['/*', '/assets/*']);
+    const html = staticHeadersFor(rules, '/login', true);
+    expect(html).toMatchObject({ ...BASE, 'strict-transport-security': HSTS });
+    expect(html['content-security-policy']).toMatch(/^default-src 'self'; script-src 'self' 'sha256-[A-Za-z0-9+/]{43}='; /);
+    expect(html['content-security-policy']).toContain("frame-ancestors 'self'");
+    expect(html['cache-control']).toBeUndefined();
+    const asset = staticHeadersFor(rules, '/assets/index-abc.js', false);
+    expect(asset['cache-control']).toBe('public, max-age=31536000, immutable');
+    expect(asset['strict-transport-security']).toBeUndefined(); // never over plain http
+    expect(asset['x-content-type-options']).toBe('nosniff');
+    expect(parseHeadersFile('# c\n/a\n  X-A: 1\n\n/b/*\n  X-B: 2:3\n')).toEqual([
+      { pattern: '/a', headers: [['x-a', '1']] },
+      { pattern: '/b/*', headers: [['x-b', '2:3']] },
+    ]);
+    expect(staticHeadersFor(parseHeadersFile('/a\n  X-A: 1\n'), '/ab', true)).toEqual({});
+  });
+
+  it('isHttpsRequest trusts x-forwarded-proto only behind a trusted proxy', () => {
+    expect(isHttpsRequest('https://a/x', undefined, false)).toBe(true);
+    expect(isHttpsRequest('http://a/x', 'https', false)).toBe(false);
+    expect(isHttpsRequest('http://a/x', 'https, http', true)).toBe(true);
+    expect(isHttpsRequest('http://a/x', 'http', true)).toBe(false);
   });
 });

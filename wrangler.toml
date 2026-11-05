@@ -1,13 +1,24 @@
 # TenderPilot — one Worker serves the API (/api/*) and the SPA (static assets), runs the cron
-# pipeline, and stores files in R2. Database: Neon Postgres (DATABASE_URL secret).
+# pipeline, and stores files in R2. Database: Neon Postgres (DATABASE_URL secret, pooled `-pooler` host).
 #
-# Secrets (wrangler secret put <NAME>): DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY,
-#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID. Optional ones may be omitted (features degrade to no-ops).
-# Deploy: pnpm deploy   (builds apps/web, then `wrangler deploy`)
+# Requires the Cloudflare **Workers Paid** plan: [limits] cpu_ms and PDF parsing / packet building do not fit the
+# Free plan's 10 ms CPU (docs/architecture.md § 4, spec 008 FR-009).
+#
+# Environments: top level = production (custom domain app.tenderpilot.in); [env.staging] = tenderpilot-staging.
+# Secrets (wrangler secret put <NAME> [--env staging]): DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY,
+#   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, SENTRY_DSN, ADMIN_TOKEN. Optional ones may be omitted (features degrade to
+#   no-ops). Owners, rotation and blast radius: docs/runbook.md § Secrets.
+# Deploy: only via .github/workflows/deploy.yml (migrate → deploy → smoke, staging before production), which sets
+#   APP_VERSION with `--var APP_VERSION:<sha7>`. `pnpm deploy:manual` is a guarded break-glass (docs/runbook.md).
 name = "tenderpilot"
 main = "apps/api/src/worker.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+routes = [{ pattern = "app.tenderpilot.in", custom_domain = true }]
+
+[limits]
+cpu_ms = 120000
 
 [assets]
 directory = "apps/web/dist"
@@ -23,10 +34,37 @@ bucket_name = "tenderpilot-blobs"
 crons = ["*/30 * * * *"]
 
 [vars]
-APP_URL = "https://tenderpilot.workers.dev"
+APP_URL = "https://app.tenderpilot.in"
 GEM_BASE_URL = "https://bidplus.gem.gov.in"
 LLM_MODEL = "claude-sonnet-5-5"
 MAIL_FROM = "TenderPilot <alerts@tenderpilot.in>"
 
 [observability]
+enabled = true
+
+# Staging: same code and cron, own Worker, R2 bucket, Neon branch (`staging`) and secrets.
+# routes/vars/r2_buckets/triggers are declared explicitly so nothing from production leaks in.
+# GEM_BASE_URL is configurable per environment (point it at a mock to keep staging off GeM).
+[env.staging]
+name = "tenderpilot-staging"
+workers_dev = false
+routes = [{ pattern = "staging.tenderpilot.in", custom_domain = true }]
+
+[env.staging.limits]
+cpu_ms = 120000
+
+[[env.staging.r2_buckets]]
+binding = "BLOBS"
+bucket_name = "tenderpilot-blobs-staging"
+
+[env.staging.triggers]
+crons = ["*/30 * * * *"]
+
+[env.staging.vars]
+APP_URL = "https://staging.tenderpilot.in"
+GEM_BASE_URL = "https://bidplus.gem.gov.in"
+LLM_MODEL = "claude-sonnet-5-5"
+MAIL_FROM = "TenderPilot Staging <alerts@tenderpilot.in>"
+
+[env.staging.observability]
 enabled = true

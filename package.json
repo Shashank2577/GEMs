@@ -11,7 +11,7 @@
     "db:seed": "pnpm --filter @tp/db run seed",
     "dev": "pnpm --filter @tp/api run dev",
     "e2e": "playwright test",
-    "deploy": "pnpm --filter @tp/web run build && wrangler deploy"
+    "deploy:manual": "node -e \"if(process.env.ALLOW_MANUAL_DEPLOY!=='1'){console.error('Refusing to deploy: production deploys run only via .github/workflows/deploy.yml (migrate, deploy, smoke). Break-glass: see docs/runbook.md#deploy--rollback, then rerun with ALLOW_MANUAL_DEPLOY=1.');process.exit(1)}\" && pnpm --filter @tp/web run build && wrangler deploy"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

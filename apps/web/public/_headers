@@ -1,0 +1,14 @@
+# Static security headers for the SPA (spec 008 FR-013). Cloudflare Workers static assets apply this file to asset
+# responses (incl. the SPA fallback); the Node server (apps/api/src/node.ts) parses the built copy in apps/web/dist and
+# sends the same headers. API responses get theirs from apps/api/src/middleware/request.ts.
+# The script-src hash is the sha256 of the inline theme script in apps/web/index.html; apps/web/src/lib/csp.test.ts
+# recomputes it, so editing that script without updating the hash here fails the web tests.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-+SnBFxfekSw5flhxpmr2WDrbwgNZhQ7RwlNzaFeCrPY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

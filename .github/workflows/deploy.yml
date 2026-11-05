@@ -1,0 +1,154 @@
+# Ordered, audited release to Cloudflare Workers + Neon (spec 008 US2: FR-007, FR-008, FR-011; ADR-0013).
+#
+#   staging:    checkout → install → pnpm --filter @tp/web build → pnpm db:migrate (staging) → wrangler deploy --env staging
+#               → smoke (staging)
+#   production: needs staging; GitHub environment `production` (required reviewer = the manual approval)
+#               → checkout → install → pnpm --filter @tp/web build → pnpm db:migrate (production) → wrangler deploy
+#               → smoke (production)
+# Migrations always run before the Worker that needs them (they are additive-only, enforced by ci.yml
+# `migrations-additive`, so the old Worker keeps working in between). Steps have no `if:` overrides, so any failure
+# stops every later step and the production job. APP_VERSION = short commit SHA (`--var APP_VERSION:<sha7>`), which
+# smoke.sh then expects from /api/health.
+#
+# Triggers:
+#   - workflow_call: from the `deploy` job in ci.yml, which runs only on a push to main after `ci-gate` succeeded,
+#     with `sha` = the pushed commit and `secrets: inherit`. A red ci never reaches this workflow.
+#   - workflow_dispatch: manual (re)deploy by an operator (`gh workflow run deploy.yml --ref main [-f sha=<sha>]`).
+#   `workflow_run` is deliberately NOT used: it only fires for workflow files on the repository's default branch,
+#   which is currently not `main` (see docs/runbook.md § Deploy & rollback).
+#
+# Concurrency: both jobs share group `deploy` with cancel-in-progress false, set on the jobs (the same group on the
+# calling job in ci.yml would deadlock). One release step runs at a time and none is cancelled mid-flight; while a
+# production job waits for approval, newer staging deploys queue behind it (GitHub keeps only the newest pending one).
+#
+# Secrets (GitHub encrypted secrets; owners and rotation in docs/runbook.md § Secrets):
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, STAGING_DATABASE_URL (repo or `staging` environment),
+#   PROD_DATABASE_URL (`production` environment only, so only an approved job can read it).
+# Variables (optional): STAGING_URL (default https://staging.tenderpilot.in), PRODUCTION_URL (default
+#   https://app.tenderpilot.in) — must match the custom domains in wrangler.toml.
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit to deploy (defaults to the triggering commit)
+        type: string
+        required: false
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to deploy (defaults to the selected ref)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+# Explicit bash = `-eo pipefail`, so `smoke.sh | tee` fails the step when smoke fails.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  staging:
+    name: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL || 'https://staging.tenderpilot.in' }}
+    outputs:
+      sha: ${{ steps.version.outputs.sha }}
+      sha7: ${{ steps.version.outputs.sha7 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - name: Resolve version
+        id: version
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "sha7=${sha::7}" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${sha} as APP_VERSION ${sha::7} (event ${{ github.event_name }})" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm --filter @tp/web build
+        run: pnpm --filter @tp/web build
+      - name: pnpm db:migrate (staging)
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::secret STAGING_DATABASE_URL is not set"; exit 1; fi
+          pnpm db:migrate
+      - name: wrangler deploy --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHA7: ${{ steps.version.outputs.sha7 }}
+        run: pnpm exec wrangler deploy --env staging --var "APP_VERSION:${SHA7}"
+      - name: smoke (staging)
+        env:
+          BASE_URL: ${{ vars.STAGING_URL || 'https://staging.tenderpilot.in' }}
+          SHA7: ${{ steps.version.outputs.sha7 }}
+        run: |
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          scripts/smoke.sh "$BASE_URL" "$SHA7" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  production:
+    name: production
+    needs: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    # Required reviewer(s) on this environment = the manual approval (Settings → Environments → production).
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL || 'https://app.tenderpilot.in' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.staging.outputs.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm --filter @tp/web build
+        run: pnpm --filter @tp/web build
+      - name: pnpm db:migrate (production)
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::secret PROD_DATABASE_URL is not set"; exit 1; fi
+          pnpm db:migrate
+      - name: wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHA7: ${{ needs.staging.outputs.sha7 }}
+        # --env "" = the top-level (production) environment, explicitly.
+        run: pnpm exec wrangler deploy --env "" --var "APP_VERSION:${SHA7}"
+      - name: smoke (production)
+        env:
+          BASE_URL: ${{ vars.PRODUCTION_URL || 'https://app.tenderpilot.in' }}
+          SHA7: ${{ needs.staging.outputs.sha7 }}
+        run: |
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          scripts/smoke.sh "$BASE_URL" "$SHA7" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

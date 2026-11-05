@@ -17,6 +17,7 @@ import { createDeps } from './adapters/index';
 import { createFsBlobStore } from './adapters/blob-fs';
 import type { RuntimeEnv } from './env';
 import { runScheduledJobs } from './lib/scheduled';
+import { isHttpsRequest, parseHeadersFile, staticHeadersFor } from './lib/security-headers';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '../../..');
@@ -46,6 +47,16 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
   const indexPath = resolve(webDist, 'index.html');
   if (existsSync(indexPath)) {
     const root = relative(process.cwd(), webDist) || '.';
+    // Same static security headers + CSP as Cloudflare (FR-013): the built copy of apps/web/public/_headers.
+    const headersFile = resolve(webDist, '_headers');
+    const rules = existsSync(headersFile) ? parseHeadersFile(readFileSync(headersFile, 'utf8')) : [];
+    const trustProxy = deps.config.trustProxy !== 'none';
+    server.use('/*', async (c, next) => {
+      await next();
+      if (c.req.path === '/api' || c.req.path.startsWith('/api/')) return;
+      const https = isHttpsRequest(c.req.url, c.req.header('x-forwarded-proto'), trustProxy);
+      for (const [k, v] of Object.entries(staticHeadersFor(rules, c.req.path, https))) if (k !== 'cache-control') c.header(k, v);
+    });
     server.use('/*', serveStatic({
       root,
       onFound: (path, c) => {

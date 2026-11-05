@@ -9,6 +9,7 @@ import { createR2BlobStore, type R2BucketLike } from './adapters/blob-r2';
 import type { RuntimeEnv } from './env';
 import { runScheduledJobs } from './lib/scheduled';
 import { settleDeferred } from './lib/defer';
+import { HSTS, SECURITY_HEADERS } from './lib/security-headers';
 
 export interface WorkerEnv extends RuntimeEnv {
   DATABASE_URL: string;
@@ -46,13 +47,23 @@ export default {
         return await withDeps(env, ctx, async (deps) => createApp(deps).fetch(request, env, ctx as never));
       } catch (e) {
         console.error('[tp] worker bootstrap failed', (e as Error).message);
-        return Response.json({ error: { code: 'service_unavailable', message: 'Service temporarily unavailable' } }, { status: 503 });
+        return Response.json({ error: { code: 'service_unavailable', message: 'Service temporarily unavailable' } }, {
+          status: 503,
+          headers: { ...SECURITY_HEADERS, ...(url.protocol === 'https:' ? { 'strict-transport-security': HSTS } : {}), 'cache-control': 'no-store' },
+        });
       }
     }
     return env.ASSETS.fetch(request);
   },
 
+  /**
+   * Awaited (FR-012): a rejection marks the invocation as failed in Cloudflare's Cron events. Steps are isolated
+   * (lib/scheduled.ts), so it rejects only when every step failed; the pool is still closed via ctx.waitUntil.
+   */
   async scheduled(_event: { cron?: string; scheduledTime?: number }, env: WorkerEnv, ctx: ExecutionContextLike): Promise<void> {
-    ctx.waitUntil(withDeps(env, ctx, (deps) => runScheduledJobs(deps, { trigger: 'cron' })).then(() => undefined));
+    const report = await withDeps(env, ctx, (deps) => runScheduledJobs(deps, { trigger: 'cron' }));
+    if (report.length > 0 && report.every((r) => !r.ok)) {
+      throw new Error(`scheduled run failed: ${report.map((r) => `${r.step}: ${r.error ?? 'failed'}`).join('; ')}`);
+    }
   },
 };

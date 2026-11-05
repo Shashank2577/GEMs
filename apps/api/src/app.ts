@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { errorHandler, notFoundHandler } from './middleware/error';
-import { injectDeps, noStore } from './middleware/request';
+import { injectDeps, noStore, securityHeaders } from './middleware/request';
 import { analysisRoutes } from './routes/analysis';
 import { assistRoutes } from './routes/assist';
 import { authRoutes } from './routes/auth';
@@ -55,6 +55,7 @@ export function createApp(deps: AppDeps) {
   const api = new Hono<AppEnv>();
   api.use('*', injectDeps(deps));
   api.use('*', noStore);
+  api.use('*', securityHeaders);
 
   api.get('/health', async (c) => {
     let db = false;
