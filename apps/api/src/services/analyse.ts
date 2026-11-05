@@ -16,6 +16,7 @@ import {
 import { buildChecklist } from '@tp/core/analyse/checklist';
 import { enrichWithLlm } from '@tp/core/analyse/llm';
 import { PdfTextError, extractPages, isPdf, joinPages, looksScanned, splitPages } from '@tp/core/analyse/pdf-text';
+import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import { combineRequirements, detectBidNumber, extractRequirementsRules, normalizeBidNumber, requirementsFromListing } from '@tp/core/analyse/rules';
 import { computeScore, effectiveStatus, resolveWeights, scoreTender, DEFAULT_WEIGHTS, type FactorOverride } from '@tp/core/analyse/score';
 import {
@@ -56,8 +57,6 @@ export function documentCheckPrefix(docs: Pick<DocRow, 'text' | 'fileName'>[], t
   return wrong.length ? `Check documents: ${wrong.join('; ')}.` : '';
 }
 
-/** The "Check documents: …" prefix of a stored summary (kept when a factor override recomputes it). */
-const CHECK_PREFIX_RE = /^Check documents: .*GEM\/\d{4}\/[A-Z]\/\d+\.(?= |$)/;
 export const withPrefix = (prefix: string, summary: string) => (prefix ? `${prefix} ${summary}` : summary);
 
 /** `tenderBidNumber` enables `bidNumberFound`; without it the field is null. */
@@ -326,7 +325,7 @@ export async function overrideFactor(
     return input.status === f.status ? rest : { ...rest, overridden: { status: input.status, reason: input.reason, by: input.userName, at } };
   });
   const r = computeScore(factors);
-  const prefix = a.summary?.match(CHECK_PREFIX_RE)?.[0] ?? '';
+  const prefix = matchCheckPrefix(a.summary) ?? '';
   const [updated] = await deps.db.update(analyses).set({
     factors, score: r.score, confidence: r.confidence, verdict: r.verdict, summary: withPrefix(prefix, r.summary), updatedAt: deps.clock.now(),
   }).where(eq(analyses.id, a.id)).returning();

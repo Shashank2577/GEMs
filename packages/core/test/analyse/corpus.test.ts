@@ -35,12 +35,15 @@ beforeAll(async () => {
   }
 });
 
+/** Text wrapping can leave "A/ B" for "A/B"; compare with whitespace around "/" removed. */
+const norm = (v: unknown) => (typeof v === 'string' ? v.replace(/\s*\/\s*/g, '/') : v);
+
 /** Why a field does not match, or null when value (+ numeric) and page are right. */
 function miss(reqs: Requirement[], f: ExpectedField): string | null {
-  const cands = reqs.filter((r) => r.key === f.key && (!MULTI_KEYS.has(f.key) || r.value === f.value));
+  const cands = reqs.filter((r) => r.key === f.key && (!MULTI_KEYS.has(f.key) || norm(r.value) === norm(f.value)));
   const r = cands[0];
   if (!r) return `${f.key}: missing (want ${JSON.stringify(f.value)} p${f.page})`;
-  if (r.value !== f.value) return `${f.key}: value ${JSON.stringify(r.value)} ≠ ${JSON.stringify(f.value)}`;
+  if (norm(r.value) !== norm(f.value)) return `${f.key}: value ${JSON.stringify(r.value)} ≠ ${JSON.stringify(f.value)}`;
   if (f.numeric !== undefined && r.numeric !== f.numeric) return `${f.key}: numeric ${r.numeric} ≠ ${f.numeric}`;
   if (r.source.page !== f.page) return `${f.key}: page ${r.source.page} ≠ ${f.page}`;
   return null;
@@ -74,6 +77,16 @@ describe('real-layout corpus (SC-001)', () => {
       expect(a.ok / a.total, report.at(-1)).toBeGreaterThanOrEqual(0.95);
     }
     expect(ok / total, report.join('\n')).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it('extracts no single-valued keys beyond the expected JSON', () => {
+    // Keys the rules legitimately read from a bid but the ground-truth JSON does not list per document.
+    const unlisted = ['bid_published_at', 'consignee_state'];
+    for (const d of docs) {
+      const want = new Set([...d.expected.fields.map((f) => f.key), ...unlisted]);
+      const extra = d.reqs.filter((r) => !MULTI_KEYS.has(r.key) && !want.has(r.key)).map((r) => r.key);
+      expect(extra, d.expected.file).toEqual([]);
+    }
   });
 
   it('every extracted requirement carries file, page, a Devanagari-free quote ≤ 220 chars and method RULE', () => {

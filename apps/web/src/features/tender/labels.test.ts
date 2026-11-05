@@ -39,12 +39,16 @@ describe('document check (T036)', () => {
   const doc = (id: string, bidNumberFound: string | null, createdAt: string) => ({ id, fileName: `${id}.pdf`, bidNumberFound, createdAt }) as TenderDocumentDto;
   it('lists mismatched documents that existed when the analysis ran', () => {
     const docs = [doc('ok', null, '2026-11-05T10:00:00Z'), doc('old', 'GEM/2026/B/1', '2026-11-05T10:00:00Z'), doc('later', 'GEM/2026/B/2', '2026-11-05T12:00:00Z')];
-    expect(mismatchedDocuments({ updatedAt: '2026-11-05T11:00:00Z' }, docs).map((d) => d.id)).toEqual(['old']);
-    expect(mismatchedDocuments({ updatedAt: '2026-11-05T11:00:00Z' }, undefined)).toEqual([]);
+    expect(mismatchedDocuments({ createdAt: '2026-11-05T11:00:00Z' }, docs).map((d) => d.id)).toEqual(['old']);
+    expect(mismatchedDocuments({ createdAt: '2026-11-05T11:00:00Z' }, undefined)).toEqual([]);
   });
   it('reads the summary prefix', () => {
     expect(documentCheckPrefix('Check documents: go-it-services.pdf is for GEM/2026/B/6120451. Go — 92/100 with 100% confidence.'))
       .toBe('Check documents: go-it-services.pdf is for GEM/2026/B/6120451.');
+    expect(documentCheckPrefix('Check documents: a.pdf is for GEM/2026/B/1; b.pdf is for GEM/2026/B/2. Go — see GEM/2026/B/1. Done.'))
+      .toBe('Check documents: a.pdf is for GEM/2026/B/1; b.pdf is for GEM/2026/B/2.');
+    expect(documentCheckPrefix('Check documents: a.pdf is for GEM/2026/B/1. Go — rebid of GEM/2026/B/1. Done.'))
+      .toBe('Check documents: a.pdf is for GEM/2026/B/1.');
     expect(documentCheckPrefix('Go — 92/100.')).toBeNull();
     expect(documentCheckPrefix(null)).toBeNull();
   });

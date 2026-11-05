@@ -5,6 +5,7 @@ import {
   Timer, Truck, type LucideIcon,
 } from 'lucide-react';
 import type { AnalysisDto, FactorStatus, Requirement, StaleReason, TenderDocKind, TenderDocumentDto } from '@tp/core/contracts/analyse';
+import { matchCheckPrefix } from '@tp/core/analyse/check-prefix';
 import { formatDateIST, formatINR } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
@@ -100,16 +101,16 @@ export function formatRequirementValue(r: Requirement): string {
 
 /**
  * Documents used by this analysis whose printed bid number is not the tender's (FR-010, US2 #13):
- * listed documents flagged `bidNumberFound` that existed when the analysis ran.
+ * listed documents flagged `bidNumberFound` that existed when the analysis was created.
  */
-export function mismatchedDocuments(analysis: Pick<AnalysisDto, 'updatedAt'>, documents: TenderDocumentDto[] | undefined): TenderDocumentDto[] {
-  const at = Date.parse(analysis.updatedAt);
+export function mismatchedDocuments(analysis: Pick<AnalysisDto, 'createdAt'>, documents: TenderDocumentDto[] | undefined): TenderDocumentDto[] {
+  const at = Date.parse(analysis.createdAt);
   return (documents ?? []).filter((d) => d.bidNumberFound && !(Date.parse(d.createdAt) > at));
 }
 
 /** The "Check documents: … is for GEM/…." prefix the API puts on an analysis summary, if any. */
 export function documentCheckPrefix(summary: string | null | undefined): string | null {
-  return summary?.match(/^Check documents: .*GEM\/\d{4}\/[A-Z]\/\d+\.(?= |$)/)?.[0] ?? null;
+  return matchCheckPrefix(summary);
 }
 
 export const CHANGE_LABEL: Record<string, string> = {

@@ -52,7 +52,12 @@ function unitMultiplier(unit: string | undefined): number {
 }
 
 /** "50 Lakh (s)" → 5000000, "1.5 Crore (s)" → 15000000, "96,000" → 96000, "Rs. 2,50,000/-" → 250000. */
-export function parseIndianAmount(s: string): number | null {
+export function parseIndianAmount(input: string): number | null {
+  // Blank out durations ("3 Years") and parenthesised text ("(For 3 Years)"): they are not the amount.
+  const blank = (m: string) => ' '.repeat(m.length);
+  const s = input
+    .replace(/\([^)]*\)/g, blank)
+    .replace(/\d[\d,]*(?:\.\d+)?\s*(?:years?|months?|days?)\b/gi, blank);
   const withUnit = s.match(new RegExp(`(\\d[\\d,]*(?:\\.\\d+)?)\\s*${UNIT_RE}\\b`, 'i'));
   const plain = s.match(/(?:₹|Rs\.?|INR)?\s*(\d[\d,]*(?:\.\d+)?)/i);
   // The first amount wins: "39,00,000 … 1.2 Crore" is 39 lakh, not 1.2 crore.
@@ -179,7 +184,9 @@ const daysP = (v: string): Parsed => {
 const deliveryP = (v: string): Parsed => {
   const s = v.replace(/^[\s:/|-]+/, '');
   if (/^1\s+[^\d\s(]/.test(s)) {
-    const row = s.split(/\s(?=2\s+[^\d\s(])/)[0].replace(/[\s:/|-]+$/, '');
+    // Row 1 ends at its "quantity days" pair; a later "2 <name>" is row 2, but "2 Lodhi Road" in an address is not.
+    const pair = /\s\d[\d,]*(?:\.\d+)?\s+\d{1,4}(?=\s+2\s+[^\d\s(]|\s*$)/.exec(s);
+    const row = (pair ? s.slice(0, pair.index + pair[0].length) : s).replace(/[\s:/|-]+$/, '');
     const m = row.match(/\s(\d[\d,]*(?:\.\d+)?)\s+(\d{1,4})$/);
     if (!m) return null;
     const n = Number.parseInt(m[2], 10);
@@ -392,6 +399,26 @@ export function inferIndianState(text: string): { state: string; index: number; 
   return state ? { state, index: m.index, length: m[0].length } : null;
 }
 
+/**
+ * State of the first consignee row. Several states can occur in one address ("Punjab National Bank
+ * Building, Sector 5, Gurugram, Haryana"): the state closes the address, so the last one before the
+ * second row ("2 <name>") wins.
+ */
+function firstRowState(block: string): { state: string; index: number; length: number } | null {
+  const rowStart = /(?:^|\s)1\s+[^\d\s(]/.exec(block);
+  const from = rowStart ? rowStart.index : 0;
+  const row2 = /\s\d[\d,]*(?:\.\d+)?\s+\d{1,4}\s+2\s+[^\d\s(]/.exec(block.slice(from));
+  const row = block.slice(from, row2 ? from + row2.index : undefined);
+  let last: { state: string; index: number; length: number } | null = null;
+  for (let off = 0; ;) {
+    const h = inferIndianState(row.slice(off));
+    if (!h) break;
+    last = { ...h, index: h.index + off + from };
+    off += h.index + h.length;
+  }
+  return last ?? inferIndianState(block);
+}
+
 const CONSIGNEE_START = /Consignees?\s*\/\s*Reporting\s*Officer/i;
 const CONSIGNEE_END = /Technical\s*Specifications|Buyer\s*Added\s*Bid\s*Specific|Specification\s*Document|Pre[- ]?Dispatch\s*Inspection|Disclaimer/i;
 
@@ -404,7 +431,7 @@ function consigneeState(flats: string[]): { state: string; page: number; quote: 
     const rest = flat.slice(start.index, start.index + 1500);
     const end = CONSIGNEE_END.exec(rest.slice(start[0].length));
     const block = end ? rest.slice(0, start[0].length + end.index) : rest;
-    const hit = inferIndianState(block);
+    const hit = firstRowState(block);
     if (hit) {
       // Start the quote at a word boundary, at most 120 characters before the state.
       const from = hit.index > 120 ? block.indexOf(' ', hit.index - 120) + 1 : 0;
@@ -456,6 +483,8 @@ export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): 
       const parsed = h.def.parse(raw);
       if (!parsed || parsed.value === '' || parsed.value == null) return;
       have.add(h.def.key);
+      // "Contract Period" in a later page's ATC heading is less certain than the page-1 bid-details row.
+      const confidence = h.def.key === 'contract_period' && page > 1 ? 0.8 : 0.95;
       out.push({
         key: h.def.key,
         label: h.def.label,
@@ -464,7 +493,7 @@ export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): 
         mandatory: h.def.mandatory,
         source: src(page, flat.slice(h.start, end)),
         method: 'RULE',
-        confidence: 0.95,
+        confidence,
       });
     });
   });
@@ -623,11 +652,17 @@ export function requirementId(r: Requirement): string {
 /**
  * Combine requirement lists from several documents, in order (bid document first, then ATC,
  * corrigenda…). For single-valued keys a later document wins (a corrigendum supersedes the
- * original); multi-valued keys are unioned. `fallback` fills keys no document provided.
+ * original), except `bid_published_at`, where the earliest document wins; multi-valued keys are unioned. `fallback` fills keys no document provided.
  */
 export function combineRequirements(lists: Requirement[][], fallback: Requirement[] = []): Requirement[] {
   const map = new Map<string, Requirement>();
-  for (const list of lists) for (const r of list) map.set(requirementId(r), r);
+  for (const list of lists) {
+    for (const r of list) {
+      // The publication date belongs to the bid document: a corrigendum's own "Dated:" must not replace it.
+      if (r.key === 'bid_published_at' && map.has(r.key)) continue;
+      map.set(requirementId(r), r);
+    }
+  }
   for (const r of fallback) if (!map.has(requirementId(r))) map.set(requirementId(r), r);
   return [...map.values()];
 }

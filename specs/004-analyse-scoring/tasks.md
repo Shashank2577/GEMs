@@ -250,6 +250,8 @@ description: "Task list for 004 Analyse — bid documents, eligibility extractio
 
 **Purpose**: Improvements that affect multiple user stories
 
+- [ ] T035a [US2] Follow-up to T035: replace/augment the corpus with real anonymised GeM PDFs (SC-001) — synthesised corpus only so far
+
 - [ ] T095 [P] Update `specs/001-gem-tender-copilot/contracts/api.md § Analyse` with the new endpoints (`DELETE …/documents/:docId`, `…/ocr`, `/analyses/:id/rescore`, `/analysis/capabilities`), new fields (`staleReason`, `staleAt`, `notes`, `lastAttempt`, `textSource`, `bidNumberFound`, `warnings`) and error codes (`analysis_running`, `ocr_unavailable`, `ocr_failed`) FR-009 FR-028 FR-037 FR-043 FR-052 FR-053 (#273)
 - [ ] T096 [P] Experience basis hint: when contracts give fewer years than the incorporation date, append "(incorporated N years ago — add older contracts as proof)" to the experience detail; tests in `packages/core/src/analyse/score.ts`, `packages/core/test/analyse/score.test.ts` FR-022 (#275)
 - [ ] T097 Run `/cairn-analyze` on `specs/004-analyse-scoring/` and resolve spec/plan/tasks inconsistencies (#277)

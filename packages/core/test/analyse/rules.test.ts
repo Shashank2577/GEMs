@@ -243,6 +243,48 @@ describe('rules: newer GeM label variants (FR-018, FR-019)', () => {
   });
 });
 
+describe('review fixes (GEM-168)', () => {
+  it('parseIndianAmount ignores durations and parenthesised text before the amount', () => {
+    expect(parseIndianAmount('3 Years 50 Lakh')).toBe(5_000_000);
+    expect(parseIndianAmount('(For 3 Years) 1.2 Crore (s)')).toBe(12_000_000);
+    expect(parseIndianAmount('39,00,000 and 1.2 Crore')).toBe(3_900_000);
+    const one = (t: string, k: string) => req(extractRequirementsRules([t]), k);
+    expect(one('Minimum Average Annual Turnover of the bidder 3 Years 50 Lakh (s)', 'turnover_min')!.numeric).toBe(5_000_000);
+    expect(one('OEM Average Turnover 3 years 200 Crore (s)', 'oem_turnover')!.numeric).toBe(2_000_000_000);
+  });
+
+  it('a corrigendum\'s own "Dated:" does not replace the bid publication date', () => {
+    const bid = extractRequirementsRules(['Bid Number: GEM/2026/B/1 Dated: 01-11-2026 Bid End Date/Time 21-11-2026 18:00:00']);
+    const corr = extractRequirementsRules(['Corrigendum Dated: 10-11-2026 Bid End Date/Time 28-11-2026 18:00:00']);
+    const all = combineRequirements([bid, corr]);
+    expect(req(all, 'bid_published_at')!.value).toBe('2026-11-01T00:00:00+05:30');
+    expect(req(all, 'bid_end')!.value).toBe('2026-11-28T18:00:00+05:30');
+    expect(req(combineRequirements([corr]), 'bid_published_at')!.value).toBe('2026-11-10T00:00:00+05:30');
+  });
+
+  it('contract_period from an ATC heading on a later page is low confidence', () => {
+    const one = (pages: string[]) => req(extractRequirementsRules(pages), 'contract_period');
+    expect(one(['Contract Period 2 Year(s)'])!.confidence).toBe(0.95);
+    expect(one(['Bid Details', 'ATC: 4. Contract Period 3 Years extendable by one year'])).toMatchObject({ numeric: 36, confidence: 0.8 });
+    expect(one(['Bid Details', 'Contract Period: 2 years from the date of award'])!.confidence).toBeLessThan(0.9);
+  });
+
+  it('delivery days survive "2 <word>" inside the first consignee address', () => {
+    const rs = extractRequirementsRules(['Delivery Days 1 Anil Kumar 110001, 2 Lodhi Road, New Delhi 25 30']);
+    expect(req(rs, 'delivery_days')).toMatchObject({ value: '30 days', numeric: 30 });
+    const two = extractRequirementsRules(['Delivery Days 1 Anil Kumar 110001, 2 Lodhi Road, New Delhi 25 30 2 Ravi S 411001, Pune 5 45']);
+    expect(req(two, 'delivery_days')!.numeric).toBe(30);
+  });
+
+  it('consignee state is the last state of the first row, not a bank name in the address', () => {
+    const rs = extractRequirementsRules([
+      'Consignees/Reporting Officer and Quantity S.No. Delivery Days 1 Anil Kumar 122001, Punjab National Bank Building, Sector 5, Gurugram, Haryana 25 30 ' +
+      '2 Ravi S 411001, Pune, Maharashtra 5 45 Buyer Added Bid Specific Terms',
+    ]);
+    expect(req(rs, 'consignee_state')!.value).toBe('Haryana');
+  });
+});
+
 describe('rules: values interleaved inside wrapped labels (T035 corpus findings)', () => {
   it('reads a value printed between the two lines of a wrapped English label', () => {
     const page = [
