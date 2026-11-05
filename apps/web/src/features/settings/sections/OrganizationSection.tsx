@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Crown, FlaskConical, Sparkles } from 'lucide-react';
-import { PLANS, formatPlanPrice, type PlanKey } from '@tp/core/contracts/plans';
+import { PLANS, formatPlanPrice, type PricedPlanKey } from '@tp/core/contracts/plans';
 import { Badge, Button, Field, Input, toast } from '@/components/ui';
 import { errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -11,7 +11,7 @@ import { useUpdateOrg } from '../api';
 import { Panel, fieldErrors } from './Panel';
 
 /** Price shown for a plan, from the single PLANS config (007/FR-086). */
-function planPrice(key: PlanKey): string {
+function planPrice(key: PricedPlanKey): string {
   return formatPlanPrice(PLANS.find((p) => p.key === key)!);
 }
 

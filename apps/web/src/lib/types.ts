@@ -5,7 +5,7 @@ export type Stage = 'identified' | 'analysing' | 'go' | 'preparing' | 'ready' | 
 
 export interface Me {
   user: { id: string; name: string; email: string; phone: string | null };
-  org: { id: string; name: string; slug: string; plan: string; onboardingState: Record<string, boolean> };
+  org: { id: string; name: string; slug: string; plan: string; onboardingState: Record<string, boolean>; trialEndsAt?: string | null };
   role: Role;
   orgs: { id: string; name: string; role: Role }[];
 }

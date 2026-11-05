@@ -1,0 +1,18 @@
+# sc12-admin-plan-flip — project desktop — 2026-11-05T09:32:07.049Z
+### no token
+> POST /api/admin/orgs/dd7d0396-d6bc-4a3a-b319-df51a32df814/plan
+< 404
+{"error":{"code":"not_found","message":"No API route for POST /api/admin/orgs/dd7d0396-d6bc-4a3a-b319-df51a32df814/plan"}}
+
+### wrong token
+> POST /api/admin/orgs/dd7d0396-d6bc-4a3a-b319-df51a32df814/plan (wrong bearer)
+< 404
+{"error":{"code":"not_found","message":"No API route for POST /api/admin/orgs/dd7d0396-d6bc-4a3a-b319-df51a32df814/plan"}}
+
+### with the operator token
+> POST /api/admin/orgs/dd7d0396-d6bc-4a3a-b319-df51a32df814/plan {"plan":"starter","note":"Invoice INV-0012"} (Authorization: Bearer <ADMIN_TOKEN>)
+< 200
+{"org":{"id":"dd7d0396-d6bc-4a3a-b319-df51a32df814","plan":"starter","trialEndsAt":null},"subscriptionId":"a7c9799d-45a2-454f-b4be-ce1637fe6a97"}
+subscriptions: starter|active|Invoice INV-0012
+activity_log org.plan_changed meta: {"to": "starter", "from": "trial", "note": "Invoice INV-0012", "trialEndsAt": null}
+POST /api/watchlists after the flip → 201

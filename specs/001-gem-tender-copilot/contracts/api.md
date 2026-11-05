@@ -34,10 +34,11 @@ A read-only token (`scope:"read"`, 006/FR-074) may only `GET`/`HEAD`: every othe
 | GET/PUT | /me/notification-prefs | `{inApp,email,whatsapp,frequency,expiryReminders}` (PUT needs the full object, per org) | prefs |
 | POST (S) | /me/notifications/test | – (1/min per user → 429 `rate_limited` + `Retry-After`) | `{inApp:'sent',email,whatsapp,skipReasons?}`, email/whatsapp each `sent\|skipped\|failed\|off`; `skipReasons` (only when something was skipped) maps a channel to `not_configured\|no_phone` (002/FR-034) |
 | GET/POST/DELETE | /me/api-tokens[/:id] | POST (S) `{name, expiresInDays?: 30\|90\|365\|null, scope?: "full"\|"read"}` (default 90, null = never; scope default `full`, fixed at creation) | list `{id,name,createdAt,lastUsedAt,expiresAt,hint,scope}` / `{…, token}` shown once; 409 `token_limit` at 10 active tokens per org (002/FR-037); `scope:"read"` = "Extension (read-only)" (006/FR-074) |
-| GET | /org | – | org |
+| GET | /org | – | org (incl. `trialEndsAt`, 008/FR-035) |
+| GET | /org/usage | – | any member (008/FR-039): `{plan, trialEndsAt, period:{start,end}, usage:{seats, watchlists, analysesThisMonth, llmAnalysesThisMonth, vaultBytes, packetsThisMonth, llmTokensThisMonth:{input,output}}, limits}`; months are IST calendar months; `limits.watchlists: null` = no plan limit (the 003/FR-027 cap of 50 still applies); demo-seeded analyses are not counted, and deleted analyses keep their AI count |
 | GET | /org/members | – | `{items:[{userId,name,email,phone,role,joinedAt}], total, invitations:[{id,email,role,createdAt,expiresAt,invitedBy}]}` (pending = unexpired, unaccepted) |
 | POST (M) | /org/invitations | `{email,role}` | `{id,email,role,inviteUrl,expiresAt}`, 201; replaces a pending invite for the same email; 409 `conflict` if already a member; 403 `forbidden` when a non-owner invites an owner |
-| POST (M) | /org/invitations/:id/resend | – | as above, 201: new token and 7-day expiry, also revives an expired invite; `invitedBy` becomes the resender; 404 for other orgs' or accepted invites |
+| POST (M) | /org/invitations/:id/resend | – | as above, 201: new token and 7-day expiry, also revives an expired invite (then counts one seat: 402 `plan_limit_reached` when the plan's seats are full, 008/FR-036); `invitedBy` becomes the resender; 404 for other orgs' or accepted invites |
 | DELETE (M) | /org/invitations/:id | – | `{ok:true}`; 404 as above |
 | PATCH/DELETE (O) | /org/members/:userId | `{role}` | member; 409 `last_owner` when it would leave no owner (FR-021) |
 | DELETE (S) | /org/members/me | – | `{ok:true,nextOrgId}`: leave the active org (FR-027); 409 `last_owner` |
@@ -81,17 +82,68 @@ for inline document previews), `Referrer-Policy: no-referrer`, `Strict-Transport
 | GET | /notifications | `unread?` → `{items, unreadCount}` |
 | POST | /notifications/:id/read, /notifications/read-all | – |
 
-## Analyse — owner: Analyse module (`routes/analysis.ts`)
+## Analyse — owner: Analyse module (`routes/analysis.ts`, `services/analyse.ts`, `services/staleness.ts`)
+
+Types: `packages/core/src/contracts/analyse.ts` (004). Every route is scoped to the session's organization and uses the standard error envelope. Role gates: `viewer+` = any signed-in member, `analyst+`, `bid_manager+`. Tender documents fetched from GeM (`orgId = null`) are shared by all orgs; uploads belong to the uploading org (another org's upload is 404).
 
 | Method | Path | Notes |
 |---|---|---|
-| POST (W) | /tenders/:id/documents | multipart `file`, `kind` → `TenderDocument` (text extracted) |
-| POST (W) | /tenders/:id/fetch-documents | downloads GeM bid document(s) via GemClient |
-| GET | /tenders/:id/documents/:docId/download | streams file |
-| POST (W) | /tenders/:id/analyse | runs rules (+LLM if key) → `Analysis` |
-| GET | /tenders/:id/analysis | latest `Analysis` or 404 |
-| POST (M) | /analyses/:id/override | `{factorKey,status,reason}` → re-scored `Analysis` |
-| GET/PUT (M) | /scoring-weights | `Record<factorKey, number>` |
+| GET | /tenders/:id/documents | viewer+. `{items: TenderDocumentDto[], total}` — the shared GeM copies plus this org's uploads (text omitted) |
+| POST (W) | /tenders/:id/documents | analyst+, multipart `file` (PDF sniffed from bytes, ≤ 25 MB) + `kind` (`bid`\|`atc`\|`corrigendum`\|`boq`\|`other`, default `bid`) → 201 `UploadTenderDocumentResponse` = `TenderDocumentDto` + `warnings: TenderDocumentWarning[]`. Text is extracted (first 150 pages) on upload; a scanned PDF is accepted with `hasText:false`; a PDF over 300 pages → 422 `document_too_long`. Marks this org's analyses of the tender stale (`document_added`). Rate limited (`upload.org`) |
+| POST (W) | /tenders/:id/fetch-documents | analyst+. Downloads the GeM bid document once → `{items, total, fetched}`: **201** when a copy was stored, **200** (`fetched:0`) when the stored copy is returned ("already here"). A corrigendum that changed the tender's `documentUrl` after the stored copy was fetched triggers a re-download as kind `corrigendum` (the earlier copy is kept) and marks every org's analyses of the tender stale (`corrigendum`). `?refresh=1` forces a re-download even when the URL is unchanged; a forced copy whose text hashes the same as a stored one stores nothing (200), while one that stores a new copy also marks every org's analyses of the tender stale (`corrigendum`). Rate limited (`gem.fetch.org`) |
+| DELETE (W) | /tenders/:id/documents/:docId | analyst+. Removes one of this org's uploads → 204; the delete, the `tender.document_removed` activity row and the stale flag (`document_removed`) commit together. A GeM-fetched document → 403 `forbidden`; unknown/other-org id → 404 |
+| GET | /tenders/:id/documents/:docId/download | viewer+. Streams the PDF; `?inline=1` for in-browser preview. `cache-control: private, no-store`, `x-content-type-options: nosniff` |
+| POST (W) | /tenders/:id/analyse | analyst+. Reads every bid document (auto-fetches from GeM when there are none and the tender has a GeM link), extracts requirements by rules (+ LLM when a key is configured and the budget/quota allow), scores and builds the checklist → 201 `AnalysisDto` (`method:'rules'\|'rules+llm'`); the response `documents` lists only the documents that were read (skipped scanned PDFs are not listed, unlike `GET …/analysis`). The auto-fetch swallows its errors except 503 `gem_busy` and 422 `document_too_long`, which analyse surfaces; with no documents and no GeM link it returns 422 `no_documents`. Rate limited (`analyse.user`). A running analysis for the tender → 409 `analysis_running`; one that exceeded the run timeout and was replaced while this request was finishing → 409 `analysis_superseded` |
+| GET | /tenders/:id/analysis | viewer+. The latest **done** `AnalysisDto` (with `documents` — including skipped scanned PDFs — and the manual overrides applied), or 404 `not_found` when the tender was never analysed. A newer attempt that is still running or failed is reported in `lastAttempt`; a first-ever run that failed or timed out returns that attempt as the DTO itself (`status:'failed'`) with `lastAttempt`, and a first-ever run that is still running is likewise returned as the DTO itself (`status:'running'`) |
+| POST (M) | /analyses/:id/override | bid_manager+. `{factorKey, status, reason}` (`reason` 3–500 chars) → the re-scored analysis in the same shape as `GET …/analysis`. `status` equal to the computed one removes the override. 409 `conflict` unless the analysis is `done`; 409 `analysis_replaced` when a newer analysis exists; an unknown `factorKey` → 400 `validation_error` (a 404 for a key outside the analysis is practically unreachable) |
+| POST (W) | /analyses/:id/rescore | analyst+. Recomputes factors, score, verdict and checklist from the **stored** requirements with the current profile, vault, past contracts and weights; keeps overrides and clears `stale`/`staleReason`/`staleAt`. Same body as `GET …/analysis`. 409 `conflict` unless `done`; 409 `analysis_running` while an analysis is running for the tender; 409 `analysis_replaced` when a newer analysis exists; 409 `reanalysis_required` when the stale reason is a document change (`corrigendum`, `document_added`, `document_removed`) or unknown — use `POST …/analyse` instead |
+| GET/PUT (M) | /scoring-weights | GET viewer+: `ScoringWeights` = `{weights, defaults, custom}`. PUT bid_manager+: partial map factor → 0–100 (`{}` resets to defaults), at least one weight > 0 else 400 `validation_error`; marks the org's analyses of open tenders stale (`weights_changed`) → `ScoringWeights` |
+
+### DTOs
+
+- `TenderDocumentDto` = `{id, tenderId, orgId (null = GeM), kind, fileName, sizeBytes, pageCount, totalPages, sourceUrl, hasText, source:'gem'\|'upload', textSource:'pdf'\|'ocr', bidNumberFound, createdAt}`.
+  - `pageCount` = pages read (capped at 150, 004/NFR-005); `totalPages` = the PDF's real page count (`totalPages > pageCount` means it was truncated; `null` for rows that predate the column).
+  - `hasText:false` = no text layer (scanned). `textSource` is `'pdf'` for every document today; `'ocr'` is reserved for US7.
+  - `bidNumberFound` = the bid number printed on page 1 when it differs from the tender's, else `null`.
+- `TenderDocumentWarning` (upload response only, non-blocking, FR-010): `{code:'bid_number_mismatch', found}` and `{code:'pages_truncated', analysed, total}`.
+- `AnalysisDto` = `{id, orgId, tenderId, status:'pending'\|'running'\|'done'\|'failed', method, requirements[], factors[], checklist[], score, confidence, verdict:'go'\|'review'\|'no_go'\|null, summary, error, stale, staleReason, staleAt, notes[], warnings[], createdBy, createdAt, updatedAt, documents?, lastAttempt?}`.
+  - `stale` + `staleReason` (`corrigendum`\|`document_added`\|`document_removed`\|`profile_changed`\|`vault_changed`\|`weights_changed`) + `staleAt` (ISO) say why and since when the result is outdated (FR-043). Re-score fixes the company-side reasons (`profile_changed`, `vault_changed`, `weights_changed`); the others need a re-analysis.
+  - `notes` = human-readable caveats of the run, e.g. pages that AI review did not cover (FR-051).
+  - `warnings` = machine-readable caveats: `{code:'llm_budget_exhausted', covered, total}` and `{code:'llm_quota_reached'}` (008/FR-031, FR-037).
+  - `lastAttempt` (GET/override/rescore only) = `{status:'running'\|'failed', error, at}` for a newer attempt than the shown result (FR-029).
+  - `documents` = the documents the analysis read: `{id, fileName, kind, pageCount, totalPages?}`.
+
+### Analyse error codes
+
+| Code | Status | When |
+|---|---|---|
+| `analysis_running` | 409 | `POST …/analyse` or `…/rescore` while an analysis of the tender is running (a run older than the timeout is treated as dead and does not block) |
+| `analysis_superseded` | 409 | The run exceeded its timeout and a newer one replaced it before it could store its result. "Reload to see the latest result." |
+| `analysis_replaced` | 409 | Override or re-score of an analysis that a newer analysis has replaced |
+| `reanalysis_required` | 409 | Re-score of an analysis whose stale reason needs the documents re-read |
+| `conflict` | 409 | Override or re-score of an analysis that is not `done` |
+| `no_documents` | 422 | Analyse with no bid document and nothing to auto-fetch, including a tender with no GeM link ("Add the bid document first") |
+| `no_gem_document` | 422 | Fetch for a tender without a GeM document link (never returned by analyse) |
+| `document_too_long` | 422 | A PDF over 300 pages, on upload, fetch or the auto-fetch inside analyse |
+| `scanned_document` | 422 | Every document of the tender is a scan without a text layer (008/FR-030); `details.documents` lists the file names. A mix analyses the readable ones and adds a `notes` entry per skipped scan |
+| `unreadable_pdf` | 422 | Upload or GeM download that cannot be parsed (damaged or password-protected) |
+| `unsupported_media_type` | 415 | Upload is not a PDF |
+| `payload_too_large` | 413 | Upload larger than 25 MB (checked before the body is read, 008/FR-021) |
+| `bad_request` | 400 | Empty file |
+| `validation_error` | 400 | Missing `file`, unknown `kind`, invalid override or weights body |
+| `gem_unavailable` | 502 | GeM could not be reached, no longer serves the document (404), or the document exceeds 25 MB |
+| `gem_busy` | 503 | The cluster-wide GeM request slot (1 request/s) was not free within 25 s (008/FR-024); also surfaced by analyse's auto-fetch |
+| `rate_limited` | 429 | `upload.org`, `gem.fetch.org` or `analyse.user` limit reached |
+| `forbidden` | 403 | Role too low, or removing a GeM-fetched document |
+| `analysis_failed` | 500 | The run failed unexpectedly; the previous result (if any) stays and is reported with `lastAttempt` |
+
+### US7 (pending): AI enrichment and OCR
+
+> Not built yet. The US7 PR completes this section (and ticks T095 in `specs/004-analyse-scoring/tasks.md`); nothing below exists on `main` today.
+
+- `POST /tenders/:id/documents/:docId/ocr` (analyst+) — read a scanned document with AI → the updated `TenderDocumentDto` (`textSource:'ocr'`). Planned: 409 when the document already has text. TODO(US7): request/response details.
+- `GET /analysis/capabilities` (viewer+) — `{ai, ocr, models}`. TODO(US7): shape and caching.
+- Error codes `ocr_unavailable` (503, no OCR model configured) and `ocr_failed` (502, the model could not transcribe the document). TODO(US7): messages and `details`.
 
 ## Profile & Vault — owner: Vault module (`routes/profile.ts`, `routes/vault.ts`)
 
@@ -194,6 +246,12 @@ Both arrays hold at most 5 items (`MY_WORK_LIMIT`), are computed for the signed-
 
 `TenderCore.isDemo: boolean` (in `packages/core/src/contracts/identify.ts`) is on every tender DTO (list items and detail). It is true when `tenders.source = 'demo'` or the stored payload carries `raw.demo === true` (the list query does not select `raw`, so `source` decides there). The web shows a "Sample" badge in the feed (card and table) and on the tender page. Demo tenders are visible only to orgs that loaded the demo (008/FR-016).
 
+## Operator — owner: Ops (`routes/admin.ts`, spec 008 FR-042)
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | /admin/orgs/:id/plan | `{plan:'trial'\|'starter'\|'pro'\|'enterprise', note, trialEndsAt?}` | `Authorization: Bearer <ADMIN_TOKEN>` only (never a member session). `{org:{id,plan,trialEndsAt}, subscriptionId}`; a paid plan clears `trialEndsAt`; writes a `subscriptions` row and the `org.plan_changed` activity. Without `ADMIN_TOKEN` configured, with a wrong token or an unknown org → the generic 404 |
+
 ## Scheduled (Worker `scheduled`, also `POST /ingestion/run`)
 
 1. `runIngestion()` — fetch N pages, upsert tenders, record events, match watchlists, create notifications.
@@ -206,8 +264,8 @@ Built with the helpers in `apps/api/src/lib/errors.ts`. Rate-limit rules: `apps/
 
 | Status | Code | When | `details` |
 |---|---|---|---|
-| 402 | `plan_limit_reached` | a plan limit (seats, watchlists, analyses, vault bytes, packets) is reached | `{limit, used, max}` |
-| 402 | `plan_expired` | the trial or plan has ended (writes only) | – |
+| 402 | `plan_limit_reached` | a plan limit (seats, watchlists, analyses, vault bytes, packets) is reached; `enterprise` is never limited (`PLAN_LIMITS`, `packages/core/src/contracts/plans.ts`) | `{limit, used, max, plan, resetsAt?}` (`resetsAt` = next IST month start, monthly limits only) |
+| 402 | `plan_expired` | the free trial has ended: every write except the FR-038 allow-list (auth, own account/sessions, revoking an API token, marking notifications read, notification prefs, `DELETE /demo`, `POST /tenders/:id/seen`, leaving the org `DELETE /org/members/me`, revoking an invitation `DELETE /org/invitations/:id`, and the operator-only `/admin/*`); reads keep working | `{plan:'trial', trialEndsAt}` |
 | 413 | `payload_too_large` | body over its cap: JSON 1 MB, vault 20 MB, tender documents 25 MB (+64 KB multipart); rejected before the body is read | `{maxBytes}` |
 | 413 | `packet_too_large` | packet would exceed 40 MB or 40 items | – |
 | 422 | `document_too_long` | tender document over 300 pages (refused before any text is read; 151–300 pages are accepted, first 150 read, `pages_truncated` warning) | – |

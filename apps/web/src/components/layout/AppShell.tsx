@@ -18,6 +18,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { CommandPalette } from './CommandPalette';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
+import { TrialBanner } from './TrialBanner';
 
 /** Slot for the bell so feature code can render it elsewhere if needed. */
 export function NotificationsBellSlot() {
@@ -240,6 +241,7 @@ export function AppShell() {
         <div className="sticky top-14 z-10"><OfflineBanner /></div>
 
         <main id="main" tabIndex={-1} className="flex-1 outline-none">
+          <TrialBanner />
           <div className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pb-12 lg:px-8">
             <RouteErrorBoundary resetKey={loc.pathname}>
               <Suspense fallback={<SkeletonPage />}>

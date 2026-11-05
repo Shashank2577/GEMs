@@ -1,8 +1,39 @@
 # ADR-0010: Plan limits, trial expiry and billing readiness without a payment provider yet
 
-**Status**: Proposed
+**Status**: Accepted (implemented by spec 008 US5, PR #540 — see "As implemented" below; the numbers in Decision 1 were placeholders)
 **Date**: 2026-11-05
 **Priority**: MUST (plan limits, trial expiry, 402 contract, usage endpoint) · SHOULD (subscriptions table) · LATER (payments)
+
+## As implemented (008 US5)
+
+The decision stands; the details below supersede the sketch in Decision 1–5 where they differ.
+
+- **Limits (FR-034)** — `PLAN_LIMITS` in `packages/core/src/contracts/plans.ts`, `null` = no plan limit (not `Infinity`):
+
+  | Plan | seats | watchlists | analyses / month | AI analyses / month | vault | packets / month | WhatsApp |
+  |---|---|---|---|---|---|---|---|
+  | `trial` (14 days) | 10 | — | 10 | 10 | 1 GB | 10 | yes |
+  | `starter` | 3 | 5 | 100 | 50 | 2 GB | 30 | no (not yet enforced — follow-up issue) |
+  | `pro` | 10 | — | 500 | 250 | 10 GB | 200 | yes |
+  | `enterprise` | — | — | — | — | — | — | yes |
+
+  "—" = no plan limit; watchlists are still capped at 50 per org by 003/FR-027 (`WATCHLIST_LIMIT`, shared with the
+  web meter). Monthly counters use the IST calendar month. Seats = members + pending, unexpired invitations.
+- **402 contract (FR-040)** — `plan_limit_reached` `{limit, used, max, plan, resetsAt?}` and `plan_expired`
+  `{plan:'trial', trialEndsAt}`; the expired check is one global middleware (`middleware/plan.ts#requireActivePlan`)
+  with an explicit allow-list (`allowedWhenExpired`, FR-038), not a flag on `requireRole`.
+- **Quota integrity** — analyses and watchlists are checked and inserted under the org row lock
+  (`SELECT … FOR NO KEY UPDATE`); seats, vault and packets are check-then-insert (a race can overshoot by the
+  concurrent requests — accepted, not a cost risk). The AI slot is reserved in the analysis' quota transaction as a
+  0-token `llm_usage` row (`reserved = true`, inserted after the analysis with `analysis_id` set) and counted on
+  `llm_usage.analysis_ref` (no FK), so deleting analyses never returns AI quota; the reservation is released by id
+  only when no call was metered, decided in-process after in-flight calls settle. Only rows the demo seeder wrote
+  (`analyses.seeded`) are outside the quota, and `DELETE /api/demo` deletes only those. Packets are counted on the
+  FK-free `packet_ledger` (written with each packet, removed only when its build fails), so deleting a packet with its
+  demo workspace does not return packet quota.
+- **Subscriptions (FR-042)** — append-only `subscriptions (org_id, plan, status, started_at, ends_at, note, created_by)`
+  written by `POST /api/admin/orgs/:id/plan` (Bearer `ADMIN_TOKEN`, ≥ 32 characters, else the endpoint stays 404).
+- **Usage (FR-039)** — `GET /api/org/usage` → `{plan, trialEndsAt, period, usage, limits}`; Settings → Plan & usage.
 
 ## Context
 

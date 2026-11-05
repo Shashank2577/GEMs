@@ -1,0 +1,4 @@
+# sc8-countdown-banners — project desktop — 2026-11-05T09:31:40.788Z
+localStorage tp-trial-banner-dismissed:b78e0930-9baf-4004-920e-154676f01475 = "2026-11-05"
+dismissal stored for 2020-01-01 → banner shown again (dismissal is per IST day)
+viewer: no countdown banner

@@ -85,7 +85,9 @@ export const TenderCard = memo(function TenderCard({ t, canDismiss = true }: { t
             {t.isDemo && <SampleBadge />}
             {t.hasCorrigendum && (
               <Tooltip content="GeM published a corrigendum this week — dates or terms changed.">
-                <Badge size="sm" tone="warning"><FileWarning aria-hidden />Corrigendum</Badge>
+                <span tabIndex={0} data-testid="corrigendum-badge" className="relative z-10 inline-flex rounded-sm focus-ring">
+                  <Badge size="sm" tone="warning"><FileWarning aria-hidden />Corrigendum</Badge>
+                </span>
               </Tooltip>
             )}
             {t.workspace && <StageBadge stage={t.workspace.stage as Stage} size="sm" />}
