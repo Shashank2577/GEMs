@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Bot, Cpu, ListChecks, PenLine, Search, TriangleAlert } from 'lucide-react';
+import { Bot, Cpu, ListChecks, PenLine, ScanText, Search, TriangleAlert } from 'lucide-react';
 import type { AnalysisDto, Requirement, TenderDocumentDto } from '@tp/core/contracts/analyse';
 import { Badge, Card, EmptyState, Input, ResponsiveTable, Tooltip, type Column } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { PageChip } from './AnalysisPanel';
-import { REQ_GROUPS, documentCheckPrefix, formatRequirementValue, mismatchedDocuments } from './labels';
+import { NEEDS_REVIEW_LABEL, OCR_REQUIREMENT_TOOLTIP, REQ_GROUPS, documentCheckPrefix, formatRequirementValue, mismatchedDocuments } from './labels';
 
 function MethodBadge({ m }: { m: Requirement['method'] }) {
   if (m === 'LLM') return <Badge tone="accent" size="sm"><Bot aria-hidden /> AI</Badge>;
@@ -74,6 +74,16 @@ export function RequirementsTab({ analysis, tenderId, documents, bidNumber }: {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 font-medium">
             {r.label}
+            {r.source.ocr && (
+              <Tooltip content={OCR_REQUIREMENT_TOOLTIP}>
+                <span tabIndex={0} className="rounded focus-ring" data-testid="ocr-requirement"><Badge size="sm" tone="info"><ScanText aria-hidden /> Read by AI (OCR)</Badge><span className="sr-only">. {OCR_REQUIREMENT_TOOLTIP}</span></span>
+              </Tooltip>
+            )}
+            {r.needsReview && (
+              <Tooltip content={r.needsReview}>
+                <span tabIndex={0} className="rounded focus-ring" data-testid="requirement-needs-review"><Badge size="sm" tone="warning"><TriangleAlert aria-hidden /> {NEEDS_REVIEW_LABEL}</Badge><span className="sr-only">. {r.needsReview}</span></span>
+              </Tooltip>
+            )}
             {r.mandatory && <Tooltip content="Mandatory for eligibility"><span className="size-1.5 rounded-full bg-danger" role="img" aria-label="mandatory" /></Tooltip>}
           </div>
           {r.source.quote && <p className="mt-0.5 line-clamp-1 text-xs font-normal text-muted-foreground md:max-w-[320px]" title={r.source.quote}>“{r.source.quote}”</p>}

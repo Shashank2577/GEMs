@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { request as playwrightRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { test, expect, uniqueUser, inviteAs, evidence, collectRunArtifacts, a11y, atPhone, noHorizontalOverflow, mockGem, seedDemo, makePng } from '../support/fixtures';
+import { test, expect, uniqueUser, inviteAs, evidence, collectRunArtifacts, a11y, atPhone, noHorizontalOverflow, mockGem, seedDemo, makePng, resetIngestionData } from '../support/fixtures';
 import { createOrgWithRoles, type OrgWithRoles, type OrgMember } from '../support/platform';
 
 /**
@@ -420,8 +420,9 @@ test('sc5b Sync health: last success > 2 h ago is "Delayed"; runs table columns,
 test('sc5c Sync now against mock-gem: GeM down -> Last run failed + "Last error:"; recovered -> toast "Sync finished", Healthy, new bids', async ({ page }) => {
   desktopOnly('shared DB state');
   test.setTimeout(240_000);
-  sql('delete from ingestion_runs');
-  await mockGem(page.request, '/__admin/reset');
+  // Start from empty ingestion state: the assertions below count new bids, and other tests/specs on the shared DB
+  // leave tenders and runs behind.
+  await resetIngestionData(page.request);
   const org = await newOrg();
   await page.setViewportSize({ width: 1440, height: 900 });
   await as(page, org.members.bid_manager);

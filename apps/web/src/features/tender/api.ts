@@ -1,7 +1,7 @@
 /** Data hooks for the tender detail page (Identify: GET /tenders/:id; Analyse: documents, analysis, override). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TenderDetail, TenderResultDto } from '@tp/core/contracts/identify';
-import type { AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto, UploadTenderDocumentResponse } from '@tp/core/contracts/analyse';
+import type { AnalysisCapabilities, AnalysisDto, FactorStatus, TenderDocKind, TenderDocumentDto, UploadTenderDocumentResponse } from '@tp/core/contracts/analyse';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import { api, ApiError } from '@/lib/api';
 import { ANALYSIS_POLL_MS, isAnalysisRunning } from './labels';
@@ -13,6 +13,11 @@ export const tenderKeys = {
   activity: (id: string) => ['tender', id, 'activity'] as const,
   result: (id: string) => ['tender', id, 'result'] as const,
 };
+
+/** GET /analysis/capabilities: is AI (and OCR) configured? Drives the "Analysing…" copy and OCR actions (004/FR-053). */
+export function useAnalysisCapabilities() {
+  return useQuery({ queryKey: ['analysis', 'capabilities'] as const, queryFn: () => api.get<AnalysisCapabilities>('/analysis/capabilities'), staleTime: 5 * 60_000 });
+}
 
 export function useTender(id: string) {
   return useQuery({ queryKey: tenderKeys.detail(id), queryFn: () => api.get<TenderDetail>(`/tenders/${id}`) });
@@ -96,6 +101,17 @@ export function useRemoveDocument(id: string) {
   return useMutation({
     mutationFn: (docId: string) => api.delete<void>(`/tenders/${id}/documents/${docId}`),
     onSuccess: () => invalidateDocumentChange(qc, id),
+  });
+}
+
+/** POST /tenders/:id/documents/:docId/ocr — read a scanned document with AI (004/FR-052). Marks the analysis stale, so refresh it too. */
+export function useOcrDocument(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (docId: string) => api.post<TenderDocumentDto>(`/tenders/${id}/documents/${docId}/ocr`),
+    onSuccess: () => invalidateDocumentChange(qc, id),
+    // 409 (already has text) means the list is out of date; refresh it either way.
+    onError: () => { qc.invalidateQueries({ queryKey: tenderKeys.documents(id) }); },
   });
 }
 

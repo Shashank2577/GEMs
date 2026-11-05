@@ -130,21 +130,56 @@ export async function checkAnalysisQuota(deps: Pick<AppDeps, 'clock'>, tx: DbOrT
  * (FK `ON DELETE SET NULL`) cannot make the fill fail (review NEW-B1). Returns the reservation id.
  */
 export async function reserveLlmSlot(
-  deps: Pick<AppDeps, 'clock'>, tx: DbOrTx, r: { orgId: string; analysisId: string; model: string },
+  deps: Pick<AppDeps, 'clock'>, tx: DbOrTx, r: { orgId: string; analysisId: string | null; analysisRef?: string; model: string },
 ): Promise<string> {
   const [row] = await tx.insert(llmUsage).values({
-    orgId: r.orgId, analysisId: r.analysisId, analysisRef: r.analysisId, kind: 'extract', model: r.model, inputTokens: 0, outputTokens: 0,
+    orgId: r.orgId, analysisId: r.analysisId, analysisRef: r.analysisRef ?? r.analysisId, kind: 'extract', model: r.model, inputTokens: 0, outputTokens: 0,
     reserved: true, createdAt: deps.clock.now(),
   }).returning({ id: llmUsage.id });
   return row!.id;
 }
 
+/** An OCR reservation still unfilled after this long was abandoned by a run that died (review N6). */
+export const ABANDONED_OCR_RESERVATION_MS = 15 * 60_000;
+
 /**
- * Give back an AI slot reserved by `reserveLlmSlot`: delete that row by id. Only `LlmMeter` calls it, and only when no
- * LLM call of the analysis was metered (the decision is in-process, never read from `analysis_id`, review NEW-B1).
+ * OCR (004/FR-052) takes one monthly AI slot per run, like an AI analysis (008/FR-037, ADR-0008 amendment
+ * 2026-11-05): under the org row lock, throw 402 `plan_limit_reached` (`limit: 'llmAnalysesPerMonth'`) when the slots
+ * are used up, else reserve one under `ref` (default: a fresh uuid) with no `analysis_id`. Manual OCR uses a fresh ref
+ * (there is no analysis); analyse's automatic OCR passes the coming analysis's id, so the analysis later links the row
+ * and uses the same slot (review N3: reserved atomically BEFORE any OCR call, never a lock-free pre-check).
+ * The run's first metered call fills the reservation and its other calls are metered under the same ref, so the run
+ * counts once; a run whose calls never reached the model gives the slot back (`meteredCompleteJson.finish`). Every
+ * attempt that reached the model keeps its slot, failed or not, so retries of a failing OCR are bounded by the quota as
+ * well as the `ocr.org` rate limit.
+ *
+ * Review N6: while holding the org lock it first deletes this org's OCR reservations that are still unfilled
+ * (`reserved`), have no `analysis_id` and are older than ABANDONED_OCR_RESERVATION_MS — left behind by a process that
+ * died mid-run (a live run fills or releases its reservation well within the 10-minute OCR budget). Returns
+ * `{ ref, reservationId }`.
+ */
+export async function reserveOcrSlot(
+  deps: Pick<AppDeps, 'db' | 'clock'>, orgId: string, model: string, opts: { ref?: string } = {},
+): Promise<{ ref: string; reservationId: string }> {
+  const ref = opts.ref ?? crypto.randomUUID();
+  const reservationId = await deps.db.transaction(async (tx) => {
+    const { plan } = await loadPlan(tx, orgId, { forUpdate: true });
+    await tx.delete(llmUsage).where(and(
+      eq(llmUsage.orgId, orgId), eq(llmUsage.reserved, true), isNull(llmUsage.analysisId),
+      lt(llmUsage.createdAt, new Date(deps.clock.now().getTime() - ABANDONED_OCR_RESERVATION_MS)),
+    ));
+    if (plan !== 'enterprise') await assertWithinPlan(deps, orgId, 'llmAnalysesPerMonth', 1, { db: tx, plan });
+    return reserveLlmSlot(deps, tx, { orgId, analysisId: null, analysisRef: ref, model });
+  });
+  return { ref, reservationId };
+}
+
+/**
+ * Give back an AI slot reserved by `reserveLlmSlot`: delete that row by id. The meter calls it only when no
+ * LLM call of the analysis was metered (analyse also calls it for automatic OCR's handed-over, unused reservation) (the decision is in-process, never read from `analysis_id`, review NEW-B1).
  * Never throws.
  */
-async function releaseLlmReservation(deps: Pick<AppDeps, 'db' | 'logger'>, reservationId: string): Promise<void> {
+export async function releaseLlmReservation(deps: Pick<AppDeps, 'db' | 'logger'>, reservationId: string): Promise<void> {
   try {
     await deps.db.delete(llmUsage).where(eq(llmUsage.id, reservationId));
   } catch (e) {
@@ -194,6 +229,12 @@ export async function usageFor(deps: Pick<AppDeps, 'db' | 'clock'>, orgId: strin
 export interface LlmUsageInput {
   orgId: string;
   analysisId?: string | null;
+  /**
+   * The analysis this call counts for when its row does not exist yet (auto-OCR runs before the analysis is inserted,
+   * 004/FR-052): stored as `analysis_ref` with `analysis_id` null; the analysis links the rows once inserted.
+   * Defaults to `analysisId`.
+   */
+  analysisRef?: string | null;
   /** Fill in this reservation row (see `reserveLlmSlot`) instead of inserting a new one. */
   reservationId?: string | null;
   kind: 'extract' | 'assist';
@@ -225,7 +266,7 @@ export async function recordLlmUsage(deps: Pick<AppDeps, 'db' | 'clock' | 'logge
       if (filled.length) return;
     }
     const row = {
-      orgId: u.orgId, analysisId: u.analysisId ?? null, analysisRef: u.analysisId ?? null, kind: u.kind, model: u.model, ...tokens,
+      orgId: u.orgId, analysisId: u.analysisId ?? null, analysisRef: u.analysisRef ?? u.analysisId ?? null, kind: u.kind, model: u.model, ...tokens,
       createdAt: deps.clock.now(),
     };
     try {
@@ -242,6 +283,12 @@ export async function recordLlmUsage(deps: Pick<AppDeps, 'db' | 'clock' | 'logge
 /** `llm.completeJson`, metered; `finish()` ends the analysis's use of it (see `meteredCompleteJson`). */
 export type MeteredCompleteJson = (<T = unknown>(req: Parameters<NonNullable<AppDeps['llm']>['completeJson']>[0]) => Promise<T>) & {
   finish: () => Promise<void>;
+  /**
+   * Give up the reservation without releasing it, when no call was metered and none is in flight: returns its id (the
+   * caller now owns it — e.g. analyse hands automatic OCR's unused slot to its enrichment calls), else null (the
+   * reservation was used, or a call still in flight may use it). Later calls of this meter insert their own rows.
+   */
+  handOver: () => string | null;
 };
 
 /**
@@ -259,7 +306,7 @@ export type MeteredCompleteJson = (<T = unknown>(req: Parameters<NonNullable<App
  */
 export function meteredCompleteJson(
   deps: Pick<AppDeps, 'db' | 'clock' | 'logger' | 'llm'>,
-  ctx: { orgId: string; analysisId: string | null; kind: 'extract' | 'assist'; reservationId?: string | null },
+  ctx: { orgId: string; analysisId: string | null; analysisRef?: string | null; kind: 'extract' | 'assist'; reservationId?: string | null },
 ): MeteredCompleteJson {
   const llm = deps.llm;
   if (!llm) throw new Error('meteredCompleteJson: no LLM configured');
@@ -287,15 +334,28 @@ export function meteredCompleteJson(
       if (r || ok || inFlightAbort) {
         // Synchronously, before any await: a concurrent `finish()` must already see this call as metered.
         metered = true;
+        if (!r) {
+          // Aborted in flight (our timeout / the run's budget) before the provider reported usage: the row records 0
+          // because the column cannot be null, but the real count is UNKNOWN and may be billed (review S1). Say so.
+          deps.logger.warn('llm usage: call aborted before the provider reported usage; tokens unknown (recorded as 0)', {
+            orgId: ctx.orgId, analysisRef: ctx.analysisRef ?? ctx.analysisId, model: llm.model, usageUnknown: true,
+          });
+        }
         const fill = reservationId;
         reservationId = null;
         await recordLlmUsage(deps, {
-          orgId: ctx.orgId, analysisId: ctx.analysisId, kind: ctx.kind, reservationId: fill, model: r?.model || llm.model, inputTokens: r?.usage.inputTokens ?? 0, outputTokens: r?.usage.outputTokens ?? 0,
+          orgId: ctx.orgId, analysisId: ctx.analysisId, analysisRef: ctx.analysisRef, kind: ctx.kind, reservationId: fill, model: r?.model || llm.model, inputTokens: r?.usage.inputTokens ?? 0, outputTokens: r?.usage.outputTokens ?? 0,
         });
       }
       inFlight--;
       await releaseIfUnused();
     }
   };
-  return Object.assign(call, { finish: async () => { finished = true; await releaseIfUnused(); } });
+  const handOver = () => {
+    if (metered || inFlight > 0 || !reservationId) return null;
+    const id = reservationId;
+    reservationId = null;
+    return id;
+  };
+  return Object.assign(call, { finish: async () => { finished = true; await releaseIfUnused(); }, handOver });
 }
