@@ -17,7 +17,7 @@ import type { DocType } from '@tp/core/vault/status';
 import { Logo } from '@/components/layout/Logo';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Badge, Button, Field, Input, Select, Stepper, Switch, toast } from '@/components/ui';
-import { errorMessage } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatINRCompact, formatNumberIN, pluralize } from '@/lib/format';
 import { useDocumentTitle } from '@/lib/hooks';
@@ -73,13 +73,14 @@ export default function OnboardingPage() {
   }, [profile.data, hydrated, me?.org.name]);
 
   const go = (to: number) => { setDir(to > step ? 1 : -1); setStep(to); window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' }); };
-  // FR-050: retry once after 1 s, then tell the user without blocking navigation.
+  // FR-050: retry once after 1 s on network/5xx errors (never on 4xx: it would fail again), then tell the user without blocking navigation.
   const tick = async (keys: Record<string, boolean>) => {
-    try { await updateOrg.mutateAsync({ onboardingState: keys }); return; } catch { /* retry below */ }
-    await new Promise((r) => setTimeout(r, 1000));
-    try { await updateOrg.mutateAsync({ onboardingState: keys }); } catch {
-      toast.error('Couldn’t save your progress — your data is saved, but setup may restart at this step');
+    const toastFail = () => toast.error('Couldn’t save your progress — your data is saved, but setup may restart at this step');
+    try { await updateOrg.mutateAsync({ onboardingState: keys }); return; } catch (e) {
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) { toastFail(); return; }
     }
+    await new Promise((r) => setTimeout(r, 1000));
+    try { await updateOrg.mutateAsync({ onboardingState: keys }); } catch { toastFail(); }
   };
 
   if (me && !can('bid_manager')) {

@@ -181,4 +181,21 @@ describe('PATCH /org onboarding state (007 US3)', () => {
     expect(done).toHaveLength(1);
     expect(done[0].meta.durationSec).toBeGreaterThanOrEqual(95);
   });
+
+  it('concurrent completed PATCHes log onboarding.completed exactly once', async () => {
+    const { owner, bidManager } = await seedOrgWithRoles(ctx.app);
+    const rs = await Promise.all([owner, bidManager, owner, bidManager, owner].map((u) =>
+      request(ctx.app, 'PATCH', '/api/org', { cookie: u.cookie, json: { onboardingState: { completed: true } } })));
+    expect(rs.every((r) => r.status === 200 && r.body.onboardingState.completed === true)).toBe(true);
+    const list = (await request(ctx.app, 'GET', '/api/activity', { cookie: owner.cookie })).body.items as { action: string }[];
+    expect(list.filter((i) => i.action === 'onboarding.completed')).toHaveLength(1);
+  });
+
+  it('concurrent PATCHes of different onboarding keys all survive', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    const keys = ['company', 'categories', 'watchlist', 'documents'];
+    await Promise.all(keys.map((k) => request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { [k]: true } } })));
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: owner.cookie });
+    expect(me.body.org.onboardingState).toEqual(Object.fromEntries(keys.map((k) => [k, true])));
+  });
 });

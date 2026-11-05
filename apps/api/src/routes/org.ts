@@ -2,7 +2,7 @@
  * Organization routes (FR-031..033): /org, /org/members, /org/invitations (+ resend, 002/FR-020), /activity.
  * Mounted at /api.
  */
-import { and, asc, count, desc, eq, gt, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, isNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Hono, type Context } from 'hono';
 import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db, type Role } from '@tp/db';
@@ -82,11 +82,21 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
   const body = await parseJson(c, updateOrgInputSchema);
   const { db } = c.var.deps;
   const patch: Partial<typeof organizations.$inferInsert> = {};
-  const justCompleted = body.onboardingState?.completed === true && !c.var.org.onboardingState?.completed;
   if (body.name !== undefined) patch.name = body.name;
-  if (body.onboardingState !== undefined) patch.onboardingState = { ...(c.var.org.onboardingState ?? {}), ...body.onboardingState };
+  // Merge in SQL (jsonb ||) so concurrent PATCHes of different keys never overwrite each other with a stale snapshot.
+  const mergeState = (o: Record<string, boolean>) => sql`coalesce(${organizations.onboardingState}, '{}'::jsonb) || ${JSON.stringify(o)}::jsonb`;
+  if (body.onboardingState !== undefined) patch.onboardingState = mergeState(body.onboardingState) as unknown as Record<string, boolean>;
   if (body.scoringWeights !== undefined) patch.scoringWeights = body.scoringWeights;
   if (!Object.keys(patch).length) return c.json(c.var.org);
+  const notCompleted = sql`coalesce((${organizations.onboardingState}->>'completed')::boolean, false) = false`;
+  // FR-052: the completed flip is a conditional UPDATE, so exactly one of N concurrent requests gets a row back
+  // (the others re-check the predicate after the row lock is released) and logs `onboarding.completed`.
+  let completedAt: Date | null = null;
+  if (body.onboardingState?.completed === true) {
+    const [flipped] = await db.update(organizations).set({ onboardingState: mergeState(body.onboardingState) as unknown as Record<string, boolean> })
+      .where(and(eq(organizations.id, orgId(c)), notCompleted)).returning({ createdAt: organizations.createdAt });
+    completedAt = flipped?.createdAt ?? null;
+  }
   const [org] = await db.update(organizations).set(patch).where(eq(organizations.id, orgId(c))).returning({
     id: organizations.id, name: organizations.name, slug: organizations.slug, plan: organizations.plan,
     onboardingState: organizations.onboardingState, scoringWeights: organizations.scoringWeights,
@@ -99,9 +109,8 @@ orgRoutes.patch('/org', requireRole('bid_manager'), async (c) => {
     });
   }
   // FR-052 / SC-001: how long sign-up to "finished setting up" took.
-  if (justCompleted) {
-    const [row] = await db.select({ createdAt: organizations.createdAt }).from(organizations).where(eq(organizations.id, orgId(c)));
-    const durationSec = row ? Math.max(0, Math.round((c.var.deps.clock.now().getTime() - row.createdAt.getTime()) / 1000)) : 0;
+  if (completedAt) {
+    const durationSec = Math.max(0, Math.round((c.var.deps.clock.now().getTime() - completedAt.getTime()) / 1000));
     await logActivity(db, {
       orgId: orgId(c), userId: userId(c), action: 'onboarding.completed', entityType: 'organization', entityId: orgId(c), meta: { durationSec },
     });
