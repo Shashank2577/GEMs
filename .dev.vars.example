@@ -5,6 +5,8 @@ APP_URL=http://localhost:8787
 GEM_BASE_URL=http://localhost:4010
 # GEM_MIN_INTERVAL_MS=1000
 # GEM_MAX_PAGES=5
+# Packet build input cap in bytes (default 60 MB = 62914560); larger selections get 413 packet_too_large.
+# PACKET_MAX_INPUT_BYTES=62914560
 
 # Optional integrations — leave empty to run in rules-only / log-only mode.
 ANTHROPIC_API_KEY=

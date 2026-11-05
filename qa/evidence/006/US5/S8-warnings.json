@@ -1,0 +1,65 @@
+{
+  "warnings": [
+    "\"Locked PDF\" is password-protected; its pages may not display correctly. Upload an unlocked copy to the vault.",
+    "\"Corrupt scan\" is damaged and could not be opened — skipped.",
+    "\"Notes file\" is not a PDF, PNG or JPG file — skipped.",
+    "OEM authorisation certificate (MAF) for this bid: the vault document has expired — replace it or ask a Bid Manager to override."
+  ],
+  "items": [
+    {
+      "kind": "cover",
+      "pages": 2,
+      "title": "Cover page & index",
+      "included": true,
+      "startPage": 1
+    },
+    {
+      "kind": "vault",
+      "pages": 1,
+      "refId": "7fbb147c-4781-4d1d-8fef-07bc24ef4dc7",
+      "title": "Good PDF",
+      "included": true,
+      "startPage": 3
+    },
+    {
+      "kind": "vault",
+      "pages": 1,
+      "refId": "210c979d-3eeb-44a0-9be6-17daf78753a6",
+      "title": "Scanned PNG",
+      "included": true,
+      "startPage": 4
+    },
+    {
+      "kind": "vault",
+      "pages": 1,
+      "refId": "1b0977fa-6dd3-4f2a-b858-c80ee064e698",
+      "title": "Scanned JPG",
+      "included": true,
+      "startPage": 5
+    },
+    {
+      "kind": "vault",
+      "pages": 1,
+      "refId": "6047fabd-844e-46af-9b38-eb7d84b54187",
+      "title": "Locked PDF",
+      "included": true,
+      "startPage": 6
+    },
+    {
+      "kind": "vault",
+      "pages": 0,
+      "refId": "4c725f93-2b9f-43d8-baf6-f368910da7ed",
+      "title": "Corrupt scan",
+      "included": false,
+      "startPage": 0
+    },
+    {
+      "kind": "vault",
+      "pages": 0,
+      "refId": "f4b1a4f4-7018-4a02-a0a7-4ebb5c39c494",
+      "title": "Notes file",
+      "included": false,
+      "startPage": 0
+    }
+  ]
+}
