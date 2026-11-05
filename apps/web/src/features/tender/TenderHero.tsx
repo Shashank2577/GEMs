@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Briefcase, Building2, Check, ChevronRight, Copy, ExternalLink, EyeOff, Gauge, Info, MapPin, MoreHorizontal, Package, Percent, RefreshCw, Wallet,
+  ArrowRight, Ban, Briefcase, Building2, Check, ChevronRight, Copy, ExternalLink, EyeOff, Gauge, Info, MapPin, MoreHorizontal, Package, Percent, RefreshCw, Wallet,
 } from 'lucide-react';
 import type { TenderDetail } from '@tp/core/contracts/identify';
 import type { AnalysisDto } from '@tp/core/contracts/analyse';
@@ -60,6 +60,13 @@ export function TenderHero({
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-accent/[0.06]" aria-hidden />
       <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/10 blur-3xl" aria-hidden />
       <div className="relative grid gap-5 p-5 sm:p-6">
+        {tender.status === 'cancelled' && (
+          <div role="alert" data-testid="cancelled-banner" className="flex items-start gap-2.5 rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+            <Ban className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div><span className="font-semibold">Cancelled on GeM</span>
+              <span className="text-foreground/80"> — the buyer withdrew this bid. Stop work on it unless it is re-issued.</span></div>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button" onClick={copy}

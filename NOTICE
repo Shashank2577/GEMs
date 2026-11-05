@@ -20,6 +20,10 @@ listed here with its licence.
    - packages/core/src/gem/client.ts fetchBidDocument byte cap (25 MB, GemError code 'too_large') —
      approach adapted from src/http.ts fetchBoundedResource({maxBytes}) (content-length check, then
      streamed byte count with cancel), with its test idea from src/http.test.ts.
+   Spec 003 Identify & Alerts (US5, 2026-11-05; upstream LICENSE re-checked: Apache-2.0):
+   - packages/core/src/gem/changes.ts summariseChanges — the material-field comparison (case-insensitive, whitespace-
+     tolerant string equality so re-cased text is not reported as an amendment) is adapted from src/monitoring.ts.
+     The IST date and ₹ formatting and the field labels are TenderPilot's own. Test: packages/core/test/gem/changes.test.ts.
    Spec 008 Operations & Scale (US4, 2026-11-05; upstream LICENSE re-checked: Apache-2.0):
    - packages/core/src/gem/http.ts — SourceHttpError, SourceBodyLimitError, canRetrySource, waitForSourceDelay,
      fetchBoundedResource and isPdfBody ported from src/http.ts. Modified: Fetch API instead of undici,

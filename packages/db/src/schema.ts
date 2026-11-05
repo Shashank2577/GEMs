@@ -566,7 +566,7 @@ export const notifications = pgTable('notifications', {
   orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   channel: text('channel').$type<'in_app' | 'email' | 'whatsapp'>().notNull(),
-  kind: text('kind').$type<'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system'>().notNull(),
+  kind: text('kind').$type<'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system' | 'corrigendum' | 'result'>().notNull(),
   title: text('title').notNull(),
   body: text('body').notNull(),
   link: text('link'),

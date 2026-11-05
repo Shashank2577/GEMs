@@ -218,7 +218,7 @@ export const notificationsQuerySchema = z.object({
 
 export interface NotificationDto {
   id: string;
-  kind: 'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system';
+  kind: 'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system' | 'corrigendum' | 'result';
   title: string;
   body: string;
   link: string | null;

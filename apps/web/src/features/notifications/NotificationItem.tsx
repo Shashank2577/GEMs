@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { AtSign, BellRing, CalendarClock, Info, Mail, MessageCircle, ShieldAlert, Sparkles, UserPlus, type LucideIcon } from 'lucide-react';
+import { AtSign, BellRing, CalendarClock, Info, Mail, MessageCircle, ShieldAlert, Sparkles, Trophy, TriangleAlert, UserPlus, type LucideIcon } from 'lucide-react';
 import type { NotificationDto } from '@tp/core/contracts/identify';
 import { Tooltip } from '@/components/ui';
 import { formatDateIST, relativeTime } from '@/lib/format';
@@ -12,6 +12,8 @@ const KIND: Record<NotificationDto['kind'], { icon: LucideIcon; cls: string; lab
   expiry: { icon: ShieldAlert, cls: 'bg-danger-soft text-danger', label: 'Document expiry' },
   assignment: { icon: UserPlus, cls: 'bg-info-soft text-info', label: 'Assignment' },
   mention: { icon: AtSign, cls: 'bg-info-soft text-info', label: 'Mention' },
+  corrigendum: { icon: TriangleAlert, cls: 'bg-warning-soft text-[hsl(32_90%_32%)] dark:text-warning', label: 'Corrigendum' },
+  result: { icon: Trophy, cls: 'bg-success-soft text-success', label: 'Result' },
   digest: { icon: BellRing, cls: 'bg-muted text-muted-foreground', label: 'Digest' },
   system: { icon: Info, cls: 'bg-muted text-muted-foreground', label: 'System' },
 };

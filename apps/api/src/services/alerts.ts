@@ -57,12 +57,21 @@ function tenderIdFromLink(link: string | null): string | null {
 
 // ───────────── email templates ─────────────
 
+/** The "Changed: …" summary a corrigendum notification carries in its body (see notifyCorrigenda). */
+function changedSummary(n: NotificationRow): string | null {
+  const m = n.kind === 'corrigendum' ? n.body.match(/Changed: (.*?)\. Re-check/s) : null;
+  return m ? m[1] : null;
+}
+
 function tenderCard(t: TenderRow | undefined, n: NotificationRow, appUrl: string, now: Date): string {
   const url = `${appUrl}${n.link ?? '/tenders'}`;
+  const changed = changedSummary(n);
+  const changedBox = changed
+    ? `<div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;line-height:20px;color:#78350f"><strong>Changed:</strong> ${esc(changed)}</div>` : '';
   if (!t) {
     return `<tr><td style="padding:16px 20px;border:1px solid #e4e7ee;border-radius:12px;background:#fff">
       <a href="${esc(url)}" style="color:#1e1b4b;font-weight:600;font-size:15px;text-decoration:none">${esc(n.title)}</a>
-      <p style="margin:6px 0 0;color:#475569;font-size:13px;line-height:20px">${esc(n.body)}</p></td></tr><tr><td style="height:12px"></td></tr>`;
+      <p style="margin:6px 0 0;color:#475569;font-size:13px;line-height:20px">${esc(n.body)}</p>${changedBox}</td></tr><tr><td style="height:12px"></td></tr>`;
   }
   const urgent = t.endAt && t.endAt.getTime() - now.getTime() < 3 * 86_400_000;
   const matched = n.body.includes('— matched') ? n.body.split('— matched')[1].trim() : '';
@@ -79,7 +88,8 @@ function tenderCard(t: TenderRow | undefined, n: NotificationRow, appUrl: string
       </tr>
     </table>
     ${matched ? `<div style="margin-top:12px;font-size:12px;color:#4338ca">Matched ${esc(matched)}</div>` : ''}
-    <a href="${esc(url)}" style="display:inline-block;margin-top:14px;padding:9px 16px;background:#4f46e5;color:#ffffff;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">Review &amp; score this bid →</a>
+    ${changedBox}
+    <a href="${esc(url)}" style="display:inline-block;margin-top:14px;padding:9px 16px;background:#4f46e5;color:#ffffff;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">${n.kind === 'corrigendum' ? 'Re-check this bid' : 'Review &amp; score this bid'} →</a>
   </td></tr><tr><td style="height:12px"></td></tr>`;
 }
 
@@ -98,7 +108,10 @@ export function renderAlertEmail(opts: {
     <h1 style="margin:0;font-size:20px;line-height:28px;color:#0f172a">${esc(heading)}</h1>
     <p style="margin:8px 0 0;color:#475569;font-size:14px;line-height:22px">${esc(intro)}</p></td></tr>
   <tr><td style="padding:16px 24px 8px;background:#ffffff"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-    ${rows.map((r) => tenderCard(r.tender, r.n, appUrl, now)).join('')}
+    ${rows.filter((r) => r.n.kind !== 'corrigendum').map((r) => tenderCard(r.tender, r.n, appUrl, now)).join('')}
+    ${rows.some((r) => r.n.kind === 'corrigendum') && rows.some((r) => r.n.kind !== 'corrigendum')
+      ? '<tr><td style="padding:4px 0 10px;color:#92400e;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Changed</td></tr>' : ''}
+    ${rows.filter((r) => r.n.kind === 'corrigendum').map((r) => tenderCard(r.tender, r.n, appUrl, now)).join('')}
   </table></td></tr>
   <tr><td style="padding:8px 24px 24px;background:#ffffff;border-radius:0 0 16px 16px">
     <a href="${esc(appUrl)}/tenders?matched=1" style="color:#4f46e5;font-size:13px;font-weight:600;text-decoration:none">Open your tender feed →</a></td></tr>
@@ -136,7 +149,7 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   const digestGroups = new Map<string, typeof pending>();
   const digestDue = istHour(now) >= DIGEST_HOUR_IST;
   for (const p of pending) {
-    const daily = p.frequency === 'daily' && p.n.kind === 'tender_match';
+    const daily = p.frequency === 'daily' && (p.n.kind === 'tender_match' || p.n.kind === 'corrigendum');
     if (!daily) {
       try {
         const r = await sendOne(deps, p, tenderById, now);
@@ -166,7 +179,13 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
     if (already) { report.held += ids.length; continue; }
     const first = group[0];
     const count = group.length;
-    const title = `${count} new GeM tender${count === 1 ? '' : 's'} matched today`;
+    const changedCount = group.filter((g) => g.n.kind === 'corrigendum').length;
+    const matchCount = count - changedCount;
+    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const title = [
+      matchCount ? `${plural(matchCount, 'new GeM tender')} matched` : '',
+      changedCount ? `${plural(changedCount, 'tracked bid')} amended` : '',
+    ].filter(Boolean).join(' and ') + ' today';
     try {
       let skipped = false;
       let reason: string | null = null;
@@ -175,7 +194,7 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
         const r = await mailer.send({
           to: first.email,
           subject: `Daily digest: ${title}`,
-          html: renderAlertEmail({ heading: title, intro: `Here is your daily summary of tenders matching ${first.orgName}'s watchlists.`, rows, appUrl: config.appUrl, orgName: first.orgName, now }),
+          html: renderAlertEmail({ heading: title, intro: `Here is your daily summary of tenders matching ${first.orgName}'s watchlists${changedCount ? ' and changes to bids you track' : ''}.`, rows, appUrl: config.appUrl, orgName: first.orgName, now }),
           text: textVersion(rows, config.appUrl),
         });
         skipped = !!r.skipped;
@@ -192,7 +211,7 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
         }
       }
       await db.insert(notifications).values({
-        orgId, userId, channel: channel as 'email' | 'whatsapp', kind: 'digest', title, body: `${count} matched tenders`,
+        orgId, userId, channel: channel as 'email' | 'whatsapp', kind: 'digest', title, body: `${count} matched or amended tenders`,
         link: '/tenders?matched=1', dedupeKey, status: skipped ? 'skipped' : 'sent', error: reason, sentAt: skipped ? null : now, createdAt: now,
       }).onConflictDoNothing();
       report.digests++;
@@ -216,11 +235,13 @@ async function sendOne(
   const tender = tenderById.get(tenderIdFromLink(p.n.link) ?? '');
   const url = `${config.appUrl}${p.n.link ?? ''}`;
   if (p.n.channel === 'email') {
-    const heading = p.n.kind === 'tender_match' ? 'A new GeM tender matches your watchlist' : p.n.title;
+    const heading = p.n.kind === 'tender_match' ? 'A new GeM tender matches your watchlist'
+      : p.n.kind === 'corrigendum' ? 'A tracked GeM bid was amended' : p.n.title;
     const r = await mailer.send({
       to: p.email,
       subject: p.n.title,
-      html: renderAlertEmail({ heading, intro: p.n.kind === 'tender_match' ? 'Act early — the best bids are prepared well before the deadline.' : p.n.body, rows: [{ n: p.n, tender }], appUrl: config.appUrl, orgName: p.orgName, now }),
+      html: renderAlertEmail({ heading, intro: p.n.kind === 'tender_match' ? 'Act early — the best bids are prepared well before the deadline.'
+        : p.n.kind === 'corrigendum' ? 'The buyer changed this bid on GeM. Re-check your eligibility analysis before you bid.' : p.n.body, rows: [{ n: p.n, tender }], appUrl: config.appUrl, orgName: p.orgName, now }),
       text: textVersion([p], config.appUrl),
     });
     return r.skipped ? { skipped: true, reason: 'Email is not configured (RESEND_API_KEY)' } : { skipped: false };

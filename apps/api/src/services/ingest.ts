@@ -23,6 +23,7 @@ import {
 } from '@tp/db';
 import { INGESTION_RUN_BUDGET_MS } from '@tp/core/contracts/caps';
 import { GemClient } from '@tp/core/gem/client';
+import { summariseChanges } from '@tp/core/gem/changes';
 import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender } from '@tp/core/gem/parse';
 import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
@@ -179,7 +180,8 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
 
     // 2–3. Upsert + events.
     const changedIds: string[] = [];
-    const corrigendumIds: string[] = [];
+    const corrigenda = new Map<string, Record<string, { from: unknown; to: unknown }>>();
+    const cancelledIds: string[] = [];
     const list = [...fetched.values()];
     for (let i = 0; i < list.length; i += 200) {
       const chunk = list.slice(i, i + 200);
@@ -191,7 +193,7 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
           const prev = byBid.get(t.bidNumber);
           const r = await upsertTender(deps, t as Insertable, prev ?? null, now);
           if (r.kind === 'created') { stats.tendersCreated++; changedIds.push(r.id); }
-          if (r.kind === 'updated') { stats.tendersUpdated++; changedIds.push(r.id); if (r.corrigendum) corrigendumIds.push(r.id); }
+          if (r.kind === 'updated') { stats.tendersUpdated++; changedIds.push(r.id); if (r.corrigendum && r.changes) corrigenda.set(r.id, r.changes); if (r.cancelled) cancelledIds.push(r.id); }
         } catch (e) {
           errors.push(`${t.bidNumber}: ${errMsg(e)}`);
           logger.error('ingestion: upsert failed', { bidNumber: t.bidNumber, error: errMsg(e) });
@@ -204,7 +206,8 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
       const m = await matchAndNotify(deps, changedIds, now);
       stats.matchesCreated = m.matchesCreated;
     }
-    if (corrigendumIds.length) await notifyCorrigenda(deps, corrigendumIds, now);
+    if (corrigenda.size) await notifyCorrigenda(deps, corrigenda, now);
+    if (cancelledIds.length) await notifyCancelled(deps, cancelledIds, now);
     // Bids whose deadline passed since we last saw them.
     await db.update(tenders).set({ status: 'closed', updatedAt: now }).where(and(eq(tenders.status, 'open'), lt(tenders.endAt, now)));
 
@@ -305,7 +308,7 @@ function driftFailure(deps: AppDeps, e: unknown, where: Record<string, unknown>)
 
 async function upsertTender(
   deps: AppDeps, t: Insertable, prev: TenderRow | null, now: Date,
-): Promise<{ id: string; kind: 'created' | 'updated' | 'unchanged'; corrigendum?: boolean }> {
+): Promise<{ id: string; kind: 'created' | 'updated' | 'unchanged'; corrigendum?: boolean; cancelled?: boolean; changes?: Record<string, { from: unknown; to: unknown }> }> {
   const { db } = deps;
   const values = {
     source: t.source, bidNumber: t.bidNumber, gemBidId: t.gemBidId, bidType: t.bidType, title: t.title, items: t.items,
@@ -351,7 +354,7 @@ async function upsertTender(
     // The reason matters: a corrigendum needs a full re-analysis, Re-score refuses it (FR-037, FR-043).
     await db.update(analyses).set({ stale: true, staleReason: 'corrigendum', staleAt: now, updatedAt: now }).where(eq(analyses.tenderId, prev.id));
   }
-  return { id: prev.id, kind: 'updated', corrigendum };
+  return { id: prev.id, kind: 'updated', corrigendum, cancelled: changes.status?.to === 'cancelled', changes };
 }
 
 // ───────────── matching & notifications ─────────────
@@ -481,8 +484,15 @@ export async function matchAndNotify(
   return { matchesCreated, notificationsCreated };
 }
 
-/** In-app heads-up for orgs that track a tender which just received a corrigendum. */
-async function notifyCorrigenda(deps: AppDeps, tenderIds: string[], now: Date): Promise<void> {
+/**
+ * Alert every member of each org that tracks a tender (has a match) on their chosen channels: in-app is created `sent`,
+ * email/WhatsApp `pending` for the dispatcher (WhatsApp `skipped` without a phone), same as match alerts. Deduped per
+ * (user, channel, dedupeKey), so a repeat sync never re-alerts.
+ */
+async function notifyTracking(
+  deps: AppDeps, tenderIds: string[], now: Date,
+  make: (t: TenderRow, orgId: string) => { kind: 'corrigendum' | 'system'; title: string; body: string; dedupeKey: string } | null,
+): Promise<void> {
   const { db } = deps;
   const tracked = await db.selectDistinct({ orgId: tenderMatches.orgId, tenderId: tenderMatches.tenderId })
     .from(tenderMatches).where(inArray(tenderMatches.tenderId, tenderIds));
@@ -493,17 +503,41 @@ async function notifyCorrigenda(deps: AppDeps, tenderIds: string[], now: Date): 
   const values: (typeof notifications.$inferInsert)[] = [];
   for (const tr of tracked) {
     const t = byId.get(tr.tenderId);
-    if (!t) continue;
+    const msg = t && make(t, tr.orgId);
+    if (!t || !msg) continue;
     for (const u of recipients.get(tr.orgId) ?? []) {
-      if (!u.prefs.inApp) continue;
-      values.push({
-        orgId: tr.orgId, userId: u.userId, channel: 'in_app', kind: 'deadline', status: 'sent', sentAt: now, createdAt: now,
-        title: `Corrigendum: ${t.title}`.slice(0, 200),
-        body: `${t.bidNumber} was amended on GeM — now closes ${fmtIstDate(t.endAt)} IST. Re-check the analysis before you bid.`,
-        link: `/tenders/${t.id}`,
-        dedupeKey: `corrigendum:${t.id}:${t.contentHash}:${tr.orgId}`,
-      });
+      const base = { orgId: tr.orgId, userId: u.userId, ...msg, title: msg.title.slice(0, 200), link: `/tenders/${t.id}`, createdAt: now };
+      if (u.prefs.inApp) values.push({ ...base, channel: 'in_app', status: 'sent', sentAt: now });
+      if (u.prefs.email) values.push({ ...base, channel: 'email', status: 'pending' });
+      if (u.prefs.whatsapp) {
+        values.push(u.phone
+          ? { ...base, channel: 'whatsapp', status: 'pending' }
+          : { ...base, channel: 'whatsapp', status: 'skipped', error: 'Add a mobile number in your account to receive WhatsApp alerts' });
+      }
     }
   }
-  if (values.length) await db.insert(notifications).values(values).onConflictDoNothing();
+  for (let i = 0; i < values.length; i += 500) await db.insert(notifications).values(values.slice(i, i + 500)).onConflictDoNothing();
+}
+
+/** Corrigendum alert (FR-051..053): kind `corrigendum`, body names every changed field (summariseChanges). */
+async function notifyCorrigenda(deps: AppDeps, changesById: Map<string, Record<string, { from: unknown; to: unknown }>>, now: Date): Promise<void> {
+  await notifyTracking(deps, [...changesById.keys()], now, (t, orgId) => {
+    const summary = summariseChanges(changesById.get(t.id) ?? {});
+    return {
+      kind: 'corrigendum',
+      title: `Corrigendum: ${t.title}`,
+      body: `${t.bidNumber} was amended on GeM — now closes ${fmtIstDate(t.endAt)} IST.${summary ? ` Changed: ${summary}.` : ''} Re-check the analysis before you bid.`,
+      dedupeKey: `corrigendum:${t.id}:${t.contentHash}:${orgId}`,
+    };
+  });
+}
+
+/** A tracked tender was cancelled on GeM (FR-054). */
+async function notifyCancelled(deps: AppDeps, tenderIds: string[], now: Date): Promise<void> {
+  await notifyTracking(deps, tenderIds, now, (t, orgId) => ({
+    kind: 'system',
+    title: `Cancelled on GeM: ${t.title}`,
+    body: `${t.bidNumber} was cancelled by the buyer on GeM. Stop work on this bid unless it is re-issued.`,
+    dedupeKey: `cancelled:${t.id}:${orgId}`,
+  }));
 }
