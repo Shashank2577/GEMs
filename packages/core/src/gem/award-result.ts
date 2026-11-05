@@ -1,4 +1,4 @@
-// parseAwardResult (006/FR-085, T092) — clean-room implementation from specs/006-apply-packet-assist/award-parser-spec.md.
+// parseAwardResult (006/FR-085, T092) — independent reimplementation (clean-room in process, not in provenance) from specs/006-apply-packet-assist/award-parser-spec.md.
 //
 // Hand-written single-pass tokenizer: every index is consumed once (indexOf / charCodeAt scanning), no regex on the whole
 // input, no DOM, no network. Row / cell / text sizes are bounded so hostile markup cannot blow up time or memory.
@@ -13,7 +13,7 @@ const MAX_CLASS_LEN = 512;
 const MAX_AMOUNT = 1e13;
 
 const FINANCIAL_WORDS = ['rank', 'price', 'l1', 'financial', 'amount', 'total'];
-const NAME_WORDS = ['seller', 'vendor', 'bidder', 'company', 'name'];
+const NAME_WORDS = ['seller', 'vendor', 'bidder', 'company', 'name', 'firm', 'participant', 'supplier', 'agency'];
 const PRICE_WORDS = ['price', 'amount', 'total'];
 
 // ───────────── text helpers ─────────────
@@ -22,7 +22,7 @@ const isWs = (c: number): boolean => c === 32 || (c >= 9 && c <= 13) || c === 0x
 const isDigit = (c: number): boolean => c >= 48 && c <= 57;
 const isAlpha = (c: number): boolean => (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
 
-const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', nbsp: ' ', '#39': "'", apos: "'" };
+const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', nbsp: ' ', apos: "'" };
 
 function decodeEntities(s: string): string {
   let amp = s.indexOf('&');
@@ -165,7 +165,9 @@ function parseRank(text: string): number {
 function hasLetter(s: string): boolean {
   for (let i = 0; i < s.length; i++) {
     const c = s.charCodeAt(i);
-    if (isAlpha(c) || (c > 127 && c !== 0x20b9 && !isWs(c))) return true;
+    if (isAlpha(c)) return true;
+    // non-ASCII letters count; general punctuation (dashes, quotes), currency symbols, CJK punctuation and Latin-1 symbols do not
+    if (c > 127 && !isWs(c) && !(c >= 0x2000 && c <= 0x206f) && !(c >= 0x20a0 && c <= 0x20cf) && !(c >= 0x3000 && c <= 0x303f) && c !== 0xd7 && c !== 0xf7 && !(c >= 0xa1 && c <= 0xbf)) return true;
   }
   return false;
 }
@@ -181,7 +183,7 @@ function cleanName(name: string): string {
 // ───────────── header / row interpretation ─────────────
 
 interface Header {
-  price: boolean;
+  cols: number;
   rankIdx: number;
   nameIdx: number;
   priceIdx: number;
@@ -195,12 +197,13 @@ const containsAny = (s: string, words: string[]): boolean => {
 function readHeader(cells: string[]): Header | null {
   const lower = cells.map((c) => c.toLowerCase());
   if (!containsAny(lower.join(' '), FINANCIAL_WORDS)) return null;
-  const h: Header = { price: true, rankIdx: -1, nameIdx: -1, priceIdx: -1 };
+  const h: Header = { cols: cells.length, rankIdx: -1, nameIdx: -1, priceIdx: -1 };
   for (let i = 0; i < lower.length; i++) {
     const c = lower[i]!;
     if (h.rankIdx < 0 && c.indexOf('rank') >= 0) h.rankIdx = i;
-    else if (h.nameIdx < 0 && containsAny(c, NAME_WORDS)) h.nameIdx = i;
+    // a price word wins over a name word ("Seller Quoted Price" is the price column)
     else if (h.priceIdx < 0 && containsAny(c, PRICE_WORDS)) h.priceIdx = i;
+    else if (h.nameIdx < 0 && containsAny(c, NAME_WORDS)) h.nameIdx = i;
     else if (h.rankIdx < 0 && c.length >= 2 && c.charCodeAt(0) === 108 && isDigit(c.charCodeAt(1)) && !containsAny(c, PRICE_WORDS)) h.rankIdx = i;
   }
   return h;
@@ -208,9 +211,10 @@ function readHeader(cells: string[]): Header | null {
 
 interface Accepted extends AwardBidder {
   marked: boolean;
+  pos: number; // offset of the row's <tr>: the document order key (nested tables finish before their parent)
 }
 
-function interpretRow(h: Header, cells: string[], marked: boolean): Accepted | null {
+function interpretRow(h: Header, cells: string[], marked: boolean, pos: number): Accepted | null {
   const noRoles = h.rankIdx < 0 && h.nameIdx < 0 && h.priceIdx < 0;
   const needed = Math.max(h.nameIdx, h.priceIdx);
   const useHeader = !noRoles && !(h.nameIdx >= 0 && h.priceIdx >= 0 && needed >= cells.length);
@@ -219,18 +223,34 @@ function interpretRow(h: Header, cells: string[], marked: boolean): Accepted | n
   let price = NaN;
   if (useHeader) {
     if (h.rankIdx >= 0 && h.rankIdx < cells.length) rank = parseRank(cells[h.rankIdx]!);
-    if (h.nameIdx < 0) return null; // the name must be labelled when the header labels other columns
     if (h.nameIdx >= cells.length) return null;
-    name = cells[h.nameIdx]!;
+    let priceCell = -1;
     if (h.priceIdx >= 0) {
       if (h.priceIdx >= cells.length) return null;
       price = parseAmount(cells[h.priceIdx]!);
+      priceCell = h.priceIdx;
     } else {
       for (let i = cells.length - 1; i >= 0; i--) {
         if (i === h.rankIdx || i === h.nameIdx) continue;
         const v = parseAmount(cells[i]!);
         if (v === v) {
           price = v;
+          priceCell = i;
+          break;
+        }
+      }
+    }
+    if (h.nameIdx >= 0) {
+      name = cells[h.nameIdx]!;
+      if (!hasLetter(name)) return null; // a name must contain a letter ('12345', '—' are not names)
+    } else {
+      // partly labelled header (rank and/or price only): the name is the first cell with letters that is not the rank/price cell.
+      // Only when the header has an unlabelled column to hold it (a lone `Price` header has no room for a name: B10 stays null).
+      if (h.cols <= (h.rankIdx >= 0 ? 1 : 0) + (h.priceIdx >= 0 ? 1 : 0)) return null;
+      for (let i = 0; i < cells.length; i++) {
+        if (i === h.rankIdx || i === priceCell) continue;
+        if (hasLetter(cells[i]!)) {
+          name = cells[i]!;
           break;
         }
       }
@@ -261,7 +281,7 @@ function interpretRow(h: Header, cells: string[], marked: boolean): Accepted | n
   }
   name = cleanName(name);
   if (!name || !(price > 0 && price <= MAX_AMOUNT)) return null;
-  return { rank, name, price, marked };
+  return { rank, name, price, marked, pos };
 }
 
 // ───────────── tokenizer ─────────────
@@ -323,7 +343,7 @@ function closeRow(t: TableCtx, pos: number): void {
     return;
   }
   if (!t.header || pos - r.start > MAX_ROW_LENGTH || t.out.length >= MAX_BIDDERS) return;
-  const a = interpretRow(t.header, r.cells, r.winner);
+  const a = interpretRow(t.header, r.cells, r.winner, r.start);
   if (a) t.out.push(a);
 }
 
@@ -346,6 +366,14 @@ function finishTable(t: TableCtx, pos: number, into: Accepted[]): void {
     if (into.length >= MAX_BIDDERS) break;
     into.push(a);
   }
+}
+
+// Block-ish tags separate words ("Acme<br>Traders"); inline tags (span, b, i, a, strong …) must not, so that
+// "<span>28,40,500</span><span>.00</span>" still reads as one number.
+const BLOCK_TAGS = new Set(['br', 'p', 'div', 'li', 'ul', 'ol', 'hr', 'table', 'tr', 'td', 'th', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+function addSpace(t: TableCtx | null): void {
+  if (t && t.cell && t.cell.raw.length < MAX_CELL_RAW) t.cell.raw += ' ';
 }
 
 function skipRawText(s: string, from: number, name: string): number {
@@ -463,14 +491,21 @@ function tokenize(s: string): Accepted[] {
     if (name === 'table') {
       if (closing) {
         if (ignoredDepth > 0) ignoredDepth--;
-        else if (stack.length) finishTable(stack.pop()!, tagStart, all);
+        else if (stack.length) {
+          finishTable(stack.pop()!, tagStart, all);
+          addSpace(stack.length ? stack[stack.length - 1]! : null);
+        }
       } else if (stack.length >= MAX_TABLE_DEPTH) ignoredDepth++;
-      else stack.push({ header: null, headerSeen: false, skip: false, row: null, cell: null, out: [] });
+      else {
+        addSpace(top);
+        stack.push({ header: null, headerSeen: false, skip: false, row: null, cell: null, out: [] });
+      }
       continue;
     }
     if (ignoredDepth > 0) continue; // inside a table nested beyond the depth cap
     const t = top;
     if (!t) continue;
+    if (BLOCK_TAGS.has(name)) addSpace(t);
     if (name === 'tr') {
       if (closing) closeRow(t, tagStart);
       else startRow(t, tagStart, cls);
@@ -485,19 +520,19 @@ function tokenize(s: string): Accepted[] {
   return all;
 }
 
+// No blanket try/catch: the tokenizer is index-bounded and calls nothing that throws on a string, so a guard would only
+// hide a real bug. Non-string input is the one case handled explicitly.
 export function parseAwardResult(input: string): AwardResult | null {
-  try {
-    if (typeof input !== 'string' || input.length === 0) return null;
-    const s = input.length > MAX_RESULT_HTML ? input.slice(0, MAX_RESULT_HTML) : input;
-    const accepted = tokenize(s);
-    if (accepted.length === 0) return null;
-    const winner = accepted.find((a) => a.marked) ?? accepted.find((a) => a.rank === 1) ?? accepted[0]!;
-    return {
-      l1Price: winner.price,
-      l1Seller: winner.name,
-      bidders: accepted.map((a) => ({ rank: a.rank, name: a.name, price: a.price })),
-    };
-  } catch {
-    return null;
-  }
+  if (typeof input !== 'string' || input.length === 0) return null;
+  const s = input.length > MAX_RESULT_HTML ? input.slice(0, MAX_RESULT_HTML) : input;
+  const accepted = tokenize(s);
+  if (accepted.length === 0) return null;
+  // nested tables finish before their parent: restore document order by row position (stable sort)
+  accepted.sort((a, b) => a.pos - b.pos);
+  const winner = accepted.find((a) => a.marked) ?? accepted.find((a) => a.rank === 1) ?? accepted[0]!;
+  return {
+    l1Price: winner.price,
+    l1Seller: winner.name,
+    bidders: accepted.map((a) => ({ rank: a.rank, name: a.name, price: a.price })),
+  };
 }

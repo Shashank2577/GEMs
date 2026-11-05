@@ -13,8 +13,8 @@
  * names and the derived `l1Price`.
  *
  * `parseAwardResult` (T092; 006/FR-085) is the second, looser reader: it takes any saved GeM RA / bid-result
- * page and finds the rank/price evaluation table by its header words. It is a clean-room implementation
- * (issue #537) written from specs/006-apply-packet-assist/award-parser-spec.md and lives in ./award-result.
+ * page and finds the rank/price evaluation table by its header words. It is an independent reimplementation (clean-room in process, not in provenance)
+ * (issue #537; see NOTICE) written from specs/006-apply-packet-assist/award-parser-spec.md and lives in ./award-result.
  */
 
 export interface BidResultBidder {

@@ -1,6 +1,6 @@
 # Behaviour spec: `parseAwardResult` (006 / FR-085, T092)
 
-Clean-room specification. Derived only from: spec.md (US7 scenario 9, FR-085), plan.md, tasks.md T092/T093, the
+Specification for an independent reimplementation (clean-room in process, not in provenance: see NOTICE). Derived only from: spec.md (US7 scenario 9, FR-085), plan.md, tasks.md T092/T093, the
 `parseAwardResult` tests in `packages/core/test/gem/award.test.ts`, the fixture `packages/core/test/fixtures/gem/ra-result.html`,
 the observable use in `SubmitStep.tsx` and the US7 E2E (scenarios S9/S9b), and the exported type names. An implementer needs
 nothing else.
@@ -8,7 +8,7 @@ nothing else.
 ## 1. Purpose
 
 Given the HTML of a public GeM RA / bid-result page that the user saved themselves, suggest the L1 price and L1 seller so the
-"Record result" dialog can pre-fill them for the human to confirm. Pure function in `@tp/core` (`packages/core/src/gem/award.ts`),
+"Record result" dialog can pre-fill them for the human to confirm. Pure function in `@tp/core`, implemented in `packages/core/src/gem/award-result.ts` and re-exported from `packages/core/src/gem/award.ts`,
 run in the browser. No DOM (`DOMParser`, `document`), no network, no I/O, no global state.
 
 ## 2. Public contract
@@ -20,11 +20,11 @@ export function parseAwardResult(input: string): AwardResult | null
 export const MAX_RESULT_HTML = 512 * 1024   // already exported by the module; the UI also slices files to this size
 ```
 
-- `bidders` lists accepted rows in table (document) order, not sorted by rank.
+- `bidders` lists accepted rows in document order (by position of the row's `<tr>`; rows of a nested table sit between the outer rows before and after it), not sorted by rank.
 - `l1Price` / `l1Seller` are the price / name of the selected winner row (section 6); the winner is one of `bidders`.
 - No `winner` flag is exposed; `bidders` entries contain exactly `{ rank, name, price }` (tests use `toEqual`).
 - Returns `null` when there is no usable price table, i.e. no accepted bidder row (UI shows "No price table found in this page.").
-- Never throws, for any string input.
+- Never throws, for any string input; any non-string input returns `null`.
 
 ## 3. Input limits
 
@@ -48,7 +48,8 @@ export const MAX_RESULT_HTML = 512 * 1024   // already exported by the module; t
 
 Tokenize the document into `<table>` elements, their rows (`<tr>`, with optional `<thead>/<tbody>`) and cells (`<th>`/`<td>`;
 a cell ends at its closing tag or at the next cell/row start). Tag and attribute names are case-insensitive. Comments, scripts and
-styles carry no cells. Cell text = inner markup stripped, entities decoded (named: `&amp; &lt; &gt; &quot; &nbsp; &#39;`;
+styles carry no cells. Cell text = inner markup stripped (block-level tags `br p div li ul ol hr h1-h6 table tr td th` count as a single space between words, so
+`Acme<br>Traders` gives `Acme Traders`; inline tags such as `span b i strong a` add nothing, so `<span>28,40,500</span><span>.00</span>` is one number), entities decoded (named: `&amp; &lt; &gt; &quot; &nbsp; &#39;`;
 numeric decimal/hex only for valid non-surrogate code points, otherwise left raw), whitespace collapsed, trimmed.
 
 Classification of each table by its **first row** (header row), case-insensitive substring match on the joined header text:
@@ -61,10 +62,15 @@ Classification of each table by its **first row** (header row), case-insensitive
 Column mapping inside a price table, from the first row's header words (not by position, B5):
 
 - rank column: header contains `rank` (or `l1`-style rank wording).
-- name column: header contains `seller`, `vendor`, `bidder`, `company` or `name`. `S.No`/serial columns are neither rank nor name.
-- price column: header contains `price`, `amount` or `total` (e.g. `Total Price (₹)`).
-- Fallback when a role has no header word (B3c, B4): the first row has no usable role headers or the table is only partially
-  labelled, then use content: the price is the right-most cell that parses as a positive amount in a column that is not the rank
+- name column: header contains `seller`, `vendor`, `bidder`, `company`, `name`, `firm`, `participant`, `supplier` or `agency`. `S.No`/serial columns are neither rank nor name.
+- price column: header contains `price`, `amount` or `total` (e.g. `Total Price (₹)`). A header cell with both a name word and a
+  price word (`Seller Quoted Price`) is the price column.
+- A name taken from a labelled name column must contain at least one letter (`12345`, `—` are not names: the row is skipped).
+- When the header labels rank and/or price but no name word, the name is read from cell contents (first cell containing letters
+  that is not the rank or price cell), provided the header has at least one unlabelled column to hold it (a lone `Price` header
+  does not: B10 stays `null`).
+- Fallback when a role has no header word (B3c; B4 is a header-path case, not a fallback): the first row has no usable role headers or the table is only partially
+  labelled (e.g. `Rank | Firm | Price` is fully labelled, `Rank | Price | Bid` has no name word), then use content: the price is the right-most cell that parses as a positive amount in a column that is not the rank
   column; the name is the first cell with letters that is not the rank/price cell; rank is a cell that is purely a rank token
   (`1`, `L1`, `l2`).
 - A rank value is `N` or `L<N>` (case-insensitive) with N a positive integer, giving N; anything else, or no rank column, gives `0`.
@@ -123,6 +129,8 @@ Shorthand: `T(rows)` = `<table><tr><th>Rank</th><th>Seller</th><th>Price</th></t
 | B10 | linear on hostile markup | (i) `<table><tr><th>Price</th>` + `<td` x 50,000 (unterminated); (ii) `<table><tr><th>Price</th></tr>` + `<tr><td>1</td><td>A` x (512 KB / 16) (unclosed cells/rows, no valid price) | both `null`; both together < 2000 ms |
 
 Currency affix handling is covered by B1 (`₹ 31,25,000`), B3c, B6c-d; non-price tables by B2 and B8; hostile input by B7 and B10; limits by section 3.
+
+Review additions (tests in `award-result.test.ts`): partly labelled headers (`Rank | Firm | Price`, `Rank | Participant | Total Price (₹)`, Supplier, Agency); block versus inline tags; price-wins header cells; non-string input; nested tables in document order; a winner-marked row that is not rank 1 wins.
 
 Observable behaviour from the UI/E2E (SubmitStep, S9/S9b), which the parser must satisfy:
 - Fixture gives L1 `2840500` and seller containing `Kaveri Systems & Services Pvt Ltd`; the UI rounds `l1Price` to an integer.

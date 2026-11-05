@@ -17,7 +17,7 @@ user's click. This plan describes the built design precisely (so QA and reviewer
 remaining work: stage-transition rules (FR-008), honest readiness when not analysed (FR-009), override/comment hardening
 (FR-027, FR-032, FR-033), template placeholder validation and role gating (FR-041, FR-043), shared packet order, input
 cap and stuck-build recovery (FR-055–FR-057), RFC 5987 filenames (FR-059), extension hardening and read-only tokens
-(FR-073–FR-075, FR-077), submission/outcome extras incl. a GeM-result parser (clean-room) (FR-084,
+(FR-073–FR-075, FR-077), submission/outcome extras incl. a GeM-result parser (independent reimplementation, clean-room in process, not in provenance) (FR-084,
 FR-085), unsaved-change guards (FR-092), and Playwright E2E with evidence for all 7 stories.
 
 ## Technical Context
@@ -95,7 +95,7 @@ packages/core/src/
 │   └── pdf-utils.ts            # A4, sanitize, wrap, embedFonts, text helpers, dateIST
 ├── assist/allowlist.ts         # FIELD_CATALOG, FORBIDDEN_*, forbiddenReason, matchField, assistPayload,
 │                               #   deriveAssistDefaults, validateAssistValues, HUMAN_STEPS (FR-061..FR-065)
-└── gem/award.ts                # NEW (FR-085): parseAwardResult(html) — RA-result table reader (clean-room, from award-parser-spec.md)
+└── gem/award.ts                # NEW (FR-085): parseAwardResult(html) — RA-result table reader (independent reimplementation, from award-parser-spec.md)
 
 apps/api/src/
 ├── routes/workspaces.ts        # create-or-get, list, detail, PATCH (stage guard), mapping, overrides, comments,
@@ -251,11 +251,11 @@ The user explicitly approved copying whichever code works best; every port is re
 
 | Source (in `/home/user/refs/`) | Target | Why |
 |---|---|---|
-| _(no upstream; original work)_ — table classification (header keywords "rank/price/l1/financial/amount/total" vs "seller/vendor/bidder/technical/qualified"), winner = trophy/winner-marked row, else rank 1, else first row | `packages/core/src/gem/award-result.ts` `parseAwardResult(html)` (pure TS, DOM-free tokenizer over `<table>`), tests in `packages/core/test/gem/award.test.ts` and `award-result.test.ts` | FR-085: suggest L1 price/seller from a GeM RA result page the user saved. clean-room implementation from `award-parser-spec.md` (issue #537); no GEM-SCRAPER code is used. |
+| Replaces an earlier port of GEM-SCRAPER's `scrape_ra_schedule()` heuristics (IshanMaheshwari-777/GEM-SCRAPER, no licence; the port was removed). The rewrite carries no GEM-SCRAPER code or text; its behaviour (header keywords, winner selection) is the same idea set — table classification (header keywords "rank/price/l1/financial/amount/total" vs "seller/vendor/bidder/technical/qualified"), winner = trophy/winner-marked row, else rank 1, else first row | `packages/core/src/gem/award-result.ts` `parseAwardResult(html)` (pure TS, DOM-free tokenizer over `<table>`), tests in `packages/core/test/gem/award.test.ts` and `award-result.test.ts` | FR-085: suggest L1 price/seller from a GeM RA result page the user saved. An independent reimplementation from `award-parser-spec.md` (issue #537); no GEM-SCRAPER code is used (see NOTICE). |
 | _(none)_ | `packages/core/test/fixtures/gem/ra-result.html` (synthetic page built for our own parser tests) | Fixture for the parser. |
 | `erenmyeager15_india-government-tenders-scraper/src/pdf.ts` (Apache-2.0) — "give the PDF reader an independent plain `Uint8Array`" pattern | `apps/api/src/services/packet.ts` `loadBytes` (copy blob bytes with `Uint8Array.from` before `PDFDocument.load`) | Avoids shared-`ArrayBuffer` slice bugs when Node `Buffer`s from the FS blob store reach pdf-lib; cheap hardening for FR-047. |
 | `erenmyeager15_india-government-tenders-scraper/src/run-budget.ts` (Apache-2.0) — explicit byte/time budget guard | `apps/api/src/services/packet.ts` input-size pre-check (FR-056) | Same "fail fast before work" shape for the Worker memory budget. |
-| Public page-structure observations on `bidplus.gem.gov.in` (`showbidDocument`, `list-ra-schedules`) | `apps/extension/README.md` + `apps/extension/test/fixtures/gem-form.html` comments | Document which GeM pages the content script targets; ideas only, no code. |
+| Public page-structure observations on `bidplus.gem.gov.in` (`showbidDocument`, `list-ra-schedules`); the notes originated from GEM-SCRAPER's `probe.py` (no licence) — ideas only, no code or text copied | `apps/extension/README.md` + `apps/extension/test/fixtures/gem-form.html` comments | Document which GeM pages the content script targets; ideas only, no code. |
 
 Not ported: scraping/login automation of any kind (Constitution I/II), Python PDF extractors (`Mujahid-Alam_gem-tender-pdf-extractor`
 — the Analyse area already parses bid PDFs), Excel exporters.

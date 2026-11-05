@@ -59,13 +59,15 @@ listed here with its licence.
    Licence: MIT License
    Used in: CONVENTIONS.md and .aisdlc/ (review and QA process templates only; no runtime code).
 
-Project notes: `parseAwardResult` (packages/core/src/gem/award-result.ts, spec 006 FR-085) is an original
-clean-room implementation written from specs/006-apply-packet-assist/award-parser-spec.md; no GEM-SCRAPER code is
-used.
+Project notes: parseAwardResult (packages/core/src/gem/award-result.ts) was rewritten in #537 from a project-authored
+behaviour spec (specs/006-apply-packet-assist/award-parser-spec.md) without access to GEM-SCRAPER source. It replaces an
+earlier port of GEM-SCRAPER's scrape_ra_schedule() heuristics (IshanMaheshwari-777/GEM-SCRAPER, no licence). The spec was
+derived from our plan, tests and fixture, which describe those heuristics (header keyword list; winner = marked row, else
+rank 1, else first row), and the authors had seen the earlier port. No GEM-SCRAPER code or text is included.
 
 Other reference repositories in the owner's reference set (Giridar33/gem-tender-tracker,
 PranavTamada/Tender_Scraper, Mujahid-Alam/gem-tender-pdf-extractor,
-Giri-Aayush/gem, rounittxx/gem-bid-scraper) were consulted for portal behaviour but no code or text from
+Giri-Aayush/gem, rounittxx/gem-bid-scraper, IshanMaheshwari-777/GEM-SCRAPER) were consulted for portal behaviour but no code or text from
 them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.
 
 Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
