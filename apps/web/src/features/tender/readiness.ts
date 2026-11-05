@@ -14,3 +14,8 @@ export function readinessChip(r: ChecklistReadiness | undefined): ReadinessChip 
     default: return null;
   }
 }
+
+/** Chip for one checklist row: no readiness map (workspace attached / vault unavailable / loading) → no chip. */
+export function rowReadinessChip(readiness: Record<string, ChecklistReadiness> | null | undefined, id: string): ReadinessChip | null {
+  return readinessChip(readiness?.[id]);
+}

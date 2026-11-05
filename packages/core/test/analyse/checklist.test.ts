@@ -80,4 +80,44 @@ describe('checklistReadiness (FR-040)', () => {
     const res = checklistReadiness([item('g', 'gst')], [{ type: 'gst', expiryDate: '2020-01-01' }, { type: 'gst', expiryDate: '2030-01-01' }], now);
     expect(res.g).toEqual({ status: 'ready' });
   });
+
+  it('IST midnight boundary: UTC date differs from IST date', () => {
+    const g = (iso: string, exp: string) => checklistReadiness([item('g', 'gst')], [{ type: 'gst', expiryDate: exp }], new Date(iso)).g;
+    // 2026-03-10T02:00+05:30 is still 2026-03-09 in UTC; IST day is the 10th.
+    expect(g('2026-03-10T02:00:00+05:30', '2026-03-10')).toEqual({ status: 'expiring', days: 0 });
+    expect(g('2026-03-10T02:00:00+05:30', '2026-03-11')).toEqual({ status: 'expiring', days: 1 });
+    expect(g('2026-03-09T23:30:00Z', '2026-03-10')).toEqual({ status: 'expiring', days: 0 });
+  });
+  it('several valid docs of one type: the latest-expiring decides', () => {
+    const g = (exps: string[]) => checklistReadiness([item('g', 'gst')], exps.map((e) => ({ type: 'gst' as const, expiryDate: e })), now).g;
+    expect(g(['2026-03-15', '2027-01-01'])).toEqual({ status: 'ready' });
+    expect(g(['2026-03-15', '2026-03-25'])).toEqual({ status: 'expiring', days: 15 });
+    expect(g(['2026-03-15', '2026-03-25', '2020-01-01'])).toEqual({ status: 'expiring', days: 15 });
+  });
+  it('threshold: 30 days is expiring, 31 is ready', () => {
+    const g = (exp: string) => checklistReadiness([item('g', 'gst')], [{ type: 'gst', expiryDate: exp }], now).g;
+    expect(g('2026-04-09')).toEqual({ status: 'expiring', days: 30 });
+    expect(g('2026-04-10')).toEqual({ status: 'ready' });
+  });
+  it('a no-expiry doc makes the item ready', () => {
+    expect(checklistReadiness([item('g', 'gst')], [{ type: 'gst', expiryDate: '2026-03-15' }, { type: 'gst' }], now).g).toEqual({ status: 'ready' });
+  });
+  it('docType other (atc_/doc_/undertaking_/oem_turnover/unrecognised cert) is n/a', () => {
+    const others = [item('atc_x', 'other'), item('doc_y', 'other'), item('undertaking_z', 'other'), item('oem_turnover_certificate', 'other'), item('cert_cmmi', 'other')];
+    const res = checklistReadiness(others, [{ type: 'other', title: 'CMMI' }], now);
+    for (const o of others) expect(res[o.id]).toEqual({ status: 'n/a' });
+  });
+  it('cert_* items match by title/tags like the Certificates factor (ISO 9001 vs 27001)', () => {
+    const c = (id: string, label: string, t: ChecklistItem['docType']) => ({ ...item(id, t), label });
+    const items2 = [c('cert_iso_9001', 'ISO 9001 certificate', 'iso'), c('cert_iso_27001', 'ISO 27001 certificate', 'iso'), c('cert_bis', 'BIS certificate', 'bis')];
+    const res = checklistReadiness(items2, [
+      { type: 'iso', title: 'ISO 9001:2015 Quality', expiryDate: '2027-01-01' },
+      { type: 'iso', title: 'Cert', tags: ['ISO 27001'], expiryDate: '2026-03-01' },
+    ], now);
+    expect(res.cert_iso_9001).toEqual({ status: 'ready' });
+    expect(res.cert_iso_27001).toEqual({ status: 'expired' });
+    expect(res.cert_bis).toEqual({ status: 'missing' });
+    const only9001 = checklistReadiness(items2, [{ type: 'iso', title: 'ISO 9001', expiryDate: '2027-01-01' }], now);
+    expect(only9001.cert_iso_27001).toEqual({ status: 'missing' });
+  });
 });

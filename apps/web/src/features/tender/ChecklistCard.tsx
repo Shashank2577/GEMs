@@ -5,12 +5,12 @@ import type { ChecklistReadiness } from '@tp/core/analyse/checklist';
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, EmptyState, Tooltip } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { DOC_TYPE_LABEL, docTypeIcon } from './labels';
-import { readinessChip, type ReadinessIcon } from './readiness';
+import { rowReadinessChip, type ReadinessIcon } from './readiness';
 
 const READINESS_ICON: Record<ReadinessIcon, LucideIcon> = { ok: CheckCircle2, warn: CircleAlert, bad: CircleX, missing: FileX2 };
 
 /** "Required documents" checklist produced by the analysis (FR-015). */
-export function ChecklistCard({ items, hasWorkspace, readiness }: { items: ChecklistItem[]; hasWorkspace: boolean; /** Vault readiness per item id (FR-040); omitted when unavailable or a workspace is attached. */ readiness?: Record<string, ChecklistReadiness> | null }) {
+export function ChecklistCard({ items, hasWorkspace, readiness, vaultUnavailable }: { items: ChecklistItem[]; hasWorkspace: boolean; vaultUnavailable?: boolean; /** Vault readiness per item id (FR-040); omitted when unavailable or a workspace is attached. */ readiness?: Record<string, ChecklistReadiness> | null }) {
   const [showOptional, setShowOptional] = useState(false);
   const mandatory = items.filter((i) => i.mandatory);
   const optional = items.filter((i) => !i.mandatory);
@@ -26,6 +26,7 @@ export function ChecklistCard({ items, hasWorkspace, readiness }: { items: Check
         <CardDescription>
           {mandatory.length} to submit · {generated} we generate for you.{' '}
           {hasWorkspace ? 'Map them to your vault in the bid workspace.' : 'Start a bid to auto-match them with your vault.'}
+          {vaultUnavailable && <span className="mt-1 block text-xs text-muted-foreground">Vault status unavailable</span>}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -34,7 +35,7 @@ export function ChecklistCard({ items, hasWorkspace, readiness }: { items: Check
         ) : (
           <>
             <ul className="divide-y border-t">
-              {mandatory.map((i) => <Row key={i.id} item={i} readiness={readiness?.[i.id]} />)}
+              {mandatory.map((i) => <Row key={i.id} item={i} readiness={readiness} />)}
             </ul>
             {optional.length > 0 && (
               <div className="border-t">
@@ -42,7 +43,7 @@ export function ChecklistCard({ items, hasWorkspace, readiness }: { items: Check
                   Optional & informational ({optional.length})
                   <ChevronDown className={cn('size-3.5 transition-transform', showOptional && 'rotate-180')} aria-hidden />
                 </button>
-                {showOptional && <ul className="divide-y border-t">{optional.map((i) => <Row key={i.id} item={i} readiness={readiness?.[i.id]} />)}</ul>}
+                {showOptional && <ul className="divide-y border-t">{optional.map((i) => <Row key={i.id} item={i} readiness={readiness} />)}</ul>}
               </div>
             )}
           </>
@@ -52,9 +53,9 @@ export function ChecklistCard({ items, hasWorkspace, readiness }: { items: Check
   );
 }
 
-function Row({ item, readiness }: { item: ChecklistItem; readiness?: ChecklistReadiness }) {
+function Row({ item, readiness }: { item: ChecklistItem; readiness?: Record<string, ChecklistReadiness> | null }) {
   const Icon = docTypeIcon(item.docType, item.generated);
-  const chip = readinessChip(readiness);
+  const chip = rowReadinessChip(readiness, item.id);
   const ChipIcon = chip ? READINESS_ICON[chip.icon] : null;
   return (
     <li className="flex items-start gap-3 px-5 py-3">

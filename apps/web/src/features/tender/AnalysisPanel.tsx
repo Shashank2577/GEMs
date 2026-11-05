@@ -10,9 +10,9 @@ import { apiUrl, errorMessage } from '@/lib/api';
 import { useCan } from '@/lib/auth';
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useOverride } from './api';
 import { checklistReadiness } from '@tp/core/analyse/checklist';
 import { useVault } from '@/features/vault/api';
+import { useOverride } from './api';
 import { ChecklistCard } from './ChecklistCard';
 import { FACTOR_HELP, FACTOR_ICON, STATUS_META, analysisPanelState, failedAttemptCopy, friendlyAnalysisError, isAnalysisRunning, truncatedDocuments } from './labels';
 
@@ -78,10 +78,10 @@ export function AnalysisPanel({
   }, [analysis.requirements]);
 
   // Vault readiness for checklist rows (FR-040): only without a workspace; hidden if the vault query fails.
-  const vault = useVault({});
+  const vault = useVault({}, { enabled: !hasWorkspace });
   const vaultItems = vault.data?.items;
   const readiness = useMemo(
-    () => (hasWorkspace || vault.isError || !vaultItems ? null : checklistReadiness(analysis.checklist, vaultItems.map((d) => ({ type: d.type, title: d.title, expiryDate: d.expiryDate })), new Date())),
+    () => (hasWorkspace || vault.isError || !vaultItems ? null : checklistReadiness(analysis.checklist, vaultItems.map((d) => ({ type: d.type, title: d.title, expiryDate: d.expiryDate, tags: d.tags })), new Date())),
     [hasWorkspace, vault.isError, vaultItems, analysis.checklist],
   );
 
@@ -149,7 +149,7 @@ export function AnalysisPanel({
       </div>
 
       <div className="grid content-start gap-6">
-        <ChecklistCard items={analysis.checklist} hasWorkspace={hasWorkspace} readiness={readiness} />
+        <ChecklistCard items={analysis.checklist} hasWorkspace={hasWorkspace} readiness={readiness} vaultUnavailable={!hasWorkspace && vault.isError} />
       </div>
 
       <OverrideDialog analysis={analysis} factor={overrideFor} tenderId={tenderId} onClose={() => setOverrideFor(null)} />

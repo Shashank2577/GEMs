@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readinessChip } from './readiness';
+import { readinessChip, rowReadinessChip } from './readiness';
 
 describe('readinessChip (FR-040)', () => {
   it('maps statuses to text labels', () => {
@@ -13,5 +13,18 @@ describe('readinessChip (FR-040)', () => {
   it('shows nothing for n/a or unknown', () => {
     expect(readinessChip({ status: 'n/a' })).toBeNull();
     expect(readinessChip(undefined)).toBeNull();
+  });
+});
+
+describe('rowReadinessChip (ChecklistCard chip decision)', () => {
+  it('shows no chip when readiness is null/undefined (workspace attached or vault unavailable)', () => {
+    expect(rowReadinessChip(null, 'gst')).toBeNull();
+    expect(rowReadinessChip(undefined, 'gst')).toBeNull();
+  });
+  it('shows the chip for the item, none for unknown ids or n/a', () => {
+    const map = { gst: { status: 'ready' as const }, gem: { status: 'n/a' as const } };
+    expect(rowReadinessChip(map, 'gst')).toMatchObject({ label: 'In vault' });
+    expect(rowReadinessChip(map, 'gem')).toBeNull();
+    expect(rowReadinessChip(map, 'zzz')).toBeNull();
   });
 });
