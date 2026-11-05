@@ -1,0 +1,1016 @@
+{
+  "url": "http://localhost:8806/dashboard",
+  "timestamp": "2026-11-05T06:05:20.679Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus-ring\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                },
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" aria-current=\"page\" class=\"rounded-md focus-ring active\" href=\"/dashboard\">",
+                  "target": [
+                    ".h-14.px-4.justify-between > .active[aria-label=\"TenderPilot home\"][aria-current=\"page\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Collapse sidebar\" data-state=\"closed\">",
+                  "target": [
+                    ".\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\">",
+                  "target": [
+                    "#radix-\\:r3\\:"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-8 w-full items-center gap-2 rounded-lg border bg-card px-2.5 text-[13px] text-muted-foreground shadow-xs transition-colors hover:border-foreground/15 hover:text-foreground focus-ring\">",
+                  "target": [
+                    ".px-3.pb-3 > .h-8.hover\\:border-foreground\\/15.w-full"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring bg-card text-foreground shadow-sm ring-1 ring-border\" href=\"/dashboard\">",
+                  "target": [
+                    ".ring-1"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/tenders\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"tenders\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/watchlists\">",
+                  "target": [
+                    "a[href$=\"watchlists\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/vault\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"vault\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/profile\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"profile\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/notifications\">",
+                  "target": [
+                    "a[href$=\"notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/settings\">",
+                  "target": [
+                    "a[href$=\"settings\"]"
+                  ]
+                },
+                {
+                  "html": "<button class=\"ml-auto hidden h-8 w-full max-w-sm items-center gap-2 rounded-lg border bg-subtle px-3 text-[13px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground focus-ring md:mr-auto md:ml-0 md:flex\">",
+                  "target": [
+                    ".md\\:mr-auto"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Theme: dark\" id=\"radix-:r9:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r9\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"QM Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-foreground.h-9[href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/tenders?matched=1\">",
+                  "target": [
+                    ".sm\\:items-end > .flex-wrap.gap-2.shrink-0 > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\].text-primary-foreground"
+                  ]
+                },
+                {
+                  "html": "<a class=\"block rounded-xl border bg-card p-4 shadow-xs sm:p-5 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-md focus-ring\" href=\"/tenders?matched=1\">",
+                  "target": [
+                    ".p-4.sm\\:p-5[href=\"/tenders?matched=1\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"block rounded-xl border bg-card p-4 shadow-xs sm:p-5 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-md focus-ring\" href=\"/tenders?matched=1&closing=7&sort=endAt\">",
+                  "target": [
+                    ".p-4.sm\\:p-5.transition-\\[box-shadow\\,border-color\\]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<a class=\"block rounded-xl border bg-card p-4 shadow-xs sm:p-5 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-md focus-ring\" href=\"/pipeline\">",
+                  "target": [
+                    ".p-4.sm\\:p-5[href$=\"pipeline\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<a class=\"block rounded-xl border bg-card p-4 shadow-xs sm:p-5 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-md focus-ring\" href=\"/pipeline\">",
+                  "target": [
+                    ".p-4.sm\\:p-5[href$=\"pipeline\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<a class=\"block rounded-xl border bg-card p-4 shadow-xs sm:p-5 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-md focus-ring\" href=\"/pipeline?stage=won\">",
+                  "target": [
+                    ".p-4.sm\\:p-5[href=\"/pipeline?stage=won\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"block rounded-xl border bg-card p-4 shadow-xs sm:p-5 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-md focus-ring\" href=\"/vault?status=expiring\">",
+                  "target": [
+                    ".p-4.sm\\:p-5[href=\"/vault?status=expiring\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".flex-wrap.gap-2.shrink-0 > button[type=\"button\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/watchlists?new=1\">",
+                  "target": [
+                    ".flex-wrap.gap-2.shrink-0 > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\][href=\"/watchlists?new=1\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/tenders?matched=1&s...\">",
+                  "target": [
+                    "a[href=\"/tenders?matched=1&sort=endAt\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60 focus-ring bg-primary-soft/60\" href=\"/profile\">",
+                  "target": [
+                    ".bg-primary-soft\\/60"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60 focus-ring\" href=\"/profile\">",
+                  "target": [
+                    "li:nth-child(2) > .hover\\:bg-muted\\/60.items-start[href$=\"profile\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60 focus-ring\" href=\"/watchlists?new=1\">",
+                  "target": [
+                    ".hover\\:bg-muted\\/60.items-start[href=\"/watchlists?new=1\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60 focus-ring\" href=\"/vault?upload=1\">",
+                  "target": [
+                    "a[href=\"/vault?upload=1\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60 focus-ring\" href=\"/tenders?matched=1\">",
+                  "target": [
+                    ".hover\\:bg-muted\\/60.items-start[href=\"/tenders?matched=1\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60 focus-ring\" href=\"/settings/team\">",
+                  "target": [
+                    "a[href$=\"team\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/onboarding\">",
+                  "target": [
+                    ".hover\\:underline"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted focus-ring\" href=\"/tenders?verdict=go\">",
+                  "target": [
+                    "a[href=\"/tenders?verdict=go\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted focus-ring\" href=\"/tenders?verdict=review\">",
+                  "target": [
+                    "a[href=\"/tenders?verdict=review\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted focus-ring\" href=\"/tenders?verdict=no_go\">",
+                  "target": [
+                    "a[href=\"/tenders?verdict=no_go\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group grid grid-cols-[6.5rem_1fr_3.5rem_1.5rem] items-center gap-3 rounded-lg px-1.5 py-1 focus-ring hover:bg-muted/60\" title=\"Identified: 0 bids · ₹0\" href=\"/pipeline?stage=identified\">",
+                  "target": [
+                    "a[title=\"Identified: 0 bids · ₹0\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group grid grid-cols-[6.5rem_1fr_3.5rem_1.5rem] items-center gap-3 rounded-lg px-1.5 py-1 focus-ring hover:bg-muted/60\" title=\"Analysing: 0 bids · ₹0\" href=\"/pipeline?stage=analysing\">",
+                  "target": [
+                    "a[title=\"Analysing: 0 bids · ₹0\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group grid grid-cols-[6.5rem_1fr_3.5rem_1.5rem] items-center gap-3 rounded-lg px-1.5 py-1 focus-ring hover:bg-muted/60\" title=\"Go: 0 bids · ₹0\" href=\"/pipeline?stage=go\">",
+                  "target": [
+                    "a[title=\"Go: 0 bids · ₹0\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group grid grid-cols-[6.5rem_1fr_3.5rem_1.5rem] items-center gap-3 rounded-lg px-1.5 py-1 focus-ring hover:bg-muted/60\" title=\"Preparing: 0 bids · ₹0\" href=\"/pipeline?stage=preparing\">",
+                  "target": [
+                    "a[title=\"Preparing: 0 bids · ₹0\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group grid grid-cols-[6.5rem_1fr_3.5rem_1.5rem] items-center gap-3 rounded-lg px-1.5 py-1 focus-ring hover:bg-muted/60\" title=\"Ready to submit: 0 bids · ₹0\" href=\"/pipeline?stage=ready\">",
+                  "target": [
+                    "a[title=\"Ready to submit: 0 bids · ₹0\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group grid grid-cols-[6.5rem_1fr_3.5rem_1.5rem] items-center gap-3 rounded-lg px-1.5 py-1 focus-ring hover:bg-muted/60\" title=\"Submitted: 0 bids · ₹0\" href=\"/pipeline?stage=submitted\">",
+                  "target": [
+                    "a[title=\"Submitted: 0 bids · ₹0\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group grid grid-cols-[6.5rem_1fr_3.5rem_1.5rem] items-center gap-3 rounded-lg px-1.5 py-1 focus-ring hover:bg-muted/60\" title=\"Won: 0 bids · ₹0\" href=\"/pipeline?stage=won\">",
+                  "target": [
+                    "a[title=\"Won: 0 bids · ₹0\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/vault?status=expiri...\">",
+                  "target": [
+                    ".h-8.px-3[href=\"/vault?status=expiring\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/tenders?matched=1\">",
+                  "target": [
+                    ".h-8.px-3[href=\"/tenders?matched=1\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative inline-flex...\" href=\"/watchlists?new=1\">",
+                  "target": [
+                    ".mt-5 > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\][href=\"/watchlists?new=1\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"min-h-dvh bg-background\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".bg-background"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(6)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(6)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "bold",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
+                  "target": [
+                    ".bg-gradient-to-br"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
+          "target": [
+            ".bg-gradient-to-br"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "12.0pt (16px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"bg-grid pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_right,black,transparent_70%)]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".bg-grid"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h2 class=\"text-base font-semibold tracking-tight\">Your command centre fills up as GeM bids arrive</h2>",
+          "target": [
+            ".text-base"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgGradient",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"bg-grid pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_right,black,transparent_70%)]\" aria-hidden=\"true\"></div>",
+                  "target": [
+                    ".bg-grid"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined due to a background gradient"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"mt-1 max-w-xl text-sm text-muted-foreground\">Create a watchlist to start matching live tenders — or load a realistic sample company to see eligibility scores, the pipeline and bid packets in action.</p>",
+          "target": [
+            ".max-w-xl.mt-1"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"73.6923076923077\" dy=\"0.71em\">24 Oct</tspan>",
+          "target": [
+            "tspan[x=\"73.6923076923077\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"177.0769230769231\" dy=\"0.71em\">26 Oct</tspan>",
+          "target": [
+            "tspan[x=\"177.0769230769231\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"280.46153846153845\" dy=\"0.71em\">28 Oct</tspan>",
+          "target": [
+            "tspan[x=\"280.46153846153845\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"383.84615384615387\" dy=\"0.71em\">30 Oct</tspan>",
+          "target": [
+            "tspan[x=\"383.84615384615387\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"487.2307692307692\" dy=\"0.71em\">1 Nov</tspan>",
+          "target": [
+            "tspan[x=\"487.2307692307692\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"590.6153846153846\" dy=\"0.71em\">3 Nov</tspan>",
+          "target": [
+            "tspan[x=\"590.6153846153846\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"686.7578125\" dy=\"0.71em\">5 Nov</tspan>",
+          "target": [
+            "tspan[x=\"686.7578125\"][dy=\"0.71em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">0</tspan>",
+          "target": [
+            "text[y=\"194\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">1</tspan>",
+          "target": [
+            "text[y=\"147.5\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">2</tspan>",
+          "target": [
+            "text[y=\"101\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">3</tspan>",
+          "target": [
+            "text[y=\"54.5\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg class=\"recharts-surface\" width=\"702\" height=\"224\" viewBox=\"0 0 702 224\" style=\"width: 100%; height: 100%;\">",
+                  "target": [
+                    ".recharts-surface"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<tspan x=\"14\" dy=\"0.355em\">4</tspan>",
+          "target": [
+            "text[y=\"8.25\"] > tspan[dy=\"0.355em\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "18.0pt (24px)",
+                "fontWeight": "normal",
+                "messageKey": "shortTextContent",
+                "expectedContrastRatio": "3:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\"><circle cx=\"60\" cy=\"60\" r=\"50\" fill=\"none\" stroke-width=\"14\" style=\"stroke: hsl(var(--muted-foreground) / 0.22);\"></circle></svg>",
+                  "target": [
+                    "svg[viewBox=\"0 0 120 120\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element content is too short to determine if it is actual text content"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"tabular text-2xl font-semibold tracking-tight\">0</span>",
+          "target": [
+            ".pointer-events-none.inset-0.absolute > .text-2xl.tracking-tight.tabular"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content is too short to determine if it is actual text content"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg viewBox=\"0 0 120 120\" width=\"100%\" height=\"100%\" class=\"block size-full\" aria-hidden=\"true\" data-testid=\"verdict-ring\"><circle cx=\"60\" cy=\"60\" r=\"50\" fill=\"none\" stroke-width=\"14\" style=\"stroke: hsl(var(--muted-foreground) / 0.22);\"></circle></svg>",
+                  "target": [
+                    "svg[viewBox=\"0 0 120 120\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-2xs font-medium uppercase tracking-wider text-muted-foreground\">analysed</span>",
+          "target": [
+            ".pointer-events-none.inset-0.absolute > .uppercase.tracking-wider.text-2xs"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<kbd class=\"inline-flex h-5 min-w-5 items-center justify-center rounded border border-b-2 bg-card px-1 font-sans text-[10px] font-medium text-muted-foreground\">↑</kbd>",
+          "target": [
+            ".gap-1\\.5.items-center.flex:nth-child(1) > kbd:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<kbd class=\"inline-flex h-5 min-w-5 items-center justify-center rounded border border-b-2 bg-card px-1 font-sans text-[10px] font-medium text-muted-foreground\">↓</kbd>",
+          "target": [
+            ".gap-1\\.5.items-center.flex:nth-child(1) > kbd:nth-child(2)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<kbd class=\"inline-flex h-5 min-w-5 items-center justify-center rounded border border-b-2 bg-card px-1 font-sans text-[10px] font-medium text-muted-foreground\">↵</kbd>",
+          "target": [
+            ".gap-1\\.5.items-center.flex:nth-child(1) > kbd:nth-child(3)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        }
+      ]
+    }
+  ],
+  "passes": 25
+}

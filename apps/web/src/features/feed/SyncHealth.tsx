@@ -45,7 +45,7 @@ export function SyncHealth({ className }: { className?: string }) {
         <button
           type="button"
           className={cn('inline-flex h-8 items-center gap-2 rounded-full border bg-card px-3 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:text-foreground focus-ring', className)}
-          aria-label={`GeM sync status: ${label}`}
+          aria-label={`GeM sync status: ${label} · ${formatNumberIN(openTenders)} open bids`}
         >
           {sync.isPending ? <Loader2 className="size-3.5 animate-spin text-primary" /> : (
             <span className="relative flex size-2">

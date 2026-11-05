@@ -12,7 +12,7 @@ import { tenderQuerySchema, type Facet, type TenderListItem, type TenderQuery } 
 import { uuidSchema } from '@tp/core/contracts/common';
 import type { AppDeps } from '../deps';
 import { conflict, notFound } from '../lib/errors';
-import { canSeeTender, visibleTenderSource } from '../lib/tender-scope';
+import { canSeeTender, DEMO_SOURCE, visibleTenderSource } from '../lib/tender-scope';
 import { parseWith } from '../lib/validate';
 import { orgId, requireAuth, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
@@ -30,10 +30,19 @@ const { raw: _rawColumn, contentHash: _hashColumn, ...listColumns } = getTableCo
 export const tenderListColumns = listColumns;
 export type TenderListRow = Omit<TenderRow, 'raw' | 'contentHash'>;
 
-/** Public tender fields (no raw payload / hash). */
-export function tenderCore(t: TenderListRow) {
-  const { raw: _raw, contentHash: _hash, ...rest } = t as TenderRow;
-  return rest;
+/** Demo tenders are marked `raw.demo = true` by the seed (007/FR-067). */
+export function isDemoTender(raw: unknown): boolean {
+  return !!raw && typeof raw === 'object' && (raw as { demo?: unknown }).demo === true;
+}
+
+/**
+ * Public tender fields (no raw payload / hash) plus `isDemo` (007/FR-067). Demo tenders are stored with
+ * `source = 'demo'` (packages/db/src/demo.ts); list rows carry no `raw` (FR-028), and a row with `raw.demo` under
+ * another source is never listed (lib/tender-scope.ts), so `source` decides there; a full row also honours `raw.demo`.
+ */
+export function tenderCore(t: TenderListRow | TenderRow) {
+  const { raw, contentHash: _hash, ...rest } = t as TenderRow;
+  return { ...rest, isDemo: t.source === DEMO_SOURCE || isDemoTender(raw) };
 }
 
 /** Read the query string, keeping repeated keys as arrays. */
