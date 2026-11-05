@@ -1,9 +1,9 @@
-# sc10b-packet-45mb — project mobile — 2026-11-05T05:55:11.630Z
-default packet: other items sum to 156600 bytes; Dell MAF stored size set to 47029320 bytes → total 47185920 bytes (45.0 MB); PACKET_MAX_INPUT_BYTES=41943040 (40 MB)
+# sc10b-packet-45mb — project mobile — 2026-11-05T06:30:40.268Z
+default packet: other items sum to 156593 bytes; Dell MAF stored size set to 47029327 bytes → total 47185920 bytes (45.0 MB); PACKET_MAX_INPUT_BYTES=41943040 (40 MB)
 ### Build packet at 45 MB
-> POST /api/workspaces/2459b35a-36b0-4e9d-ac72-7a0db01dd890/packets {}
+> POST /api/workspaces/ba51da6b-eae3-453f-b158-5c72c4dbe950/packets {}
 < 413
-{"error":{"code":"packet_too_large","message":"These documents add up to 45.0 MB — remove or compress some before building (limit 40 MB).","details":{"totalBytes":47185920,"limitBytes":41943040,"items":[{"title":"OEM authorisation certificate (MAF) for this bid","sizeBytes":47029320},{"title":"Covering Letter for Technical Bid","sizeBytes":51200},{"title":"Undertaking regarding Non-Blacklisting / Non-Debarment","sizeBytes":51200},{"title":"Self-Certificate of Local Content (Make in India)","sizeBytes":51200},{"title":"Audited balance sheets — last 3 financial years","sizeBytes":1282},{"title":"GST registration certificate","sizeBytes":859},{"title":"PAN card of the firm","sizeBytes":859}]}}}
+{"error":{"code":"packet_too_large","message":"These documents add up to 45.0 MB — remove or compress some before building (limit 40 MB).","details":{"totalBytes":47185920,"limitBytes":41943040,"items":[{"title":"OEM authorisation certificate (MAF) for this bid","sizeBytes":47029327},{"title":"Covering Letter for Technical Bid","sizeBytes":51200},{"title":"Undertaking regarding Non-Blacklisting / Non-Debarment","sizeBytes":51200},{"title":"Self-Certificate of Local Content (Make in India)","sizeBytes":51200},{"title":"Audited balance sheets — last 3 financial years","sizeBytes":1281},{"title":"GST registration certificate","sizeBytes":856},{"title":"PAN card of the firm","sizeBytes":856}]}}}
 
 packets rows before/after: 0/0; stored files before/after: 88/88
 control: Dell MAF back to 1 MB → build 201

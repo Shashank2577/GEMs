@@ -1,8 +1,8 @@
-# sc8-document-too-long — project desktop — 2026-11-05T05:54:50.412Z
+# sc8-document-too-long — project desktop — 2026-11-05T06:30:20.714Z
 ### 300-page upload (boundary)
 > POST /api/tenders/:id/documents
 < 201
-{"id":"bca8fb75-434d-4d93-a371-80a82ad1471a","tenderId":"e3a2e322-4053-4467-8cec-d4cdf83cd609","orgId":"2a92f79b-6e58-4531-9871-2db38df72fe7","kind":"bid","fileName":"exactly-300-pages.pdf","sizeBytes":78744,"pageCount":300,"sourceUrl":null,"hasText":true,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T05:54:50.802Z","warnings":[]}
+{"id":"221d6d57-6543-45a7-b967-8871048f338f","tenderId":"43acdc94-9179-42ae-ae98-b426a68abf3e","orgId":"f732b032-32cf-4d1b-8890-55709ae4c7e8","kind":"bid","fileName":"exactly-300-pages.pdf","sizeBytes":78743,"pageCount":300,"sourceUrl":null,"hasText":true,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T06:30:21.098Z","warnings":[]}
 
 ### 301-page upload
 > POST /api/tenders/:id/documents (301 pages)

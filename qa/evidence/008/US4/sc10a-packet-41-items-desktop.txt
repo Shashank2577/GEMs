@@ -1,6 +1,6 @@
-# sc10a-packet-41-items — project desktop — 2026-11-05T05:54:53.983Z
+# sc10a-packet-41-items — project desktop — 2026-11-05T06:30:24.328Z
 ### Build packet with 41 items
-> POST /api/workspaces/8bf9dd41-f89b-4dd8-b8ef-e4e38f3be69a/packets {items: 41 × cover}
+> POST /api/workspaces/d8c53e90-0788-4d47-9896-cf6fefed23d9/packets {items: 41 × cover}
 < 413
 {"error":{"code":"packet_too_large","message":"This packet has 41 items (limit 40). Deselect some items and try again.","details":{"items":41,"maxItems":40}}}
 
@@ -8,5 +8,5 @@ packets rows before/after: 0/0; stored files before/after: 54/54
 ### Control: 40 items
 > POST … {items: 40 × cover}
 < 201
-{"id":"74252009-b1bc-4f89-b01c-a429eab9dacc","workspaceId":"8bf9dd41-f89b-4dd8-b8ef-e4e38f3be69a","status":"ready","items":[{"kind":"cover","pages":2,"title":"Item 1","included":true,"startPage":1}],"warnings":["OEM authorisation certificate (MAF) for this bid: the vault document has expired — replace it or ask a Bid Manager to override."],"sizeBytes":2887,"pageCount":2,"createdBy":{"id":"02b094cb-20f2-4970-9191-85652e58e280","name":"QA analyst mw34sjvp1","email":"analyst.mw34sjvp1@example.in"},"createdAt":"2026-11-05T05:54:54.624Z","downloadUrl":"/api/packets/74252009-b1bc-4f89-b01c-a429eab9dacc/download"}
+{"id":"e8261039-d23f-4fd4-bd29-32f893770a4f","workspaceId":"d8c53e90-0788-4d47-9896-cf6fefed23d9","status":"ready","items":[{"kind":"cover","pages":2,"title":"Item 1","included":true,"startPage":1}],"warnings":["OEM authorisation certificate (MAF) for this bid: the vault document has expired — replace it or ask a Bid Manager to override."],"sizeBytes":2888,"pageCount":2,"createdBy":{"id":"88b12cf4-555c-4477-835c-ecd5d6c6630e","name":"QA analyst mw3627ny1","email":"analyst.mw3627ny1@example.in"},"createdAt":"2026-11-05T06:30:24.952Z","downloadUrl":"/api/packets/e8261039-d23f-4fd4-bd29-32f893770a4f/download"}
 

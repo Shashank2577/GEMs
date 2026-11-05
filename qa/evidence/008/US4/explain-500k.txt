@@ -1,3 +1,4 @@
+# NOTE (QA round 2): the ?state=Maharashtra line below is the ROUND-1 result and is superseded by explain-state.txt (round 2: tenders_open_state_idx). The notifications_pending_idx line (criterion 5) is unchanged by the rework (migration 0015 touches only tenders_open_state_idx).
 # QA re-run on a 500k fixture: apps/api/test/perf-indexes.test.ts with constants raised to 500,000 tenders / 1,000,000 notifications / 500 pending
 # (scratch copy, not committed; real SQL captured from GET /api/tenders; EXPLAIN (ANALYZE, FORMAT JSON); fixture = packages/db/src/fixtures/bulk-tenders.ts). 11 tests passed.
 /tenders                                           ms=0.11   indexes=tenders_open_created_idx

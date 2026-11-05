@@ -1,5 +1,5 @@
-# sc7-llm-budget — project desktop — 2026-11-05T05:54:44.596Z
-tender GEM/2026/B/9219476 has 5 documents (bid, ATC, corrigendum, BOQ, other)
+# sc7-llm-budget — project desktop — 2026-11-05T06:30:15.036Z
+tender GEM/2026/B/9496705 has 5 documents (bid, ATC, corrigendum, BOQ, other)
 LLM calls made by this analysis: 2; characters sent per call: [6892, 6566]; total 13458
-wall clock click → warning visible: 2913 ms
+wall clock click → warning visible: 2894 ms
 GET analysis → method=rules+llm warnings=[{"code":"llm_budget_exhausted","total":5,"covered":2}]

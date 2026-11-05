@@ -1,5 +1,5 @@
-# sc7-llm-budget — project mobile — 2026-11-05T05:55:04.392Z
-tender GEM/2026/B/9907645 has 5 documents (bid, ATC, corrigendum, BOQ, other)
+# sc7-llm-budget — project mobile — 2026-11-05T06:30:33.387Z
+tender GEM/2026/B/9681301 has 5 documents (bid, ATC, corrigendum, BOQ, other)
 LLM calls made by this analysis: 2; characters sent per call: [6892, 6566]; total 13458
-wall clock click → warning visible: 3035 ms
+wall clock click → warning visible: 2827 ms
 GET analysis → method=rules+llm warnings=[{"code":"llm_budget_exhausted","total":5,"covered":2}]

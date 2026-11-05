@@ -1,8 +1,8 @@
-# sc9-scanned-document — project desktop — 2026-11-05T05:54:52.327Z
+# sc9-scanned-document — project desktop — 2026-11-05T06:30:22.738Z
 ### upload of a 4-page PDF without text
 > POST /api/tenders/:id/documents
 < 201
-{"id":"e0cb43fb-68fa-4be6-a090-4320fd143f55","tenderId":"195fdd80-04eb-47db-9a22-dcfea0c42db1","orgId":"730e0864-0687-4c92-9821-fa7b022ad824","kind":"bid","fileName":"scanned-bid.pdf","sizeBytes":602,"pageCount":4,"sourceUrl":null,"hasText":false,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T05:54:52.432Z","warnings":[]}
+{"id":"926e6adc-6b40-48b7-9c00-117566840671","tenderId":"c228393b-de45-4a43-9810-9ae46d441691","orgId":"01a02b33-948c-487d-8f9f-f6be21c0c11b","kind":"bid","fileName":"scanned-bid.pdf","sizeBytes":602,"pageCount":4,"sourceUrl":null,"hasText":false,"source":"upload","textSource":"pdf","bidNumberFound":null,"createdAt":"2026-11-05T06:30:22.854Z","warnings":[]}
 
 ### Analyse
 > POST /api/tenders/:id/analyse

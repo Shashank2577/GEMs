@@ -1,6 +1,6 @@
-# sc2b-concurrent-manual-syncs — project desktop — 2026-11-05T05:54:36.826Z
-call 1: 200 ok
-call 2: 409 ingestion_running
+# sc2b-concurrent-manual-syncs — project desktop — 2026-11-05T06:30:08.305Z
+call 1: 409 ingestion_running
+call 2: 200 ok
 call 3: 409 ingestion_running
 max concurrent status='running' rows observed (15 ms polling): 1
 ingestion_runs: manual:success
