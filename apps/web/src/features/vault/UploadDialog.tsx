@@ -25,9 +25,9 @@ export function serverFieldErrors(e: unknown): Record<string, string> {
   return {};
 }
 
-/** `onUploaded(id)` opens a document: the new one, or the existing one after **Open existing** (FR-067). */
+/** `onUploaded(id, doc?)` opens a document: the new one (with its DTO), or the existing one after **Open existing** (FR-067, id only). */
 export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUploaded }: {
-  open: boolean; onOpenChange: (o: boolean) => void; initialFile?: File | null; presetType?: DocType | null; onUploaded?: (id: string, doc: VaultDocumentDto) => void;
+  open: boolean; onOpenChange: (o: boolean) => void; initialFile?: File | null; presetType?: DocType | null; onUploaded?: (id: string, doc?: VaultDocumentDto) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [draft, setDraft] = useState<DocDraft>(emptyDraft());
