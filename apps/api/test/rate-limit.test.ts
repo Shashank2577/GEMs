@@ -71,7 +71,8 @@ describe('rate-limit lib', () => {
     const both = { 'cf-connecting-ip': '198.51.100.7', 'x-forwarded-for': ' 198.51.100.8 , 10.0.0.1' };
     expect(await ip('cloudflare', both)).toBe('198.51.100.7');
     expect(await ip('cloudflare', { 'x-forwarded-for': '198.51.100.8' })).toBeNull();
-    expect(await ip('xff', both)).toBe('198.51.100.8');
+    // 008/FR-022: the right-most hop is the one our proxy appended; left hops are client-supplied.
+    expect(await ip('xff', both)).toBe('10.0.0.1');
     expect(await ip('none', both)).toBeNull(); // untrusted: forged headers are ignored
     expect(await ip('xff', {})).toBeNull();
   });

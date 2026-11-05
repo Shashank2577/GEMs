@@ -1,5 +1,5 @@
 {
-  "id": "02c513a3-a3b4-4f6e-a566-b73888dfdf7b",
+  "id": "818f3a04-879e-4035-911f-8b4fc95a277f",
   "prevId": "93a2f762-09b6-45fb-bf4b-bdc48a2d3dd4",
   "version": "7",
   "dialect": "postgresql",
@@ -2080,6 +2080,62 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.rate_limits": {
+      "name": "rate_limits",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_start": {
+          "name": "window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "rate_limits_window_idx": {
+          "name": "rate_limits_window_idx",
+          "columns": [
+            {
+              "expression": "window_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "rate_limits_key_window_start_pk": {
+          "name": "rate_limits_key_window_start_pk",
+          "columns": [
+            "key",
+            "window_start"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.sessions": {
       "name": "sessions",
       "schema": "",
@@ -3232,21 +3288,6 @@
             },
             {
               "expression": "content_sha256",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "vault_expiry_idx": {
-          "name": "vault_expiry_idx",
-          "columns": [
-            {
-              "expression": "expiry_date",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

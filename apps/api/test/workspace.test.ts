@@ -534,8 +534,11 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
 
     it('another org with a workspace for the same bid gets the stored hint (200, no GeM call)', async () => {
       const t = await tenderOf('lost');
-      const other = await signup(ctx.app, { orgName: 'Second Bidder Org' });
-      expect((await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: other.cookie })).status).toBe(201);
+      // Demo tenders exist only for orgs that loaded the demo (008/FR-016), so the second bidder loads it too.
+      const rival = await seedOrgWithRoles(ctx.app, 'Second Bidder Org');
+      expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: rival.bidManager.cookie })).status).toBeLessThan(300);
+      const other = rival.analyst;
+      expect((await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: other.cookie })).status).toBeLessThan(300); // demo seed already created it
       const before = mock.state.requests.results;
       const r = await hint(t.id, other.cookie);
       expect(r.status).toBe(200);

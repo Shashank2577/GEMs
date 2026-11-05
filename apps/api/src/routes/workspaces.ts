@@ -110,7 +110,7 @@ async function notify(deps: AppDeps, org: string, userIds: string[], n: { kind: 
 workspacesRoutes.post('/tenders/:id/workspace', requireRole('analyst'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
-  const t = await getTenderRow(deps, c.req.param('id'));
+  const t = await getTenderRow(deps, c.req.param('id'), c.var.org);
   const [existing] = await deps.db.select().from(bidWorkspaces).where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.tenderId, t.id)));
   if (existing) return c.json({ ...(await workspaceDto(deps, existing)), created: false });
 
@@ -386,7 +386,7 @@ export const HINT_TTL_MS = 15 * 60_000;
 workspacesRoutes.get('/tenders/:id/result-hint', requireRole('analyst'), async (c) => {
   const { deps } = c.var;
   const org = orgId(c);
-  const t = await getTenderRow(deps, c.req.param('id'));
+  const t = await getTenderRow(deps, c.req.param('id'), c.var.org);
   const [w] = await deps.db.select({ id: bidWorkspaces.id }).from(bidWorkspaces).where(and(eq(bidWorkspaces.orgId, org), eq(bidWorkspaces.tenderId, t.id)));
   if (!w) throw notFound('Bid workspace');
   if (!t.gemBidId) return c.json({ available: false, reason: 'no_gem_id' } satisfies BidResultHint);

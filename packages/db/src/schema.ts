@@ -76,6 +76,20 @@ export const authAttempts = pgTable('auth_attempts', {
   count: integer('count').notNull().default(0),
 }, (t) => ({ pk: primaryKey({ columns: [t.key, t.kind] }) }));
 
+/**
+ * Generic fixed-window request counters (008/FR-017): one row per (`<rule>:<subject>`, aligned window start).
+ * Written by `apps/api/src/lib/rate-limiter.ts` with a single upsert; dead windows are pruned by the scheduler.
+ */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.key, t.windowStart] }),
+  // Pruning deletes by window_start (lib/rate-limiter.ts#pruneRateLimits).
+  windowIdx: index('rate_limits_window_idx').on(t.windowStart),
+}));
+
 /** Single-use password reset links (002/FR-011). Only the SHA-256 of the token is stored. */
 export const passwordResets = pgTable('password_resets', {
   id: id(),

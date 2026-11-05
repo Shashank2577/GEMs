@@ -14,12 +14,13 @@ import {
   DEFAULT_NOTIFICATION_PREFS, type ApiTokenSummary, type InvitePreview, type NotificationPrefs,
 } from '@tp/core/contracts/auth';
 import { requireAuth, requireSession, orgId, userId } from '../middleware/auth';
+import { rateLimit } from '../middleware/rate-limit';
 import { logActivity } from '../lib/activity';
 import { getDummyHash, hashPassword, randomToken, sha256Hex, verifyPassword } from '../lib/crypto';
 import { HttpError, badRequest, conflict, notFound, unauthorized } from '../lib/errors';
 import { buildMe } from '../lib/me';
 import { defer } from '../lib/defer';
-import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, hit, rateLimited, reset } from '../lib/rate-limit';
+import { LOGIN_IP_LIMIT, RESET_EMAIL_LIMIT, RESET_IP_LIMIT, check, clientIp, credentialLimiter, failClosed, hit, rateLimited, reset, worst } from '../lib/rate-limit';
 import { clearSessionCookie, firstMembership, loadMembership, loadUser, rememberOrg, resolveAuth, startSession } from '../lib/session';
 import { slugify } from '../lib/slug';
 import { parseJson, parseWith } from '../lib/validate';
@@ -57,7 +58,8 @@ function isUniqueViolation(e: unknown): boolean {
 
 // ───────────── Signup / login / logout ─────────────
 
-authRoutes.post('/auth/signup', async (c) => {
+// 008/FR-019 `auth.signup.ip`: 20 sign-ups per client IP per hour.
+authRoutes.post('/auth/signup', rateLimit('auth.signup.ip'), async (c) => {
   const body = await parseJson(c, signupInputSchema);
   const { db } = c.var.deps;
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, body.email));
@@ -156,12 +158,15 @@ authRoutes.post('/auth/forgot-password', async (c) => {
   const now = clock.now();
   // Counted for every email (existing or not) so the 429 reveals nothing about accounts.
   const ip = clientIp(c, config.trustProxy);
-  const [byEmail, byIp] = await Promise.all([
+  const [byEmail, byIp] = await failClosed(Promise.all([
     hit(db, email, 'reset_email', RESET_EMAIL_LIMIT, now),
     ip ? hit(db, ip, 'reset_ip', RESET_IP_LIMIT, now) : Promise.resolve(null),
-  ]);
-  const blocked = [byEmail, byIp].filter((st) => st?.over);
-  if (blocked.length) throw rateLimited(Math.max(...blocked.map((st) => st!.retryAfterSec)));
+  ]));
+  const blocked = [
+    byEmail.over ? { rule: 'auth.reset.email', retryAfterSec: byEmail.retryAfterSec } : null,
+    byIp?.over ? { rule: 'auth.reset.ip', retryAfterSec: byIp.retryAfterSec } : null,
+  ].filter((b): b is { rule: string; retryAfterSec: number } => !!b);
+  if (blocked.length) throw worst(blocked);
 
   defer(c, 'password reset email', async () => {
     const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
@@ -191,8 +196,8 @@ authRoutes.post('/auth/reset-password', async (c) => {
   const now = clock.now();
   const ip = clientIp(c, config.trustProxy);
   if (ip) {
-    const st = await check(db, ip, 'login_ip', LOGIN_IP_LIMIT, now);
-    if (st?.limited) throw rateLimited(st.retryAfterSec);
+    const st = await failClosed(check(db, ip, 'login_ip', LOGIN_IP_LIMIT, now));
+    if (st?.limited) throw rateLimited(st.retryAfterSec, 'auth.fail.ip');
   }
   const tokenHash = await sha256Hex(body.token);
   const valid = and(eq(passwordResets.tokenHash, tokenHash), isNull(passwordResets.usedAt), gt(passwordResets.expiresAt, now));

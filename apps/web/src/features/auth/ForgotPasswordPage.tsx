@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Mail, MailCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/label';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, tooManyAttemptsMessage } from '@/lib/api';
 import { AuthLayout } from './AuthLayout';
 import { FormAlert } from './FormAlert';
 
@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
       setSentTo(value);
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) setError('Enter a valid work email');
-      else setFormError(errorMessage(err));
+      else setFormError(tooManyAttemptsMessage(err) ?? errorMessage(err)); // 429 auth.reset.email → inline
     } finally {
       setLoading(false);
     }
