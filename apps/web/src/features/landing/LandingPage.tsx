@@ -14,8 +14,11 @@ import {
 import { Logo } from '@/components/layout/Logo';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Badge, Button, Countdown, Progress, ScoreRing, Tabs, TabsContent, TabsList, TabsTrigger, VerdictBadge } from '@/components/ui';
+import { PLANS, PRICING_NOTE, formatPlanPrice, planCtaHref } from '@tp/core/contracts/plans';
 import { useDocumentTitle } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
+
+export const LANDING_TITLE = 'TenderPilot — GeM tender co-pilot for Indian sellers';
 
 const NAV = [
   { href: '#how', label: 'How it works' },
@@ -46,7 +49,7 @@ function SectionHead({ eyebrow, title, body, center = true }: { eyebrow: string;
 }
 
 export default function LandingPage() {
-  useDocumentTitle('TenderPilot — GeM tender co-pilot for Indian sellers');
+  useDocumentTitle(LANDING_TITLE, { raw: true });
   return (
     <div className="min-h-dvh overflow-x-hidden bg-background text-foreground">
       <SiteNav />
@@ -466,42 +469,24 @@ function PersonaVisual({ k }: { k: string }) {
 
 // ───────────── Pricing ─────────────
 
-const PLANS = [
-  {
-    name: 'Starter', price: '₹2,999', per: '/month', blurb: 'For a founder-led MSME bidding a few times a month.',
-    features: ['3 team members', '5 watchlists', 'Email & in-app alerts', 'Go / No-Go scoring', 'Document vault (2 GB)', 'Bid packet builder'],
-    cta: 'Start free trial',
-  },
-  {
-    name: 'Pro', price: '₹7,999', per: '/month', blurb: 'For growing teams bidding every week.', featured: true,
-    features: ['10 team members', 'Unlimited watchlists', 'WhatsApp alerts & daily digest', 'AI-assisted bid reading', 'Annexure templates', 'Chrome co-pilot', 'Pipeline & win-rate analytics'],
-    cta: 'Start free trial',
-  },
-  {
-    name: 'Enterprise', price: 'Custom', per: '', blurb: 'For OEMs, distributors and consultants with many entities.',
-    features: ['Unlimited members & orgs', 'SSO & audit exports', 'Custom scoring rules', 'Dedicated success manager', 'Priority support (IST)'],
-    cta: 'Talk to sales',
-  },
-];
-
 function Pricing() {
   return (
     <section id="pricing" className="scroll-mt-20 border-t bg-subtle/50 py-20 sm:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <SectionHead eyebrow="Pricing" title="Pays for itself with one extra win" body="Prices exclude 18% GST. Every plan starts with a 14-day free trial of Pro." />
+        <SectionHead eyebrow="Pricing" title="Pays for itself with one extra win" body={PRICING_NOTE} />
         <div className="mt-14 grid gap-5 lg:grid-cols-3">
           {PLANS.map((p, i) => (
-            <Reveal key={p.name} delay={i * 0.06}>
+            <Reveal key={p.key} delay={i * 0.06}>
               <div className={cn('relative flex h-full flex-col rounded-2xl border bg-card p-6 shadow-xs sm:p-8', p.featured && 'border-primary shadow-lg ring-1 ring-primary/30')}>
                 {p.featured && <Badge tone="solid" className="absolute -top-3 left-6"><Sparkles /> Most popular</Badge>}
                 <h3 className="text-lg font-semibold">{p.name}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{p.blurb}</p>
-                <p className="mt-6 flex items-baseline gap-1"><span className="text-4xl font-semibold tracking-tight tabular">{p.price}</span><span className="text-sm text-muted-foreground">{p.per}</span></p>
+                <p className="mt-6 flex items-baseline gap-1"><span className="text-4xl font-semibold tracking-tight tabular">{formatPlanPrice(p)}</span>{p.monthlyInr != null && <span className="text-sm text-muted-foreground">/month</span>}</p>
                 <ul className="mt-6 grid flex-1 content-start gap-2.5 text-sm">
                   {p.features.map((f) => <li key={f} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-success" />{f}</li>)}
                 </ul>
                 <Button className="mt-8" variant={p.featured ? 'primary' : 'secondary'} size="lg" asChild>
-                  {p.name === 'Enterprise' ? <a href="mailto:sales@tenderpilot.in?subject=TenderPilot%20Enterprise">{p.cta}</a> : <Link to="/signup">{p.cta}</Link>}
+                  {p.key === 'enterprise' ? <a href={planCtaHref(p)}>{p.cta}</a> : <Link to={planCtaHref(p)}>{p.cta}</Link>}
                 </Button>
               </div>
             </Reveal>

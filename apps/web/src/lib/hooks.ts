@@ -24,13 +24,15 @@ export function useNow(ms = 30_000) {
   return now;
 }
 
-export function useDocumentTitle(title?: string) {
+/** Sets `document.title` to `<title> · TenderPilot`, or to `title` verbatim with `{ raw: true }` (007/FR-084). */
+export function useDocumentTitle(title?: string, opts?: { raw?: boolean }) {
+  const raw = opts?.raw ?? false;
   useEffect(() => {
     if (!title) return;
     const prev = document.title;
-    document.title = `${title} · TenderPilot`;
+    document.title = raw ? title : `${title} · TenderPilot`;
     return () => { document.title = prev; };
-  }, [title]);
+  }, [title, raw]);
 }
 
 export function useLocalStorage<T>(key: string, initial: T) {

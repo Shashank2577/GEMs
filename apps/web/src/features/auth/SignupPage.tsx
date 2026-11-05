@@ -7,6 +7,7 @@ import { Field } from '@/components/ui/label';
 import { toast } from '@/components/ui/toaster';
 import { safeNext, useAuth } from '@/lib/auth';
 import { ApiError, errorMessage, tooManyAttemptsMessage } from '@/lib/api';
+import { signupPlan, trialNote } from '@tp/core/contracts/plans';
 import { AuthLayout } from './AuthLayout';
 import { PasswordInput, StrengthMeter } from './PasswordInput';
 import { FormAlert } from './FormAlert';
@@ -18,6 +19,7 @@ export default function SignupPage() {
   const { signup } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const plan = signupPlan(params.get('plan'));
   const [form, setForm] = useState({ name: '', email: '', password: '', orgName: '' });
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -55,6 +57,7 @@ export default function SignupPage() {
       footer={<>Already have an account? <Link to="/login" className="font-medium text-primary hover:underline">Sign in</Link></>}
     >
       <form onSubmit={onSubmit} noValidate className="grid gap-4">
+        {plan && <p data-testid="plan-trial-note" className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium">{trialNote(plan)}</p>}
         {formError && <FormAlert>{formError}</FormAlert>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Your name" error={errors.name}>
