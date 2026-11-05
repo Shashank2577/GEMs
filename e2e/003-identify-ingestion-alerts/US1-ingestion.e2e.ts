@@ -2,13 +2,12 @@
  * 003 / US1 (#62) — Polite, reliable GeM BidPlus ingestion with visible sync health. QA task T022.
  * Covers spec scenarios 1-9 (+ FR-013 cooldown, scenario 11). Serial: the scenarios build on one another's state
  * (empty DB -> first sync -> second sync -> outages -> recovery -> stale -> busy/timeout -> RBAC).
- * The manual-sync cooldown (FR-013; platform-wide, 10 min since 008/US4 FR-026) is cleared by ageing earlier manual runs
- * in SQL once its 429 has been observed (same approach as 004/US6 and 002/US6), instead of waiting it out.
+ * The manual-sync cooldown (FR-013, default 10 min since 008/FR-026, platform-wide, real clock) is asserted on the first sync; later syncs age `ingestion_runs` in SQL first (no 10-minute wait).
  * Direct SQL (psql) is used only to read counts and to arrange "running"/"old" rows that cannot be produced via the API.
  */
 import { execFileSync } from 'node:child_process';
 import { request as pwRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { test, expect, evidence, collectRunArtifacts, mockGem, uniqueUser } from '../support/fixtures';
+import { test, expect, evidence, collectRunArtifacts, mockGem, uniqueUser, resetIngestionData } from '../support/fixtures';
 
 const SPEC = '003', STORY = 'US1';
 const BASE = `http://localhost:${process.env.E2E_PORT || 8788}`;
@@ -28,16 +27,19 @@ async function loginPage(page: Page, c: Creds) {
   expect(res.status(), await res.text()).toBe(200);
 }
 
-/** Ends the manual-sync cooldown: earlier manual runs are moved 2 hours into the past. */
-const ageManualRuns = () => sql(`update ingestion_runs set started_at = started_at - interval '2 hours', finished_at = finished_at - interval '2 hours' where trigger = 'manual'`);
+/** Age every finished run by 10 min so the platform-wide manual-sync cooldown (FR-013, default 10 min) is over without waiting. */
+const ageRuns = () => sql("update ingestion_runs set started_at = started_at - interval '10 minutes', finished_at = finished_at - interval '10 minutes' where finished_at is not null");
 
-/** POST /api/ingestion/run; if the FR-013 cooldown is active (429 sync_cooldown), age the earlier runs and retry. */
+/** POST /api/ingestion/run after clearing the cooldown in SQL; a residual 429 is waited out only if short (<= 60 s). */
 async function runSync(req: APIRequestContext, data: unknown = { pages: 5 }) {
+  ageRuns();
   for (let i = 0; i < 3; i++) {
     const res = await req.post('/api/ingestion/run', { data });
     if (res.status() !== 429) return res;
-    expect((await res.json()).error.code).toBe('sync_cooldown');
-    ageManualRuns();
+    const retryAt = Date.parse((await res.json()).error.details.retryAt);
+    const waitMs = Math.max(0, retryAt - Date.now()) + 1500;
+    if (waitMs > 60_000) throw new Error(`manual sync cooldown is ${Math.round(waitMs / 1000)}s: age ingestion_runs in SQL first`);
+    await sleep(waitMs);
   }
   throw new Error('cooldown never cleared');
 }
@@ -51,6 +53,7 @@ async function openPill(page: Page) {
 const dotClass = (pill: ReturnType<Page['getByRole']>) => pill.locator('span.rounded-full').last().getAttribute('class');
 
 test.describe.configure({ mode: 'serial' });
+test.beforeAll(async ({ request }, info) => { if (info.project.name === 'desktop') await resetIngestionData(request); }); // clean state per spec file: whole-directory runs pass
 test.afterEach(async ({ page }) => { await collectRunArtifacts(SPEC, STORY, page); });
 
 test.describe('US1 ingestion', () => {
@@ -112,8 +115,7 @@ test.describe('US1 ingestion', () => {
     const btn = page.getByRole('button', { name: 'Sync now' });
     await expect(btn).toBeDisabled();
     await expect(page.locator('span[title^="Next manual sync at"]')).toHaveCount(1);
-    // filtered: the app shell also has an (empty) offline live region since 007/US7
-    await expect(page.getByRole('status').filter({ hasText: 'Next manual sync at' })).toContainText(/Next manual sync at/);
+    await expect(page.locator('#sync-cooldown-hint')).toContainText(/Next manual sync at/); // not getByRole('status'): the app-wide offline-banner is also role=status
     await shot(page, 'S1-S11-cooldown-popover');
     await page.keyboard.press('Escape');
     await page.goto('/tenders');
@@ -135,7 +137,7 @@ test.describe('US1 ingestion', () => {
     await shot(page, 'S2-tender-6421001');
   });
 
-  test('S3: second sync with nothing changed creates nothing (after cooldown)', async ({ page }) => {
+  test('S3: second sync with nothing changed creates nothing (cooldown aged in SQL)', async ({ page }) => {
     await loginPage(page, state.manager!);
     const before = { tenders: count('tenders'), events: count('tender_events'), notifs: count('notifications'), fetched: sql('select min(fetched_at) from tenders') };
     const res = await runSync(page.request);
@@ -153,12 +155,12 @@ test.describe('US1 ingestion', () => {
 
   test('S4: mock-gem down -> run failed, data kept, red dot + "Last sync failed" (UI Sync now)', async ({ page }) => {
     await mockGem(page.request, '/__admin/fail', { mode: 'down' });
-    ageManualRuns(); // end the cooldown left by S3
+    ageRuns(); // cooldown elapsed (10 min, aged in SQL), the UI reads nextManualSyncAt on load
     await loginPage(page, state.manager!);
     const pill = await openPill(page);
     await pill.click();
     const btn = page.getByRole('button', { name: 'Sync now' });
-    await expect(btn).toBeEnabled({ timeout: 30_000 }); // UI re-evaluates the cooldown every 5 s
+    await expect(btn).toBeEnabled({ timeout: 15_000 });
     await btn.click();
     await expect(page.getByText('Last sync failed')).toBeVisible({ timeout: 30_000 });
     const info = await (await page.request.get('/api/ingestion/runs')).json();
@@ -189,12 +191,12 @@ test.describe('US1 ingestion', () => {
 
   test('S8a + S9: recovered sync -> green pulsing dot, "Synced ...", "· 36 open bids", runs list (UI Sync now)', async ({ page }) => {
     await mockGem(page.request, '/__admin/fail', { mode: 'off' });
-    ageManualRuns(); // end the cooldown left by the failed run
+    ageRuns();
     await loginPage(page, state.manager!);
     const pill = await openPill(page);
     await pill.click();
     const btn = page.getByRole('button', { name: 'Sync now' });
-    await expect(btn).toBeEnabled({ timeout: 30_000 });
+    await expect(btn).toBeEnabled({ timeout: 15_000 });
     await btn.click();
     await expect(page.getByText('GeM sync is healthy')).toBeVisible({ timeout: 30_000 });
     await expect(pill).toContainText(/Synced/);

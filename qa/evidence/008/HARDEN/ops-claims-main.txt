@@ -1,0 +1,38 @@
+$ ls origin/main .github/workflows
+.github/workflows/apply-branch-protection.yml
+.github/workflows/project-board.yml
+.github/workflows/wiki-sync.yml
+$ ls scripts
+scripts/lighthouse-landing.mjs
+scripts/load
+scripts/local-pg.sh
+$ grep deploy package.json
+14:    "deploy": "pnpm --filter @tp/web run build && wrangler deploy"
+$ grep Deploy wrangler.toml
+12:# Deploy: pnpm deploy   (builds apps/web, then `wrangler deploy`)
+42:APP_URL = "https://tenderpilot.workers.dev"
+$ runbook headings
+3:## Launch checklist
+7:### Release gate: spec 002 auth hardening (008/FR-023)
+40:### Before running migration 0010 (demo data-fix, 008/FR-016)
+55:### Abuse and isolation controls in place (008/US3)
+76:## Monitors
+117:## First 10 minutes
+121:### `db_unreachable`
+128:### `ingestion_stale`
+142:### `alerts_backlog`
+153:### 5xx spike
+161:### GeM 403/429
+170:### Escalation
+180:## Monitor configuration and fire-drill record
+195:## Data retention and housekeeping
+235:### Shared LLM extraction cache (FR-072)
+247:## R2 lifecycle for packets
+268:## Offboarding
+299:## Hyperdrive
+310:### Enable Hyperdrive (operator, once per environment; Cloudflare API token with Hyperdrive edit)
+333:### Staging verification (T111, operator — not runnable from CI)
+352:## Full-text search migration
+367:## LATER triggers
+380:## Spec 008 launch checklist (ARCH-01 to ARCH-13)
+415:### Before the first paid plan flip

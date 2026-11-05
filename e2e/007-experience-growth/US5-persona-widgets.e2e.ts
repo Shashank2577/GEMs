@@ -467,7 +467,11 @@ test('FR-071/072 role matrix on a demo org: placement of My bids and the Awaitin
   matrix.viewerPatch = forbidden.status();
   expect(forbidden.status()).toBe(403);
   const analystPatch = await analyst.api.patch(`/api/workspaces/${ws.workspaceId}`, { data: { stage: 'go' } });
-  matrix.analystPatchStatus = analystPatch.status(); // informational: analysts may move stages via the pipeline
+  matrix.analystPatchStatus = analystPatch.status();
+  // #527: Go / No-Go is the Bid Manager's call at the API too, so the read-only UI is backed by a 403 for Analysts.
+  expect(analystPatch.status()).toBe(403);
+  expect((await analystPatch.json()).error.code).toBe('forbidden');
+  expect((await analyst.api.patch(`/api/workspaces/${ws.workspaceId}`, { data: { stage: 'dropped' } })).status()).toBe(403);
   saveJson('FR-071-072-role-matrix', matrix);
 });
 
