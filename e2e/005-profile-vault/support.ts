@@ -91,3 +91,40 @@ export async function makeMidOrg(page: Page) {
 }
 
 export const ring = (page: Page, pct: number) => page.getByRole('img', { name: `Profile ${pct}% complete` }).first();
+
+// ---- US5 helpers (PDF uploads, contract/OEM API shortcuts) ----
+import { createRequire } from 'node:module';
+const { PDFDocument, StandardFonts } = createRequire(import.meta.url)('../../apps/api/node_modules/pdf-lib') as typeof import('../../apps/api/node_modules/pdf-lib');
+
+/** A real one-page PDF (pdf-lib) carrying `text`. */
+export async function makePdf(text: string): Promise<Buffer> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595, 842]);
+  page.drawText(text, { x: 50, y: 780, size: 14, font: await pdf.embedFont(StandardFonts.Helvetica) });
+  return Buffer.from(await pdf.save());
+}
+
+/** Upload a generated PDF through POST /api/vault; returns the created document DTO. */
+export async function uploadPdf(page: Page, fields: { type: string; title: string; expiryDate?: string }) {
+  const multipart: Record<string, string | { name: string; mimeType: string; buffer: Buffer }> = {
+    file: { name: `${fields.title.replace(/\W+/g, '-').toLowerCase()}.pdf`, mimeType: 'application/pdf', buffer: await makePdf(fields.title) },
+    type: fields.type, title: fields.title,
+  };
+  if (fields.expiryDate) multipart.expiryDate = fields.expiryDate;
+  const r = await page.request.post('/api/vault', { multipart });
+  expect(r.status(), await r.text()).toBe(201);
+  return r.json() as Promise<{ id: string; type: string; title: string; expiryDate: string | null }>;
+}
+
+export async function addContract(page: Page, data: Record<string, unknown>) {
+  const r = await page.request.post('/api/past-contracts', { data: { buyerType: 'central', ...data } });
+  expect(r.status(), await r.text()).toBe(201);
+  return r.json() as Promise<{ id: string; title: string; cracDocumentId: string | null; value: number }>;
+}
+
+/** Action names from the dashboard activity feed (newest first). */
+export async function activityActions(page: Page): Promise<string[]> {
+  const r = await page.request.get('/api/dashboard');
+  expect(r.status()).toBe(200);
+  return ((await r.json()) as { activity: { action: string }[] }).activity.map((a) => a.action);
+}
