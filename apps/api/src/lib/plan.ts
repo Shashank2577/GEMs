@@ -318,7 +318,7 @@ export function meteredCompleteJson(
           // Aborted in flight (our timeout / the run's budget) before the provider reported usage: the row records 0
           // because the column cannot be null, but the real count is UNKNOWN and may be billed (review S1). Say so.
           deps.logger.warn('llm usage: call aborted before the provider reported usage; tokens unknown (recorded as 0)', {
-            orgId: ctx.orgId, analysisRef: ctx.analysisRef ?? ctx.analysisId, model: llm.model, tokensUnknown: true,
+            orgId: ctx.orgId, analysisRef: ctx.analysisRef ?? ctx.analysisId, model: llm.model, usageUnknown: true,
           });
         }
         const fill = reservationId;

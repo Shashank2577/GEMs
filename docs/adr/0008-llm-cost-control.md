@@ -66,7 +66,7 @@ Any analyst can trigger analyses without limit; spend is unbounded and invisible
     slot; a document whose automatic OCR failed is recorded (`tender.document_ocr_failed`) and analyse does not OCR it
     again until someone runs OCR on it explicitly.
   - *Calls aborted in flight* (our timeout) before the provider reports usage are recorded with 0 tokens because the
-    columns are NOT NULL, and a `tokensUnknown: true` warning is logged: the real count is unknown and may be billed.
+    columns are NOT NULL, and a warning with `usageUnknown: true` is logged: the real count is unknown and may be billed.
   - **Cost raise — needs product sign-off before release.** 004/FR-051 raised 008/FR-031's per-analysis caps from
     2 calls / 90,000 characters to **8 calls / 480,000 characters** (automatic OCR calls count towards the 8). Worst case
     per AI analysis (≈ 4 characters per token):
