@@ -61,7 +61,8 @@ export function NotificationItem({ n, compact, onNavigate }: { n: NotificationDt
       <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', k.cls)}><k.icon className="size-4" aria-hidden /></span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">
-          <span className={cn('line-clamp-2 text-[13px] leading-snug', n.read ? 'font-medium text-foreground/85' : 'font-semibold')}>{!n.read && <span className="sr-only">Unread: </span>}{n.title}</span>
+          {!n.read && <span className="sr-only">Unread: </span>}
+          <span className={cn('line-clamp-2 text-[13px] leading-snug', n.read ? 'font-medium text-foreground/85' : 'font-semibold')}>{n.title}</span>
           {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-hidden />}
         </span>
         <span className={cn('mt-0.5 block text-xs text-muted-foreground', compact ? 'line-clamp-2' : 'line-clamp-3')}>{n.body}</span>

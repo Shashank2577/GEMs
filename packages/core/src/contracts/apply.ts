@@ -3,6 +3,7 @@
  * packets and the submission assistant. See specs/001-gem-tender-copilot/contracts/api.md (Apply).
  */
 import { z } from 'zod';
+import { PACKET_MAX_ITEMS } from './caps';
 import type { ActivityItem } from './auth';
 import type { AnalysisDto, ChecklistItem } from './analyse';
 import type { Readiness, ReadinessItem, ReadinessState } from '../packet/mapping';
@@ -95,7 +96,8 @@ export const packetItemSchema = z.object({
 });
 export type PacketItemInput = z.infer<typeof packetItemSchema>;
 
-export const packetBuildSchema = z.object({ items: z.array(packetItemSchema).max(200).optional() });
+/** 008/FR-032: at most PACKET_MAX_ITEMS (40) items; the API answers 413 `packet_too_large` before this schema runs. */
+export const packetBuildSchema = z.object({ items: z.array(packetItemSchema).max(PACKET_MAX_ITEMS).optional() });
 
 export const assistValuesSchema = z.record(z.string().min(1).max(80), z.string().max(2000));
 

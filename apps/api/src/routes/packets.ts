@@ -16,12 +16,12 @@ import { annexureTemplates, bidWorkspaces, packets } from '@tp/db';
 import { annexureTemplateInputSchema, packetBuildSchema } from '@tp/core/contracts/apply';
 import { normalizeTemplateKey, unknownPlaceholderMessage, unknownPlaceholders, type TemplateKey } from '@tp/core/packet/templates';
 import { logActivity } from '../lib/activity';
-import { HttpError, notFound } from '../lib/errors';
+import { HttpError, badRequest, notFound } from '../lib/errors';
 import { contentDisposition } from '../lib/http';
-import { parseJson } from '../lib/validate';
+import { parseJson, parseWith } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { rateLimit } from '../middleware/rate-limit';
-import { buildWorkspacePacket, getTenderRow, recoverStuckPackets, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
+import { assertPacketItemCount, buildWorkspacePacket, getTenderRow, recoverStuckPackets, getWorkspace, people, renderAnnexure, templatesFor, toPacketDto } from '../services/packet';
 import type { AppEnv } from '../types';
 
 export const packetsRoutes = new Hono<AppEnv>();
@@ -65,9 +65,9 @@ packetsRoutes.put('/annexure-templates/:key', requireRole('bid_manager'), async 
   const body = await parseJson(c, annexureTemplateInputSchema);
   assertKnownPlaceholders(body.body);
   const now = deps.clock.now();
-  const [existing] = await deps.db.select().from(annexureTemplates).where(and(eq(annexureTemplates.orgId, org), eq(annexureTemplates.key, key)));
-  if (existing) await deps.db.update(annexureTemplates).set({ title: body.title, body: body.body, updatedAt: now }).where(eq(annexureTemplates.id, existing.id));
-  else await deps.db.insert(annexureTemplates).values({ orgId: org, key, title: body.title, body: body.body, createdAt: now, updatedAt: now });
+  // Atomic upsert on the unique (org_id, key) index: concurrent saves cannot create duplicates or 500 (006/FR-036).
+  await deps.db.insert(annexureTemplates).values({ orgId: org, key, title: body.title, body: body.body, createdAt: now, updatedAt: now })
+    .onConflictDoUpdate({ target: [annexureTemplates.orgId, annexureTemplates.key], set: { title: body.title, body: body.body, updatedAt: now } });
   await logActivity(deps.db, { orgId: org, userId: userId(c), action: 'annexure.template_updated', entityType: 'annexure_template', entityId: key, meta: { title: body.title } });
   const items = await templatesFor(deps, org);
   return c.json(items.find((t) => t.key === key));
@@ -122,7 +122,18 @@ packetsRoutes.post('/workspaces/:id/packets', requireRole('analyst'), rateLimit(
   const { deps } = c.var;
   const org = orgId(c);
   const w = await getWorkspace(deps, org, c.req.param('id'));
-  const body = await parseJson(c, packetBuildSchema);
+  // 008/FR-032: > 40 items is a 413 packet_too_large (not a 400), so count before the schema caps the array.
+  // The body is read and parsed once (review N2); invalid JSON is the usual 400.
+  let raw: unknown;
+  try {
+    const text = await c.req.text();
+    raw = text ? JSON.parse(text) : {};
+  } catch {
+    throw badRequest('Request body must be valid JSON');
+  }
+  const peek = raw as { items?: unknown } | null;
+  if (Array.isArray(peek?.items)) assertPacketItemCount(peek.items.length);
+  const body = parseWith(packetBuildSchema, raw, 'body');
   const p = await buildWorkspacePacket(deps, org, userId(c), w, body.items);
   await logActivity(deps.db, {
     orgId: org, userId: userId(c), action: p.status === 'ready' ? 'workspace.packet_built' : 'workspace.packet_failed', entityType: 'workspace', entityId: w.id,

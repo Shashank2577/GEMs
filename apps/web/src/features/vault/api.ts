@@ -12,8 +12,9 @@ export const vaultKeys = {
   summary: ['vault', 'summary'] as const,
 };
 
-export function useVault(f: VaultFilters) {
+export function useVault(f: VaultFilters, opts: { enabled?: boolean } = {}) {
   return useQuery({
+    enabled: opts.enabled ?? true,
     queryKey: vaultKeys.list(f),
     queryFn: () => api.get<Paged<VaultDocumentDto>>('/vault', { type: f.type, status: f.status, category: f.category, q: f.q?.trim() || undefined, sort: f.sort }),
     placeholderData: keepPreviousData,

@@ -124,6 +124,10 @@ const FOREIGN: Record<string, () => Call> = {
   'POST /workspaces/:id/overrides': () => asB('POST', `/workspaces/${ids.workspace}/overrides`, { itemId: 'gst', reason: 'Hijack attempt' }),
   'GET /workspaces/:id/comments': () => asB('GET', `/workspaces/${ids.workspace}/comments`),
   'POST /workspaces/:id/comments': () => asB('POST', `/workspaces/${ids.workspace}/comments`, { body: 'Hijack' }),
+  'GET /workspaces/:id/packets': () => asB('GET', `/workspaces/${ids.workspace}/packets`),
+  'DELETE /workspaces/:id/overrides/:itemId': () => asB('DELETE', `/workspaces/${ids.workspace}/overrides/oem_authorization`),
+  'POST /workspaces/:id/annexures/:key/preview': () =>
+    asB('POST', `/workspaces/${ids.workspace}/annexures/authority_letter/preview`, { title: 'Authority', body: 'Draft body for {{tender.bidNumber}}.' }),
   'DELETE /workspaces/:id/comments/:commentId': () => asB('DELETE', `/workspaces/${ids.workspace}/comments/${ids.comment}`),
   'GET /workspaces/:id/annexures/:key.pdf': () => asB('GET', `/workspaces/${ids.workspace}/annexures/non_blacklisting.pdf`),
   'POST /workspaces/:id/packets': () => asB('POST', `/workspaces/${ids.workspace}/packets`, {}),
@@ -143,10 +147,6 @@ const FOREIGN: Record<string, () => Call> = {
 const FOREIGN_EXTRA: Record<string, () => Call> = {
   'PATCH /views/:id': () => asB('PATCH', `/views/${ids.view}`, { name: 'Hijack' }),
   'DELETE /views/:id': () => asB('DELETE', `/views/${ids.view}`),
-  'GET /workspaces/:id/packets': () => asB('GET', `/workspaces/${ids.workspace}/packets`),
-  'DELETE /workspaces/:id/overrides/:itemId': () => asB('DELETE', `/workspaces/${ids.workspace}/overrides/oem_authorization`),
-  'POST /workspaces/:id/annexures/:key/preview': () =>
-    asB('POST', `/workspaces/${ids.workspace}/annexures/authority_letter/preview`, { title: 'Authority', body: 'Draft body for {{tender.bidNumber}}.' }),
 };
 
 /** Parameter is public/global data; the call may succeed but must only affect org B. Run after the foreign sweep. */
@@ -242,7 +242,9 @@ async function snapshotOrgA(): Promise<string> {
   const tables = (res as unknown as { rows: { table_name: string }[] }).rows.map((r) => r.table_name);
   const out: Record<string, unknown[]> = {};
   for (const t of tables) {
-    const rows = await ctx.db.execute(sql.raw(`select * from "${t}" where org_id = '${A.org.orgId}' order by 1`));
+    // Order by the whole row: `order by 1` is org_id in some tables (memberships, notification_prefs), which left
+    // the order to the heap and made the before/after comparison flaky under load.
+    const rows = await ctx.db.execute(sql.raw(`select * from "${t}" as r where org_id = '${A.org.orgId}' order by r::text`));
     out[t] = (rows as unknown as { rows: unknown[] }).rows;
   }
   const org = await ctx.db.execute(sql.raw(`select * from organizations where id = '${A.org.orgId}'`));

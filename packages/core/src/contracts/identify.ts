@@ -201,20 +201,28 @@ export interface IngestionRunsResponse {
   lastRun: IngestionRunDto | null;
   totalTenders: number;
   openTenders: number;
+  /** When a manual "Sync now" is allowed again (008/FR-026), or null when it is allowed now. */
+  nextManualSyncAt: string | null;
+  /** Cooldown length in minutes (server config, default 10). */
+  manualSyncCooldownMin: number;
 }
 
 // ───────────── Notifications ─────────────
 
+/** Notification kinds; must equal the `notifications.kind` union in @tp/db (type-checked in apps/api routes/notifications.ts). */
+export const NOTIFICATION_KINDS = ['tender_match', 'expiry', 'deadline', 'assignment', 'mention', 'digest', 'system'] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
 export const notificationsQuerySchema = z.object({
   unread: flag,
-  kind: z.string().optional(),
+  kind: z.enum(NOTIFICATION_KINDS).optional(), // 003/FR-049
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
 export interface NotificationDto {
   id: string;
-  kind: 'tender_match' | 'expiry' | 'deadline' | 'assignment' | 'mention' | 'digest' | 'system';
+  kind: NotificationKind;
   title: string;
   body: string;
   link: string | null;

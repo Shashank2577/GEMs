@@ -24,8 +24,8 @@ let deps: AppDeps;
 let mailer: ReturnType<typeof createLogMailer>;
 const logs: string[] = [];
 
-const capture = (level: string): Logger[keyof Logger] => (msg, meta) => { logs.push(`${level} ${msg} ${meta ? JSON.stringify(meta) : ''}`); };
-const logger: Logger = { info: capture('info'), warn: capture('warn'), error: capture('error') };
+const capture = (level: string): Required<Logger>[keyof Logger] => (msg, meta) => { logs.push(`${level} ${msg} ${meta ? JSON.stringify(meta) : ''}`); };
+const logger: Logger = { debug: capture('debug'), info: capture('info'), warn: capture('warn'), error: capture('error') };
 
 beforeAll(async () => {
   ctx = await createTestContext();

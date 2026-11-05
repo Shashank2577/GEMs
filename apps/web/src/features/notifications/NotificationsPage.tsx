@@ -7,6 +7,7 @@ import { Button, EmptyState, ErrorState, PageHeader, Segmented, Skeleton, toast 
 import { formatDateIST, pluralize } from '@/lib/format';
 import { useMarkAllRead, useNotificationList } from './api';
 import { NotificationItem } from './NotificationItem';
+import { isUnreadFilter } from './filter';
 
 const istDayKey = (iso: string) => new Date(Date.parse(iso) + 330 * 60_000).toISOString().slice(0, 10);
 
@@ -31,7 +32,7 @@ function groupByDay(items: NotificationDto[]) {
 
 export default function NotificationsPage() {
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') === 'unread' ? 'unread' : 'all';
+  const tab = isUnreadFilter(params) ? 'unread' : 'all';
   const q = useNotificationList(tab === 'unread');
   const markAll = useMarkAllRead();
   const items = useMemo(() => q.data?.pages.flatMap((p) => p.items) ?? [], [q.data]);

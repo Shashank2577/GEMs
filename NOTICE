@@ -20,6 +20,15 @@ listed here with its licence.
    - packages/core/src/gem/client.ts fetchBidDocument byte cap (25 MB, GemError code 'too_large') —
      approach adapted from src/http.ts fetchBoundedResource({maxBytes}) (content-length check, then
      streamed byte count with cancel), with its test idea from src/http.test.ts.
+   Spec 008 Operations & Scale (US4, 2026-11-05; upstream LICENSE re-checked: Apache-2.0):
+   - packages/core/src/gem/http.ts — SourceHttpError, SourceBodyLimitError, canRetrySource, waitForSourceDelay,
+     fetchBoundedResource and isPdfBody ported from src/http.ts. Modified: Fetch API instead of undici,
+     Uint8Array instead of Node Buffer (runs on Cloudflare Workers), readBoundedBody split out and now used by
+     packages/core/src/gem/client.ts for the bid-document byte cap, an optional beforeAttempt hook (cluster-wide
+     GeM lease), status/url on the result.
+   - packages/core/src/gem/http.test.ts — cases adapted from src/http.test.ts (node:test → vitest).
+   - Planned (spec 008 US1, not yet in this repository): .github/workflows/ci.yml and dod.yml will adapt the
+     structure of .github/workflows/ci.yml (minimal permissions, timeouts, production-dependency audit step).
    Spec 004 Analyse US2 extraction (ported at commit 46925c6, 2026-11-05), packages/core/src/analyse/rules.ts:
    - label variants from src/routes.ts buildEligibilitySummary: "MSE/Startup Relaxation for Years Of
      Experience (and Turnover)" with values "Yes | Complete" / "No | Complete", and "Years of Past
@@ -31,6 +40,9 @@ listed here with its licence.
    Spec 006 Apply (ported at commit 46925c6, 2026-11-05):
    - apps/api/src/services/packet.ts buildWorkspacePacket loadBytes — the "independent Uint8Array copy before
      PDF load" hardening (Uint8Array.from(bytes) before parsing) adapted from src/pdf.ts parseGemPdfText.
+   - apps/api/src/services/packet.ts buildWorkspacePacket input-size pre-check (413 packet_too_large, 006/FR-056) —
+     the "fail fast against an explicit byte budget before doing any work" shape adapted from src/run-budget.ts
+     (the idea only; no code copied).
    Licence text: https://www.apache.org/licenses/LICENSE-2.0
 
 2. gem-search — https://github.com/arush15june/gem-search

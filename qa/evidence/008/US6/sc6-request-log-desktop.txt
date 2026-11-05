@@ -1,0 +1,28 @@
+# sc6-request-log — project desktop — 2026-11-05T05:55:42.209Z
+### Signed-in request with query string
+> GET /api/tenders?q=SECRETSEARCHTERM&token=… (x-request-id: us6-mw34t852-001)
+< 200
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: us6-mw34t852-001
+{"items":[],"total":0,"facets":{"states":[],"ministries":[],"categories":[]}}
+
+--- the stdout line ---
+{"rid":"us6-mw34t852-001","method":"GET","path":"/api/tenders","status":200,"ms":9,"orgId":"e49ba6bc-7c2e-45e6-a256-9752315bfb3c","userId":"fa4754ec-73bc-4970-bb00-ef5457d84395","ts":"2026-11-05T05:55:42.222Z","level":"info","msg":"request"}
+### Request with an Authorization header
+> GET /api/tenders (Authorization: Bearer tp_…)
+< 401
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: us6-mw34t852-002
+{"error":{"code":"unauthorized","message":"Please sign in to continue"}}
+
+### Login
+> POST /api/auth/login {email,password}
+< 200
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: us6-mw34t852-003
+{"user":{"id":"fa4754ec-73bc-4970-bb00-ef5457d84395","name":"QA obs mw34tl1n5","email":"obs.mw34tl1n5@example.in","phone":null},"org":{"id":"e49ba6bc-7c2e-45e6-a256-9752315bfb3c","name":"obs Traders mw34tl1n5","slug":"obs-traders-mw34tl1n5","plan":"trial","onboardingState":{},"scoringWeights":null},"role":"owner","orgs":[{"id":"e49ba6bc-7c2e-45e6-a256-9752315bfb3c","name":"obs Traders mw34tl1n5","slug":"obs-traders-mw34tl1n5","role":"owner"}]}
+
+log bytes scanned: 25488; session cookie values checked: 1

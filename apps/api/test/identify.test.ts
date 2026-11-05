@@ -2,19 +2,22 @@
  * T038 — Identify routes: tender feed filters/facets/sort/pagination, detail, seen/dismiss, watchlists CRUD +
  * preview + roles, ingestion run/runs roles, notifications, and org isolation.
  */
-import { eq, like, sql } from 'drizzle-orm';
+import { and, eq, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { analyses, bidWorkspaces, ingestionRuns, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
+import { analyses, bidWorkspaces, ingestionRuns, memberships, notificationPrefs, notifications, tenderMatches, tenders, watchlists } from '@tp/db';
 import type { NormalizedTender } from '@tp/core/gem/parse';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
 import { byPreviewOrder, escapeLike, phraseLike, type Candidate } from '../src/routes/watchlists';
+import { dispatchNotifications } from '../src/services/alerts';
 import { matchAndNotify, runIngestion } from '../src/services/ingest';
 import { createTestContext, request, seedOrgWithRoles, signup, type SignedUp, type TestContext } from './helpers';
 
 const REF = new Date('2026-11-04T04:30:00.000Z');
 const GEM = 'http://mock-gem.test';
+const TEST_APP = 'http://tp.test';
 
 let ctx: TestContext;
+let mock: ReturnType<typeof createMockGem>;
 let team: Awaited<ReturnType<typeof seedOrgWithRoles>>;
 let other: SignedUp;
 let laptopWatchlistId: string;
@@ -23,7 +26,7 @@ const get = (path: string, who: SignedUp = team.analyst) => request(ctx.app, 'GE
 const tenderId = async (bid: string) => (await ctx.db.select({ id: tenders.id }).from(tenders).where(eq(tenders.bidNumber, bid)))[0].id;
 
 beforeAll(async () => {
-  const mock = createMockGem({ now: () => REF, token: 'b'.repeat(32) });
+  mock = createMockGem({ now: () => REF, token: 'b'.repeat(32) });
   ctx = await createTestContext({ now: REF, gemBaseUrl: GEM, fetch: async (input, init) => mock.app.fetch(new Request(input as string, init)) });
   team = await seedOrgWithRoles(ctx.app, 'Sharma Infotech Pvt Ltd');
   other = await signup(ctx.app, { orgName: 'Rival Traders' });
@@ -51,6 +54,56 @@ describe('GET /tenders', () => {
     expect(r.body.facets.states.find((f: { value: string }) => f.value === 'Maharashtra').count).toBe(6);
     expect(r.body.facets.ministries.length).toBeGreaterThan(15);
     expect(r.body.facets.categories.length).toBeGreaterThan(20);
+  });
+
+  it('facets from the shared GROUPING SETS query equal one GROUP BY per facet (count desc, value asc, non-null)', async () => {
+    // Reference: what a per-facet query returns over open, still-open tenders (this fixture has no demo rows and no
+    // dismissals, so the scope / dismissed conditions are no-ops here).
+    const expected = async (col: 'state' | 'ministry' | 'category', extra = sql`true`) =>
+      ((await ctx.db.execute(sql`select ${sql.raw(col)} as value, count(*)::int as count from tenders
+        where status = 'open' and coalesce(end_at, 'infinity'::timestamptz) >= ${REF} and ${sql.raw(col)} is not null and ${extra}
+        group by 1 order by 2 desc, 1 asc limit 60`)) as unknown as { rows: { value: string; count: number }[] }).rows;
+    const all = await get('/tenders');
+    expect(all.body.facets).toEqual({ states: await expected('state'), ministries: await expected('ministry'), categories: await expected('category') });
+    // With ?state=X the state facet leaves its own filter out; total, ministries and categories keep it.
+    const mh = await get('/tenders?state=Maharashtra');
+    expect(mh.body.total).toBe(6);
+    expect(mh.body.facets).toEqual({
+      states: await expected('state'),
+      ministries: await expected('ministry', sql`state = 'Maharashtra'`),
+      categories: await expected('category', sql`state = 'Maharashtra'`),
+    });
+    // One shared key (state + ministry): each facet leaves only its own filter out; total keeps both.
+    const mini = (await ctx.db.execute(sql`select ministry from tenders where state = 'Maharashtra' and status = 'open' and ministry is not null limit 1`)) as unknown as { rows: { ministry: string }[] };
+    const M = mini.rows[0]!.ministry;
+    const both = await get(`/tenders?state=Maharashtra&ministry=${encodeURIComponent(M)}`);
+    const msql = sql`ministry = ${M}`;
+    expect(both.body.facets).toEqual({
+      states: await expected('state', msql),
+      ministries: await expected('ministry', sql`state = 'Maharashtra'`),
+      categories: await expected('category', sql`state = 'Maharashtra' and ministry = ${M}`),
+    });
+    // Zero shared keys (all three filters set): every facet drops exactly its own filter.
+    const cat = ((await ctx.db.execute(sql`select category from tenders where state = 'Maharashtra' and ministry = ${M} and status = 'open' and category is not null limit 1`)) as unknown as { rows: { category: string }[] }).rows[0]!.category;
+    const trio = await get(`/tenders?state=Maharashtra&ministry=${encodeURIComponent(M)}&category=${encodeURIComponent(cat)}`);
+    expect(trio.body.facets).toEqual({
+      states: await expected('state', sql`ministry = ${M} and category = ${cat}`),
+      ministries: await expected('ministry', sql`state = 'Maharashtra' and category = ${cat}`),
+      categories: await expected('category', sql`state = 'Maharashtra' and ministry = ${M}`),
+    });
+    // NULL facet values: an open tender with a null state counts in total but is never a facet value.
+    await ctx.db.insert(tenders).values({
+      source: 'gem', sourceUrl: 'https://example.test/null-state-1', contentHash: 'null-state-hash', bidNumber: 'GEM/2026/B/9990001', title: 'Null state tender', ministry: M,
+      status: 'open', endAt: new Date(REF.getTime() + 10 * 86_400_000), state: null,
+    } as typeof tenders.$inferInsert);
+    const withNull = await get('/tenders');
+    expect(withNull.body.total).toBe(37);
+    expect(withNull.body.facets).toEqual({ states: await expected('state'), ministries: await expected('ministry'), categories: await expected('category') });
+    expect(withNull.body.facets.states.every((f: { value: unknown }) => f.value !== null && f.value !== '')).toBe(true);
+    await ctx.db.delete(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/9990001'));
+    // Nothing matches: total 0 and empty facets (the () grouping set still yields its row).
+    const none = await get('/tenders?q=zzzz-no-such-tender');
+    expect(none.body).toMatchObject({ total: 0, items: [], facets: { states: [], ministries: [], categories: [] } });
   });
 
   it('paginates without overlap', async () => {
@@ -266,7 +319,7 @@ describe('ingestion routes', () => {
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.viewer.cookie, json: {} })).status).toBe(403);
     expect((await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 99 } })).status).toBe(400);
     ctx.clock.advance(60_000);
-    // FR-013: the setup's manual run finished < 2 min ago → cooldown; allowed again from retryAt.
+    // 008/FR-026: the setup's manual run finished < 10 min ago → cooldown; allowed again from retryAt.
     const cool = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.owner.cookie, json: { pages: 1 } });
     expect(cool.status).toBe(429);
     ctx.clock.set(new Date(cool.body.error.details.retryAt));
@@ -280,20 +333,32 @@ describe('ingestion routes', () => {
   });
 });
 
-describe('manual sync cooldown (FR-013)', () => {
+describe('manual sync cooldown (008/FR-026, supersedes 003 FR-013)', () => {
   const runCount = async () => Number((await ctx.db.select({ n: sql<number>`count(*)::int` }).from(ingestionRuns))[0].n);
 
-  it('rejects a manual sync within 2 min of a finished manual run with 429 sync_cooldown and retryAt', async () => {
+  it('rejects a manual sync within 10 min of a finished manual run with 429 sync_cooldown and retryAt, without calling GeM', async () => {
     // Own fixture: a manual run that finished just now (later than any earlier one), so order doesn't matter.
     ctx.clock.advance(60_000);
     const finishedAt = ctx.clock.now();
     await ctx.db.insert(ingestionRuns).values({ trigger: 'manual', status: 'success', startedAt: new Date(finishedAt.getTime() - 5_000), finishedAt });
     const baseline = await runCount();
-    const retryAt = new Date(finishedAt.getTime() + 2 * 60_000);
+    const retryAt = new Date(finishedAt.getTime() + 10 * 60_000);
+
+    // Scenario 3: finished at T, clicked at T+4 min → retryAt = T+10 min, and GeM sees nothing.
+    ctx.clock.set(new Date(finishedAt.getTime() + 4 * 60_000));
+    const gemRequests = mock.state.requestLog.length;
+    const at4 = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
+    expect(at4.status).toBe(429);
+    expect(at4.body.error.details.retryAt).toBe(retryAt.toISOString());
+    expect(mock.state.requestLog.length).toBe(gemRequests);
+    // Everyone sees when the next manual sync is allowed (drives the disabled Sync now + helper text).
+    const health = await get('/ingestion/runs', team.viewer);
+    expect(health.body).toMatchObject({ nextManualSyncAt: retryAt.toISOString(), manualSyncCooldownMin: 10 });
 
     ctx.clock.set(new Date(retryAt.getTime() - 1_000));
     const r = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
     expect(r.status).toBe(429);
+    expect(mock.state.requestLog.length).toBe(gemRequests);
     expect(r.body.error).toMatchObject({ code: 'sync_cooldown', details: { retryAt: retryAt.toISOString() } });
     const ist = retryAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
     expect(r.body.error.message).toBe(`GeM was synced moments ago. Next manual sync at ${ist} IST.`);
@@ -303,6 +368,7 @@ describe('manual sync cooldown (FR-013)', () => {
 
     // A scheduled run neither starts nor extends the cooldown.
     ctx.clock.set(retryAt);
+    expect((await get('/ingestion/runs', team.viewer)).body.nextManualSyncAt).toBeNull();
     const cron = await runIngestion(ctx.deps, { trigger: 'cron', pages: 1 });
     expect(cron.status).toBe('success');
     const ok = await request(ctx.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: { pages: 1 } });
@@ -314,7 +380,22 @@ describe('manual sync cooldown (FR-013)', () => {
     expect(rival.status).toBe(429);
     expect(rival.body.error.code).toBe('sync_cooldown');
     expect(await runCount()).toBe(baseline + 2);
-    ctx.clock.advance(2 * 60_000);
+    ctx.clock.advance(10 * 60_000);
+  });
+
+  it('honours MANUAL_SYNC_COOLDOWN_MIN', async () => {
+    const short = await createTestContext({ now: ctx.clock.now(), keepData: true, gemBaseUrl: GEM, env: { MANUAL_SYNC_COOLDOWN_MIN: '3' } });
+    try {
+      const finishedAt = short.clock.now();
+      await short.db.insert(ingestionRuns).values({ trigger: 'manual', status: 'success', startedAt: finishedAt, finishedAt });
+      short.clock.advance(2 * 60_000);
+      const r = await request(short.app, 'POST', '/ingestion/run', { cookie: team.bidManager.cookie, json: {} });
+      expect(r.status).toBe(429);
+      expect(r.body.error.details.retryAt).toBe(new Date(finishedAt.getTime() + 3 * 60_000).toISOString());
+    } finally {
+      await short.close();
+    }
+    ctx.clock.advance(10 * 60_000);
   });
 });
 
@@ -347,7 +428,7 @@ describe('end-to-end: new bid published on GeM → matched → alert', () => {
     const before = (await get('/tenders?matched=1', team.owner)).body.total;
     const mockFetch = ctx.deps.fetch;
     const pub = await mockFetch(`${GEM}/__admin/publish`, { method: 'POST', body: JSON.stringify({ count: 1 }) });
-    expect((await pub.json()).published).toEqual(['GEM/2026/B/6421101']);
+    expect(((await pub.json()) as { published: string[] }).published).toEqual(['GEM/2026/B/6421101']);
     ctx.clock.advance(30 * 60_000);
     const run = await runIngestion(ctx.deps, { trigger: 'cron', pages: 1 });
     expect(run).toMatchObject({ tendersCreated: 1, matchesCreated: 1 });
@@ -579,5 +660,164 @@ describe('watchlist SQL helpers and batched matching', () => {
     } finally {
       await ctx.db.delete(tenders).where(like(tenders.bidNumber, `${prefix}%`));
     }
+  });
+});
+
+describe('notifications ?kind validation (003/FR-049)', () => {
+  it('rejects an unknown kind with 400 and accepts a real one', async () => {
+    const bad = await get('/notifications?kind=bogus', team.owner);
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('validation_error');
+    const ok = await get('/notifications?kind=tender_match', team.owner);
+    expect(ok.status).toBe(200);
+    expect(ok.body.items.every((i: { kind: string }) => i.kind === 'tender_match')).toBe(true);
+    expect((await get('/notifications?kind=digest', team.owner)).body.total).toBe(0);
+  });
+});
+
+describe('one-click email unsubscribe (003/FR-048)', () => {
+  const ids = () => ({ userId: other.me.user.id as string, orgId: other.me.org.id as string });
+  const prefsEmail = async () => (await get('/me/notification-prefs', other)).body.email;
+  const setPrefsEmail = async (email: boolean) =>
+    request(ctx.app, 'PUT', '/me/notification-prefs', { cookie: other.cookie, json: { ...(await get('/me/notification-prefs', other)).body, email } });
+  const tokenOf = (h: string) => new URL(h.slice(1, -1)).searchParams.get('token')!;
+  const tokenFor = async (userId: string, orgId: string) => {
+    const { signUnsubscribeToken } = await import('../src/lib/unsubscribe');
+    return signUnsubscribeToken(ctx.deps.config.unsubscribeSecret!, userId, orgId);
+  };
+  const queueEmail = async (title: string, orgId = ids().orgId) =>
+    (await ctx.db.insert(notifications).values({ orgId, userId: ids().userId, channel: 'email', kind: 'system', title, body: 'x', status: 'pending', dedupeKey: title }).returning())[0];
+  const rowOf = async (id: string) => (await ctx.db.select().from(notifications).where(eq(notifications.id, id)))[0];
+  const oneClick = (token: string) => ctx.app.request(`${TEST_APP}/api/notifications/unsubscribe?token=${token}`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click',
+  });
+
+  it('dispatched alert emails carry List-Unsubscribe + List-Unsubscribe-Post for the recipient and org', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    await queueEmail('Unsub headers check');
+    await dispatchNotifications(ctx.deps);
+    const mail = ctx.mailer.sent.find((m) => m.subject === 'Unsub headers check');
+    expect(mail?.to).toBe(other.email);
+    expect(mail!.headers!['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+    expect(mail!.headers!['List-Unsubscribe']).toMatch(new RegExp(`^<${TEST_APP}/api/notifications/unsubscribe\\?token=[\\w.-]+>$`));
+    expect(tokenOf(mail!.headers!['List-Unsubscribe'])).toBe(await tokenFor(userId, orgId));
+  });
+
+  it('GET only shows a confirmation form (link scanners change nothing); its POST unsubscribes and confirms in HTML', async () => {
+    const { userId, orgId } = ids();
+    const token = await tokenFor(userId, orgId);
+    await setPrefsEmail(true);
+    for (let i = 0; i < 3; i++) {
+      const page = await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${token}`);
+      expect(page.status).toBe(200);
+      expect(page.headers.get('content-type')).toMatch(/text\/html/);
+      expect(page.text).toContain('<form method="post" action="/api/notifications/unsubscribe?token=');
+      expect(page.text).toContain('Rival Traders');
+      expect(page.text).toMatch(/match alerts, daily digests and bid deadline reminders/);
+    }
+    expect(await prefsEmail()).toBe(true);
+
+    const action = (await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${token}`)).text.match(/action="([^"]+)"/)![1].replace(/&amp;/g, '&');
+    const done = await request(ctx.app, 'POST', action, { form: {} });
+    expect(done.status).toBe(200);
+    expect(done.headers.get('content-type')).toMatch(/text\/html/);
+    expect(done.text).toMatch(/You are unsubscribed/);
+    expect(await prefsEmail()).toBe(false);
+  });
+
+  it('the confirmation POST from a signed-in browser (Origin: null under no-referrer, or APP_URL) is not blocked by the origin check, and ignores the cookie', async () => {
+    const { userId, orgId } = ids();
+    const token = await tokenFor(userId, orgId);
+    // Signed in as a *different* user: the token alone decides whose email is switched off.
+    const signedIn = team.owner;
+    const ownerPrefs = async () => (await get('/me/notification-prefs', signedIn)).body.email;
+    const ownerBefore = await ownerPrefs();
+    for (const origin of ['null', TEST_APP]) {
+      await setPrefsEmail(true);
+      const r = await request(ctx.app, 'POST', `/notifications/unsubscribe?token=${token}`, { cookie: signedIn.cookie, form: {}, headers: { origin } });
+      expect(r.status, origin).toBe(200);
+      expect(r.text).toMatch(/You are unsubscribed/);
+      expect(await prefsEmail()).toBe(false);
+      expect(await ownerPrefs()).toBe(ownerBefore);
+    }
+    // The exemption is that exact path, POST only: other methods there and other routes are still refused.
+    for (const [method, path] of [['PUT', `/notifications/unsubscribe?token=${token}`], ['POST', '/notifications/unsubscribe/x'], ['PATCH', '/org']]) {
+      const r = await request(ctx.app, method, path, { cookie: signedIn.cookie, json: { name: 'X' }, headers: { origin: 'null' } });
+      expect(r.status, `${method} ${path}`).toBe(403);
+      expect(r.body.error.code).toBe('bad_origin');
+    }
+  });
+
+  it('RFC 8058 one-click POST turns email off without signing in and skips already-queued emails', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    const queued = await queueEmail('Unsub queued before click');
+    const res = await oneClick(await tokenFor(userId, orgId));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, email: false });
+    expect(await prefsEmail()).toBe(false);
+    expect(await rowOf(queued.id)).toMatchObject({ status: 'skipped', error: 'unsubscribed', nextAttemptAt: null });
+    await dispatchNotifications(ctx.deps);
+    expect(ctx.mailer.sent.some((m) => m.subject === 'Unsub queued before click')).toBe(false);
+    // Idempotent.
+    expect((await oneClick(await tokenFor(userId, orgId))).status).toBe(200);
+  });
+
+  it('the token is bound to its org, and stops working once the user leaves that org', async () => {
+    const { userId, orgId } = ids();
+    // `other` is also a member of team's org, with email on there.
+    await ctx.db.insert(memberships).values({ orgId: team.orgId, userId, role: 'analyst' });
+    await ctx.db.insert(notificationPrefs).values({ orgId: team.orgId, userId, email: true })
+      .onConflictDoUpdate({ target: [notificationPrefs.orgId, notificationPrefs.userId], set: { email: true } });
+    const teamEmail = async () => (await ctx.db.select().from(notificationPrefs).where(and(eq(notificationPrefs.orgId, team.orgId), eq(notificationPrefs.userId, userId))))[0].email;
+    const queuedInTeam = await queueEmail('Unsub other org row', team.orgId);
+    try {
+      await setPrefsEmail(true);
+      expect((await oneClick(await tokenFor(userId, orgId))).status).toBe(200);
+      expect(await prefsEmail()).toBe(false);
+      expect(await teamEmail()).toBe(true); // org B untouched
+      expect(await rowOf(queuedInTeam.id)).toMatchObject({ status: 'pending' });
+
+      // A token for org A with the payload rewritten to org B fails the signature.
+      const [, sig] = (await tokenFor(userId, orgId)).split('.');
+      const swapped = `${Buffer.from(`${userId}:${team.orgId}:email_matches`).toString('base64url')}.${sig}`;
+      expect((await oneClick(swapped)).status).toBe(400);
+      expect(await teamEmail()).toBe(true);
+
+      // After leaving team's org its link is invalid (GET and POST) and nothing changes.
+      const teamToken = await tokenFor(userId, team.orgId);
+      expect((await request(ctx.app, 'GET', `/notifications/unsubscribe?token=${teamToken}`)).status).toBe(200);
+      await ctx.db.delete(memberships).where(and(eq(memberships.orgId, team.orgId), eq(memberships.userId, userId)));
+      for (const method of ['GET', 'POST']) {
+        const r = await request(ctx.app, method, `/notifications/unsubscribe?token=${teamToken}`);
+        expect(r.status, method).toBe(400);
+        expect(r.body.error.code).toBe('invalid_token');
+      }
+      expect(await teamEmail()).toBe(true);
+    } finally {
+      await ctx.db.delete(memberships).where(and(eq(memberships.orgId, team.orgId), eq(memberships.userId, userId)));
+      await ctx.db.delete(notifications).where(eq(notifications.id, queuedInTeam.id));
+    }
+  });
+
+  it('a tampered, truncated, foreign-scope or missing token is 400 invalid_token and changes nothing', async () => {
+    const { userId, orgId } = ids();
+    await setPrefsEmail(true);
+    const good = await tokenFor(userId, orgId);
+    const [p, s] = good.split('.');
+    const { signUnsubscribeToken } = await import('../src/lib/unsubscribe');
+    const forged = await signUnsubscribeToken('another-secret', userId, orgId);
+    const otherUser = Buffer.from(`${team.owner.me.user.id}:${orgId}:email_matches`).toString('base64url');
+    for (const token of [`${p}.${s.slice(0, -2)}AA`, `${otherUser}.${s}`, forged, p, '', 'garbage']) {
+      for (const method of ['GET', 'POST']) {
+        const r = await request(ctx.app, method, `/notifications/unsubscribe?token=${token}`);
+        expect(r.status, `${method} ${token}`).toBe(400);
+        expect(r.body.error.code).toBe('invalid_token');
+      }
+    }
+    const none = await request(ctx.app, 'POST', '/notifications/unsubscribe');
+    expect(none.body.error.code).toBe('invalid_token');
+    expect(await prefsEmail()).toBe(true);
   });
 });

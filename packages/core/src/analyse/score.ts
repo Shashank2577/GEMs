@@ -14,6 +14,10 @@
 import type { DocType, Requirement, ScoreFactor } from './types';
 import { buildChecklist, isMseProfile, isStartupProfile, type ChecklistProfile } from './checklist';
 import { inr, plural, years } from './format';
+import { certKey, isValidDoc, vaultHas, type ScoreVaultDoc } from './vault-match';
+
+export { isValidDoc };
+export type { ScoreVaultDoc };
 
 export const FACTOR_KEYS = [
   'turnover', 'experience', 'similarWork', 'emd', 'mii', 'oem', 'certificates', 'documents', 'deliveryFeasibility', 'timeToClose',
@@ -53,7 +57,6 @@ export interface ScoreProfile extends ChecklistProfile {
   operatingStates?: string[] | null;
 }
 export interface ScorePastContract { value: number; startDate?: string | null; endDate?: string | null; title?: string; category?: string | null }
-export interface ScoreVaultDoc { id?: string; type: DocType; title?: string; expiryDate?: string | null; tags?: string[] }
 export interface ScoreTender {
   endAt?: Date | string | null; state?: string | null; emdAmount?: number | null;
   title?: string | null; category?: string | null; items?: { name: string }[] | null;
@@ -97,12 +100,6 @@ export const effectiveStatus = (f: ScoreFactor): Status => f.overridden?.status 
 const DAY = 86_400_000;
 const toDate = (d: Date | string | null | undefined) => (d == null ? null : d instanceof Date ? d : new Date(d));
 
-function isValidDoc(d: ScoreVaultDoc, now: Date) {
-  if (!d.expiryDate) return true;
-  const exp = new Date(`${d.expiryDate.slice(0, 10)}T23:59:59+05:30`);
-  return exp.getTime() >= now.getTime();
-}
-
 /** Average of the latest (up to) 3 financial years. */
 export function averageTurnover(financials: ScoreProfile['financials']): { avg: number; years: number } | null {
   const list = (financials ?? []).filter((f) => Number.isFinite(f.turnover) && f.turnover > 0);
@@ -140,8 +137,6 @@ export function significantWords(text: string): Set<string> {
   }
   return out;
 }
-
-const certKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 export function scoreTender(input: ScoreInput): ScoreResult {
   const { requirements, profile, now } = input;
@@ -287,15 +282,7 @@ export function scoreTender(input: ScoreInput): ScoreResult {
     if (!certs.length) push('certificates', 'na', 'No specific certificates are requested.');
     else {
       const owned = new Set((profile?.certifications ?? []).map(certKey));
-      const vaultHas = (name: string) => {
-        const k = certKey(name);
-        return vault.some((d) => isValidDoc(d, now) && (
-          (k.startsWith('iso') && d.type === 'iso' && certKey(`${d.title ?? ''} ${(d.tags ?? []).join(' ')}`).includes(k.replace('iso', ''))) ||
-          (k === 'bis' && d.type === 'bis') ||
-          certKey(d.title ?? '').includes(k)
-        ));
-      };
-      const missing = certs.map((c) => String(c.value ?? c.label)).filter((n) => !owned.has(certKey(n)) && ![...owned].some((o) => o.includes(certKey(n))) && !vaultHas(n));
+      const missing = certs.map((c) => String(c.value ?? c.label)).filter((n) => !owned.has(certKey(n)) && ![...owned].some((o) => o.includes(certKey(n))) && !vaultHas(n, vault, now));
       const names = certs.map((c) => String(c.value ?? c.label));
       if (!missing.length) push('certificates', 'pass', `You hold all requested certificates: ${names.join(', ')}.`, { requirementKey: 'certificate' });
       else push('certificates', 'fail', `Missing ${plural(missing.length, 'certificate')}: ${missing.join(', ')}.`, { requirementKey: 'certificate' });

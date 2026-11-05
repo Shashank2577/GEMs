@@ -3,7 +3,7 @@
  * ingestion → alerts → reminders, each isolated so one failure does not stop the others.
  */
 import type { AppDeps } from '../deps';
-import { runIngestion } from '../services/ingest';
+import { IngestionBusyError, runIngestion } from '../services/ingest';
 import { dispatchNotifications } from '../services/alerts';
 import { runExpiryReminders } from '../services/reminders';
 import { pruneAuthState } from './rate-limit';
@@ -13,7 +13,15 @@ export interface ScheduledReport { step: string; ok: boolean; ms: number; error?
 
 export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' | 'manual' } = {}): Promise<ScheduledReport[]> {
   const steps: [string, () => Promise<unknown>][] = [
-    ['ingestion', () => runIngestion(deps, { trigger: opts.trigger ?? 'cron' })],
+    ['ingestion', async () => {
+      try {
+        await runIngestion(deps, { trigger: opts.trigger ?? 'cron' });
+      } catch (e) {
+        // Overlapping tick or a manual Sync now holds the single running slot (008/FR-025) — not a failure.
+        if (!(e instanceof IngestionBusyError)) throw e;
+        deps.logger.info('ingestion skipped: already running', { runId: e.run?.id ?? null });
+      }
+    }],
     ['alerts', () => dispatchNotifications(deps)],
     ['reminders', () => runExpiryReminders(deps)],
     ['auth-cleanup', () => pruneAuthState(deps.db, deps.clock.now())],
@@ -27,7 +35,8 @@ export async function runScheduledJobs(deps: AppDeps, opts: { trigger?: 'cron' |
       report.push({ step, ok: true, ms: Date.now() - t0 });
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
-      deps.logger.error(`scheduled step failed: ${step}`, { error });
+      deps.logger.error(`scheduled step failed: ${step}`, { error, job: step });
+      try { deps.errors.capture(e, { job: step }); } catch { /* never let reporting stop the pipeline */ }
       report.push({ step, ok: false, ms: Date.now() - t0, error });
     }
   }

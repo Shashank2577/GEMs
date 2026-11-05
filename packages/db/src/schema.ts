@@ -2,6 +2,8 @@
  * TenderPilot database schema — single source of truth (see specs/001-gem-tender-copilot/data-model.md).
  * Every org-owned table carries org_id (Constitution IV).
  */
+import { sql } from 'drizzle-orm';
+import type { AnalysisWarning } from '@tp/core/contracts/analyse';
 import {
   pgTable, text, uuid, timestamp, integer, bigint, boolean, jsonb, real, date,
   uniqueIndex, index, primaryKey,
@@ -277,6 +279,24 @@ export const tenders = pgTable('tenders', {
   bidUq: uniqueIndex('tenders_source_bid_uq').on(t.source, t.bidNumber),
   endIdx: index('tenders_end_idx').on(t.endAt),
   stateIdx: index('tenders_state_idx').on(t.state),
+  // 008/FR-027: ~6 % of tenders are open and every feed/dashboard query filters on it. Built CONCURRENTLY by the
+  // hand-edited non-transactional migration 0017 (`-- tp:non-transactional`, see migrate.ts).
+  openCreatedIdx: index('tenders_open_created_idx').on(t.createdAt.desc().nullsFirst()).where(sql`status = 'open'`),
+  // Closing-date sort (review S5): the feed's "still open" filter is `coalesce(end_at, 'infinity') >= now`, so the index
+  // is on that expression — expired-but-not-yet-closed rows are skipped by the range, not read and filtered.
+  // Replaces tenders_open_end_idx (end_at); built CONCURRENTLY by the hand-edited non-transactional migration 0018.
+  openClosingIdx: index('tenders_open_closing_idx').on(sql`coalesce(${t.endAt}, 'infinity'::timestamptz)`).where(sql`status = 'open'`),
+  // DESC NULLS LAST = the feed's "highest value" sort; also serves minValue/maxValue ranges.
+  openValueIdx: index('tenders_open_value_idx').on(t.estimatedValue.desc().nullsLast()).where(sql`status = 'open'`),
+  // `?state=X` (US4 scenario 4, PR #515 QA finding 1): equality on state, then the default sort (created_at DESC), then
+  // the "still open" expression, so one index answers the page query in order (`state = X` and `coalesce(end_at, …)
+  // >= now` are both Index Conds, no sort, LIMIT stops early) and the count/facet queries as a single bitmap scan.
+  // With only (state) the planner preferred tenders_open_created_idx + filter for the page and a BitmapAnd of the
+  // non-partial tenders_state_idx and tenders_open_closing_idx for count/facets (it estimates "still open" at the
+  // default 1/3 because partial-index expression stats are not used). Rebuilt by migration 0019.
+  openStateIdx: index('tenders_open_state_idx').on(t.state, t.createdAt.desc().nullsFirst(), sql`coalesce(${t.endAt}, 'infinity'::timestamptz)`).where(sql`status = 'open'`),
+  openMinistryIdx: index('tenders_open_ministry_idx').on(t.ministry).where(sql`status = 'open'`),
+  openCategoryIdx: index('tenders_open_category_idx').on(t.category).where(sql`status = 'open'`),
 }));
 
 export const tenderEvents = pgTable('tender_events', {
@@ -321,6 +341,18 @@ export const ingestionRuns = pgTable('ingestion_runs', {
   error: text('error'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, () => ({
+  // 008/FR-025: at most one running ingestion, cluster-wide (cron ticks, manual syncs, every isolate).
+  oneRunningUq: uniqueIndex('ingestion_runs_one_running_uq').on(sql`(true)`).where(sql`status = 'running'`),
+}));
+
+/**
+ * Cluster-wide GeM request slots (008/FR-024, NFR-002). One row (`id = 'gem'`): each request atomically moves
+ * `next_slot_at` forward by the minimum interval and sleeps until its own slot (`apps/api/src/lib/gem-lease.ts`).
+ */
+export const gemThrottle = pgTable('gem_throttle', {
+  id: text('id').primaryKey(),
+  nextSlotAt: timestamp('next_slot_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ───────────── Identify: watchlists & matches ─────────────
@@ -430,10 +462,19 @@ export const analyses = pgTable('analyses', {
   staleReason: text('stale_reason').$type<StaleReason>(),
   staleAt: timestamp('stale_at', { withTimezone: true }),
   notes: jsonb('notes').$type<string[]>().notNull().default([]), // FR-051
+  /** Machine-readable caveats rendered by the web (008/FR-031: `llm_budget_exhausted`, `llm_quota_reached`). */
+  warnings: jsonb('warnings').$type<AnalysisWarning[]>().notNull().default([]),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => ({ orgTenderIdx: index('analyses_org_tender_idx').on(t.orgId, t.tenderId) }));
+}, (t) => ({
+  orgTenderIdx: index('analyses_org_tender_idx').on(t.orgId, t.tenderId),
+  // 008/FR-027: "latest analysis per (org, tender)" lookups in the feed sort/decorate.
+  orgTenderCreatedIdx: index('analyses_org_tender_created_idx').on(t.orgId, t.tenderId, t.createdAt.desc().nullsFirst()),
+}));
+
+/** 008/FR-031/FR-037 analysis warnings; one definition, in the core contract (review N1). */
+export type { AnalysisWarning };
 
 // ───────────── Apply: workspace & packet ─────────────
 
@@ -481,7 +522,10 @@ export const comments = pgTable('comments', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
   createdAt: createdAt(),
-});
+}, (t) => ({
+  /** Comment thread per workspace (006/NFR-001). */
+  wsIdx: index('comments_ws_idx').on(t.workspaceId),
+}));
 
 export const annexureTemplates = pgTable('annexure_templates', {
   id: id(),
@@ -491,7 +535,10 @@ export const annexureTemplates = pgTable('annexure_templates', {
   body: text('body').notNull(), // {{placeholders}}
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (t) => ({
+  /** One override per (org, key) (006/FR-036). System templates (org_id NULL) are code, not rows. */
+  orgKeyUq: uniqueIndex('annexure_templates_org_key_uq').on(t.orgId, t.key),
+}));
 
 export interface PacketItem {
   kind: 'cover' | 'annexure' | 'vault' | 'tender_doc';
@@ -532,12 +579,18 @@ export const notifications = pgTable('notifications', {
   dedupeKey: text('dedupe_key'),
   status: text('status').$type<'pending' | 'sent' | 'failed' | 'skipped' | 'read'>().notNull().default('pending'),
   error: text('error'),
+  /** Delivery attempts made so far (email / WhatsApp); FR-047 retries transient failures up to 3. */
+  attempts: integer('attempts').notNull().default(0),
+  /** Earliest time the dispatcher may (re)try this row; also the claim lease while a dispatcher holds it. */
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
   sentAt: timestamp('sent_at', { withTimezone: true }),
   readAt: timestamp('read_at', { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => ({
   userIdx: index('notifications_user_idx').on(t.orgId, t.userId, t.createdAt),
   dedupeUq: uniqueIndex('notifications_dedupe_uq').on(t.userId, t.channel, t.dedupeKey),
+  // 008/FR-029: the dispatcher's select of pending outbound alerts (built CONCURRENTLY in migration 0017).
+  pendingIdx: index('notifications_pending_idx').on(t.createdAt).where(sql`status = 'pending' AND channel IN ('email','whatsapp')`),
 }));
 
 export const activityLog = pgTable('activity_log', {

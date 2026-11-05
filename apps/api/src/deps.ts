@@ -38,6 +38,8 @@ export interface LlmRequest {
   prompt: string;
   /** Default 2048. */
   maxTokens?: number;
+  /** Aborts the provider request (008/FR-031: a timed-out call stops spending tokens and isolate time). */
+  signal?: AbortSignal;
 }
 
 export interface LlmResult {
@@ -72,6 +74,8 @@ export interface EmailMessage {
   html?: string;
   text?: string;
   replyTo?: string;
+  /** Extra headers, e.g. List-Unsubscribe / List-Unsubscribe-Post (RFC 8058). */
+  headers?: Record<string, string>;
 }
 
 export interface Mailer {
@@ -99,6 +103,8 @@ export interface WhatsApp {
 export interface Clock { now(): Date }
 
 export interface Logger {
+  /** Optional so test doubles need not implement it; call as `logger.debug?.()`. */
+  debug?(msg: string, meta?: Record<string, unknown>): void;
   info(msg: string, meta?: Record<string, unknown>): void;
   warn(msg: string, meta?: Record<string, unknown>): void;
   error(msg: string, meta?: Record<string, unknown>): void;

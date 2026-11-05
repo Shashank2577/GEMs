@@ -3,6 +3,7 @@
  * secrets) and by the Node server (`process.env`). Missing optional integrations degrade to
  * logged no-ops (Constitution VII).
  */
+import { MANUAL_SYNC_COOLDOWN_MIN } from '@tp/core/contracts/caps';
 
 /** All string environment variables the API understands. */
 export interface RuntimeEnv {
@@ -33,8 +34,17 @@ export interface RuntimeEnv {
   NODE_ENV?: string;
   /** Operator token for /api/admin/* (008/FR-042). Unset → admin routes answer 404. */
   ADMIN_TOKEN?: string;
+  /**
+   * HMAC key for one-click email unsubscribe links (003/FR-048). Unset in production → no unsubscribe headers (a warning
+   * is logged when email is configured); development uses a random per-process key, tests a fixed one.
+   */
+  UNSUBSCRIBE_SECRET?: string;
+  /** "1" mounts the test-only GET /api/__test/mail (003/NFR-008). Never set on the Worker. */
+  E2E_TEST_HOOKS?: string;
   /** Sentry DSN; unset → error reporter is a no-op (008/FR-046). */
   SENTRY_DSN?: string;
+  /** Sentry environment tag: "production" | "staging" | "development" (default from NODE_ENV). */
+  SENTRY_ENVIRONMENT?: string;
   /** "debug" | "info" | "warn" | "error" (default info). */
   LOG_LEVEL?: string;
   /** /api/health reports `ingestion_stale` when the last successful sync is older than this (default 120). */
@@ -58,6 +68,8 @@ export interface AppConfig {
   packetMaxInputBytes: number;
   /** Null when ADMIN_TOKEN is unset. */
   adminToken: string | null;
+  /** UNSUBSCRIBE_SECRET; when unset: null in production, a random per-process key in development, a fixed key in test. */
+  unsubscribeSecret: string | null;
   /** Null when SENTRY_DSN is unset. */
   sentryDsn: string | null;
   logLevel: LogLevel;
@@ -107,11 +119,28 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     packetMaxInputBytes: positiveInt(env.PACKET_MAX_INPUT_BYTES, DEFAULT_PACKET_MAX_INPUT_BYTES),
     adminToken: env.ADMIN_TOKEN || null,
+    unsubscribeSecret: env.UNSUBSCRIBE_SECRET || fallbackUnsubscribeSecret(environment),
     sentryDsn: env.SENTRY_DSN || null,
     logLevel: parseLogLevel(env.LOG_LEVEL),
     healthIngestionMaxAgeMin: nonNegativeInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),
-    manualSyncCooldownMin: nonNegativeInt(env.MANUAL_SYNC_COOLDOWN_MIN, 10),
+    manualSyncCooldownMin: nonNegativeInt(env.MANUAL_SYNC_COOLDOWN_MIN, MANUAL_SYNC_COOLDOWN_MIN),
   };
+}
+
+/** Fixed key for the test environment only (deterministic tokens in tests). */
+export const TEST_UNSUBSCRIBE_SECRET = 'tp-test-unsubscribe-secret';
+let devUnsubscribeSecret: string | undefined;
+
+/**
+ * Unsubscribe key when UNSUBSCRIBE_SECRET is unset: none in production (no List-Unsubscribe headers), the fixed test
+ * key in tests, and a random key per process in development (generated lazily — Workers forbid randomness at module
+ * scope), so a well-known key can never forge links on a real deployment that forgot to set NODE_ENV.
+ */
+function fallbackUnsubscribeSecret(environment: AppConfig['environment']): string | null {
+  if (environment === 'production') return null;
+  if (environment === 'test') return TEST_UNSUBSCRIBE_SECRET;
+  devUnsubscribeSecret ??= `dev-${crypto.randomUUID()}-${crypto.randomUUID()}`;
+  return devUnsubscribeSecret;
 }
 
 /** Like positiveInt but 0 is allowed (e.g. MANUAL_SYNC_COOLDOWN_MIN=0 turns the cooldown off). */

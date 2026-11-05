@@ -30,6 +30,8 @@ scenarios marked *(gap)* are not implemented yet; everything else is implemented
 | ARCH-19 notification retries (003 `notifications.attempts`, T077) | spec 003 | Only the pending-notifications index (FR-029) and Resend batch (FR-074) live here |
 | ARCH-03 manual-sync cooldown (003 FR-013, 2 min) | spec 003 (contract `429 sync_cooldown`) | This spec **raises the cooldown to 10 minutes** and makes it cluster-wide (FR-026) |
 | Pricing display `PLANS` (007 FR-082, T067) | spec 007 | `PLAN_LIMITS` is added to the same `packages/core/src/contracts/plans.ts` (FR-034) |
+| Watchlist preview/back-fill completeness (003 FR-028, no silent cap) | spec 003 | **003 FR-028 prevails**: `candidateTenders` is bounded by open + `end_at > now()`, a slim projection and keyset paging — no row cap (FR-028) |
+| Packet input-size cap (006 FR-056, configurable `PACKET_MAX_INPUT_BYTES`, code default 60 MB, message per 006) | spec 006 | The Worker sets `PACKET_MAX_INPUT_BYTES=41943040` (40 MB) in `wrangler.toml`; this spec adds the 40-item cap (FR-032) |
 
 ## Personas affected
 
@@ -261,7 +263,7 @@ partial indexes; 20 concurrent `fetch-documents` calls against mock-gem show ≥
    2 minutes) *(gap)*.
 4. **Given** 500,000 tenders of which 30,000 are open, **When** `GET /api/tenders?sort=closing` and `?state=Maharashtra`
    and `?minValue=500000` are each called 200 times, **Then** p95 < 300 ms on the CI-sized Postgres and `EXPLAIN` shows
-   `tenders_open_end_idx`, `tenders_open_state_idx` and `tenders_open_value_idx` respectively *(gap)*.
+   `tenders_open_closing_idx`, `tenders_open_state_idx` and `tenders_open_value_idx` respectively *(gap)*.
 5. **Given** 1,000,000 notifications of which 500 are `pending` email/WhatsApp, **When** the dispatcher's select is
    `EXPLAIN`ed, **Then** it uses `notifications_pending_idx` and returns in < 50 ms *(gap)*.
 6. **Given** the feed, watchlist preview and dashboard queries, **When** their SQL is inspected (test on the query
@@ -272,14 +274,19 @@ partial indexes; 20 concurrent `fetch-documents` calls against mock-gem show ≥
    wall-clock, and if the budget is exhausted the remaining documents are rules-only and the result shows the warning
    "AI review covered 2 of 5 documents; the rest were checked by rules only." *(gap)*.
 8. **Given** a tender document with 301 pages, **When** it is uploaded or fetched, **Then** the API returns 422
-   `document_too_long` "This document has 301 pages. TenderPilot reads up to 300 pages — upload the bid document and
-   ATC separately." and no `tender_documents` row is written *(gap)*.
+   `document_too_long` "This document has 301 pages. TenderPilot accepts documents of up to 300 pages and reads the
+   first 150 — upload the bid document and ATC separately." before any text is read, and no blob and no
+   `tender_documents` row is written; a document of 151–300 pages is accepted, its first 150 pages are read and the
+   upload answers with a `pages_truncated` warning (004 NFR-005, `MAX_EXTRACT_PAGES = 150`) *(gap; message amended
+   2026-11-05, PR #515 review)*.
 9. **Given** a PDF whose text layer is empty on ≥ 80 % of pages (scanned), **When** it is analysed, **Then** the API
    returns 422 `scanned_document` "This PDF is a scan without text. Upload the text PDF from GeM or an OCR'd copy."
    *(gap; `looksScanned` exists but only annotates activity meta)*.
-10. **Given** a packet build whose selected items total 45 MB or 41 items, **When** **Build packet** is clicked,
-    **Then** the API returns 413 `packet_too_large` "This packet would be 45 MB (limit 40 MB). Deselect large
-    attachments and try again." (or "41 items (limit 40)") **before** any `packets` row or R2 object is written *(gap)*.
+10. **Given** a packet build (Worker, `PACKET_MAX_INPUT_BYTES=41943040`) whose selected documents total 45 MB, or which
+    has 41 items, **When** **Build packet** is clicked, **Then** the API returns 413 `packet_too_large` with 006 FR-056's
+    message "These documents add up to 45.0 MB — remove or compress some before building (limit 40 MB)." (or "This
+    packet has 41 items (limit 40). Deselect some items and try again.") **before** any `packets` row or R2 object is
+    written *(gap)*.
 
 ---
 
@@ -593,22 +600,35 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   global — and MUST make no GeM request in that case. The web Sync now control MUST show "Next manual sync at
   HH:MM IST" while cooling down.
 - **FR-027** *(gap)*: `tenders` MUST have partial indexes `WHERE status = 'open'`: `tenders_open_created_idx
-  (created_at desc)`, `tenders_open_end_idx (end_at)`, `tenders_open_value_idx (estimated_value)`,
-  `tenders_open_state_idx (state)`, `tenders_open_ministry_idx (ministry)`, `tenders_open_category_idx (category)`;
+  (created_at desc)`, `tenders_open_closing_idx (coalesce(end_at, 'infinity'))` (the feed's "still open" expression,
+  so expired-but-open rows fall outside the range), `tenders_open_value_idx (estimated_value)`,
+  `tenders_open_state_idx (state, created_at desc, coalesce(end_at, 'infinity'))` (so `?state=` reads it for the page,
+  count and facets), `tenders_open_ministry_idx (ministry)`, `tenders_open_category_idx (category)`;
   `analyses` MUST have `analyses_org_tender_created_idx (org_id, tender_id, created_at desc)`.
 - **FR-028** *(gap)*: Feed, watchlist preview and dashboard list queries MUST select a shared projection
   `tenderListColumns` (no `raw`, no document text); `candidateTenders` MUST be limited to open tenders with
-  `end_at > now()` and a maximum of 2,000 rows.
+  `end_at > now()`, use the slim projection and keyset paging, and MUST NOT cap the row count (003 FR-028's
+  no-silent-cap rule prevails; amended 2026-11-05, PR #515 review).
 - **FR-029** *(gap)*: `notifications` MUST have `notifications_pending_idx (created_at) WHERE status = 'pending' AND
   channel IN ('email','whatsapp')`.
-- **FR-030** *(gap)*: Tender documents MUST be capped at `MAX_TENDER_DOC_PAGES = 300` (422 `document_too_long`), and
-  documents where `looksScanned()` is true MUST be rejected for analysis with 422 `scanned_document`.
+- **FR-030** *(gap)*: Tender documents MUST be capped at `MAX_TENDER_DOC_PAGES = 300`: a longer document is refused
+  with 422 `document_too_long` before any text is read (no blob, no row). Documents of 151–300 pages are accepted and
+  truncated to the first `MAX_EXTRACT_PAGES = 150` pages with a `pages_truncated` warning (004 NFR-005; amended
+  2026-11-05, PR #515 review).
+  Scanned documents (`looksScanned()` true) MUST NOT be analysed: in a mixed set they are skipped with a note, and when
+  every document of the analysis is a scan the API returns 422 `scanned_document`.
 - **FR-031** *(gap)*: An analysis MUST make at most `MAX_LLM_CALLS_PER_ANALYSIS = 2` LLM calls, send at most
   `MAX_LLM_INPUT_CHARS = 90_000` characters in total, set a 60 s per-call timeout and a 120 s overall budget; when a
   budget is exhausted the remaining documents use rules only and the analysis carries a warning
   `llm_budget_exhausted` rendered as "AI review covered X of Y documents; the rest were checked by rules only."
-- **FR-032** *(gap)*: Packet builds MUST pre-flight the total input size and item count: > 40 MB or > 40 items → 413
-  `packet_too_large` before writing any row or blob; the request schema `packetBuildSchema.items.max` MUST be 40.
+  No LLM call starts or runs past `min(120 s budget, 2-minute running timeout) − 30 s` (`LLM_FINISH_RESERVE_MS`),
+  measured from the request on the same clock as the analysis row's `created_at`, so scoring and the final write land
+  inside 120 s and before the run could be reported "timed out" (amended 2026-11-05, PR #515 review).
+- **FR-032** *(gap)*: Packet builds MUST pre-flight the total input size and item count before writing any row or
+  blob: > 40 items → 413 `packet_too_large`, and the request schema `packetBuildSchema.items.max` MUST be 40. The size
+  check is 006 FR-056's (Σ stored sizes + 50 KB per annexure, configurable `PACKET_MAX_INPUT_BYTES`, 006's message);
+  the Worker MUST set `PACKET_MAX_INPUT_BYTES=41943040` (40 MB) so pdf-lib's 2–3× peak (ADR-0007) stays under the
+  128 MB isolate (amended 2026-11-05, PR #515 review).
 - **FR-033** *(gap)*: Load-test scripts (`scripts/load/feed.sh`, `scripts/load/gem-fetch.sh`) and a 500k-tender
   fixture generator (`packages/db/src/fixtures/bulk-tenders.ts`) MUST exist so FR-027/NFR-001 can be re-verified.
 

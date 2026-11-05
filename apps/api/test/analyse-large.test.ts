@@ -20,7 +20,7 @@ let bytes: Uint8Array;
 async function longPdf(pages: number): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
-  for (let i = 1; i <= pages; i++) doc.addPage([595, 842]).drawText(`Page ${i}: eligibility and terms of the bid`, { x: 40, y: 780, size: 10, font });
+  for (let i = 1; i <= pages; i++) doc.addPage([595, 842]).drawText(`Page ${i}: eligibility and terms of the bid, including turnover and experience criteria`, { x: 40, y: 780, size: 10, font });
   return doc.save();
 }
 
