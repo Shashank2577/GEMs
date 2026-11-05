@@ -54,7 +54,10 @@ export interface ScoreProfile extends ChecklistProfile {
 }
 export interface ScorePastContract { value: number; startDate?: string | null; endDate?: string | null; title?: string; category?: string | null }
 export interface ScoreVaultDoc { id?: string; type: DocType; title?: string; expiryDate?: string | null; tags?: string[] }
-export interface ScoreTender { endAt?: Date | string | null; state?: string | null; emdAmount?: number | null }
+export interface ScoreTender {
+  endAt?: Date | string | null; state?: string | null; emdAmount?: number | null;
+  title?: string | null; category?: string | null; items?: { name: string }[] | null;
+}
 
 export type FactorOverride = NonNullable<ScoreFactor['overridden']>;
 
@@ -118,6 +121,24 @@ export function experienceYears(pcs: ScorePastContract[], profile: ScoreProfile 
   const inc = toDate(profile?.incorporationDate ?? null);
   if (inc && !Number.isNaN(inc.getTime())) return { years: Math.max(0, (now.getTime() - inc.getTime()) / (365.25 * DAY)), basis: 'incorporation' };
   return null;
+}
+
+/** Words too generic to prove an authorisation covers a product. */
+const OEM_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'supply', 'supplies', 'purchase', 'procurement', 'installation', 'commissioning', 'maintenance',
+  'service', 'services', 'item', 'items', 'product', 'products', 'equipment', 'equipments', 'system', 'systems', 'related', 'type', 'set',
+  'new', 'various', 'other', 'others', 'gem', 'bid', 'tender', 'including', 'complete', 'including', 'unit', 'units', 'india', 'indian',
+  'limited', 'ltd', 'pvt', 'private', 'authorised', 'authorized', 'authorisation', 'authorization', 'partner', 'reseller', 'channel',
+]);
+
+/** Lower-cased significant words (light plural stemming) of a text; used for the OEM product match (FR-030). */
+export function significantWords(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const w of text.toLowerCase().split(/[^a-z0-9]+/)) {
+    if (w.length < 3 || OEM_STOPWORDS.has(w) || /^\d+$/.test(w)) continue;
+    out.add(w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w);
+  }
+  return out;
 }
 
 const certKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -242,7 +263,19 @@ export function scoreTender(input: ScoreInput): ScoreResult {
       const vaultAuth = vault.filter((d) => d.type === 'oem_authorization' && isValidDoc(d, now));
       if (validAuth.length || vaultAuth.length) {
         const names = validAuth.map((a) => a.oem).filter(Boolean);
-        push('oem', 'pass', `You hold a valid OEM authorisation${names.length ? ` (${names.slice(0, 3).join(', ')})` : ''}. Confirm it covers this bid's product.`, { blocking: r.mandatory, requirementKey: 'oem_auth' });
+        const t = input.tender;
+        const subject = (t?.category || t?.title || '').trim();
+        const tenderWords = significantWords([t?.category, t?.title, ...(t?.items ?? []).map((i) => i.name)].filter(Boolean).join(' '));
+        // Only judge coverage when the tender text is known; otherwise keep the generic "confirm" pass.
+        const authWords = significantWords([
+          ...validAuth.flatMap((a) => [a.oem, a.products ?? '']),
+          ...vaultAuth.flatMap((d) => [d.title ?? '', ...(d.tags ?? [])]),
+        ].join(' '));
+        const covers = !tenderWords.size || [...tenderWords].some((w) => authWords.has(w));
+        if (!covers) {
+          const listed = (names.length ? names : vaultAuth.map((d) => d.title ?? '').filter(Boolean)).slice(0, 3).join(', ');
+          push('oem', 'unknown', `None of your valid OEM authorisations${listed ? ` (${listed})` : ''} mention ${subject} — confirm one covers this product.`, { blocking: r.mandatory, requirementKey: 'oem_auth' });
+        } else push('oem', 'pass', `You hold a valid OEM authorisation${names.length ? ` (${names.slice(0, 3).join(', ')})` : ''}. Confirm it covers this bid's product.`, { blocking: r.mandatory, requirementKey: 'oem_auth' });
       } else if (!profile) push('oem', 'unknown', 'The bid needs an OEM authorisation; complete your company profile to check.', { blocking: r.mandatory, requirementKey: 'oem_auth' });
       else push('oem', 'fail', 'The bid needs an OEM authorisation (MAF) and none is on file. Request one from the OEM before bidding.', { blocking: r.mandatory, requirementKey: 'oem_auth' });
     }

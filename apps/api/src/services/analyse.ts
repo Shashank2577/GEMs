@@ -327,7 +327,7 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
     const company = await loadCompany(deps, input.orgId);
     const result = scoreTender({
       requirements, profile: company.profile, pastContracts: company.pastContracts, vaultDocs: company.vault,
-      tender: { endAt: tender.endAt, state: tender.state, emdAmount: tender.emdAmount }, weights: company.weights, now,
+      tender: { endAt: tender.endAt, state: tender.state, emdAmount: tender.emdAmount, title: tender.title, category: tender.category, items: tender.items }, weights: company.weights, now,
       overrides: overridesOf(previous),
     });
     const checklist = buildChecklist(requirements, company.profile);

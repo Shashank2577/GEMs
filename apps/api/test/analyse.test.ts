@@ -607,3 +607,25 @@ describe('US3 run lifecycle: one running analysis, failed attempts keep the prev
     expect(got.body).toMatchObject({ status: 'failed', error: 'boom', lastAttempt: { status: 'failed', error: 'boom' } });
   });
 });
+
+describe('OEM product match (T050, FR-030)', () => {
+  it('a Desktop Computers tender whose authorisations do not mention it → OEM factor unknown ("Needs review"), not a hard fail', async () => {
+    const other = await seedOrgWithRoles(ctx.app, 'Aarav Technologies');
+    await seedCompany(other.orgId);
+    await ctx.db.update(companyProfiles).set({
+      oemAuthorizations: [
+        { oem: 'CP PLUS', products: 'IP cameras, NVRs', validTill: '2027-06-01' },
+        { oem: 'D-Link India', products: 'Managed switches, Wi-Fi access points' },
+      ],
+    }).where(eq(companyProfiles.orgId, other.orgId));
+    const t = await insertTender('review-hardware-oem', { contentHash: 'oem-match', source: 'oem-match', title: 'Desktop Computers (Q2)', category: 'Desktop Computers' });
+    const up = await request(ctx.app, 'POST', `/tenders/${t.id}/documents`, { cookie: other.analyst.cookie, form: { file: pdfFile('review-hardware-oem') } });
+    expect(up.status).toBe(201);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: other.analyst.cookie });
+    expect(r.status).toBe(201);
+    const oem = r.body.factors.find((f: any) => f.key === 'oem');
+    expect(oem).toMatchObject({ status: 'unknown' });
+    expect(oem.detail).toBe('None of your valid OEM authorisations (CP PLUS, D-Link India) mention Desktop Computers — confirm one covers this product.');
+    expect(r.body.verdict).not.toBe('no_go'); // unknown, not fail: the factor reads "Needs review"
+  });
+});
