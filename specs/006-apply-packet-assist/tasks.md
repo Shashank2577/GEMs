@@ -72,7 +72,7 @@ task is sized at ≤ 1 day.
 
 ### Built
 
-- [x] T011 [US1] Create-or-get `POST /tenders/:id/workspace` with initial stage from analysis, owner, due = closing, auto-map of real matches, race handling and activity in `apps/api/src/routes/workspaces.ts` FR-001, FR-002
+- [x] T011 [US1] Create-or-get `POST /tenders/:id/workspace` with initial stage from analysis, owner, due = closing, empty stored mapping (auto picks resolved at read time; FR-002 amended), race handling and activity in `apps/api/src/routes/workspaces.ts` FR-001, FR-002
 - [x] T012 [US1] `GET /workspaces` (stage/mine/q, byStage) and `GET /workspaces/:id` in `apps/api/src/routes/workspaces.ts` and `listWorkspaceCards` in `apps/api/src/services/packet.ts` FR-010, FR-011, FR-022
 - [x] T013 [US1] `PATCH /workspaces/:id` with strict schema, member check, assignment notifications, `ready` guard (409 `not_ready` / `not_analysed`), position, `submittedAt`, minimal outcome in `apps/api/src/routes/workspaces.ts` FR-004, FR-005, FR-006, FR-012, FR-082
 - [x] T014 [P] [US1] Activity sentences for `workspace.*` actions in `apps/web/src/features/workspace/labels.tsx` FR-007

@@ -92,9 +92,10 @@ technical disqualification on GeM).
 
 1. **Given** the Apply fixture and the Analyst signed in, **When** they call `POST /api/tenders/{tenderId}/workspace`,
    **Then** the response is **201** with `created: true`, `stage: "go"`, `owner.id` = the Analyst, `dueAt` = the tender's
-   `endAt`, `assignees: []`, an empty stored `mapping` (`{}` — every item automatic, FR-014) and `readiness.items` resolving
-   gst, pan, balance_sheets → "Balance sheet 2024-25" and oem_authorization → "Dell MAF" with `auto: true` (4 picks; `udyam`
-   unmatched because nothing matches); the activity log has `workspace.created` for both the workspace and the tender.
+   `endAt`, `assignees: []` and an empty stored `mapping` (`{}` — every item automatic, FR-014); a following
+   `GET /api/workspaces/{id}` returns `readiness.items` resolving gst, pan, balance_sheets → "Balance sheet 2024-25" and
+   oem_authorization → "Dell MAF" with `auto: true` (4 picks; `udyam` unmatched because nothing matches); the activity log
+   has `workspace.created` for both the workspace and the tender, with meta `autoMatched: 4`.
 2. **Given** the workspace exists, **When** any Analyst+ calls the same endpoint again (or two calls race), **Then** the
    response is **200** with `created: false` and the same `id`; no second row exists (`workspace_org_tender_uq`).
 3. **Given** the Viewer, **When** they call `POST /api/tenders/{tenderId}/workspace`, **Then** the response is **403**
