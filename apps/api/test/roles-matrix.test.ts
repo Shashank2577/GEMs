@@ -103,6 +103,7 @@ const MATRIX: Entry[] = [
   { method: 'POST', path: '/api/workspaces/:id/packets', min: 'analyst' },
   // ── experience ──
   { method: 'POST', path: '/api/demo/seed', min: 'bid_manager' },
+  { method: 'DELETE', path: '/api/demo', min: 'bid_manager' },
 ];
 
 const ROLES: Role[] = ['viewer', 'analyst', 'bid_manager', 'owner'];

@@ -112,6 +112,8 @@ export interface TenderMatchDto { watchlistId: string; watchlistName: string; re
 
 export interface TenderCore {
   id: string;
+  /** True for sample tenders loaded by the demo seed (`tenders.raw.demo`); the web shows a "Sample" badge (007/FR-067). */
+  isDemo: boolean;
   source: string;
   bidNumber: string;
   gemBidId: string | null;

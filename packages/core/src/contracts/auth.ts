@@ -3,6 +3,7 @@
  * preferences, API tokens and activity (contracts/api.md § Platform).
  */
 import { z } from 'zod';
+import { ONBOARDING_KEYS } from './experience';
 import { emailSchema, paginationQuerySchema, phoneE164Schema, roleSchema, type RoleName } from './common';
 
 export const PASSWORD_MIN_LENGTH = 8;
@@ -211,7 +212,13 @@ export type ChangeRoleInput = z.infer<typeof changeRoleInputSchema>;
 export const updateOrgInputSchema = z.object({
   name: z.string().trim().min(2).max(160).optional(),
   /** Merged into the existing onboarding state (keys set to the given booleans). */
-  onboardingState: z.record(z.string(), z.boolean()).optional(),
+  onboardingState: z.record(z.string(), z.boolean()).superRefine((o, ctx) => {
+    // Whitelist (FR-048). Issues sit on the field itself so API errors map to `details.fields.onboardingState`.
+    const keys = Object.keys(o);
+    const bad = keys.filter((k) => !(ONBOARDING_KEYS as readonly string[]).includes(k));
+    if (bad.length) ctx.addIssue({ code: 'custom', message: `Unknown onboarding key: ${bad[0]}` });
+    if (keys.length > 16) ctx.addIssue({ code: 'custom', message: 'At most 16 onboarding keys' });
+  }).optional(),
   /** Replaces the scoring weights; `null` resets to defaults. */
   scoringWeights: z.record(z.string(), z.number().min(0).max(100)).nullable().optional(),
 });

@@ -1,0 +1,24 @@
+[
+  {
+    "method": "PUT",
+    "url": "/api/profile",
+    "body": {
+      "legalName": "Aarav Technologies Pvt Ltd",
+      "gstin": "27AAJCA4721K1ZK",
+      "pan": "AAJCA4721K",
+      "state": "Maharashtra",
+      "mseCategory": null,
+      "isStartup": false,
+      "miiClass": "class_1"
+    }
+  },
+  {
+    "method": "PATCH",
+    "url": "/api/org",
+    "body": {
+      "onboardingState": {
+        "company": true
+      }
+    }
+  }
+]

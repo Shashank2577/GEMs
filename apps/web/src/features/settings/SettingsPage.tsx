@@ -4,11 +4,10 @@
  */
 import { lazy, Suspense } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
-import { Activity, BellRing, Building2, KeyRound, SlidersHorizontal, UserRound, Users, type LucideIcon } from 'lucide-react';
 import { PageHeader, SkeletonList } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { visibleSettingsItems } from './items';
 
 const OrganizationSection = lazy(() => import('./sections/OrganizationSection'));
 const AccountSection = lazy(() => import('./sections/AccountSection'));
@@ -18,20 +17,9 @@ const ScoringSection = lazy(() => import('./sections/ScoringSection'));
 const TokensSection = lazy(() => import('./sections/TokensSection'));
 const SyncSection = lazy(() => import('./sections/SyncSection'));
 
-interface Item { to: string; label: string; icon: LucideIcon; min?: Role; description: string }
-const ITEMS: Item[] = [
-  { to: 'organization', label: 'Organization', icon: Building2, description: 'Name and plan' },
-  { to: 'account', label: 'Your account', icon: UserRound, description: 'Name, mobile, password' },
-  { to: 'team', label: 'Team & roles', icon: Users, description: 'Members and invitations' },
-  { to: 'notifications', label: 'Notifications', icon: BellRing, description: 'Email, WhatsApp, digests' },
-  { to: 'scoring', label: 'Scoring weights', icon: SlidersHorizontal, description: 'Tune Go / No-Go' },
-  { to: 'api-tokens', label: 'API tokens & extension', icon: KeyRound, description: 'Chrome co-pilot' },
-  { to: 'sync', label: 'Sync health', icon: Activity, description: 'GeM ingestion runs' },
-];
-
 export default function SettingsPage() {
   const { can } = useAuth();
-  const items = ITEMS.filter((i) => !i.min || can(i.min));
+  const items = visibleSettingsItems(can);
   return (
     <div>
       <PageHeader title="Settings" description="Your team, alerts, scoring and integrations." />
