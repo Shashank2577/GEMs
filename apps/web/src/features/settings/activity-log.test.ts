@@ -18,6 +18,10 @@ describe('activity log helpers', () => {
     expect(activityObject({ meta: { email: 'a@b.in' } })).toBe('a@b.in');
     expect(activityObject({ meta: {} })).toBeNull();
   });
+  it('member.role_changed never falls back to "team"', () => {
+    expect(activityObject({ action: 'member.role_changed', meta: { from: 'a', to: 'b', name: 'Ravi' } })).toBe('Ravi');
+    expect(activityObject({ action: 'member.role_changed', meta: {} })).toBe('a teammate');
+  });
   it('prefers the server target, then meta, then a generic noun', () => {
     expect(activityObject({ action: 'workspace.created', meta: { workspaceId: 'x' }, target: { label: 'Road repairs' } })).toBe('Road repairs');
     expect(activityObject({ action: 'vault.uploaded', meta: { fileName: 'gst.pdf' } })).toBe('gst.pdf');

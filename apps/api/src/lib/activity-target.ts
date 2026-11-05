@@ -4,6 +4,7 @@ import { bidWorkspaces, tenders, vaultDocuments, watchlists, type Db } from '@tp
 import type { ActivityItem } from '@tp/core/contracts/auth';
 
 type ActivityTarget = NonNullable<ActivityItem['target']>;
+const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 
 export async function enrichActivity<T extends Omit<ActivityItem, 'target'>>(db: Db, org: string, items: T[]): Promise<(T & { target: ActivityTarget | null })[]> {
   const ids = (type: string) => [...new Set(items.filter((i) => i.entityType === type && i.entityId).map((i) => i.entityId!))].filter((id) => /^[0-9a-f-]{36}$/i.test(id));
@@ -28,7 +29,7 @@ export async function enrichActivity<T extends Omit<ActivityItem, 'target'>>(db:
     else if (i.entityType === 'vault_document') target = { label: vs.get(id) ?? metaTitle ?? 'a document', href: '/vault' };
     else if (i.entityType === 'watchlist') target = { label: wl.get(id) ?? metaTitle ?? 'a watchlist', href: '/watchlists' };
     else if (i.entityType === 'company_profile' || i.action.startsWith('profile.')) target = { label: 'company profile', href: '/profile' };
-    else if (i.action.startsWith('member.')) target = { label: typeof i.meta.email === 'string' ? i.meta.email : 'team', href: '/settings/team' };
+    else if (i.action.startsWith('member.')) target = { label: str(i.meta.email) ?? str(i.meta.name) ?? 'a teammate', href: '/settings/team' };
     else if (metaTitle) target = { label: metaTitle, href: '/dashboard' };
     return { ...i, target };
   });

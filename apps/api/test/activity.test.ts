@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, asc, eq } from 'drizzle-orm';
 import { activityLog } from '@tp/db';
+import { enrichActivity } from '../src/lib/activity-target';
 import { createTestContext, request, signup, TEST_PASSWORD, type TestContext } from './helpers';
 
 let ctx: TestContext;
@@ -227,5 +228,19 @@ describe('FR-042 activity entries', () => {
     expect(cross.body.items.some((i: any) => i.action === 'auth.password_changed')).toBe(false);
     const one = await request(ctx.app, 'GET', '/api/activity?entityType=organization', { cookie: a.cookie });
     expect(one.body.items.every((i: any) => i.entityType === 'organization')).toBe(true);
+  });
+});
+
+describe('activity target labels for member.* entries (cairn S1)', () => {
+  const item = (action: string, meta: Record<string, unknown>) => ({ id: action, action, entityType: 'user', entityId: null, userId: null, meta, createdAt: new Date().toISOString() }) as unknown as Parameters<typeof enrichActivity>[2][number];
+  it('role_changed names the member (name, or email when present), never "team"', async () => {
+    const out = await enrichActivity(ctx.db, '00000000-0000-0000-0000-000000000000', [
+      item('member.role_changed', { from: 'analyst', to: 'bid_manager', name: 'Ravi Kumar' }),
+      item('member.role_changed', { from: 'analyst', to: 'viewer', name: 'Ravi', email: 'ravi@example.in' }),
+      item('member.role_changed', {}),
+      item('member.removed', { name: '' }),
+    ]);
+    expect(out.map((o) => o.target?.label)).toEqual(['Ravi Kumar', 'ravi@example.in', 'a teammate', 'a teammate']);
+    expect(out.every((o) => o.target?.href === '/settings/team')).toBe(true);
   });
 });
