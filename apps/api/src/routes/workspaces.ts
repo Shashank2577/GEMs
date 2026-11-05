@@ -5,6 +5,7 @@
  *   GET   /workspaces                     ?stage&mine&q → Kanban cards { items, total, byStage }        viewer+
  *   GET   /workspaces/:id                 WorkspaceDetail                                               viewer+
  *   PATCH /workspaces/:id                 stage/owner/assignees/due/position/outcome; `ready` + won/lost guarded (409) analyst+
+ *                                         moving INTO go/dropped (the Go/No-Go decision) is bid_manager+, else 403 (#527)
  *   PUT   /workspaces/:id/mapping         { itemId: docId | null | "auto" }                              analyst+
  *   POST  /workspaces/:id/overrides       { itemId, reason }                                            bid_manager+
  *   DELETE /workspaces/:id/overrides/:itemId                                                            bid_manager+
@@ -22,7 +23,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { bidWorkspaces, comments, gemResultHints, memberships, notifications } from '@tp/db';
 import {
-  STAGES, STAGE_LABELS, assistValuesSchema, canTransition, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
+  DECISION_FORBIDDEN_MESSAGE, DECISION_STAGES, STAGES, STAGE_LABELS, assistValuesSchema, canTransition, commentInputSchema, mappingInputSchema, overrideInputSchema, submittedInputSchema,
   workspaceUpdateSchema, type StageName, type WorkspaceListResponse,
 } from '@tp/core/contracts/apply';
 import { validateAssistValues, isForbiddenKey } from '@tp/core/assist/allowlist';
@@ -195,6 +196,8 @@ workspacesRoutes.patch('/workspaces/:id', requireRole('analyst'), async (c) => {
     if (body.outcome && !stage) stage = body.outcome.result;
   }
   if (stage && stage !== w.stage) {
+    // #527 item 5: the Go / No-Go decision is Bid Manager+ on the server too, not only hidden in the UI.
+    if (DECISION_STAGES.includes(stage) && !roleAtLeast(c.var.role, 'bid_manager')) throw forbidden(DECISION_FORBIDDEN_MESSAGE);
     if (stage === 'ready') {
       const { readiness } = await readinessOf(deps, org, w);
       if (!readiness.analysed) throw conflict('Analyse the tender before marking the bid ready to submit.', { blockers: [], reason: 'not_analysed' });

@@ -279,7 +279,8 @@ describe('outcome price validation, dropped guard and override-aware blockers (0
 
   it('POST submitted on a dropped bid → 409 with the move-back message', async () => {
     const wid = await fresh();
-    expect((await request(ctx.app, 'PATCH', `/workspaces/${wid}`, { cookie: s.org.analyst.cookie, json: { stage: 'dropped' } })).status).toBe(200);
+    // Dropping (No-Go) is Bid Manager+ (#527); the submitted guard below is still exercised as the Analyst.
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${wid}`, { cookie: s.org.bidManager.cookie, json: { stage: 'dropped' } })).status).toBe(200);
     const r = await request(ctx.app, 'POST', `/workspaces/${wid}/submitted`, { cookie: s.org.analyst.cookie });
     expect(r.status).toBe(409);
     expect(r.body.error.message).toBe('This bid was dropped. Move it back to the pipeline first.');
@@ -344,6 +345,69 @@ describe('PATCH /workspaces/:id — won/lost only after submission (T020; 006/FR
     const lost = await request(ctx.app, 'PATCH', `/workspaces/${goId}`, { cookie: s.org.analyst.cookie, json: { outcome: { result: 'lost' } } });
     expect(lost.status).toBe(200);
     expect(lost.body).toMatchObject({ stage: 'lost', outcome: { result: 'lost' } });
+  });
+});
+
+describe('PATCH /workspaces/:id — Go / No-Go is Bid Manager+ (#527 item 5; 004 roles, 007/FR-072)', () => {
+  let n = 0;
+  /** A workspace in "identified" (its tender has no analysis), started by the Analyst. */
+  const fresh = async () => {
+    const t = await seedTender(ctx, 80 + n++);
+    const r = await request(ctx.app, 'POST', `/tenders/${t.id}/workspace`, { cookie: s.org.analyst.cookie });
+    expect(r.body.stage).toBe('identified');
+    return r.body.id as string;
+  };
+  const stageOf = async (id: string) => (await request(ctx.app, 'GET', `/workspaces/${id}`, { cookie: s.org.analyst.cookie })).body.workspace.stage as string;
+  const stageLogs = async (id: string) => ctx.db.select().from(activityLog).where(and(eq(activityLog.entityId, id), eq(activityLog.action, 'workspace.stage_changed')));
+
+  it('an Analyst cannot move a bid to Go or Dropped: 403 forbidden, stage and activity unchanged', async () => {
+    const id = await fresh();
+    for (const stage of ['go', 'dropped']) {
+      const r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage, position: 0 } });
+      expect(r.status).toBe(403);
+      expect(r.body.error).toEqual({ code: 'forbidden', message: 'Only a Bid Manager or Owner can make the Go / No-Go decision.' });
+    }
+    expect(await stageOf(id)).toBe('identified');
+    expect(await stageLogs(id)).toHaveLength(0);
+  });
+
+  it('the same refusal applies to an Analyst\'s API token (extension / integrations)', async () => {
+    const id = await fresh();
+    const token = (await request(ctx.app, 'POST', '/me/api-tokens', { cookie: s.org.analyst.cookie, json: { name: 'go-no-go' } })).body.token as string;
+    const r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { bearer: token, json: { stage: 'go' } });
+    expect(r.status).toBe(403);
+    expect(r.body.error.code).toBe('forbidden');
+    const bmToken = (await request(ctx.app, 'POST', '/me/api-tokens', { cookie: s.org.bidManager.cookie, json: { name: 'go-no-go' } })).body.token as string;
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { bearer: bmToken, json: { stage: 'go' } })).status).toBe(200);
+  });
+
+  it('an Analyst can still make every other stage move, edit other fields, and move a bid out of Go', async () => {
+    const id = await fresh();
+    let r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage: 'analysing' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('analysing');
+    r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { dueAt: null, position: 0 } });
+    expect(r.status).toBe(200);
+    // Bid Manager says Go; the Analyst then moves it on to Preparing (006 US1 #9).
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.bidManager.cookie, json: { stage: 'go' } })).status).toBe(200);
+    r = await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage: 'preparing' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('preparing');
+    // An unchanged stage is a no-op, not a decision: an Analyst re-sending the current stage is fine.
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.bidManager.cookie, json: { stage: 'go' } })).status).toBe(200);
+    expect((await request(ctx.app, 'PATCH', `/workspaces/${id}`, { cookie: s.org.analyst.cookie, json: { stage: 'go' } })).status).toBe(200);
+  });
+
+  it('a Bid Manager and an Owner can decide Go and Drop (200, logged as a stage change)', async () => {
+    const a = await fresh();
+    let r = await request(ctx.app, 'PATCH', `/workspaces/${a}`, { cookie: s.org.bidManager.cookie, json: { stage: 'go' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('go');
+    expect((await stageLogs(a))[0]).toMatchObject({ userId: s.org.bidManager.me.user.id, meta: expect.objectContaining({ from: 'identified', to: 'go' }) });
+    const b = await fresh();
+    r = await request(ctx.app, 'PATCH', `/workspaces/${b}`, { cookie: s.org.owner.cookie, json: { stage: 'dropped' } });
+    expect(r.status).toBe(200);
+    expect(r.body.stage).toBe('dropped');
   });
 });
 

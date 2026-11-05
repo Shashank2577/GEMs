@@ -43,6 +43,14 @@ export function canTransition(from: StageName, to: StageName): TransitionCheck {
   return { ok: true };
 }
 
+/**
+ * The Go / No-Go decision (001 personas, 004 roles table: "Bid Manager owns the Go/No-Go decision"; 007/FR-072).
+ * Moving a bid INTO one of these stages is Bid Manager+ at the API (#527 item 5); every other move stays Analyst+.
+ * "Dropped" is the No-Go outcome ("Drop" on the dashboard's Awaiting-your-decision card).
+ */
+export const DECISION_STAGES: readonly StageName[] = ['go', 'dropped'];
+export const DECISION_FORBIDDEN_MESSAGE = 'Only a Bid Manager or Owner can make the Go / No-Go decision.';
+
 /** Active pipeline columns (Kanban), in order. */
 export const PIPELINE_STAGES: StageName[] = ['identified', 'analysing', 'go', 'preparing', 'ready', 'submitted', 'won', 'lost'];
 

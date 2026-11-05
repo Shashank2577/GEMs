@@ -13,14 +13,17 @@
  *
  * Scope: this matrix tests the ROUTE GATE only (requireRole / requireAuth / requireSession). Checks made inside
  * handlers (e.g. only an Owner may invite an Owner, last-owner protection, org scoping) are covered by auth.test.ts
- * and isolation.test.ts.
+ * and isolation.test.ts. The exception is FIELD_GATES below: a field value on an otherwise lower-gated route that
+ * needs a higher role (e.g. the Go / No-Go stage on PATCH /workspaces/:id, #527) is matrixed here against real rows.
  * Minimums follow 002/FR-022. Two differ from the older 001 contracts/api.md table, which was updated to match:
  * `POST /analyses/:id/override` is Bid Manager+ ("overrides" in FR-022), and `POST /workspaces/:id/comments` is
  * Analyst+ (tender work).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Role } from '@tp/db';
+import { DECISION_FORBIDDEN_MESSAGE } from '@tp/core/contracts/apply';
 import { createTestContext, request, seedOrgWithRoles, type RequestOptions, type SignedUp, type TestContext } from './helpers';
+import { seedTender } from './workspace-fixtures';
 
 type Min = Role | 'session' | 'public';
 interface Entry {
@@ -178,6 +181,48 @@ describe('role matrix: every mutating route × every role (FR-022)', () => {
     // and an owner's token passes the role gates of non-session routes
     const r = await request(ctx.app, 'PATCH', '/api/org', { bearer: token, json: {} });
     expect(r.status).toBe(200);
+  });
+});
+
+/**
+ * Field-level gates: a value that needs a higher role than its route's MATRIX minimum. Each call runs against a fresh
+ * workspace (stage "identified": no analysis), so below `min` → 403 `forbidden` with `message` and the stage is
+ * unchanged; at/above it → 200 and the stage moved.
+ */
+interface FieldGate { method: 'PATCH'; path: string; json: { stage: string }; min: Role; message: string }
+const FIELD_GATES: FieldGate[] = [
+  // 001 personas / 004 roles table: the Bid Manager owns the Go / No-Go decision; 007/FR-072 (#527 item 5).
+  { method: 'PATCH', path: '/api/workspaces/:id', json: { stage: 'go' }, min: 'bid_manager', message: DECISION_FORBIDDEN_MESSAGE },
+  { method: 'PATCH', path: '/api/workspaces/:id', json: { stage: 'dropped' }, min: 'bid_manager', message: DECISION_FORBIDDEN_MESSAGE },
+  // every other stage move stays Analyst+ (006/FR-004)
+  { method: 'PATCH', path: '/api/workspaces/:id', json: { stage: 'analysing' }, min: 'analyst', message: FORBIDDEN_MESSAGE.analyst },
+  { method: 'PATCH', path: '/api/workspaces/:id', json: { stage: 'preparing' }, min: 'analyst', message: FORBIDDEN_MESSAGE.analyst },
+];
+
+describe('field-level role gates (inside handlers)', () => {
+  let n = 100;
+  const freshWorkspace = async () => {
+    const t = await seedTender(ctx, n++);
+    const r = await request(ctx.app, 'POST', `/api/tenders/${t.id}/workspace`, { cookie: org.analyst.cookie });
+    expect(r.body.stage).toBe('identified');
+    return r.body.id as string;
+  };
+
+  it.each(FIELD_GATES.map((g) => [`${key(g)} ${JSON.stringify(g.json)} min ${g.min}`, g] as const))('%s', async (_name, g) => {
+    for (const role of ROLES) {
+      const id = await freshWorkspace();
+      const r = await request(ctx.app, g.method, g.path.replace(':id', id), { cookie: userFor(org, role).cookie, json: g.json });
+      const stage = (await request(ctx.app, 'GET', `/api/workspaces/${id}`, { cookie: org.owner.cookie })).body.workspace.stage;
+      if (RANK[role] >= RANK[g.min]) {
+        expect(r.status, `${role}: ${r.text}`).toBe(200);
+        expect(stage, role).toBe(g.json.stage);
+      } else {
+        expect(r.status, `${role}: ${r.text}`).toBe(403);
+        // A Viewer is stopped by the route gate (Analyst+) before the field gate.
+        expect(r.body.error, role).toEqual({ code: 'forbidden', message: role === 'viewer' ? FORBIDDEN_MESSAGE.analyst : g.message });
+        expect(stage, role).toBe('identified');
+      }
+    }
   });
 });
 
