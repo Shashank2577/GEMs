@@ -72,4 +72,4 @@ Note on Codex: the automatic Codex review on #478 failed ("usage limit reached",
 | #535 | [comment](https://github.com/Shashank2577/GEMs/pull/535#issuecomment-6652388413) | [comment](https://github.com/Shashank2577/GEMs/pull/535#issuecomment-6652821869) |
 | #542 | [comment](https://github.com/Shashank2577/GEMs/pull/542#issuecomment-6653313629) | [comment](https://github.com/Shashank2577/GEMs/pull/542#issuecomment-6654050656) |
 
-US7 has no PR yet; its review is recorded when it lands. T099 is therefore ticked for US1 to US6 only with that caveat noted in `tasks.md`.
+US7 has no PR yet; its review is recorded when it lands. T099 is left open; this record covers US1 to US6 (US7 review is added in the US7 PR).

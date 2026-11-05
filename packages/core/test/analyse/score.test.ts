@@ -77,7 +77,7 @@ describe('scoreTender on the sample bids', () => {
       expect(e.detail).toBe('You have 4.4 years of experience; the bid needs 6 years. (incorporated 11.6 years ago — add older contracts as proof)');
     });
 
-    it('no hint when the incorporation date would not meet the bid either (nogo-experience sentence unchanged)', () => {
+    it('no hint when the incorporation date would not meet the bid either (contracts-basis sentence unchanged)', () => {
       const e = exp({}, basePastContracts, 5);
       expect(e.detail).toBe('You have 4.4 years of experience; the bid needs 5 years.');
     });

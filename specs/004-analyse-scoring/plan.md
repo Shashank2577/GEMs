@@ -51,7 +51,7 @@ checklist readiness on the tender page, and Playwright E2E with evidence per sto
 | III. Deterministic first, models second | Rules path produces every verdict with zero keys; LLM items carry method `LLM`, page, quote, confidence ≤ 0.9; LLM failures fall back to rules; factors and summary explain the score. OCR output is marked `source.ocr` and capped at 0.8. Escalation model (FR-050) only extracts. | ✅ |
 | IV. Tenant isolation & data protection | Analyses, uploads, weights scoped by `org_id`; GeM copies are public data; downloads `private, no-store`; FR-054 forbids sending profile/vault data to the LLM. Roles enforced server-side (`requireRole`). | ✅ |
 | V. Delightful, accessible UX | Loading/empty/error/stale states for every tab; 375 px and 1440 px layouts; reduced motion; aria labels; gap FR-056 adds axe scans. | ✅ (axe scans done, FR-056) |
-| VI. Test-first, E2E verified | 42 core unit tests + API tests exist; E2E for US1–US6 done with evidence in `qa/evidence/004/`; the US7 E2E (T094) is the only open one. | ⚠️ open — US7 only |
+| VI. Test-first, E2E verified | ~480 core unit tests + API tests exist; E2E for US1–US6 done with evidence in `qa/evidence/004/`; the US7 E2E (T094) is the only open one. | ⚠️ open — US7 only |
 | VII. Edge-native, serverless | `unpdf` and fetch-based Anthropic adapter run on Workers; no LLM key → `deps.llm = null` (logged no-op). OCR uses only fetch + pdf-lib. | ✅ |
 | VIII. Simplicity & traceability | One schema (`packages/db/src/schema.ts`), types mirrored in `packages/core/src/analyse/types.ts`; tasks reference FR ids; ported code attributed in `NOTICE`. | ✅ (`NOTICE` added, T004) |
 
@@ -128,8 +128,8 @@ All under `/api`, JSON unless noted, errors `{error:{code,message,details?}}`. R
 | Method & path | Role | Request | Success | Errors | Status |
 |---|---|---|---|---|---|
 | `GET /tenders/:id/documents` | V | — | 200 `{items: TenderDocumentDto[], total}` | 404 tender | built |
-| `POST /tenders/:id/documents` | A | multipart `file`, `kind?` | 201 `TenderDocumentDto` (+ `warnings[]`, `bidNumberFound` — gap FR-010) | 400 `bad_request` / `validation_error`, 403, 404, 413 `payload_too_large`, 415 `unsupported_media_type`, 422 `unreadable_pdf` | built |
-| `POST /tenders/:id/fetch-documents` | A | — (gap: `?refresh=1` after corrigendum, FR-046) | 201 `{items,total,fetched:1}` / 200 `{fetched:0}` | 403, 404, 422 `no_gem_document`, 502 `gem_unavailable` (incl. > 25 MB, gap FR-008) | built |
+| `POST /tenders/:id/documents` | A | multipart `file`, `kind?` | 201 `TenderDocumentDto` (+ `warnings[]`, `bidNumberFound`, FR-010) | 400 `bad_request` / `validation_error`, 403, 404, 413 `payload_too_large`, 415 `unsupported_media_type`, 422 `unreadable_pdf` | built |
+| `POST /tenders/:id/fetch-documents` | A | — (`?refresh=1` after corrigendum, FR-046) | 201 `{items,total,fetched:1}` / 200 `{fetched:0}` | 403, 404, 422 `no_gem_document`, 502 `gem_unavailable` (incl. > 25 MB, FR-008) | built |
 | `GET /tenders/:id/documents/:docId/download` | V | `?inline=1` | 200 PDF stream | 404 | built |
 | `DELETE /tenders/:id/documents/:docId` | A | — | 204 | 403 (GeM doc), 404 | built (US1, FR-009) |
 | `POST /tenders/:id/documents/:docId/ocr` | A | — | 200 `TenderDocumentDto` (`textSource:'ocr'`) | 404, 409 `conflict` (has text), 502 `ocr_failed`, 503 `ocr_unavailable` | gap FR-052 |
