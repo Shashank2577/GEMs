@@ -14,10 +14,11 @@ const { PDFDocument } = createRequire(join(process.cwd(), 'apps', 'api', 'packag
 
 export const MB = 1024 * 1024;
 
-/** A real PDF with `pages` pages (each stamped with `label` so different files differ). */
-export async function makePdf(pages = 1, label = 'TenderPilot QA'): Promise<Buffer> {
+/** A real PDF with `pages` pages (each stamped with `label` so different files differ). `makePdf(text)` = one page carrying `text` (US5). */
+export async function makePdf(pagesOrText: number | string = 1, label = 'TenderPilot QA'): Promise<Buffer> {
+  const [pages, text] = typeof pagesOrText === 'string' ? [1, pagesOrText] : [pagesOrText, label];
   const doc = await PDFDocument.create();
-  for (let i = 1; i <= pages; i++) doc.addPage([300, 200]).drawText(`${label} - page ${i}/${pages}`, { x: 20, y: 100, size: 12 });
+  for (let i = 1; i <= pages; i++) doc.addPage([300, 200]).drawText(`${text} - page ${i}/${pages}`, { x: 20, y: 100, size: 12 });
   return Buffer.from(await doc.save());
 }
 
@@ -220,17 +221,6 @@ export async function makeMidOrg(page: Page) {
 export const ring = (page: Page, pct: number) => page.getByRole('img', { name: `Profile ${pct}% complete` }).first();
 
 // ---- US5 helpers (PDF uploads, contract/OEM API shortcuts) ----
-import { createRequire } from 'node:module';
-const { PDFDocument, StandardFonts } = createRequire(import.meta.url)('../../apps/api/node_modules/pdf-lib') as typeof import('../../apps/api/node_modules/pdf-lib');
-
-/** A real one-page PDF (pdf-lib) carrying `text`. */
-export async function makePdf(text: string): Promise<Buffer> {
-  const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595, 842]);
-  page.drawText(text, { x: 50, y: 780, size: 14, font: await pdf.embedFont(StandardFonts.Helvetica) });
-  return Buffer.from(await pdf.save());
-}
-
 /** Upload a generated PDF through POST /api/vault; returns the created document DTO. */
 export async function uploadPdf(page: Page, fields: { type: string; title: string; expiryDate?: string }) {
   const multipart: Record<string, string | { name: string; mimeType: string; buffer: Buffer }> = {

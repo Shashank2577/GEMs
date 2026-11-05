@@ -972,9 +972,12 @@ describe('vault delete — review fixes (FR-041)', () => {
 
   it('rolls back every unlink when the row delete fails', async () => {
     const o = await seedOrgWithRoles(ctx.app, 'Rollback Traders');
-    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'crac.pdf'), type: 'crac', title: 'CRAC' } });
-    await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title: 'T', value: 1000, cracDocumentId: doc.body.id } });
-    await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Dell', products: 'x', documentId: doc.body.id }] } });
+    // One document linked from both places: it must be an oem_authorization for PUT /profile (FR-061);
+    // cracDocumentId only requires vault ownership (FR-055).
+    const doc = await request(ctx.app, 'POST', '/vault', { cookie: o.analyst.cookie, form: { file: file(await pdf(), 'maf.pdf'), type: 'oem_authorization', title: 'Dell MAF' } });
+    expect(doc.status).toBe(201);
+    expect((await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title: 'T', value: 1000, cracDocumentId: doc.body.id } })).status).toBe(201);
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [{ oem: 'Dell', products: 'x', documentId: doc.body.id }] } })).status).toBe(200);
     const failingTx = new Proxy(ctx.db, {
       get(target, prop, recv) {
         if (prop === 'transaction') {

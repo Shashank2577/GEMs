@@ -101,6 +101,8 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
   );
 }
 
+const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
 export function PastContracts() {
   const { can } = useAuth();
   const canWrite = can('analyst');
@@ -125,8 +127,9 @@ export function PastContracts() {
     { key: 'crac', header: 'Proof', hideOnMobile: true, cell: (c) => c.cracDocumentId ? <Badge tone="success" size="sm"><Link2 />Linked</Badge> : <Badge tone="warning" size="sm">No CRAC</Badge> },
     ...(canWrite ? [{ key: 'actions', header: <span className="sr-only">Actions</span>, className: 'w-10', cell: (c: PastContractDto) => (
       <DropdownMenu>
-        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`Actions for ${c.title}`} onClick={(e) => e.stopPropagation()}><MoreHorizontal /></Button></DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={`Actions for ${c.title}`} onClick={stop} onKeyDown={stop}><MoreHorizontal /></Button></DropdownMenuTrigger>
+        {/* The menu is portalled, but React events still bubble to the row's onRowClick (Enter/click → Edit). */}
+        <DropdownMenuContent align="end" onClick={stop} onKeyDown={stop}>
           <DropdownMenuItem onSelect={() => { setEditing(c); setOpen(true); }}><Pencil />Edit</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDeleting(c)} className="text-danger focus:text-danger"><Trash2 />Delete</DropdownMenuItem>
         </DropdownMenuContent>
