@@ -8,9 +8,9 @@
  *   analyseTender        → rules (+ LLM when configured) → score → checklist → analyses row
  *   overrideFactor       → audited manual status change + re-score
  */
-import { and, asc, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import {
-  analyses, companyProfiles, organizations, pastContracts, tenderDocuments, tenders, vaultDocuments,
+  activityLog, analyses, companyProfiles, organizations, pastContracts, tenderDocuments, tenderEvents, tenders, vaultDocuments,
   type Requirement, type ScoreFactor,
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
@@ -34,7 +34,7 @@ import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, forbidden, notFound, unprocessable } from '../lib/errors';
 import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
-import { markStale } from './staleness';
+import { keepStaleOnCompletion, lockTenderInputs, markStale, type DbOrTx } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
 type DocRow = typeof tenderDocuments.$inferSelect;
@@ -104,7 +104,11 @@ export async function getTender(deps: AppDeps, tenderId: string, viewer: TenderV
 
 /** Documents visible to an org: public GeM documents + its own uploads, oldest first. */
 export async function listTenderDocuments(deps: AppDeps, tenderId: string, orgId: string): Promise<DocRow[]> {
-  return deps.db.select().from(tenderDocuments)
+  return documentsIn(deps.db, tenderId, orgId);
+}
+
+function documentsIn(db: DbOrTx, tenderId: string, orgId: string): Promise<DocRow[]> {
+  return db.select().from(tenderDocuments)
     .where(and(eq(tenderDocuments.tenderId, tenderId), or(isNull(tenderDocuments.orgId), eq(tenderDocuments.orgId, orgId))))
     .orderBy(asc(tenderDocuments.createdAt));
 }
@@ -161,15 +165,24 @@ export async function uploadTenderDocument(deps: AppDeps, input: UploadInput): P
   const fileName = safeName(input.file.name || 'document.pdf');
   const blobKey = `tenders/${input.tenderId}/${input.orgId}/${id}.pdf`;
   await deps.blobs.put(blobKey, bytes, { contentType: 'application/pdf' });
-  const [doc] = await deps.db.insert(tenderDocuments).values({
-    id, tenderId: input.tenderId, orgId: input.orgId, kind: input.kind, fileName, blobKey,
-    sizeBytes: bytes.length, pageCount: pages.length, totalPages, text: joinPages(pages), sourceUrl: null,
-  }).returning();
-  await logActivity(deps.db, {
-    orgId: input.orgId, userId: input.userId, action: 'tender.document_uploaded', entityType: 'tender', entityId: input.tenderId,
-    meta: { documentId: id, fileName, kind: input.kind, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), scanned: looksScanned(pages) },
+  // Row, activity entry and stale flag commit together (S2), under the org+tender lifecycle lock so a run starting now
+  // either reads this document or is flagged by markStale (S4).
+  const doc = await deps.db.transaction(async (tx) => {
+    await lockAnalyses(tx, input.orgId, input.tenderId);
+    const [doc] = await tx.insert(tenderDocuments).values({
+      id, tenderId: input.tenderId, orgId: input.orgId, kind: input.kind, fileName, blobKey,
+      sizeBytes: bytes.length, pageCount: pages.length, totalPages, text: joinPages(pages), sourceUrl: null,
+    }).returning();
+    await logActivity(tx, {
+      orgId: input.orgId, userId: input.userId, action: 'tender.document_uploaded', entityType: 'tender', entityId: input.tenderId,
+      meta: { documentId: id, fileName, kind: input.kind, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), scanned: looksScanned(pages) },
+    });
+    await markStale(tx, { orgId: input.orgId, tenderIds: [input.tenderId] }, 'document_added', deps.clock.now());
+    return doc;
+  }).catch(async (e) => {
+    await deps.blobs.delete(blobKey).catch(() => {});
+    throw e;
   });
-  await markStale(deps.db, { orgId: input.orgId, tenderIds: [input.tenderId] }, 'document_added', deps.clock.now());
   return { doc, tender, totalPages };
 }
 
@@ -179,31 +192,83 @@ export async function removeTenderDocument(deps: AppDeps, input: { orgId: string
   await getTender(deps, input.tenderId, input.viewer);
   const doc = await getTenderDocument(deps, input.tenderId, input.docId, input.orgId);
   if (doc.orgId === null) throw forbidden('Documents fetched from GeM are shared and cannot be removed');
-  const deleted = await deps.db.delete(tenderDocuments)
-    .where(and(eq(tenderDocuments.id, doc.id), eq(tenderDocuments.orgId, input.orgId)))
-    .returning({ id: tenderDocuments.id });
-  // A concurrent delete already removed it: only one request logs and marks the analysis stale.
-  if (!deleted.length) throw notFound('Document');
+  // Delete, activity entry and stale flag commit together (S2), under the lifecycle lock (S4, see uploadTenderDocument).
+  await deps.db.transaction(async (tx) => {
+    await lockAnalyses(tx, input.orgId, input.tenderId);
+    const deleted = await tx.delete(tenderDocuments)
+      .where(and(eq(tenderDocuments.id, doc.id), eq(tenderDocuments.orgId, input.orgId)))
+      .returning({ id: tenderDocuments.id });
+    // A concurrent delete already removed it: only one request logs and marks the analysis stale.
+    if (!deleted.length) throw notFound('Document');
+    await logActivity(tx, {
+      orgId: input.orgId, userId: input.userId, action: 'tender.document_removed', entityType: 'tender', entityId: input.tenderId,
+      meta: { documentId: doc.id, fileName: doc.fileName, kind: doc.kind },
+    });
+    await markStale(tx, { orgId: input.orgId, tenderIds: [input.tenderId] }, 'document_removed', deps.clock.now());
+  });
   try {
     await deps.blobs.delete(doc.blobKey);
   } catch (e) {
     // The row is gone, so the file is unreachable; log and keep going rather than failing the user.
     deps.logger.warn('analyse: blob delete failed after document removal', { tenderId: input.tenderId, blobKey: doc.blobKey, error: (e as Error).message });
   }
-  await logActivity(deps.db, {
-    orgId: input.orgId, userId: input.userId, action: 'tender.document_removed', entityType: 'tender', entityId: input.tenderId,
-    meta: { documentId: doc.id, fileName: doc.fileName, kind: doc.kind },
-  });
-  await markStale(deps.db, { orgId: input.orgId, tenderIds: [input.tenderId] }, 'document_removed', deps.clock.now());
 }
 
 // ───────────── Fetch from GeM ─────────────
 
-export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
+/** Activity action recording a GeM re-fetch that failed (S3): analyse does not retry it until a newer corrigendum. */
+export const GEM_FETCH_FAILED = 'tender.document_fetch_failed';
+
+/**
+ * FR-046: has a corrigendum changed the tender's document URL since the newest GeM copy was stored? Both sides are
+ * app-clock times stamped at their own write: the corrigendum event when ingestion writes it (not when the run
+ * started, review B1) and the copy's `created_at` when the fetch stores it, so a copy fetched while an ingestion run
+ * was going is still compared correctly with a corrigendum that run wrote afterwards.
+ *
+ * With `orgId` (the analyse path, S3) a failed re-fetch recorded for that org counts like a copy: analyse falls back
+ * to the stored copies and only tries again once a newer corrigendum arrives (or someone fetches explicitly).
+ */
+export async function gemCopyOutdated(db: DbOrTx, tenderId: string, gemDocs: Pick<DocRow, 'createdAt'>[], opts: { orgId?: string } = {}): Promise<boolean> {
+  if (!gemDocs.length) return false;
+  let since = gemDocs.reduce((m, d) => (d.createdAt > m ? d.createdAt : m), gemDocs[0]!.createdAt);
+  if (opts.orgId) {
+    const [failed] = await db.select({ at: activityLog.createdAt }).from(activityLog)
+      .where(and(eq(activityLog.orgId, opts.orgId), eq(activityLog.entityType, 'tender'), eq(activityLog.entityId, tenderId), eq(activityLog.action, GEM_FETCH_FAILED)))
+      .orderBy(desc(activityLog.createdAt)).limit(1);
+    if (failed && failed.at > since) since = failed.at;
+  }
+  const events = await db.select({ changes: tenderEvents.changes }).from(tenderEvents)
+    .where(and(eq(tenderEvents.tenderId, tenderId), eq(tenderEvents.kind, 'corrigendum'), gt(tenderEvents.createdAt, since)));
+  return events.some((e) => !!e.changes && 'documentUrl' in e.changes);
+}
+
+/** SHA-256 (hex) of a document's extracted text: the identity used to spot a re-fetch of the same document (S5). */
+async function textHash(text: string | null): Promise<string> {
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text ?? '')));
+  return Array.from(d, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const gemDocsIn = (db: DbOrTx, tenderId: string) =>
+  db.select().from(tenderDocuments).where(and(eq(tenderDocuments.tenderId, tenderId), isNull(tenderDocuments.orgId))).orderBy(asc(tenderDocuments.createdAt));
+
+/**
+ * Download the tender's GeM bid document (public, shared by every org) once. A later call returns the stored copy,
+ * unless a corrigendum changed `documentUrl` after that copy was fetched (FR-046) or `refresh` is set: then the
+ * current document is downloaded as kind `corrigendum` and the earlier copy is kept. The 150-page text cap and
+ * `total_pages` handling are the same as for the first copy.
+ *
+ * A re-fetch that stores a new copy marks every org's analyses of the tender stale (`corrigendum`, S5); a forced
+ * refresh whose text hashes the same as a stored copy stores nothing. The store is a check-then-insert under the
+ * tender's exclusive input lock, so two concurrent fetches store one copy. A re-fetch that fails (other than a busy
+ * GeM lease) is recorded as `tender.document_fetch_failed` so analyse does not retry it on every run (S3).
+ */
+export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer; refresh?: boolean }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
   const tender = await getTender(deps, input.tenderId, input.viewer);
-  const existing = (await listTenderDocuments(deps, tender.id, input.orgId)).filter((d) => d.orgId === null);
-  if (existing.length) return { documents: existing, fetched: 0, tender };
-  const ref = tender.gemBidId ?? tender.documentUrl;
+  const existing = await gemDocsIn(deps.db, tender.id);
+  const outdated = await gemCopyOutdated(deps.db, tender.id, existing);
+  if (existing.length && !outdated && !input.refresh) return { documents: existing, fetched: 0, tender };
+  // The URL a corrigendum published wins over the bid id; the first copy keeps the bid id first.
+  const ref = existing.length ? (tender.documentUrl ?? tender.gemBidId) : (tender.gemBidId ?? tender.documentUrl);
   if (!ref) throw new HttpError(422, 'no_gem_document', 'This tender has no GeM document link. Download the bid PDF from GeM and upload it here.');
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
@@ -214,34 +279,75 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
     beforeRequest: () => deps.gemLease.acquire(GEM_LEASE_MAX_WAIT_MS),
   });
   let got: { bytes: Uint8Array; url: string };
+  let pages: string[];
+  let totalPages: number;
   try {
-    got = await client.fetchBidDocument(ref);
+    try {
+      got = await client.fetchBidDocument(ref);
+    } catch (e) {
+      if (e instanceof HttpError) throw e; // 503 gem_busy from the lease
+      deps.logger.warn('analyse: GeM document fetch failed', { tenderId: tender.id, error: (e as Error).message });
+      const msg = e instanceof GemError && e.code === 'too_large'
+        ? 'The GeM document is larger than 25 MB — download it from GeM and upload it here.'
+        : e instanceof GemError && e.status === 404
+          ? 'GeM no longer serves this bid document. Upload the PDF instead.'
+          : 'Could not download the bid document from GeM right now. Try again in a few minutes or upload the PDF.';
+      throw new HttpError(502, 'gem_unavailable', msg);
+    }
+    ({ pages, totalPages } = await extractOrThrow(got.bytes));
   } catch (e) {
-    if (e instanceof HttpError) throw e; // 503 gem_busy from the lease
-    deps.logger.warn('analyse: GeM document fetch failed', { tenderId: tender.id, error: (e as Error).message });
-    const msg = e instanceof GemError && e.code === 'too_large'
-      ? 'The GeM document is larger than 25 MB — download it from GeM and upload it here.'
-      : e instanceof GemError && e.status === 404
-        ? 'GeM no longer serves this bid document. Upload the PDF instead.'
-        : 'Could not download the bid document from GeM right now. Try again in a few minutes or upload the PDF.';
-    throw new HttpError(502, 'gem_unavailable', msg);
+    // A busy lease is transient and says nothing about the document: only real failures are remembered.
+    if (existing.length && !(e instanceof HttpError && e.status === 503)) {
+      await logActivity(deps.db, {
+        orgId: input.orgId, userId: input.userId, action: GEM_FETCH_FAILED, entityType: 'tender', entityId: tender.id,
+        meta: { code: e instanceof HttpError ? e.code : 'error', sourceUrl: ref }, createdAt: deps.clock.now(),
+      });
+    }
+    throw e;
   }
-  const { pages, totalPages } = await extractOrThrow(got.bytes);
+  const text = joinPages(pages);
+  const hash = await textHash(text);
   if (totalPages > pages.length) deps.logger.warn('analyse: GeM document truncated to the page cap', { tenderId: tender.id, pages: pages.length, totalPages });
   const id = crypto.randomUUID();
   const blobKey = `tenders/${tender.id}/gem/${id}.pdf`;
   await deps.blobs.put(blobKey, got.bytes, { contentType: 'application/pdf' });
   const fileName = `${tender.bidNumber.replace(/[^\w-]+/g, '-')}.pdf`;
-  const [doc] = await deps.db.insert(tenderDocuments).values({
-    id, tenderId: tender.id, orgId: null, kind: 'bid', fileName, blobKey, sizeBytes: got.bytes.length,
-    pageCount: pages.length, totalPages, text: joinPages(pages), sourceUrl: got.url,
-  }).returning();
-  if (!tender.documentUrl) await deps.db.update(tenders).set({ documentUrl: got.url }).where(eq(tenders.id, tender.id));
-  await logActivity(deps.db, {
-    orgId: input.orgId, userId: input.userId, action: 'tender.document_fetched', entityType: 'tender', entityId: tender.id,
-    meta: { documentId: id, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), sourceUrl: got.url },
-  });
-  return { documents: [doc], fetched: 1, tender };
+  let stored: { documents: DocRow[]; doc: DocRow | null };
+  try {
+    stored = await deps.db.transaction(async (tx) => {
+      // Check-then-insert under the tender's exclusive input lock (S5): a concurrent fetch that stored a copy since our
+      // read wins, and runs starting now either read this copy or are flagged by markStale below (S4).
+      await lockTenderInputs(tx, tender.id, 'exclusive');
+      const current = await gemDocsIn(tx, tender.id);
+      const known = new Set(existing.map((d) => d.id));
+      if (current.some((d) => !known.has(d.id))) return { documents: current, doc: null };
+      // A forced refresh that finds the same document (same text) stores nothing new.
+      if (input.refresh && !outdated) {
+        for (const d of current) if ((await textHash(d.text)) === hash) return { documents: current, doc: null };
+      }
+      const at = deps.clock.now();
+      const [doc] = await tx.insert(tenderDocuments).values({
+        id, tenderId: tender.id, orgId: null, kind: current.length ? 'corrigendum' : 'bid', fileName: current.length ? fileName.replace(/\.pdf$/, '-corrigendum.pdf') : fileName,
+        blobKey, sizeBytes: got.bytes.length, pageCount: pages.length, totalPages, text, sourceUrl: got.url, createdAt: at,
+      }).returning();
+      if (!tender.documentUrl) await tx.update(tenders).set({ documentUrl: got.url }).where(eq(tenders.id, tender.id));
+      await logActivity(tx, {
+        orgId: input.orgId, userId: input.userId, action: 'tender.document_fetched', entityType: 'tender', entityId: tender.id,
+        meta: { documentId: id, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), sourceUrl: got.url, ...(current.length ? { kind: 'corrigendum' } : {}) },
+      });
+      // Every org's analyses read the previous GeM copy: the changed document needs a full re-analysis (S5, FR-046).
+      if (current.length) await markStale(tx, { tenderIds: [tender.id] }, 'corrigendum', at);
+      return { documents: [...current, doc!], doc: doc! };
+    });
+  } catch (e) {
+    await deps.blobs.delete(blobKey).catch(() => {});
+    throw e;
+  }
+  if (!stored.doc) {
+    await deps.blobs.delete(blobKey).catch(() => {});
+    return { documents: stored.documents, fetched: 0, tender };
+  }
+  return { documents: stored.documents, fetched: 1, tender };
 }
 
 // ───────────── Analyse ─────────────
@@ -287,10 +393,19 @@ const lockAnalyses = (tx: Tx, orgId: string, tenderId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${orgId}:${tenderId}`}, 0))`);
 
 /** Under the lifecycle lock: `running` rows of this org+tender older than the timeout become failed "timed out" (FR-028). */
+const timedOutRuns = (orgId: string, tenderId: string, now: Date) =>
+  and(eq(analyses.orgId, orgId), eq(analyses.tenderId, tenderId), eq(analyses.status, 'running'), lte(analyses.createdAt, new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS)));
+
+/**
+ * The rows are locked in ascending id order first, like markStale does (S1), so expiring several rows can never
+ * deadlock with a markStale that locks an overlapping set.
+ */
 async function expireTimedOutRuns(tx: Tx, orgId: string, tenderId: string, now: Date) {
-  const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
+  const where = timedOutRuns(orgId, tenderId, now);
+  const locked = await tx.select({ id: analyses.id }).from(analyses).where(where).orderBy(asc(analyses.id)).for('update');
+  if (!locked.length) return;
   await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
-    .where(and(eq(analyses.orgId, orgId), eq(analyses.tenderId, tenderId), eq(analyses.status, 'running'), lte(analyses.createdAt, cutoff)));
+    .where(and(inArray(analyses.id, locked.map((r) => r.id)), eq(analyses.status, 'running')));
 }
 
 /** A `running` analysis older than this is treated as failed ("timed out") (FR-028). */
@@ -399,31 +514,52 @@ export async function analyseTender(
   const elapsedSince = (t: number) => deps.clock.now().getTime() - t;
   const started = deps.clock.now().getTime();
   const callWithTimeout = opts.withTimeout ?? withTimeout;
-  const tender = await getTender(deps, input.tenderId, input.viewer);
-  let docs = await listTenderDocuments(deps, tender.id, input.orgId);
-  if (!docs.length && (tender.gemBidId || tender.documentUrl)) {
-    try {
-      docs = (await fetchGemDocuments(deps, input)).documents;
-    } catch (e) {
-      // GeM busy (503) and over-long documents (422) are actionable for the user; anything else falls through.
-      if (e instanceof HttpError && (e.status === 503 || e.code === 'document_too_long')) throw e;
-      deps.logger.warn('analyse: auto-fetch of GeM document failed', { tenderId: tender.id, error: (e as Error).message });
+  const seen = await getTender(deps, input.tenderId, input.viewer);
+  const docsBefore = await listTenderDocuments(deps, seen.id, input.orgId);
+  if (seen.gemBidId || seen.documentUrl) {
+    if (!docsBefore.length) {
+      try {
+        await fetchGemDocuments(deps, input);
+      } catch (e) {
+        // GeM busy (503) and over-long documents (422) are actionable for the user; anything else falls through.
+        if (e instanceof HttpError && (e.status === 503 || e.code === 'document_too_long')) throw e;
+        deps.logger.warn('analyse: auto-fetch of GeM document failed', { tenderId: seen.id, error: (e as Error).message });
+      }
+    } else if (await gemCopyOutdated(deps.db, seen.id, docsBefore.filter((d) => d.orgId === null), { orgId: input.orgId })) {
+      // FR-046: a corrigendum changed the document URL after the GeM copy was fetched: pick up the new document too.
+      // Any failure (busy GeM, 404, timeout, a document over the page limit, …) falls back to the copies we have
+      // (S3); fetchGemDocuments records it, so the next analyse does not retry until a newer corrigendum arrives.
+      try {
+        await fetchGemDocuments(deps, input);
+      } catch (e) {
+        deps.logger.warn('analyse: re-fetch of the corrigendum GeM document failed; using the stored copies', {
+          tenderId: seen.id, error: (e as Error).message, code: e instanceof HttpError ? e.code : undefined,
+        });
+      }
     }
   }
-  if (!docs.length) {
-    throw new HttpError(422, 'no_documents', 'Add the bid document first — upload the PDF or fetch it from GeM.');
-  }
-  // 008/FR-030: scans without a text layer cannot be analysed. Skip them; with nothing readable left → 422.
-  const scanned = docs.filter((d) => isScannedDocument(splitPages(d.text), SCANNED_EMPTY_PAGE_RATIO));
-  const readable = docs.filter((d) => !scanned.includes(d));
-  if (!readable.length) throw unprocessable('scanned_document', SCANNED_DOCUMENT_MESSAGE, { documents: scanned.map((d) => d.fileName) });
-  const notes = scanned.map((d) => `${d.fileName} is a scan without text and was not read — upload the text PDF from GeM or an OCR’d copy.`);
 
-  const now = deps.clock.now();
   // One running analysis per org+tender (FR-028). The advisory lock serialises concurrent requests
   // for the same org+tender until commit, so the check and the insert cannot interleave.
-  const row = await deps.db.transaction(async (tx) => {
-    await lockAnalyses(tx, input.orgId, tender.id);
+  // The inputs (tender row and documents) are read in this same transaction, under the lifecycle lock and the shared
+  // tender-input lock that every writer of those inputs also takes before its write + markStale (S4): a change either
+  // committed before this read (and is analysed) or its markStale runs after the running row committed (and flags it,
+  // FR-045). Company inputs are read just before the final write and changes to them flag the running row.
+  const { row, tender, readable, notes, now } = await deps.db.transaction(async (tx) => {
+    await lockAnalyses(tx, input.orgId, seen.id);
+    await lockTenderInputs(tx, seen.id, 'shared');
+    const [tender] = await tx.select().from(tenders).where(eq(tenders.id, seen.id));
+    if (!tender) throw notFound('Tender');
+    const docs = await documentsIn(tx, tender.id, input.orgId);
+    if (!docs.length) {
+      throw new HttpError(422, 'no_documents', 'Add the bid document first — upload the PDF or fetch it from GeM.');
+    }
+    // 008/FR-030: scans without a text layer cannot be analysed. Skip them; with nothing readable left → 422.
+    const scanned = docs.filter((d) => isScannedDocument(splitPages(d.text), SCANNED_EMPTY_PAGE_RATIO));
+    const readable = docs.filter((d) => !scanned.includes(d));
+    if (!readable.length) throw unprocessable('scanned_document', SCANNED_DOCUMENT_MESSAGE, { documents: scanned.map((d) => d.fileName) });
+    const notes = scanned.map((d) => `${d.fileName} is a scan without text and was not read — upload the text PDF from GeM or an OCR’d copy.`);
+    const now = deps.clock.now();
     await expireTimedOutRuns(tx, input.orgId, tender.id, now);
     const scope = and(eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'));
     const [running] = await tx.select({ id: analyses.id }).from(analyses).where(scope).limit(1);
@@ -431,7 +567,7 @@ export async function analyseTender(
     const [inserted] = await tx.insert(analyses).values({
       orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
     }).returning();
-    return inserted;
+    return { row: inserted, tender, readable, notes, now };
   });
   // Every write to this row from here on is guarded by `status = 'running'`: if a newer request marked
   // it timed out (and maybe replaced it), the late finisher changes nothing and logs nothing (FR-028).
@@ -513,7 +649,9 @@ export async function analyseTender(
       });
       const [done] = await tx.update(analyses).set({
         status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
-        score: result.score, confidence: result.confidence, verdict: result.verdict, summary: withPrefix(prefix, result.summary), error: null, stale: false,
+        score: result.score, confidence: result.confidence, verdict: result.verdict, summary: withPrefix(prefix, result.summary), error: null,
+        // FR-045: a change made while this run was going (markStale flags running rows) keeps it stale.
+        ...keepStaleOnCompletion(),
         notes, warnings, updatedAt: deps.clock.now(),
       }).where(ours).returning();
       return done ?? null;
@@ -595,9 +733,12 @@ export async function overrideFactor(
  *
  * Only a company-side change (profile/vault/weights) can be fixed this way: an analysis stale for a
  * corrigendum or a document change (or with no recorded reason) answers 409 `reanalysis_required`.
- * The row is read FOR UPDATE: markStale (which does not take the advisory lock) then either committed
- * before our read, so we see its reason, or waits for our commit and re-flags the row afterwards, so a
- * change racing with the re-score is never lost (S3).
+ * The row is locked FOR UPDATE before it is read (with the timed-out runs we expire, in id order, S1): markStale
+ * (which does not take the advisory lock) then either committed before our read, so we see its reason, or waits
+ * for our commit and re-flags the row afterwards, so a
+ * change racing with the re-score is never lost (S3). That is why the flag is cleared unconditionally here,
+ * unlike a run's completion (FR-045, `keepStaleOnCompletion`): nothing can flag this row between our read and
+ * our write, and comparing with `created_at` would be wrong anyway (a re-scored row's own change is newer).
  */
 export async function rescoreAnalysis(
   deps: AppDeps,
@@ -609,8 +750,12 @@ export async function rescoreAnalysis(
   const now = deps.clock.now();
   const { a, updated } = await deps.db.transaction(async (tx) => {
     await lockAnalyses(tx, input.orgId, tender.id);
+    // Lock our row together with the timed-out running rows we are about to expire, in ascending id order (S1): the
+    // same order markStale locks in, so the two cannot deadlock whichever ids they share.
+    const mine = and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId));
+    await tx.select({ id: analyses.id }).from(analyses).where(or(mine, timedOutRuns(input.orgId, tender.id, now))).orderBy(asc(analyses.id)).for('update');
     await expireTimedOutRuns(tx, input.orgId, tender.id, now);
-    const [a] = await tx.select().from(analyses).where(and(eq(analyses.id, input.analysisId), eq(analyses.orgId, input.orgId))).for('update');
+    const [a] = await tx.select().from(analyses).where(mine);
     if (!a) throw notFound('Analysis');
     if (a.status !== 'done') throw new HttpError(409, 'conflict', 'Only a completed analysis can be re-scored');
     const [running] = await tx.select({ id: analyses.id }).from(analyses).where(and(
@@ -668,12 +813,16 @@ export async function saveWeights(deps: AppDeps, input: { orgId: string; userId:
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(input.weights)) if (typeof v === 'number') clean[k] = v;
   const stored = Object.keys(clean).length ? resolveWeights(clean) : null;
-  const [before] = await deps.db.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, input.orgId));
-  const changed = !sameWeights(resolveWeights(before?.scoringWeights), resolveWeights(stored));
-  await deps.db.update(organizations).set({ scoringWeights: stored }).where(eq(organizations.id, input.orgId));
-  await logActivity(deps.db, { orgId: input.orgId, userId: input.userId, action: 'org.scoring_weights_updated', entityType: 'organization', entityId: input.orgId, meta: { weights: stored } });
-  // Existing results of open tenders were scored with the old weights (FR-044): flag them so the banner
-  // offers Re-score. Closed tenders keep their historical result; a save that changes nothing flags nothing.
-  if (changed) await markStale(deps.db, { orgId: input.orgId, openOnly: true }, 'weights_changed', deps.clock.now());
+  // Save, activity entry and stale flags commit together (S2); the org row is locked so `changed` compares with
+  // what this save replaces.
+  await deps.db.transaction(async (tx) => {
+    const [before] = await tx.select({ scoringWeights: organizations.scoringWeights }).from(organizations).where(eq(organizations.id, input.orgId)).for('update');
+    const changed = !sameWeights(resolveWeights(before?.scoringWeights), resolveWeights(stored));
+    await tx.update(organizations).set({ scoringWeights: stored }).where(eq(organizations.id, input.orgId));
+    await logActivity(tx, { orgId: input.orgId, userId: input.userId, action: 'org.scoring_weights_updated', entityType: 'organization', entityId: input.orgId, meta: { weights: stored } });
+    // Existing results of open tenders were scored with the old weights (FR-044): flag them so the banner
+    // offers Re-score. Closed tenders keep their historical result; a save that changes nothing flags nothing.
+    if (changed) await markStale(tx, { orgId: input.orgId, openOnly: true }, 'weights_changed', deps.clock.now());
+  });
   return weightsResponse(stored);
 }

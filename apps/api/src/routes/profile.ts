@@ -24,6 +24,7 @@ import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { conflict, notFound, validationError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
+import { markStale } from '../services/staleness';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
@@ -146,6 +147,9 @@ profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
       await tx.insert(companyProfiles).values({ ...values, orgId: org, updatedAt: now })
         .onConflictDoUpdate({ target: companyProfiles.orgId, set: { ...values, updatedAt: now } });
     }
+    // The company profile feeds eligibility and scoring (FR-044): open tenders' results are now out of date. Flagged in
+    // the same transaction as the save, so the flag commits with it or not at all (S2).
+    if (Object.keys(patch).length) await markStale(tx, { orgId: org, openOnly: true }, 'profile_changed', c.var.deps.clock.now());
   });
   await logActivity(db, { orgId: org, userId: userId(c), action: 'profile.updated', entityType: 'profile', entityId: org, meta: { fields: Object.keys(patch) } });
   return c.json(await buildProfileResponse(c.var.deps, org));
@@ -175,10 +179,14 @@ profileRoutes.post('/past-contracts', requireRole('analyst'), async (c) => {
   const org = orgId(c);
   const input = await parseJson(c, pastContractCreateSchema);
   await assertDocInOrg(c.var.deps, org, input.cracDocumentId);
-  const [row] = await c.var.deps.db.insert(pastContracts).values({
-    orgId: org, buyer: input.buyer, buyerType: input.buyerType, title: input.title, category: input.category ?? null, value: input.value,
-    startDate: input.startDate ?? null, endDate: input.endDate ?? null, gemContractNo: input.gemContractNo ?? null, cracDocumentId: input.cracDocumentId ?? null,
-  }).returning();
+  const [row] = await c.var.deps.db.transaction(async (tx) => {
+    const rows = await tx.insert(pastContracts).values({
+      orgId: org, buyer: input.buyer, buyerType: input.buyerType, title: input.title, category: input.category ?? null, value: input.value,
+      startDate: input.startDate ?? null, endDate: input.endDate ?? null, gemContractNo: input.gemContractNo ?? null, cracDocumentId: input.cracDocumentId ?? null,
+    }).returning();
+    await markStale(tx, { orgId: org, openOnly: true }, 'profile_changed', c.var.deps.clock.now()); // with the write (S2)
+    return rows;
+  });
   await logActivity(c.var.deps.db, { orgId: org, userId: userId(c), action: 'profile.past_contract_added', entityType: 'past_contract', entityId: row!.id, meta: { buyer: row!.buyer, value: row!.value } });
   return c.json(toPastContractDto(row!), 201);
 });
@@ -195,8 +203,13 @@ profileRoutes.patch('/past-contracts/:id', requireRole('analyst'), async (c) => 
   if (start && end && end < start) throw validationError('endDate: End date is before the start date', { fields: { endDate: 'End date is before the start date' } });
   await assertDocInOrg(c.var.deps, org, patch.cracDocumentId);
   const [row] = Object.keys(patch).length
-    ? await c.var.deps.db.update(pastContracts).set(patch).where(and(eq(pastContracts.orgId, org), eq(pastContracts.id, id))).returning()
+    ? await c.var.deps.db.transaction(async (tx) => {
+      const rows = await tx.update(pastContracts).set(patch).where(and(eq(pastContracts.orgId, org), eq(pastContracts.id, id))).returning();
+      if (rows.length) await markStale(tx, { orgId: org, openOnly: true }, 'profile_changed', c.var.deps.clock.now()); // with the write (S2)
+      return rows;
+    })
     : [existing];
+  if (!row) throw notFound('Past contract');
   await logActivity(c.var.deps.db, { orgId: org, userId: userId(c), action: 'profile.past_contract_updated', entityType: 'past_contract', entityId: id, meta: { fields: Object.keys(patch) } });
   return c.json(toPastContractDto(row!));
 });
@@ -204,8 +217,12 @@ profileRoutes.patch('/past-contracts/:id', requireRole('analyst'), async (c) => 
 profileRoutes.delete('/past-contracts/:id', requireRole('analyst'), async (c) => {
   const org = orgId(c);
   const id = contractId(c.req.param('id'));
-  const [row] = await c.var.deps.db.delete(pastContracts).where(and(eq(pastContracts.orgId, org), eq(pastContracts.id, id))).returning({ id: pastContracts.id, buyer: pastContracts.buyer });
-  if (!row) throw notFound('Past contract');
+  const row = await c.var.deps.db.transaction(async (tx) => {
+    const [gone] = await tx.delete(pastContracts).where(and(eq(pastContracts.orgId, org), eq(pastContracts.id, id))).returning({ id: pastContracts.id, buyer: pastContracts.buyer });
+    if (!gone) throw notFound('Past contract');
+    await markStale(tx, { orgId: org, openOnly: true }, 'profile_changed', c.var.deps.clock.now()); // with the write (S2)
+    return gone;
+  });
   await logActivity(c.var.deps.db, { orgId: org, userId: userId(c), action: 'profile.past_contract_deleted', entityType: 'past_contract', entityId: id, meta: { buyer: row.buyer } });
   return c.json({ ok: true as const });
 });

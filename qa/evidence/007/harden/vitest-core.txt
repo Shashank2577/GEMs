@@ -1,0 +1,42 @@
+
+ RUN  v2.1.9 /home/user/GEMs/packages/core
+
+ ✓ test/gem/award.test.ts (26 tests) 134ms
+ ✓ test/analyse/rules.test.ts (39 tests) 470ms
+ ✓ test/analyse/score.test.ts (24 tests) 588ms
+ ✓ test/gem/client.test.ts (19 tests) 124ms
+ ✓ test/vault/completeness.test.ts (17 tests) 22ms
+ ✓ test/vault/validators.test.ts (44 tests) 46ms
+ ✓ test/vault/status.test.ts (35 tests) 35ms
+ ✓ test/gem/parse.test.ts (17 tests) 71ms
+ ✓ test/packet/build.test.ts (10 tests) 1209ms
+   ✓ buildPacket > assembles cover + index + documents in order with bookmarks and page numbers 338ms
+   ✓ page plan agreement (SC-005) > agrees for 61 documents 491ms
+ ✓ test/match/matcher.test.ts (13 tests) 31ms
+ ✓ src/gem/http.test.ts (18 tests) 109ms
+ ✓ test/packet/templates.test.ts (14 tests) 488ms
+   ✓ renderAnnexurePdf > renders every system template to a readable PDF with letterhead and signature block 407ms
+ ✓ test/analyse/checklist.test.ts (15 tests) 493ms
+ ✓ test/analyse/corpus.test.ts (6 tests) 291ms
+ ✓ test/packet/mapping.test.ts (14 tests) 11ms
+ ✓ test/assist/allowlist.test.ts (80 tests) 31ms
+ ✓ test/gem/normalize.test.ts (30 tests) 16ms
+ ✓ test/analyse/llm.test.ts (6 tests) 11ms
+stdout | test/analyse/pdf-text.test.ts > extractPages (ported from erenmyeager15 pdf.test.ts) > rejects invalid bytes behind a %PDF-1.7 header with PdfTextError
+Warning: Indexing all PDF objects
+
+ ✓ test/analyse/pdf-text.test.ts (8 tests) 169ms
+ ✓ src/gem/client.test.ts (5 tests) 29ms
+ ✓ test/platform/hardening.test.ts (5 tests) 14ms
+ ✓ test/packet/mentions.test.ts (9 tests) 14ms
+ ✓ test/platform/user-agent.test.ts (11 tests) 17ms
+ ✓ src/contracts/caps.test.ts (3 tests) 4ms
+ ✓ test/packet/stages.test.ts (11 tests) 4ms
+ ✓ test/time.test.ts (2 tests) 3ms
+
+ Test Files  26 passed (26)
+      Tests  481 passed (481)
+   Start at  09:09:52
+   Duration  4.99s (transform 1.12s, setup 0ms, collect 3.24s, tests 4.43s, environment 5ms, prepare 1.87s)
+
+exit=0

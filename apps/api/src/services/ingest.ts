@@ -10,7 +10,8 @@
  *    `response.response.docs` fails the run as format drift and logs `ingestion.format_drift` (FR-014).
  * 2. Upsert tenders by (source, bidNumber); unchanged content hash → only `fetchedAt` moves.
  * 3. Record tender_events: created / updated / corrigendum / closed / cancelled with a field diff.
- *    A corrigendum (end date, quantity, EMD, …) marks existing analyses `stale`.
+ *    A corrigendum (end date, quantity, EMD, …) marks existing analyses `stale`, in the same transaction as
+ *    the tender update and its event, stamped with the clock at that write (FR-043, FR-045).
  * 4. Match new & changed tenders against every active watchlist (all orgs) → tender_matches (unique).
  * 5. Queue notifications per org member and their prefs: in-app (sent immediately), email / WhatsApp
  *    (pending → services/alerts.ts). Deduped by (user, channel, `tender:<tenderId>:<orgId>`).
@@ -18,7 +19,7 @@
  */
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import {
-  analyses, ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
+  ingestionRuns, memberships, notificationPrefs, notifications, tenderEvents, tenderMatches, tenders, users, watchlists,
   type WatchlistCriteria,
 } from '@tp/db';
 import { INGESTION_RUN_BUDGET_MS } from '@tp/core/contracts/caps';
@@ -27,6 +28,7 @@ import { diffTenders, isCorrigendum, isFormatDriftError, type NormalizedTender }
 import { compileCriteria, matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { REAL_ONLY } from '../lib/tender-scope';
+import { lockTenderInputs, markStale } from './staleness';
 
 export interface RunIngestionOptions {
   trigger?: 'cron' | 'manual' | 'seed';
@@ -345,12 +347,24 @@ async function upsertTender(
   const kind = corrigendum ? 'corrigendum'
     : changes.status?.to === 'closed' ? 'closed'
       : changes.status?.to === 'cancelled' ? 'cancelled' : 'updated';
-  await db.update(tenders).set({ ...merged, updatedAt: now }).where(eq(tenders.id, prev.id));
-  await db.insert(tenderEvents).values({ tenderId: prev.id, kind, changes, createdAt: now });
-  if (corrigendum) {
-    // The reason matters: a corrigendum needs a full re-analysis, Re-score refuses it (FR-037, FR-043).
-    await db.update(analyses).set({ stale: true, staleReason: 'corrigendum', staleAt: now, updatedAt: now }).where(eq(analyses.tenderId, prev.id));
-  }
+  // One transaction: the tender change, its event and the stale flags commit together, so a crash or a markStale
+  // failure can never leave a committed corrigendum without its flags (review S2).
+  await db.transaction(async (tx) => {
+    // A run reads the tender in the transaction that inserts its running row, under the shared side of this lock:
+    // it either sees the new values or is already visible to markStale below (review S4).
+    if (corrigendum) await lockTenderInputs(tx, prev.id, 'exclusive');
+    // Stamped when written, not when the run started (up to the run budget earlier): analyses and GeM copies
+    // created during the run carry their own write times and are compared with these (FR-045, FR-046; review B1).
+    const at = deps.clock.now();
+    await tx.update(tenders).set({ ...merged, updatedAt: at }).where(eq(tenders.id, prev.id));
+    await tx.insert(tenderEvents).values({ tenderId: prev.id, kind, changes, createdAt: at });
+    if (corrigendum) {
+      // Every org's analyses (FR-041). The reason matters: a corrigendum needs a full re-analysis, Re-score
+      // refuses it (FR-037, FR-043). markStale flags done and running rows (a running one completes as
+      // stale, FR-045) and locks them in id order, so it cannot deadlock with Re-score or another markStale.
+      await markStale(tx, { tenderIds: [prev.id] }, 'corrigendum', at);
+    }
+  });
   return { id: prev.id, kind: 'updated', corrigendum };
 }
 

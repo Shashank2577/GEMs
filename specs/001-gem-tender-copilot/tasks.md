@@ -101,6 +101,7 @@ Owner: `apps/api/src/routes/{dashboard,demo}.ts`, `packages/db/src/demo.ts`, `ap
 
 - [ ] T080 Playwright config + global setup (local Postgres, migrate, mock-gem, Node server serving built SPA)
 - [ ] T081 [P] E2E US1 discover & alert; [P] US2 analyse; [P] US3 vault; [P] US4 packet; [P] US5 assist; [P] US6 dashboard/pipeline; [P] US7 onboarding
+  - US6 dashboard/pipeline and US7 onboarding: delivered by spec 007 (US1 dashboard, US2 pipeline, US3 guided onboarding; `e2e/007-experience-growth/`, evidence in `qa/evidence/007/`, roll-up in `qa/evidence/007/README.md`). Their E2E items are done there (007 T024/T037/T048 and the later 007 QA tasks); US1–US5 of 001 remain with their own specs (003–006).
 - [ ] T082 Responsive + dark-mode + accessibility pass (axe), screenshot review of every page at 375 and 1440 px
 - [ ] T083 Deployment docs: Cloudflare Worker + Neon + R2 (`docs/deploy.md`), `.dev.vars.example`, GitHub Actions CI (typecheck, unit, API, E2E)
 - [ ] T084 README, NOTICE (Apache-2.0 attribution), quickstart
