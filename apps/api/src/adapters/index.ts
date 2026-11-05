@@ -1,6 +1,6 @@
 /** Build AppDeps from environment variables + runtime-specific db/blob store. */
 import type { Db } from '@tp/db';
-import type { AppDeps, BlobStore, Clock, ErrorReporter, GemLease, Logger } from '../deps';
+import type { AppDeps, BlobStore, Clock, ErrorReporter, GemLease, LlmClient, LlmPurpose, Logger } from '../deps';
 import { adminTokenWarning, loadConfig, loadGemConfig, type AppConfig, type RuntimeEnv } from '../env';
 import { createPgGemLease } from '../lib/gem-lease';
 import { createPgRateLimiter } from '../lib/rate-limiter';
@@ -32,6 +32,18 @@ export function createDeps({ env, db, blobs, clock, logger, errors, fetch: f }: 
   warnMissingUnsubscribeSecret(env, config, logger);
   const gem = loadGemConfig(env);
   const doFetch: typeof fetch = f ?? ((input, init) => fetch(input, init));
+  const llmKey = env.ANTHROPIC_API_KEY;
+  const makeLlm = (model: string): LlmClient => createAnthropicClient({ apiKey: llmKey!, model, baseUrl: env.LLM_BASE_URL, fetch: doFetch, logger });
+  const llm = llmKey ? makeLlm(config.llmModel) : null;
+  // Built on first use per purpose (createDeps runs per request on the Worker).
+  const tiers = new Map<LlmPurpose, LlmClient | null>([['enrichment', llm]]);
+  const llmFor = (purpose: LlmPurpose): LlmClient | null => {
+    if (!tiers.has(purpose)) {
+      const model = purpose === 'ocr' ? config.llmOcrModel : config.llmEscalationModel;
+      tiers.set(purpose, llmKey && model ? makeLlm(model) : null);
+    }
+    return tiers.get(purpose) ?? null;
+  };
   return {
     db,
     blobs,
@@ -40,9 +52,8 @@ export function createDeps({ env, db, blobs, clock, logger, errors, fetch: f }: 
     clock: clock ?? systemClock,
     gem,
     fetch: doFetch,
-    llm: env.ANTHROPIC_API_KEY
-      ? createAnthropicClient({ apiKey: env.ANTHROPIC_API_KEY, model: config.llmModel, baseUrl: env.LLM_BASE_URL, fetch: doFetch })
-      : null,
+    llm,
+    llmFor,
     mailer: env.RESEND_API_KEY
       ? createResendMailer({ apiKey: env.RESEND_API_KEY, from: config.mailFrom, fetch: doFetch, logger })
       : createLogMailer(logger),

@@ -227,8 +227,9 @@ function AnalysisWarnings({ analysis }: { analysis: AnalysisDto }) {
   const lines = [...(analysis.warnings ?? []).map(analysisWarningText), ...(analysis.notes ?? [])];
   if (!lines.length) return null;
   return (
-    <ul role="status" aria-label="Analysis warnings" data-testid="analysis-warnings"
-      className="mt-3 grid gap-1.5 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
+    <div role="status" aria-label="Analysis warnings" data-testid="analysis-warnings"
+      className="mt-3 rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm">
+    <ul className="grid gap-1.5">
       {lines.map((line) => (
         <li key={line} className="flex items-start gap-2">
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
@@ -236,6 +237,7 @@ function AnalysisWarnings({ analysis }: { analysis: AnalysisDto }) {
         </li>
       ))}
     </ul>
+    </div>
   );
 }
 

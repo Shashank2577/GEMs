@@ -480,6 +480,11 @@ export interface Requirement {
   source: { documentId?: string; fileName?: string; page?: number; quote?: string; ocr?: boolean };
   method: 'RULE' | 'LLM' | 'MANUAL';
   confidence: number; // 0..1
+  /**
+   * Set when the escalation model (004/FR-050) disagreed with this item but could not displace it (its quote was not
+   * found on the cited page, or it was less confident): what it read instead, for a human to check. Never scored.
+   */
+  needsReview?: string;
 }
 
 export interface ScoreFactor {

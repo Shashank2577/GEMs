@@ -201,6 +201,8 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   'tender.document_uploaded': 'uploaded a document',
   'tender.document_fetched': 'fetched the bid document from GeM',
   'tender.document_fetch_failed': 'couldn’t fetch the updated bid document from GeM',
+  'tender.document_ocr': 'read a scanned document with AI OCR',
+  'tender.document_ocr_failed': 'couldn’t read a scanned document with AI OCR',
   'analysis.factor_overridden': 'overrode a factor',
   'analysis.rescored': 're-scored the analysis',
   'tender.dismissed': 'dismissed this tender',
@@ -220,3 +222,35 @@ export function analysisWarningText(w: AnalysisWarning): string {
       return 'Part of this analysis used rules only.';
   }
 }
+
+/** Tooltip on requirements read from a scanned page (004/FR-052). */
+export const OCR_REQUIREMENT_TOOLTIP = 'Read by AI from a scanned page — check against the original';
+
+export type OcrActionState = 'hidden' | 'available' | 'running';
+
+/**
+ * "Read with AI (OCR)" row action: only for documents the API says need OCR (`needsOcr`: ≥ 80% of pages without text, not
+ * yet transcribed — a scan with a few text pages still qualifies), when OCR is configured and the user is analyst+
+ * (FR-052/FR-053).
+ */
+export function ocrActionState(
+  doc: Pick<TenderDocumentDto, 'needsOcr'>, opts: { ocrAvailable: boolean; canRun: boolean; running: boolean },
+): OcrActionState {
+  if (!doc.needsOcr || !opts.ocrAvailable || !opts.canRun) return 'hidden';
+  return opts.running ? 'running' : 'available';
+}
+
+export const isOcrDocument = (doc: Pick<TenderDocumentDto, 'textSource'>) => doc.textSource === 'ocr';
+
+/** Notice for a document with no readable text. Spec wording when the user cannot run OCR; otherwise points at the OCR action. */
+export function unreadableDocumentNotice(fileName: string, offerOcr: boolean): string {
+  return offerOcr
+    ? `We couldn't read text from ${fileName}. Use “Read with AI (OCR)” to transcribe it, or upload a text PDF.`
+    : `We couldn't read text from ${fileName}. Upload a text PDF or ask your admin to enable AI OCR.`;
+}
+
+/** Documents analysis cannot read yet (`needsOcr`), and so need the notice. */
+export const unreadableDocuments = <T extends Pick<TenderDocumentDto, 'needsOcr'>>(docs: readonly T[] | undefined): T[] => (docs ?? []).filter((d) => d.needsOcr);
+
+/** Tooltip on a rule-read requirement the AI review disagreed with (004/FR-050, review S9). */
+export const NEEDS_REVIEW_LABEL = 'Check this';

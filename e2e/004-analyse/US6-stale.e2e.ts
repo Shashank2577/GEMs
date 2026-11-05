@@ -103,6 +103,9 @@ test('1 corrigendum +7 days and sync: analysis stale:true, corrigendum event, ba
 test('2 stale analysis: "Outdated" badge, feed "Re-check" + tooltip, History "Corrigendum issued" + "Re-check eligibility" + old→new end date, History tab dot @mobile', async ({ page }) => {
   await signupViaApi(page);
   const { t } = await staleViaCorrigendum(page);
+  // Isolation: the mock tender is shared with other tests (each adds a corrigendum event); keep only the event this
+  // test just caused, so the History assertions below are not ambiguous.
+  psql(`delete from tender_events where tender_id = ${sqlStr(t.id)} and kind = 'corrigendum' and id <> (select id from tender_events where tender_id = ${sqlStr(t.id)} and kind = 'corrigendum' order by created_at desc limit 1)`);
   await openTenderPage(page, t.id);
   await expect(page.getByText('Outdated', { exact: true })).toBeVisible();
   await ev(page, '02a-outdated-badge');

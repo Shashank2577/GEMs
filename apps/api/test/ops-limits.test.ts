@@ -105,6 +105,7 @@ describe('rule table (FR-019)', () => {
       'watchlist.preview.user': [30, 60, 'user'],
       'upload.org': [120, 3600, 'org'],
       'gem.fetch.org': [30, 3600, 'org'],
+      'ocr.org': [20, 3600, 'org'],
       'analyse.user': [30, 3600, 'user'],
       'packet.org': [30, 3600, 'org'],
       'api.user': [600, 60, 'user_or_token'],
@@ -138,6 +139,10 @@ describe('limit + 1 → 429 for every generic rule, open again in the next windo
       call: async () => request(ctx.app, 'POST', `/tenders/${tenderId}/documents`, { cookie: org.analyst.cookie, form: { file: file(await pdf('bid'), 'bid.pdf') } }),
     },
     { rule: 'gem.fetch.org', subject: () => org.orgId, call: () => request(ctx.app, 'POST', `/tenders/${tenderId}/fetch-documents`, { cookie: org.analyst.cookie }) },
+    {
+      rule: 'ocr.org', subject: () => org.orgId,
+      call: () => request(ctx.app, 'POST', `/tenders/${tenderId}/documents/${crypto.randomUUID()}/ocr`, { cookie: org.analyst.cookie }),
+    },
     { rule: 'analyse.user', subject: () => org.analyst.me.user.id, call: () => request(ctx.app, 'POST', `/tenders/${tenderId}/analyse`, { cookie: org.analyst.cookie }) },
     {
       rule: 'packet.org', subject: () => org.orgId,
