@@ -30,6 +30,12 @@ async function open(page: Page, path: string) {
   await expect(page.locator('main#main')).toBeVisible();
   await page.waitForLoadState('networkidle');
 }
+/** Settle: no skeletons and no running finite CSS animations/transitions (Radix menus, dialogs and palette fade in) so axe never measures blended colours. */
+async function settle(page: Page) {
+  await expect(page.locator('[data-skeleton], .animate-pulse')).toHaveCount(0, { timeout: 15_000 });
+  await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))));
+}
 const desktopOnly = (title: string) => test.info().project.name === 'desktop' || test.skip(true, title);
 
 const palette = (page: Page) => page.getByRole('dialog').filter({ has: page.getByPlaceholder(/Search pages, actions/) });
@@ -369,7 +375,7 @@ test('sc7 keyboard: first Tab stop is "Skip to content", focus rings on every st
   await page.reload();
   await expect(page.locator('main#main')).toBeVisible();
   const missing: string[] = [];
-  // Stop 1 is the skip link, which is hidden until focused and then shown as a solid pill (no ring); recorded below.
+  // Stop 1 is the skip link, which is hidden until focused and then shown as a solid pill with a focus ring; style recorded below.
   await page.keyboard.press('Tab');
   const skipStyle = await page.evaluate(() => { const cs = getComputedStyle(document.activeElement as HTMLElement); return { text: document.activeElement?.textContent, boxShadow: cs.boxShadow, outlineStyle: cs.outlineStyle, background: cs.backgroundColor }; });
   test.info().annotations.push({ type: 'skip-link focus style', description: JSON.stringify(skipStyle) });
@@ -553,6 +559,7 @@ test('sc11 "?" opens the Keyboard shortcuts dialog listing Ctrl K, /, G+letter s
   await openPalette(page);
   await palette(page).getByRole('option', { name: /Keyboard shortcuts/ }).click();
   await expect(dlg).toBeVisible();
+  await settle(page);
   await a11y(page, 'shortcuts-dialog');
 });
 
@@ -600,7 +607,7 @@ test('sc12 overlays: palette, account menu, notifications bell and sidebar org s
   await page.setViewportSize({ width: 1440, height: 900 });
   const failures: string[] = [];
   const openMenu = page.locator('[role="menu"][data-state="open"]');
-  const scan = async (name: string) => { try { await a11y(page, name); } catch (e) { failures.push(`${name}: ${(e as Error).message.split('\n').slice(0, 12).join(' | ')}`); } };
+  const scan = async (name: string) => { await settle(page); try { await a11y(page, name); } catch (e) { failures.push(`${name}: ${(e as Error).message.split('\n').slice(0, 12).join(' | ')}`); } };
   for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((t) => { try { localStorage.setItem('tp-theme', t); } catch { /* blocked */ } }, theme);
     await open(page, '/dashboard');
@@ -652,6 +659,7 @@ test('sc12 @mobile org switcher inside the 375px drawer: axe-clean open, picking
   let trigger = await openSwitcher();
   await expect(page.getByRole('menuitem', { name: new RegExp(orgBName) })).toBeVisible();
   await ev(page, 'sc12-mobile-drawer-org-switcher-open-light');
+  await settle(page);
   await a11y(page, 'drawer-org-switcher-open-light-375');
   // Esc closes the menu and returns focus to the trigger
   await page.keyboard.press('Escape');
@@ -662,6 +670,7 @@ test('sc12 @mobile org switcher inside the 375px drawer: axe-clean open, picking
   // dark: open -> axe
   await page.evaluate(() => { localStorage.setItem('tp-theme', 'dark'); document.documentElement.classList.add('dark'); });
   trigger = await openSwitcher();
+  await settle(page);
   await a11y(page, 'drawer-org-switcher-open-dark-375');
   await ev(page, 'sc12-mobile-drawer-org-switcher-open-dark');
   await page.keyboard.press('Escape');

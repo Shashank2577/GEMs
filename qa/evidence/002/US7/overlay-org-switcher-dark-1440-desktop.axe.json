@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8804/dashboard",
-  "timestamp": "2026-11-05T05:29:58.992Z",
+  "url": "http://localhost:8806/dashboard",
+  "timestamp": "2026-11-05T06:05:25.079Z",
   "violations": [],
   "incomplete": [
     {
@@ -637,44 +637,6 @@
             ".cursor-default.data-\\[disabled\\]\\:pointer-events-none.data-\\[highlighted\\]\\:bg-muted:nth-child(2) > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "contrastRatio": 0,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": "elmPartiallyObscured",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div data-side=\"bottom\" data-align=\"start\" role=\"menu\" aria-orientation=\"vertical\" data-state=\"open\" data-radix-menu-cont...=\"\" dir=\"ltr\" id=\"radix-:r4:\" aria-labelledby=\"radix-:r3:\" class=\"z-50 min-w-[12rem] o...\" tabindex=\"-1\" data-orientation=\"vertical\" style=\"outline: none; --rad...\">",
-                  "target": [
-                    "#radix-\\:r4\\:"
-                  ]
-                },
-                {
-                  "html": "<a aria-current=\"page\" class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring bg-card text-foreground shadow-sm ring-1 ring-border\" href=\"/dashboard\">",
-                  "target": [
-                    ".ring-1"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because it's partially obscured by another element"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<span class=\"block truncate\">shell Traders mw33w8p822</span>",
-          "target": [
-            ".cursor-default.data-\\[disabled\\]\\:pointer-events-none.data-\\[highlighted\\]\\:bg-muted:nth-child(2) > .flex-1.min-w-0 > .block.truncate"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
         }
       ]
     }

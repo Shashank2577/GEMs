@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8804/tenders",
-  "timestamp": "2026-11-05T05:27:51.450Z",
+  "url": "http://localhost:8806/tenders",
+  "timestamp": "2026-11-05T06:03:29.995Z",
   "violations": [],
   "incomplete": [
     {
@@ -101,7 +101,7 @@
                 {
                   "html": "<button class=\"flex h-8 w-full items-center gap-2 rounded-lg border bg-card px-2.5 text-[13px] text-muted-foreground shadow-xs transition-colors hover:border-foreground/15 hover:text-foreground focus-ring\">",
                   "target": [
-                    ".hover\\:border-foreground\\/15.w-full.shadow-xs"
+                    ".w-full.hover\\:border-foreground\\/15.px-2\\.5"
                   ]
                 },
                 {
@@ -175,7 +175,7 @@
                 {
                   "html": "<button class=\"ml-auto hidden h-8 w-full max-w-sm items-center gap-2 rounded-lg border bg-subtle px-3 text-[13px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground focus-ring md:mr-auto md:ml-0 md:flex\">",
                   "target": [
-                    ".md\\:mr-auto"
+                    ".max-w-sm"
                   ]
                 },
                 {
@@ -217,9 +217,9 @@
               "data": null,
               "relatedNodes": [
                 {
-                  "html": "<button type=\"button\" class=\"inline-flex h-8 item...\" aria-label=\"GeM sync status: Not...\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "html": "<button type=\"button\" class=\"inline-flex h-8 item...\" aria-label=\"GeM sync status: Syn...\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
                   "target": [
-                    ".shadow-xs[aria-haspopup=\"dialog\"][data-state=\"closed\"]"
+                    ".hover\\:text-foreground.px-3[aria-haspopup=\"dialog\"]"
                   ]
                 }
               ],
@@ -245,25 +245,25 @@
                 {
                   "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">My matches</button>",
                   "target": [
-                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(1)"
+                    ".px-3\\.5.hover\\:text-foreground[role=\"tab\"]:nth-child(1)"
                   ]
                 },
                 {
                   "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">New</button>",
                   "target": [
-                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(2)"
+                    ".px-3\\.5.hover\\:text-foreground[role=\"tab\"]:nth-child(2)"
                   ]
                 },
                 {
                   "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">Closing this week</button>",
                   "target": [
-                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(3)"
+                    ".px-3\\.5.hover\\:text-foreground[role=\"tab\"]:nth-child(3)"
                   ]
                 },
                 {
                   "html": "<button role=\"tab\" aria-selected=\"false\" class=\"h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-ring text-muted-foreground hover:bg-muted hover:text-foreground\">Go verdicts</button>",
                   "target": [
-                    ".px-3\\.5.h-8[role=\"tab\"]:nth-child(4)"
+                    ".px-3\\.5.hover\\:text-foreground[role=\"tab\"]:nth-child(4)"
                   ]
                 },
                 {
@@ -281,7 +281,7 @@
           "impact": "serious",
           "html": "<div class=\"-mx-4 mb-4 flex items-center gap-3 overflow-x-auto px-4 pb-1 scrollbar-thin sm:mx-0 sm:px-0\" role=\"tablist\" aria-label=\"Saved views\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
           "target": [
-            ".overflow-x-auto"
+            ".mb-4"
           ],
           "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
         },
@@ -301,49 +301,187 @@
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">3 days</button>",
                   "target": [
-                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(2)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">7 days</button>",
                   "target": [
-                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(3)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">14 days</button>",
                   "target": [
-                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                    "div[role=\"group\"] > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(4)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">30 days</button>",
                   "target": [
-                    ".hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(5)"
+                    ".hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(5)"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search states…\" aria-label=\"Search States\" value=\"\" style=\"\">",
+                  "target": [
+                    "input[placeholder=\"Search states…\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rs:-Maharashtra\">",
+                  "target": [
+                    "#\\:rs\\:-Maharashtra"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rs:-Karnataka\">",
+                  "target": [
+                    "#\\:rs\\:-Karnataka"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rs:-West Bengal\">",
+                  "target": [
+                    "#\\:rs\\:-West\\ Bengal"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rs:-Gujarat\">",
+                  "target": [
+                    "#\\:rs\\:-Gujarat"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rs:-Odisha\">",
+                  "target": [
+                    "#\\:rs\\:-Odisha"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rs:-Punjab\">",
+                  "target": [
+                    "#\\:rs\\:-Punjab"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex w-fit items-center gap-1 rounded px-1.5 text-xs font-medium text-primary hover:underline focus-ring\">",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(2) > .flex-col.gap-1\\.5.min-w-0 > .w-fit.hover\\:underline.px-1\\.5"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search ministries…\" aria-label=\"Search Ministries\" value=\"\" style=\"\">",
+                  "target": [
+                    "input[placeholder=\"Search ministries…\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rt:-Ministry of Def...\">",
+                  "target": [
+                    "#\\:rt\\:-Ministry\\ of\\ Defence"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rt:-Ministry of Ele...\">",
+                  "target": [
+                    "#\\:rt\\:-Ministry\\ of\\ Electronics\\ and\\ Information\\ Technology"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rt:-Ministry of Fin...\">",
+                  "target": [
+                    "#\\:rt\\:-Ministry\\ of\\ Finance"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rt:-Ministry of Hom...\">",
+                  "target": [
+                    "#\\:rt\\:-Ministry\\ of\\ Home\\ Affairs"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rt:-Ministry of Rai...\">",
+                  "target": [
+                    "#\\:rt\\:-Ministry\\ of\\ Railways"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":rt:-Uttar Pradesh\">",
+                  "target": [
+                    "#\\:rt\\:-Uttar\\ Pradesh"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex w-fit items-center gap-1 rounded px-1.5 text-xs font-medium text-primary hover:underline focus-ring\">",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(3) > .flex-col.gap-1\\.5.min-w-0 > .w-fit.hover\\:underline.px-1\\.5"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search categories…\" aria-label=\"Search Categories\" value=\"\" style=\"\">",
+                  "target": [
+                    "input[placeholder=\"Search categories…\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":ru:-Laptop - Notebo...\">",
+                  "target": [
+                    "#\\:ru\\:-Laptop\\ -\\ Notebook"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":ru:-Ambulance (Type...\">",
+                  "target": [
+                    "#\\:ru\\:-Ambulance\\ \\(Type\\ B\\)\\ \\(V2\\)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":ru:-Custom Bid for ...\">",
+                  "target": [
+                    "#\\:ru\\:-Custom\\ Bid\\ for\\ Services\\ -\\ Annual\\ Maintenance\\ Contract\\ of\\ CCTV\\ Surveillance\\ System"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":ru:-Desktop Compute...\">",
+                  "target": [
+                    "#\\:ru\\:-Desktop\\ Computers\\ \\(Q2\\)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer size-4 shrink-0...\" id=\":ru:-Diesel Generato...\">",
+                  "target": [
+                    "#\\:ru\\:-Diesel\\ Generator\\ Set\\ \\(V2\\)\\ 125\\ kVA"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex w-fit items-center gap-1 rounded px-1.5 text-xs font-medium text-primary hover:underline focus-ring\">",
+                  "target": [
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(4) > .flex-col.gap-1\\.5.min-w-0 > .w-fit.hover\\:underline.px-1\\.5"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Under ₹10 L</button>",
                   "target": [
-                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(1)"
+                    ".grid-cols-1 > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(1)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">₹10 L – ₹1 Cr</button>",
                   "target": [
-                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                    ".grid-cols-1 > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(2)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">₹1 Cr – ₹5 Cr</button>",
                   "target": [
-                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                    ".grid-cols-1 > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(3)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Above ₹5 Cr</button>",
                   "target": [
-                    ".grid-cols-1 > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                    ".grid-cols-1 > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(4)"
                   ]
                 },
                 {
@@ -361,55 +499,55 @@
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Go</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(1)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(1)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Review</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(2)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">No-Go</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(3)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Not analysed</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(6) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(4)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Bid</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(1)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(1)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Reverse auction</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(2)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(2)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Service</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(3)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(3)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" aria-pressed=\"false\" class=\"h-7 rounded-full border px-2.5 text-xs font-medium transition-colors focus-ring bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground\">Bunch</button>",
                   "target": [
-                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .flex-wrap.gap-1\\.5 > .hover\\:border-foreground\\/20.h-7.px-2\\.5:nth-child(4)"
+                    ".py-4.first\\:pt-0.last\\:border-0:nth-child(7) > .gap-1\\.5.flex-wrap.flex > .hover\\:border-foreground\\/20.px-2\\.5.hover\\:text-foreground:nth-child(4)"
                   ]
                 },
                 {
                   "html": "<button type=\"button\" class=\"relative inline-flex...\">",
                   "target": [
-                    ".pt-2 > .transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\].duration-150.disabled\\:pointer-events-none"
+                    ".pt-2 > .px-3.\\[\\&_svg\\]\\:size-4.h-8"
                   ]
                 }
               ],
@@ -435,7 +573,7 @@
                 {
                   "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search item, buyer, ...\" aria-label=\"Search tenders\" value=\"\" style=\"\">",
                   "target": [
-                    ".pl-9"
+                    "input[aria-label=\"Search tenders\"]"
                   ]
                 },
                 {
@@ -479,7 +617,7 @@
                 {
                   "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">",
                   "target": [
-                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(1)"
+                    ".transition-all.shadow-sm[role=\"radio\"]"
                   ]
                 },
                 {
@@ -497,7 +635,387 @@
           "impact": "serious",
           "html": "<div class=\"flex items-center gap-2\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
           "target": [
-            ".mt-2.flex-wrap.justify-between > .gap-2[data-aria-hidden=\"true\"][aria-hidden=\"true\"]"
+            ".mt-2.justify-between.flex-wrap > .gap-2[data-aria-hidden=\"true\"][aria-hidden=\"true\"]"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/13260978-437e-4144-b5de-52414899497c\"><span class=\"line-clamp-2\">Laptop - Notebook</span></a>",
+                  "target": [
+                    "#t-13260978-437e-4144-b5de-52414899497c-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/13260978-43...\">",
+                  "target": [
+                    "li:nth-child(1) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(1) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/3edab889-b5be-4209-9c77-62b0152b4edb\"><span class=\"line-clamp-2\">Fogging Machine (Q3)</span></a>",
+                  "target": [
+                    "#t-3edab889-b5be-4209-9c77-62b0152b4edb-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/3edab889-b5...\">",
+                  "target": [
+                    "li:nth-child(2) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(2) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/8a79e72d-91a4-49ba-a9ab-3fae12a51bf1\"><span class=\"line-clamp-2\">Hospital Bed (V3) (Q2) + 2 more items</span></a>",
+                  "target": [
+                    "#t-8a79e72d-91a4-49ba-a9ab-3fae12a51bf1-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/8a79e72d-91...\">",
+                  "target": [
+                    "li:nth-child(3) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(3) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/d8e28f50-1497-4cc9-9be0-acee575ec01d\"><span class=\"line-clamp-2\">Housekeeping and Cleaning Services - Office + 1 more item</span></a>",
+                  "target": [
+                    "#t-d8e28f50-1497-4cc9-9be0-acee575ec01d-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/d8e28f50-14...\">",
+                  "target": [
+                    "li:nth-child(4) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(4) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/0a11afce-3367-4302-83dc-4110c029c874\">",
+                  "target": [
+                    "#t-0a11afce-3367-4302-83dc-4110c029c874-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/0a11afce-33...\">",
+                  "target": [
+                    "li:nth-child(5) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(5) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/d9a9aa07-bc9d-45cc-b753-98cd74d999a3\"><span class=\"line-clamp-2\">Multiparameter Patient Monitor (V2) (Q2) + 1 more item</span></a>",
+                  "target": [
+                    "#t-d9a9aa07-bc9d-45cc-b753-98cd74d999a3-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/d9a9aa07-bc...\">",
+                  "target": [
+                    "li:nth-child(6) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(6) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/92a6eb8f-e852-4420-9569-7ac82599142e\"><span class=\"line-clamp-2\">Multifunction Machine MFM (V2)</span></a>",
+                  "target": [
+                    "#t-92a6eb8f-e852-4420-9569-7ac82599142e-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/92a6eb8f-e8...\">",
+                  "target": [
+                    "li:nth-child(7) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(7) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/d5ef26dd-4f02-4548-9900-8cca99ac36a9\"><span class=\"line-clamp-2\">Tractor (V2)</span></a>",
+                  "target": [
+                    "#t-d5ef26dd-4f02-4548-9900-8cca99ac36a9-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/d5ef26dd-4f...\">",
+                  "target": [
+                    "li:nth-child(8) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(8) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/22120343-2eeb-40e1-92b8-27c1c22febb1\"><span class=\"line-clamp-2\">Manpower Outsourcing Services - Minimum wage - Unskilled + 2 more items</span></a>",
+                  "target": [
+                    "#t-22120343-2eeb-40e1-92b8-27c1c22febb1-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/22120343-2e...\">",
+                  "target": [
+                    "li:nth-child(9) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(9) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/621dafe3-5966-472e-a6a3-e7c31ce4e7e7\"><span class=\"line-clamp-2\">Pest Control Service - Residential/Office</span></a>",
+                  "target": [
+                    "#t-621dafe3-5966-472e-a6a3-e7c31ce4e7e7-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/621dafe3-59...\">",
+                  "target": [
+                    "li:nth-child(10) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(10) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/043c80b5-98e4-4bc7-8b1c-64e78016f466\"><span class=\"line-clamp-2\">Goods Transport Service - Per Trip based Service - Truck + 1 more item</span></a>",
+                  "target": [
+                    "#t-043c80b5-98e4-4bc7-8b1c-64e78016f466-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/043c80b5-98...\">",
+                  "target": [
+                    "li:nth-child(11) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(11) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/e42bbcc8-3779-443e-b7a9-211ae9a344fc\"><span class=\"line-clamp-2\">Printer Cartridge / Toner (Q3)</span></a>",
+                  "target": [
+                    "#t-e42bbcc8-3779-443e-b7a9-211ae9a344fc-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/e42bbcc8-37...\">",
+                  "target": [
+                    "li:nth-child(12) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(12) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/d4a2cc6b-fa1d-4213-a369-b36c73453761\"><span class=\"line-clamp-2\">Water Purifier / RO Plant (Q3)</span></a>",
+                  "target": [
+                    "#t-d4a2cc6b-fa1d-4213-a369-b36c73453761-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/d4a2cc6b-fa...\">",
+                  "target": [
+                    "li:nth-child(13) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(13) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/3f56cbca-ab13-4149-ba97-7f7b0f69ef79\"><span class=\"line-clamp-2\">Steel Almirah (V2)</span></a>",
+                  "target": [
+                    "#t-3f56cbca-ab13-4149-ba97-7f7b0f69ef79-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/3f56cbca-ab...\">",
+                  "target": [
+                    "li:nth-child(14) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(14) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/7f05cbdb-4320-40ce-8a5f-f6441724fe7e\"><span class=\"line-clamp-2\">Monthly Basis Cab &amp; Taxi Hiring Services - Sedan + 1 more item</span></a>",
+                  "target": [
+                    "#t-7f05cbdb-4320-40ce-8a5f-f6441724fe7e-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/7f05cbdb-43...\">",
+                  "target": [
+                    "li:nth-child(15) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(15) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/3ef39f53-c616-41e2-8a58-81bd47f47908\"><span class=\"line-clamp-2\">ICU Ventilator (V2) (Q2) + 1 more item</span></a>",
+                  "target": [
+                    "#t-3ef39f53-c616-41e2-8a58-81bd47f47908-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/3ef39f53-c6...\">",
+                  "target": [
+                    "li:nth-child(16) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(16) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/0fa52770-41f4-4e83-a913-9ee19edc8285\"><span class=\"line-clamp-2\">Laptop - Notebook (Q2) + 1 more item</span></a>",
+                  "target": [
+                    "#t-0fa52770-41f4-4e83-a913-9ee19edc8285-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/0fa52770-41...\">",
+                  "target": [
+                    "li:nth-child(17) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(17) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/248469d8-ab5c-467f-8810-2f793d77e1bc\"><span class=\"line-clamp-2\">School Furniture - Dual Desk (V2)</span></a>",
+                  "target": [
+                    "#t-248469d8-ab5c-467f-8810-2f793d77e1bc-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/248469d8-ab...\">",
+                  "target": [
+                    "li:nth-child(18) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(18) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/0b5b5d6d-dd40-40f4-ae2a-1719b6e62758\"><span class=\"line-clamp-2\">Interactive Panel (V2) (Q2) + 1 more item</span></a>",
+                  "target": [
+                    "#t-0b5b5d6d-dd40-40f4-ae2a-1719b6e62758-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/0b5b5d6d-dd...\">",
+                  "target": [
+                    "li:nth-child(19) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(19) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                },
+                {
+                  "html": "<a class=\"rounded-sm outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring\" href=\"/tenders/c67d284c-f921-462f-a420-2d461bd2e594\"><span class=\"line-clamp-2\">Network Video Recorder (NVR) (Q2) + 2 more items</span></a>",
+                  "target": [
+                    "#t-c67d284c-f921-462f-a420-2d461bd2e594-title > .rounded-sm.after\\:absolute.after\\:inset-0"
+                  ]
+                },
+                {
+                  "html": "<a class=\"relative select-none...\" data-state=\"closed\" href=\"/tenders/c67d284c-f9...\">",
+                  "target": [
+                    "li:nth-child(20) > article > .items-start.gap-4.flex > .flex-col.items-end.z-10 > .px-2.sm\\:inline-flex.\\[\\&_svg\\]\\:size-3\\.5"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "li:nth-child(20) > article > .mt-4.pt-3.border-t > .z-10.gap-1.relative > .hover\\:text-primary.text-primary.px-3"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<ul class=\"flex flex-col gap-3\" aria-label=\"Tenders\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            "ul[aria-label=\"Tenders\"]"
           ],
           "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
         },
@@ -511,7 +1029,7 @@
                 {
                   "html": "<button type=\"button\" class=\"relative inline-flex...\">",
                   "target": [
-                    ".hover\\:bg-primary\\/90"
+                    ".px-4.h-9.text-sm"
                   ]
                 }
               ],
@@ -521,9 +1039,9 @@
           ],
           "none": [],
           "impact": "serious",
-          "html": "<div class=\"flex flex-col items-center justify-center rounded-xl border border-dashed bg-subtle text-center px-6 py-14\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "html": "<div class=\"flex flex-col items-center gap-2 py-6\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
           "target": [
-            ".border-dashed"
+            ".py-6"
           ],
           "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
         },

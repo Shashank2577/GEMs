@@ -1,6 +1,6 @@
 {
-  "url": "http://localhost:8804/dashboard",
-  "timestamp": "2026-11-05T05:30:05.257Z",
+  "url": "http://localhost:8806/dashboard",
+  "timestamp": "2026-11-05T06:05:29.603Z",
   "violations": [],
   "incomplete": [
     {
@@ -370,20 +370,20 @@
               "id": "aria-valid-attr-value",
               "data": {
                 "messageKey": "controlsWithinPopup",
-                "needsReview": "aria-controls=\"radix-:rv:\""
+                "needsReview": "aria-controls=\"radix-:ru:\""
               },
               "relatedNodes": [],
               "impact": "critical",
-              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:rv:\""
+              "message": "Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:ru:\""
             }
           ],
           "none": [],
           "impact": "critical",
-          "html": "<button type=\"button\" id=\"radix-:ru:\" aria-haspopup=\"menu\" aria-expanded=\"true\" data-state=\"open\" class=\"group flex w-full it...\" aria-controls=\"radix-:rv:\" data-radix-popper-si...=\"bottom\" data-radix-popper-al...=\"start\">",
+          "html": "<button type=\"button\" id=\"radix-:rt:\" aria-haspopup=\"menu\" aria-expanded=\"true\" data-state=\"open\" class=\"group flex w-full it...\" aria-controls=\"radix-:ru:\" data-radix-popper-si...=\"bottom\" data-radix-popper-al...=\"start\">",
           "target": [
-            "#radix-\\:ru\\:"
+            "#radix-\\:rt\\:"
           ],
-          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:rv:\""
+          "failureSummary": "Fix all of the following:\n  Unable to determine if aria-controls referenced ID exists on the page while using aria-haspopup: aria-controls=\"radix-:ru:\""
         }
       ]
     },
@@ -624,9 +624,9 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<tspan x=\"285.7578125\" dy=\"0.71em\">5 Nov</tspan>",
+          "html": "<tspan x=\"285.6796875\" dy=\"0.71em\">5 Nov</tspan>",
           "target": [
-            "tspan[x=\"285.7578125\"][dy=\"0.71em\"]"
+            "tspan[x=\"285.6796875\"][dy=\"0.71em\"]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
         },
@@ -1059,7 +1059,7 @@
                 {
                   "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
                   "target": [
-                    "#radix-\\:ru\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
+                    "#radix-\\:rt\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
                   ]
                 }
               ],
@@ -1072,7 +1072,7 @@
           "impact": "serious",
           "html": "<span aria-hidden=\"true\" class=\"flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[hsl(20_90%_52%)] text-[11px] font-bold text-white shadow-sm\">ST</span>",
           "target": [
-            "#radix-\\:ru\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
+            "#radix-\\:rt\\: > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
         },
@@ -1164,6 +1164,31 @@
             ".cursor-default.data-\\[disabled\\]\\:pointer-events-none.data-\\[highlighted\\]\\:bg-muted:nth-child(3) > .bg-gradient-to-br.from-accent.to-\\[hsl\\(20_90\\%_52\\%\\)\\]"
           ],
           "failureSummary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"block truncate\">shell Traders mw3563s623</span>",
+          "target": [
+            ".cursor-default.data-\\[disabled\\]\\:pointer-events-none.data-\\[highlighted\\]\\:bg-muted:nth-child(3) > .min-w-0.flex-1 > .block.truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
         }
       ]
     }
