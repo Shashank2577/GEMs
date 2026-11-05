@@ -1,0 +1,36 @@
+{
+  "name": "TenderPilot",
+  "short_name": "TenderPilot",
+  "description": "GeM tender co-pilot for Indian sellers: discover, qualify and prepare bids. You type the price and submit on GeM.",
+  "id": "/dashboard",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "lang": "en-IN",
+  "theme_color": "#4f46e5",
+  "background_color": "#ffffff",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

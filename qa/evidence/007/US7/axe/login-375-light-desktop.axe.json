@@ -1,7 +1,1 @@
-{
-  "url": "http://localhost:8788/login",
-  "timestamp": "2026-11-05T07:49:55.475Z",
-  "violations": [],
-  "incomplete": [],
-  "passes": 24
-}
+{"url":"http://localhost:8788/login","timestamp":"2026-11-05T08:40:42.933Z","violations":[],"incomplete":[],"passes":24}

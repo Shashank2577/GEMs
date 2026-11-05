@@ -1,0 +1,20 @@
+{
+  "/icons/icon-192.png": {
+    "w": 192,
+    "h": 192,
+    "bytes": 8431,
+    "purpose": "any"
+  },
+  "/icons/icon-512.png": {
+    "w": 512,
+    "h": 512,
+    "bytes": 25173,
+    "purpose": "any"
+  },
+  "/icons/icon-maskable-512.png": {
+    "w": 512,
+    "h": 512,
+    "bytes": 15163,
+    "purpose": "maskable"
+  }
+}
