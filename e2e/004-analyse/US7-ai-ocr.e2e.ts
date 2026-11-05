@@ -17,12 +17,13 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import type { APIRequestContext, Page, Playwright } from '@playwright/test';
+import type { APIRequestContext, Page, PlaywrightWorkerArgs } from '@playwright/test';
 import type { AnalysisDto, TenderDocumentDto } from '../../packages/core/src/contracts/analyse';
 import { GEM_URL, checkA11y, inviteAs } from '../support/fixtures';
 import { SPEC, analyse, collectRunArtifacts, evidence, expect, mockGem, signupViaApi, test, uniqueUser, uploadFixtureViaApi } from './support';
 import { ESI_ITEM, startLlmStub, type LlmCall, type LlmStub, type StubItem } from './llm-stub';
 
+type PW = PlaywrightWorkerArgs['playwright'];
 const STORY = 'US7';
 const ev = (page: Page, name: string) => evidence(page, SPEC, STORY, `${name}-${test.info().project.name}`);
 const E2E_DB = process.env.E2E_DATABASE_URL || 'postgres://tp:tp@localhost:5433/tenderpilot_e2e';
@@ -127,7 +128,7 @@ function useUpAiSlots(orgId: string, slots = 10) {
 /** A requirement as the contract compares them (ids/timestamps left out). */
 const shape = (a: AnalysisDto) => a.requirements.map((r) => ({ key: r.key, label: r.label, value: r.value, numeric: r.numeric, method: r.method, confidence: r.confidence, page: r.source.page ?? null }));
 
-async function newApiOrg(playwright: Playwright, baseURL: string | undefined) {
+async function newApiOrg(playwright: PW, baseURL: string | undefined) {
   const api = await playwright.request.newContext({ baseURL });
   const res = await api.post('/api/auth/signup', { data: uniqueUser('us7b') });
   expect(res.status(), await res.text()).toBe(201);
@@ -273,7 +274,7 @@ test('2 rule value kept over a lower-confidence LLM value; new key added; fuzzy 
 interface Baseline { tenderId: string; analysis: AnalysisDto }
 let rulesBaseline: Baseline | undefined;
 /** Rules-only reference: another org, same tender and document, AI slots used up → method 'rules', no LLM call. */
-async function baselineRules(playwright: Playwright, baseURL: string | undefined, tenderId?: string): Promise<Baseline> {
+async function baselineRules(playwright: PW, baseURL: string | undefined, tenderId?: string): Promise<Baseline> {
   if (rulesBaseline) return rulesBaseline;
   const api = await newApiOrg(playwright, baseURL);
   const id = tenderId!;
@@ -289,7 +290,7 @@ async function baselineRules(playwright: Playwright, baseURL: string | undefined
 }
 let tender3: { id: string; bidNumber: string } | undefined;
 
-async function failureCase(page: Page, playwright: Playwright, baseURL: string | undefined, mode: 'http-error' | 'non-json', shot: string) {
+async function failureCase(page: Page, playwright: PW, baseURL: string | undefined, mode: 'http-error' | 'non-json', shot: string) {
   await keyedOrg(page);
   tender3 ??= await freshGemTender(page.request);
   const base = await baselineRules(playwright, baseURL, tender3.id);
