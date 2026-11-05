@@ -50,10 +50,10 @@ checklist readiness on the tender page, and Playwright E2E with evidence per sto
 | II. Polite, public-only ingestion | GeM documents fetched once per tender via `GemClient` (≤ 1 req/s, honest UA, back-off, public `/showbidDocument`); source URL + fetch time kept (`tender_documents.source_url`, `created_at`). Gap FR-008 adds a byte cap; FR-046 re-fetches only on corrigendum. | ✅ |
 | III. Deterministic first, models second | Rules path produces every verdict with zero keys; LLM items carry method `LLM`, page, quote, confidence ≤ 0.9; LLM failures fall back to rules; factors and summary explain the score. OCR output is marked `source.ocr` and capped at 0.8. Escalation model (FR-050) only extracts. | ✅ |
 | IV. Tenant isolation & data protection | Analyses, uploads, weights scoped by `org_id`; GeM copies are public data; downloads `private, no-store`; FR-054 forbids sending profile/vault data to the LLM. Roles enforced server-side (`requireRole`). | ✅ |
-| V. Delightful, accessible UX | Loading/empty/error/stale states for every tab; 375 px and 1440 px layouts; reduced motion; aria labels; gap FR-056 adds axe scans. | ✅ (axe gate pending) |
-| VI. Test-first, E2E verified | 42 core unit tests + API tests exist; E2E per story is the main open work (T025, T038, T054, T064, T070, T080, T094). | ⚠️ open — tracked |
+| V. Delightful, accessible UX | Loading/empty/error/stale states for every tab; 375 px and 1440 px layouts; reduced motion; aria labels; gap FR-056 adds axe scans. | ✅ (axe scans done, FR-056) |
+| VI. Test-first, E2E verified | ~480 core unit tests + API tests exist; E2E for US1–US6 done with evidence in `qa/evidence/004/`; the US7 E2E (T094) is the only open one. | ⚠️ open — US7 only |
 | VII. Edge-native, serverless | `unpdf` and fetch-based Anthropic adapter run on Workers; no LLM key → `deps.llm = null` (logged no-op). OCR uses only fetch + pdf-lib. | ✅ |
-| VIII. Simplicity & traceability | One schema (`packages/db/src/schema.ts`), types mirrored in `packages/core/src/analyse/types.ts`; tasks reference FR ids; ported code attributed in `NOTICE`. | ✅ (NOTICE file missing — T004) |
+| VIII. Simplicity & traceability | One schema (`packages/db/src/schema.ts`), types mirrored in `packages/core/src/analyse/types.ts`; tasks reference FR ids; ported code attributed in `NOTICE`. | ✅ (`NOTICE` added, T004) |
 
 No violations requiring Complexity Tracking.
 
@@ -128,22 +128,22 @@ All under `/api`, JSON unless noted, errors `{error:{code,message,details?}}`. R
 | Method & path | Role | Request | Success | Errors | Status |
 |---|---|---|---|---|---|
 | `GET /tenders/:id/documents` | V | — | 200 `{items: TenderDocumentDto[], total}` | 404 tender | built |
-| `POST /tenders/:id/documents` | A | multipart `file`, `kind?` | 201 `TenderDocumentDto` (+ `warnings[]`, `bidNumberFound` — gap FR-010) | 400 `bad_request` / `validation_error`, 403, 404, 413 `payload_too_large`, 415 `unsupported_media_type`, 422 `unreadable_pdf` | built (+gap) |
-| `POST /tenders/:id/fetch-documents` | A | — (gap: `?refresh=1` after corrigendum, FR-046) | 201 `{items,total,fetched:1}` / 200 `{fetched:0}` | 403, 404, 422 `no_gem_document`, 502 `gem_unavailable` (incl. > 25 MB, gap FR-008) | built (+gap) |
+| `POST /tenders/:id/documents` | A | multipart `file`, `kind?` | 201 `TenderDocumentDto` (+ `warnings[]`, `bidNumberFound`, FR-010) | 400 `bad_request` / `validation_error`, 403, 404, 413 `payload_too_large`, 415 `unsupported_media_type`, 422 `unreadable_pdf` | built |
+| `POST /tenders/:id/fetch-documents` | A | — (`?refresh=1` after corrigendum, FR-046) | 201 `{items,total,fetched:1}` / 200 `{fetched:0}` | 403, 404, 422 `no_gem_document`, 502 `gem_unavailable` (incl. > 25 MB, FR-008) | built |
 | `GET /tenders/:id/documents/:docId/download` | V | `?inline=1` | 200 PDF stream | 404 | built |
-| `DELETE /tenders/:id/documents/:docId` | A | — | 204 | 403 (GeM doc), 404 | gap FR-009 |
+| `DELETE /tenders/:id/documents/:docId` | A | — | 204 | 403 (GeM doc), 404 | built (US1, FR-009) |
 | `POST /tenders/:id/documents/:docId/ocr` | A | — | 200 `TenderDocumentDto` (`textSource:'ocr'`) | 404, 409 `conflict` (has text), 502 `ocr_failed`, 503 `ocr_unavailable` | gap FR-052 |
-| `POST /tenders/:id/analyse` | A | — | 201 `AnalysisDto` (with `documents`) | 403, 404, 409 `analysis_running` (gap FR-028), 422 `no_documents`, 500 `analysis_failed` | built (+gap) |
-| `GET /tenders/:id/analysis` | V | — | 200 `AnalysisDto` (+ `lastAttempt`, `staleReason`, `staleAt`, `notes` — gap) | 404 | built (+gap) |
-| `POST /analyses/:id/override` | M | `{factorKey, status, reason}` | 200 `AnalysisDto` | 400 `validation_error`, 403, 404, 409 `conflict` | built |
-| `POST /analyses/:id/rescore` | A | — | 200 `AnalysisDto` | 403, 404, 409 (not done) | gap FR-037 |
+| `POST /tenders/:id/analyse` | A | — | 201 `AnalysisDto` (with `documents`) | 403, 404, 409 `analysis_running` / `analysis_superseded` (FR-028), 422 `no_documents` / `scanned_document`, 500 `analysis_failed` | built |
+| `GET /tenders/:id/analysis` | V | — | 200 `AnalysisDto` (+ `lastAttempt`, `staleReason`, `staleAt`, `notes`) | 404 | built |
+| `POST /analyses/:id/override` | M | `{factorKey, status, reason}` | 200 `AnalysisDto` | 400 `validation_error`, 403, 404, 409 `conflict` (not done) / `analysis_replaced` | built |
+| `POST /analyses/:id/rescore` | A | — | 200 `AnalysisDto` | 403, 404, 409 `conflict` (not done) / `analysis_running` / `analysis_replaced` / `reanalysis_required` | built (US6, FR-037) |
 | `GET /scoring-weights` | V | — | 200 `{weights, defaults, custom}` | — | built |
 | `PUT /scoring-weights` | M | partial `{[factorKey]: 0..100}` or `{}` | 200 `{weights, defaults, custom}` | 400 `validation_error`, 403 | built |
 | `GET /analysis/capabilities` | V | — | 200 `{ai, ocr, models:{enrichment?, ocr?, escalation?}}` | — | gap FR-053 |
 
-`AnalysisDto` additions (gap): `staleReason: 'corrigendum'|'document_added'|'document_removed'|'profile_changed'|'vault_changed'|'weights_changed'|null`,
+`AnalysisDto` additions (built, US6): `staleReason: 'corrigendum'|'document_added'|'document_removed'|'profile_changed'|'vault_changed'|'weights_changed'|null`,
 `staleAt: string|null`, `notes: string[]`, `lastAttempt?: {status:'running'|'failed', error: string|null, at: string}`.
-`TenderDocumentDto` additions (gap): `textSource: 'pdf'|'ocr'`, `bidNumberFound: string|null`.
+`TenderDocumentDto` additions: `bidNumberFound` and `totalPages` (built); `textSource: 'pdf'|'ocr'` is in the DTO (always `'pdf'` until US7).
 
 ## Data Model Touch-points
 

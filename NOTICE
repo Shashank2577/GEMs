@@ -61,27 +61,21 @@ listed here with its licence.
    same markup (spec 007, T004/T032).
    Licence text: https://opensource.org/license/mit
 
-3. GEM-SCRAPER — https://github.com/IshanMaheshwari-777/GEM-SCRAPER
-   Licence: none. The upstream repository has no licence file, so no licence is claimed or granted here; the
-   heuristics were ported with THIS project's owner's approval (not the upstream author's;
-   docs/delivery/TEAM_PLAYBOOK.md reference-scrapers list; specs/006-apply-packet-assist/plan.md, T092). This is an
-   exception to .cairn/workflow/memory/constitution.md (Apache-2.0/MIT only) awaiting human ratification.
-   Used in: packages/core/src/gem/award.ts (parseAwardResult — TypeScript port of the table heuristics of
-   scrape_ra_schedule() in scraper.py: financial-table header keywords, rank / seller / last-numeric-cell price
-   column rules, trophy/winner row marker, trailing portal-tag stripping), spec 006 T092. The fixture
-   packages/core/test/fixtures/gem/ra-result.html is synthetic, built to that structure (the reference
-   ra_page_dump.html is a GeM home page without an evaluation table).
-   Differs from upstream: the rank cell is never used as the price, amount cells are never used as seller
-   names, rows without a price are skipped, and the first winner-marked row is taken (upstream: the last).
-
-4. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
+3. ai-sdlc — https://github.com/Shashank2577/ai-sdlc
    Licence: MIT License
    Used in: CONVENTIONS.md and .aisdlc/ (review and QA process templates only; no runtime code).
 
+Project notes: parseAwardResult (packages/core/src/gem/award-result.ts) was rewritten in #537 from a project-authored
+behaviour spec (specs/006-apply-packet-assist/award-parser-spec.md) without access to GEM-SCRAPER source. It replaces an
+earlier port of GEM-SCRAPER's scrape_ra_schedule() heuristics (IshanMaheshwari-777/GEM-SCRAPER, no licence). The spec was
+derived from our plan, tests and fixture, which describe those heuristics (header keyword list; winner = marked row, else
+rank 1, else first row), and the authors had seen the earlier port. No GEM-SCRAPER code or text is included.
+
 Other reference repositories in the owner's reference set (Giridar33/gem-tender-tracker,
 PranavTamada/Tender_Scraper, Mujahid-Alam/gem-tender-pdf-extractor,
-Giri-Aayush/gem, rounittxx/gem-bid-scraper) were consulted for portal behaviour but no code or text from
-them has been copied into this repository as of 2026-11-05. Add an entry above before copying from any of them.
+Giri-Aayush/gem, rounittxx/gem-bid-scraper, IshanMaheshwari-777/GEM-SCRAPER) were consulted for portal behaviour but no code or text from
+the consulted repositories is present in the current tree as of 2026-11-05. An earlier GEM-SCRAPER port was removed in #537 and remains in
+git history. Add an entry above before copying from any of them.
 
 Mujahid-Alam/gem-tender-pdf-extractor has no licence: it is used for ideas only — no licence, no code
 copied. Its page-1 field list (gem3.py) serves only as a coverage checklist for our own label table

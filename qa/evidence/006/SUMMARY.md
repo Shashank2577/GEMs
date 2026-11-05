@@ -33,7 +33,7 @@ No price, CAPTCHA, OTP, DSC, e-Sign or final-submit automation in apps/extension
 ## Open follow-ups
 - #494 Annexures: phone breakpoint 768 vs spec 640; palette aria-label/visible text mismatch
 - #500 NFR-003 packet build memory vs the 60 MB input cap
-- #537 needs-human: ratify or replace the unlicensed GEM-SCRAPER port exception
+- #537: resolved by independent reimplementation in #550 (pending human confirmation before close)
 - #538 Narrow read-only API tokens to the routes the extension needs
 - Observation from HARDEN QA: shared workspace header buttons fail axe label-content-name-mismatch on a full-page scan
 
