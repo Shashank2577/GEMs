@@ -1,7 +1,7 @@
 /** Upload a document: drop a file, we guess type/title/FY, the user confirms the metadata. */
 import { useEffect, useState } from 'react';
 import { FileText, ImageIcon, Lock, RefreshCw } from 'lucide-react';
-import { VAULT_ACCEPT, VAULT_MAX_BYTES } from '@tp/core/contracts/vault';
+import { VAULT_ACCEPT, VAULT_MAX_BYTES, type VaultDocumentDto } from '@tp/core/contracts/vault';
 import { guessDocType, guessFinancialYear, type DocType } from '@tp/core/vault/status';
 import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, FileDropzone, formatBytes, toast,
@@ -23,7 +23,7 @@ export function serverFieldErrors(e: unknown): Record<string, string> {
 }
 
 export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUploaded }: {
-  open: boolean; onOpenChange: (o: boolean) => void; initialFile?: File | null; presetType?: DocType | null; onUploaded?: (id: string) => void;
+  open: boolean; onOpenChange: (o: boolean) => void; initialFile?: File | null; presetType?: DocType | null; onUploaded?: (id: string, doc: VaultDocumentDto) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [draft, setDraft] = useState<DocDraft>(emptyDraft());
@@ -63,7 +63,7 @@ export function UploadDialog({ open, onOpenChange, initialFile, presetType, onUp
         toast.success(`“${doc.title}” added to the vault`, {
           description: doc.status === 'expired' ? 'Heads up: this document has already expired.' : doc.status === 'expiring' ? `It expires in ${doc.daysToExpiry} days — we’ll remind you.` : doc.pageCount ? `${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'} · stored privately` : 'Stored privately',
         });
-        onUploaded?.(doc.id);
+        onUploaded?.(doc.id, doc);
         onOpenChange(false);
       },
       onError: (err) => {

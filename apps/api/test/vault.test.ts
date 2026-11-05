@@ -502,13 +502,14 @@ describe('past contracts & OEM authorisations (US5)', () => {
   it('lists by end date desc, then created desc (FR-056)', async () => {
     const o = await seedOrgWithRoles(ctx.app, 'US5 Order');
     // created_at comes from the DB default, so sequential inserts are strictly ordered.
-    for (const [title, endDate] of [['Old', '2023-03-31'], ['Newest', '2025-09-30'], ['Same end, created first', '2024-12-31'], ['Same end, created later', '2024-12-31']]) {
+    // Undated contracts sort last (NULLS LAST), not as the newest.
+    for (const [title, endDate] of [['Undated', null], ['Old', '2023-03-31'], ['Newest', '2025-09-30'], ['Same end, created first', '2024-12-31'], ['Same end, created later', '2024-12-31']]) {
       const r = await request(ctx.app, 'POST', '/past-contracts', { cookie: o.analyst.cookie, json: { buyer: 'NIC', title, value: 1000, endDate } });
       expect(r.status).toBe(201);
     }
     const l = await request(ctx.app, 'GET', '/past-contracts', { cookie: o.viewer.cookie });
-    expect(l.body.total).toBe(4);
-    expect(l.body.items.map((i: any) => i.title)).toEqual(['Newest', 'Same end, created later', 'Same end, created first', 'Old']);
+    expect(l.body.total).toBe(5);
+    expect(l.body.items.map((i: any) => i.title)).toEqual(['Newest', 'Same end, created later', 'Same end, created first', 'Old', 'Undated']);
   });
 
   it('logs added / updated (with fields) / deleted activity (FR-057)', async () => {
@@ -537,7 +538,7 @@ describe('past contracts & OEM authorisations (US5)', () => {
     ['a document of another type (CRAC)', () => cracId],
     ['a random UUID', () => '6f1c2d3e-4b5a-4c6d-8e7f-901234567890'],
   ])('rejects OEM documentId of %s → 400 (FR-061)', async (_label, id) => {
-    await request(ctx.app, 'PUT', '/profile', { cookie: us5.analyst.cookie, json: oem(mafId) });
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: us5.analyst.cookie, json: oem(mafId) })).status).toBe(200);
     const body = { oemAuthorizations: [{ oem: 'HP', products: '', documentId: mafId }, { oem: 'Dell', products: '', documentId: id() }] };
     const r = await request(ctx.app, 'PUT', '/profile', { cookie: us5.analyst.cookie, json: body });
     expect(r.status).toBe(400);
@@ -547,5 +548,22 @@ describe('past contracts & OEM authorisations (US5)', () => {
     const stored = (await request(ctx.app, 'GET', '/profile', { cookie: us5.viewer.cookie })).body.profile.oemAuthorizations;
     expect(stored).toHaveLength(1);
     expect(stored[0].documentId).toBe(mafId);
+  });
+
+  it('a stored link that went stale (retyped or deleted) never blocks an unrelated save; a new bad id still does', async () => {
+    const o = await seedOrgWithRoles(ctx.app, 'US5 Stale');
+    const maf = await upload(o.analyst, 'oem_authorization', 'Lenovo MAF');
+    const gone = await upload(o.analyst, 'oem_authorization', 'Acer MAF');
+    const rows = [{ oem: 'Lenovo', products: '', documentId: maf }, { oem: 'Acer', products: '', documentId: gone }];
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: rows } })).status).toBe(200);
+    expect((await request(ctx.app, 'PATCH', `/vault/${maf}`, { cookie: o.analyst.cookie, json: { type: 'crac' } })).status).toBe(200);
+    await ctx.db.delete(vaultDocuments).where(eq(vaultDocuments.id, gone));
+    // Unrelated field, and the editor's usual full resend of the stored rows → both 200.
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { tradeName: 'Stale Co' } })).status).toBe(200);
+    expect((await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { tradeName: 'Stale Co 2', oemAuthorizations: rows } })).status).toBe(200);
+    // A NEW invalid id is still refused.
+    const r = await request(ctx.app, 'PUT', '/profile', { cookie: o.analyst.cookie, json: { oemAuthorizations: [...rows, { oem: 'HP', products: '', documentId: otherMafId }] } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields).toEqual({ 'oemAuthorizations.2.documentId': 'Pick an OEM authorisation from your vault' });
   });
 });

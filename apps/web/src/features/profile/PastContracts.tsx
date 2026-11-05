@@ -1,7 +1,8 @@
 /** Past contracts / CRACs — saved immediately (separate API from the profile form). */
 import { useEffect, useState } from 'react';
 import { Briefcase, Link2, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { BUYER_TYPES, BUYER_TYPE_LABELS, pastContractCreateSchema, type PastContractDto } from '@tp/core/contracts/vault';
+import { BUYER_TYPES, BUYER_TYPE_LABELS, pastContractCreateSchema, type PastContractDto, type VaultDocumentDto } from '@tp/core/contracts/vault';
+import { docTypeInfo } from '@tp/core/vault/status';
 import {
   Badge, Button, ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DropdownMenu,
   DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, ErrorState, Field, Input, ResponsiveTable, Select, SkeletonList, toast, type Column,
@@ -27,6 +28,14 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
   const save = useSavePastContract();
   const docs = useVault({ category: 'Experience' });
   const [uploading, setUploading] = useState(false);
+  // The just-uploaded CRAC, shown in the picker until the refetched vault list includes it (no blank picker).
+  const [uploaded, setUploaded] = useState<VaultDocumentDto | null>(null);
+  const onUploaded = (id: string, doc: VaultDocumentDto) => {
+    // FR-059/FR-062: only Experience documents count as proof; the type may have been changed in the dialog.
+    if (docTypeInfo(doc.type).category !== 'Experience') { toast.warning('Uploaded to the vault, but only Experience documents can be linked as proof'); return; }
+    setUploaded(doc);
+    set('cracDocumentId', id);
+  };
   useEffect(() => { if (open) { setD(editing ? fromDto(editing) : empty); setErrors({}); } }, [open, editing]);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
 
@@ -47,7 +56,7 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
 
   const docOptions = [
     { value: '__none', label: 'Not linked' },
-    ...(docs.data?.items ?? []).map((x) => ({ value: x.id, label: x.title })),
+    ...[...(docs.data?.items ?? []), ...(uploaded && !docs.data?.items.some((x) => x.id === uploaded.id) ? [uploaded] : [])].map((x) => ({ value: x.id, label: x.title })),
     { value: '__upload', label: 'Upload a new CRAC…' },
   ];
   return (
@@ -82,7 +91,7 @@ function ContractDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
           </Field>
         </form>
         {/* FR-062: rendered inside the contract dialog so it stacks on top and the draft is kept. */}
-        <UploadDialog open={uploading} onOpenChange={setUploading} presetType="crac" onUploaded={(id) => set('cracDocumentId', id)} />
+        <UploadDialog open={uploading} onOpenChange={setUploading} presetType="crac" onUploaded={onUploaded} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="submit" form="pc-form" loading={save.isPending}>{editing ? 'Save contract' : 'Add contract'}</Button>

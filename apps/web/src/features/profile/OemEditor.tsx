@@ -40,15 +40,16 @@ export function OemEditor({ value, onChange, errors, disabled }: {
               hint={st || offerDocExpiry ? (
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   {st && <ExpiryBadge status={st.status} days={st.daysToExpiry} />}
+                  {offerDocExpiry && !r.validTill && <span>Document expires {formatDateIST(docExpiry)}</span>}
                   {offerDocExpiry && (
                     <Button type="button" variant="link" size="sm" className="h-auto text-xs" onClick={() => update(i, { validTill: docExpiry })}>
-                      Use document expiry ({formatDateIST(docExpiry)})
+                      {r.validTill ? `Use document expiry (${formatDateIST(docExpiry)})` : 'Use document expiry'}
                     </Button>
                   )}
                 </span>
               ) : undefined}
             >
-              <Input type="date" value={r.validTill ?? ''} placeholder={docExpiry ?? undefined} disabled={disabled} onChange={(e) => update(i, { validTill: e.target.value || null })} />
+              <Input type="date" value={r.validTill ?? ''} disabled={disabled} onChange={(e) => update(i, { validTill: e.target.value || null })} />
             </Field>
             <Field label="Vault document" id={`f-oemAuthorizations.${i}.documentId`} error={errors[`oemAuthorizations.${i}.documentId`]}>
               <Select value={r.documentId ?? '__none'} disabled={disabled} onValueChange={(v) => update(i, { documentId: v === '__none' ? null : v })} options={options} />

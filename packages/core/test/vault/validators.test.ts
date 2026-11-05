@@ -183,25 +183,3 @@ describe('quoted examples are themselves valid (FR-004)', () => {
   });
   it('PIN placeholder used in the UI (411001) is valid', () => expect(validatePincode('411001')).toBeNull());
 });
-
-describe('quoted examples are themselves valid (FR-004)', () => {
-  // Every "e.g. …" in a validator message (and the matching UI placeholder/hint) must pass its own validator.
-  const exampleIn = (msg: string | null, re: RegExp) => { expect(msg).not.toBeNull(); const m = msg!.match(re); expect(m).not.toBeNull(); return m![1]!; };
-  it.each([
-    ['GSTIN', validateGstin, '27AAPFU0939F1Z', /e\.g\. (\w+)/],
-    ['PAN', validatePan, 'AAPF', /e\.g\. (\w+)/],
-    ['Udyam', validateUdyam, 'UDYAM-1', /e\.g\. ([\w-]+)/],
-    ['CIN', validateCin, 'U72200MH2015PTC12345', /e\.g\. (\w+)/],
-    ['IFSC', validateIfsc, 'HDFC1', /e\.g\. (\w+)/],
-    ['DPIIT', validateDpiit, 'X1', /like (\w+)/],
-  ] as const)('%s', (_name, validator, bad, re) => {
-    const example = exampleIn((validator as (v: string) => string | null)(bad), re);
-    expect((validator as (v: string) => string | null)(example)).toBeNull();
-  });
-  it('GSTIN example is 27AAPCS1234K1Z2 and embeds the PAN example', () => {
-    expect(validateGstin('27AAPCS1234K1Z5')).not.toBeNull();
-    expect(exampleIn(validateGstin('1'), /e\.g\. (\w+)/)).toBe('27AAPCS1234K1Z2');
-    expect(gstinPan('27AAPCS1234K1Z2')).toBe(exampleIn(validatePan('1'), /e\.g\. (\w+)/));
-  });
-  it('PIN placeholder used in the UI (411001) is valid', () => expect(validatePincode('411001')).toBeNull());
-});
