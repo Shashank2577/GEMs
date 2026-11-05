@@ -22,6 +22,8 @@ export interface RuntimeEnv {
   WHATSAPP_PHONE_ID?: string;
   WHATSAPP_API_VERSION?: string;
   LOG_REQUESTS?: string;
+  /** Which proxy header carries the client IP: "cloudflare" (cf-connecting-ip), "xff"/"1" (x-forwarded-for), unset = none. */
+  TRUST_PROXY?: string;
   /** "development" | "production" | "test" */
   NODE_ENV?: string;
 }
@@ -35,6 +37,16 @@ export interface AppConfig {
   logRequests: boolean;
   mailFrom: string;
   llmModel: string;
+  /** Proxy whose client-IP header is trusted for rate limiting (002/FR-010). */
+  trustProxy: TrustProxy;
+}
+
+export type TrustProxy = 'cloudflare' | 'xff' | 'none';
+
+function parseTrustProxy(v: string | undefined): TrustProxy {
+  if (!v) return 'none';
+  if (/^cloudflare$/i.test(v)) return 'cloudflare';
+  return /^(1|true|yes|on|xff|x-forwarded-for)$/i.test(v) ? 'xff' : 'none';
 }
 
 export const DEFAULT_LLM_MODEL = 'claude-sonnet-5-5';
@@ -54,6 +66,7 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     logRequests: truthy(env.LOG_REQUESTS, environment !== 'test'),
     mailFrom: env.MAIL_FROM || 'TenderPilot <alerts@tenderpilot.in>',
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
   };
 }
 

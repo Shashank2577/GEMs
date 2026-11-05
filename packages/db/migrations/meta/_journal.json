@@ -8,6 +8,13 @@
       "when": 1793813376188,
       "tag": "0000_last_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793845957931,
+      "tag": "0001_tranquil_iron_monger",
+      "breakpoints": true
     }
   ]
 }

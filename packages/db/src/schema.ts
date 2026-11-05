@@ -60,7 +60,32 @@ export const sessions = pgTable('sessions', {
   activeOrgId: uuid('active_org_id').references(() => organizations.id, { onDelete: 'set null' }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: createdAt(),
+  /** Raw User-Agent at sign-in (truncated), for "Where you're signed in" (002/FR-012). */
+  userAgent: text('user_agent'),
+  /** Refreshed at most every 5 minutes by resolveAuth (002/FR-012). */
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
 }, (t) => ({ tokenUq: uniqueIndex('sessions_token_uq').on(t.tokenHash) }));
+
+/** Failed-authentication counters for rate limiting (002/FR-010). key = normalised email or client IP. */
+export const authAttempts = pgTable('auth_attempts', {
+  key: text('key').notNull(),
+  kind: text('kind').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull().default(0),
+}, (t) => ({ pk: primaryKey({ columns: [t.key, t.kind] }) }));
+
+/** Single-use password reset links (002/FR-011). Only the SHA-256 of the token is stored. */
+export const passwordResets = pgTable('password_resets', {
+  id: id(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => ({
+  tokenUq: uniqueIndex('password_resets_token_uq').on(t.tokenHash),
+  userIdx: index('password_resets_user_idx').on(t.userId),
+}));
 
 /** Personal API tokens (browser extension). */
 export const apiTokens = pgTable('api_tokens', {

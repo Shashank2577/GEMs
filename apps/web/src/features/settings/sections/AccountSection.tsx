@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { PasswordInput } from '@/features/auth/PasswordInput';
 import { useChangePassword, useUpdateMe } from '../api';
 import { Panel, fieldErrors } from './Panel';
+import { SessionsPanel } from './SessionsPanel';
 
 /** "+919822012345" → "98220 12345" for display. */
 export const displayMobile = (e164: string | null | undefined) => (e164?.startsWith('+91') ? `${e164.slice(3, 8)} ${e164.slice(8)}` : e164 ?? '');
@@ -79,6 +80,7 @@ export default function AccountSection() {
           </div>
         </Panel>
       </form>
+      <SessionsPanel />
     </div>
   );
 }
