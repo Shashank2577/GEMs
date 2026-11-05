@@ -120,3 +120,12 @@ describe('financial years', () => {
     expect(averageTurnoverLastN([{ fy: 'junk', turnover: 5 }], 3)).toBeNull();
   });
 });
+
+describe('isoDateSchema (US6 review: impossible calendar dates)', () => {
+  it('accepts real dates incl. 29 Feb in a leap year and rejects rolled-over ones', async () => {
+    const { isoDateSchema } = await import('../../src/contracts/vault');
+    expect(isoDateSchema.safeParse('2028-02-29').success).toBe(true);
+    expect(isoDateSchema.safeParse('2029-11-03').success).toBe(true);
+    for (const bad of ['2029-02-29', '2029-02-30', '2026-04-31', '2026-13-01', '2026-00-10']) expect(isoDateSchema.safeParse(bad).success, bad).toBe(false);
+  });
+});
