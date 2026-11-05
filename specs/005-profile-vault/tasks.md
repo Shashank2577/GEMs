@@ -83,7 +83,7 @@ task is sized at ≤ 1 day.
 - [x] T019 [US1] In-app navigation guard: `useBlocker(dirty)` + `ConfirmDialog` "Discard unsaved changes?" with **Stay** / **Discard and leave** in `apps/web/src/features/profile/ProfilePage.tsx` FR-013 (#127)
 - [x] T020 [US1] Optimistic concurrency: accept optional `expectedUpdatedAt` in `profileInputSchema` (`packages/core/src/contracts/vault.ts`), return 409 `conflict` "Someone else saved the profile at <time IST>. Reload to see their changes." when it differs from the stored `updated_at` in `apps/api/src/routes/profile.ts`; API test for both match and mismatch in `apps/api/test/vault.test.ts` FR-014 (#128)
 - [x] T021 [US1] Web: send `expectedUpdatedAt` from `profile.data.profile.updatedAt` on save and show the 409 message with a **Reload** action (keeps the draft until reload) in `apps/web/src/features/profile/ProfilePage.tsx`, `apps/web/src/features/profile/api.ts` FR-014 (#129)
-- [ ] T022 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in `qa/evidence/005/US1/` — scenarios 1–14 (desktop + `@mobile` 375 px: pill nav, save bar above tab bar, no horizontal scroll), viewer read-only, axe scan; spec `e2e/005-profile-vault/US1-profile.e2e.ts`; `VERDICT.md` FR-001…FR-015, NFR-005, NFR-006 (#130)
+- [x] T022 [US1] QA: Playwright E2E for US1 with evidence (screenshots, video, trace) in `qa/evidence/005/US1/` — scenarios 1–14 (desktop + `@mobile` 375 px: pill nav, save bar above tab bar, no horizontal scroll), viewer read-only, axe scan; spec `e2e/005-profile-vault/US1-profile.e2e.ts`; `VERDICT.md` FR-001…FR-015, NFR-005, NFR-006 (#130)
 
 **Checkpoint**: Profile editing is fully functional and testable independently
 
