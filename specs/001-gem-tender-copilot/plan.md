@@ -16,7 +16,8 @@ R2 stores files.
 
 **Language/Version**: TypeScript 5.x, Node 22 (local/CI), Cloudflare Workers runtime (prod)
 **Primary Dependencies**:
-- API: Hono 4, Drizzle ORM, zod, `@neondatabase/serverless` (prod) / `pg` (local), `unpdf` (PDF text),
+- API: Hono 4, Drizzle ORM, zod, `pg` (one driver: Node locally/CI, and on Workers through the Hyperdrive binding —
+  spec 008 FR-075, ADR-0002), `unpdf` (PDF text),
   `pdf-lib` (packet/annexures), WebCrypto PBKDF2 for passwords.
 - Web: React 18, Vite 5, React Router 6, TanStack Query 5, Tailwind CSS 3 with a token-based design
   system (CSS variables, light/dark), Radix UI primitives, lucide-react icons, Recharts, sonner
@@ -68,7 +69,7 @@ packages/
     src/assist/     # extension fill allow-list + field mapping
     src/contracts/  # zod DTOs shared by API and web
     test/fixtures/  # recorded BidPlus JSON, sample bid PDFs
-  db/              # drizzle schema, migrations (SQL), db factory (pg | neon), seed/demo data
+  db/              # drizzle schema, migrations (SQL), db factory (`createNodeDb`, pg), seed/demo data
 apps/
   api/             # Hono app: routes/, services/, middleware/, adapters/ (blob, llm, mail, whatsapp)
     src/app.ts      # createApp(deps)
@@ -112,11 +113,20 @@ wrangler.toml      # one Worker: API at /api/*, SPA via static assets, cron, R2 
 6. **Alerts**: `notifications` table is the outbox; dispatcher sends email (Resend API) / WhatsApp
    (Meta Cloud API) when keys exist, else marks `skipped`.
 7. **Single Worker deploy**: `wrangler.toml` `assets = { directory = "apps/web/dist", not_found_handling = "single-page-application" }`,
-   `run_worker_first = ["/api/*"]`, cron `*/30 * * * *`, R2 binding `BLOBS`, secrets `DATABASE_URL`,
-   `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `SESSION_SECRET`.
+   `run_worker_first = ["/api/*"]`, cron `*/30 * * * *`, R2 binding `BLOBS`. Secrets (spec 008 FR-015; managed
+   only via `wrangler secret put` for the Worker and GitHub encrypted secrets for CI; owner, location, rotation and
+   blast radius in `docs/runbook.md` § Secrets): Worker — `DATABASE_URL` (Neon pooled `-pooler` host),
+   `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `SENTRY_DSN`, `UNSUBSCRIBE_SECRET`, `ADMIN_TOKEN`;
+   CI — `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `STAGING_DATABASE_URL`, `PROD_DATABASE_URL`, `NEON_API_KEY`.
+   Session tokens are random and stored hashed, so there is no session-signing secret.
+
+> Secrets check (008 T009, against `apps/api/src/env.ts`, `wrangler.toml` and `.dev.vars.example`): `UNSUBSCRIBE_SECRET`
+> (HMAC key of one-click unsubscribe links; required together with `RESEND_API_KEY`, else alert
+> emails carry no `List-Unsubscribe` header) is read by the Worker, and `ADMIN_TOKEN` must be at least 32 characters or the operator endpoint stays
+> off. `SESSION_SECRET` is read nowhere.
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| Two DB drivers | Neon in Workers, `pg` locally | Neon serverless driver cannot target a local Postgres without a proxy in CI |
+| — | (none) | The former "Two DB drivers" row is gone: Workers use `pg` over Hyperdrive since spec 008 FR-075. |

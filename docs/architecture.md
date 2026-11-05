@@ -46,7 +46,7 @@ flowchart LR
   B -- "/* (SPA)" --> A
   X -- "/api/assist/:id" --> W
   CRON --> W
-  W -- "WebSocket Pool per request<br/>@neondatabase/serverless" --> PG
+  W -- "pg Pool (max 5) per request<br/>via Hyperdrive (008/FR-075)" --> PG
   W -- "put/get/delete<br/>BlobStore" --> R2
   W -- "≤1 req/s, honest UA<br/>GemClient" --> GEM
   W -. "analyse (rules + LLM)" .-> LLM
@@ -59,7 +59,7 @@ flowchart LR
 | Layer | Path | Responsibility |
 |---|---|---|
 | Domain (pure, no I/O) | `packages/core/src/{gem,match,analyse,vault,packet,assist,contracts}` | BidPlus parsing + polite client, watchlist matcher, PDF text → requirements (rules, optional LLM), scoring, checklist, annexures, packet merge, extension allow-list, zod DTOs shared with the web app |
-| Schema (source of truth) | `packages/db/src/schema.ts`, `packages/db/migrations/` | Drizzle schema, SQL migrations, `createNodeDb` (pg) / `createNeonDb` (neon-serverless), seed + demo data |
+| Schema (source of truth) | `packages/db/src/schema.ts`, `packages/db/migrations/` | Drizzle schema, SQL migrations, `createNodeDb` (pg — the only driver, also on Workers via Hyperdrive since 008/FR-075), seed + demo data |
 | API | `apps/api/src/{app,routes,services,middleware,lib,adapters}` | Hono routers (thin), services (orchestration), auth middleware, adapters for blob/LLM/mail/WhatsApp, `createDeps()` |
 | Entrypoints | `apps/api/src/worker.ts` (Cloudflare), `apps/api/src/node.ts` (Node) | Build `AppDeps` per runtime, mount `createApp(deps)`, run `runScheduledJobs(deps)` on cron / interval |
 | Web | `apps/web` | SPA, TanStack Query over `/api`, same origin (no CORS) |
@@ -83,11 +83,11 @@ plugs into (rate limiter, usage meter, error reporter are new `AppDeps` members,
 sequenceDiagram
   participant Br as Browser
   participant W as Worker fetch()
-  participant DB as Neon (Pool/WebSocket)
+  participant DB as Neon (via Hyperdrive)
   participant R2 as R2
 
   Br->>W: GET /api/tenders?matched=1 (cookie tp_session)
-  W->>W: withDeps(): createNeonDb(DATABASE_URL) → new Pool
+  W->>W: withDeps(): createNodeDb(env.HYPERDRIVE.connectionString, {max: 5}) → new pg Pool
   W->>W: createApp(deps).fetch(req)
   W->>DB: select session by sha256(token) (+ user, membership, org)
   Note over W: requireAuth sets c.var user/org/role — every query uses orgId(c)

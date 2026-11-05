@@ -1,0 +1,20 @@
+# sc8-later-triggers — project desktop — 2026-11-05T10:31:07.214Z
+## LATER triggers
+
+Deferred decisions, each with the measurable trigger that reopens it (FR-076). Check these at the monthly ops review.
+
+| Item | Trigger (any one) | Decision record |
+|---|---|---|
+| Cloudflare Queues for analysis / packet builds | analysis p95 > 60 s over a week (`tender.analysed` `total_ms` in `activity_log`); an "analyse all new matches" batch feature is scheduled; a customer needs > 300-page documents | [ADR-0007 §5](adr/0007-synchronous-analysis-and-packet-with-caps.md) |
+| Postgres row-level security | a second code path to the database (reporting, admin tools, BI) is planned; or a customer security questionnaire requires RLS | [ADR-0004 §3](adr/0004-tenant-isolation-application-level.md) |
+| Razorpay subscriptions + webhook | ≥ 5 paying orgs (`select count(*) from organizations where plan <> 'trial'`) | [ADR-0010 §6](adr/0010-plan-limits-and-billing-readiness.md) |
+| Workers Analytics Engine request metrics | a customer asks for per-org request/usage metrics that `activity_log` + `llm_usage` cannot answer | [ADR-0011 §5](adr/0011-observability.md) |
+| Weekly `pg_dump` to R2 | a customer requires off-provider backups (contract / security questionnaire) | [ADR-0013 §3](adr/0013-deployment-migrations-backups-secrets.md) |
+| Revisit keeping closed tenders | `tenders` reaches 5M rows | [ADR-0012](adr/0012-data-retention-and-housekeeping.md) |
+
+Queues: trigger "analysis p95 > 60 s over a week (`tender.analysed` `total_ms` in `activity_log`); an "anal…" → adr/0007-synchronous-analysis-and-packet-with-caps.md (file exists: true)
+RLS: trigger "a second code path to the database (reporting, admin tools, BI) is planned; or a customer …" → adr/0004-tenant-isolation-application-level.md (file exists: true)
+Razorpay: trigger "≥ 5 paying orgs (`select count(*) from organizations where plan <> 'trial'`)" → adr/0010-plan-limits-and-billing-readiness.md (file exists: true)
+Analytics Engine: trigger "a customer asks for per-org request/usage metrics that `activity_log` + `llm_usage` cannot…" → adr/0011-observability.md (file exists: true)
+weekly pg_dump: trigger "a customer requires off-provider backups (contract / security questionnaire)" → adr/0013-deployment-migrations-backups-secrets.md (file exists: true)
+docs/adr/README.md lists LATER priorities: 4 mentions

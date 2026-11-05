@@ -97,6 +97,76 @@ describe('chunked enrichment (T087, FR-051)', () => {
   });
 });
 
+describe('chunked enrichment × shared extraction cache (FR-051 × 008/FR-072)', () => {
+  const longPages = (count: number) => Array.from({ length: count }, (_, i) => `Page text ${i + 1} ` + 'terms and conditions of the bid '.repeat(800));
+  let other: Awaited<ReturnType<typeof seedOrgWithRoles>>;
+  beforeAll(async () => {
+    other = await seedOrgWithRoles(ctx.app, 'Tier Co B');
+    await ctx.db.update(organizations).set({ plan: 'pro' }).where(eq(organizations.id, other.orgId));
+  });
+  /** A GeM-fetched (public, org_id null) document every org sees. */
+  async function gemTenderWithText(pages: string[], fileName: string) {
+    n++;
+    const [t] = await ctx.db.insert(tenders).values({
+      bidNumber: `GEM/2026/B/96${String(n).padStart(5, '0')}`, title: 'Tiers cache', sourceUrl: `https://bidplus.gem.gov.in/all-bids#c${n}`,
+      contentHash: `tiers-cache-${n}`, endAt: new Date('2026-11-28T09:30:00Z'),
+    }).returning();
+    await ctx.db.insert(tenderDocuments).values({
+      tenderId: t!.id, orgId: null, kind: 'bid', fileName, blobKey: `gem/tender/${n}.pdf`, sizeBytes: 100,
+      pageCount: pages.length, totalPages: pages.length, text: pages.join(PAGE_SEPARATOR),
+    });
+    return t!;
+  }
+  const runAs = (org: typeof roles, tenderId: string, llm: LlmClient) =>
+    analyseTender({ ...ctx.deps, llm, llmFor: (p) => (p === 'enrichment' ? llm : null) },
+      { orgId: org.orgId, userId: org.analyst.me.user.id, tenderId, viewer: {} });
+  const certPerCall = (_r: Req, i: number) => ({ requirements: [{ key: 'certificate', label: `Cert ${i}`, value: `CERT-${i}`, page: 1, quote: 'q', confidence: 0.8 }] });
+
+  it('a fully read chunked document is stored (union of the chunks) and another org reuses it with zero LLM calls', async () => {
+    const t = await gemTenderWithText(longPages(4), 'gem-long.pdf'); // 2 chunks
+    const seenA: Req[] = [];
+    const a = await runAs(roles, t.id, fake('s', certPerCall, seenA));
+    expect(seenA).toHaveLength(2);
+    const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+    expect(doc!.extractedMethod).toBe('LLM');
+    expect((doc!.requirements ?? []).map((r) => r.value)).toEqual(['CERT-0', 'CERT-1']);
+
+    const seenB: Req[] = [];
+    const b = await runAs(other, t.id, fake('s', certPerCall, seenB));
+    expect(seenB).toHaveLength(0);
+    expect(b.analysis).toMatchObject({ method: 'rules+llm', warnings: [], notes: [] });
+    const llmOf = (x: typeof a) => x.analysis.requirements.filter((r) => r.method === 'LLM');
+    expect(llmOf(b)).toEqual(llmOf(a));
+    expect(await ctx.db.select().from(llmUsage).where(eq(llmUsage.analysisRef, b.analysis.id))).toHaveLength(0);
+  });
+
+  it('a document with unread pages (beyond 4 chunks) is NOT stored; the next org calls the LLM again', async () => {
+    const t = await gemTenderWithText(longPages(12), 'gem-huge.pdf'); // pages 9–12 unread
+    const seen: Req[] = [];
+    const a = await runAs(roles, t.id, fake('s', certPerCall, seen));
+    expect(seen).toHaveLength(4);
+    expect(a.analysis.notes).toEqual(['Pages 9–12 of gem-huge.pdf were not read by AI']);
+    const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+    expect(doc).toMatchObject({ requirements: null, extractorVersion: null, extractedMethod: null });
+    await runAs(other, t.id, fake('s', certPerCall, seen));
+    expect(seen).toHaveLength(8);
+  });
+
+  it('a failed chunk or an OCR-derived document is NOT stored', async () => {
+    const failed = await gemTenderWithText(longPages(4), 'gem-fail.pdf');
+    await runAs(roles, failed.id, fake('s', (r, i) => { if (i === 1) throw new Error('overloaded'); return certPerCall(r, i); }));
+    const ocr = await gemTenderWithText(longPages(2), 'gem-ocr.pdf');
+    await ctx.db.update(tenderDocuments).set({ textSource: 'ocr' }).where(eq(tenderDocuments.tenderId, ocr.id));
+    const seen: Req[] = [];
+    await runAs(roles, ocr.id, fake('s', certPerCall, seen));
+    expect(seen).toHaveLength(1);
+    for (const t of [failed, ocr]) {
+      const [doc] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.tenderId, t.id));
+      expect(doc).toMatchObject({ requirements: null, extractorVersion: null, extractedMethod: null });
+    }
+  });
+});
+
 describe('escalation (T088, FR-050, FR-048)', () => {
   const spec = getSampleBidSpec('go-it-services')!;
   async function sampleText() {

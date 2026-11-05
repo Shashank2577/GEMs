@@ -16,7 +16,8 @@ import {
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
 import {
-  buildEscalationPrompt, buildLlmPrompt, chunkPages, enrichWithLlm, escalateWithLlm, escalationCandidates, promptChars, unreadPagesNote,
+  CURRENT_EXTRACTOR_VERSION, buildEscalationPrompt, buildLlmPrompt, chunkPages, enrichWithLlm, escalateWithLlm, escalationCandidates,
+  mergeRequirements, promptChars, unreadPagesNote,
 } from '@tp/core/analyse/llm';
 import {
   PdfPageLimitError, PdfTextError, extractPdf, isPdf, isScannedDocument, joinPages, looksScanned, splitPages,
@@ -688,6 +689,44 @@ export function withTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms: nu
   return Promise.race([call(ctrl.signal), expired]).finally(() => clearTimeout(timer));
 }
 
+/**
+ * 008/FR-072 shared extraction cache — tenant isolation: ONLY documents fetched from GeM (`org_id IS NULL`, public data
+ * every org sees) are ever cached or reused. An org's own upload is never written to or read from the cache, so no
+ * requirement derived from one tenant's document can appear in another tenant's analysis.
+ */
+export function cachedExtraction(d: Pick<DocRow, 'orgId' | 'requirements' | 'extractorVersion' | 'extractedMethod'>): Requirement[] | null {
+  if (d.orgId !== null) return null;
+  if (d.extractedMethod !== 'LLM' || d.extractorVersion !== CURRENT_EXTRACTOR_VERSION || !Array.isArray(d.requirements)) return null;
+  return d.requirements;
+}
+
+/** Longest the analysis waits for the cache write; past it the write may still land, but the analysis goes on. */
+export const STORE_EXTRACTION_TIMEOUT_MS = 2_000;
+
+/**
+ * Write the shared extraction (org-null documents only). Concurrent misses on the same document — two orgs analysing
+ * it at once — both call the LLM and both write; the last write wins. Both replies were produced from the same public
+ * text at the same extractor version, so either is a valid cache entry; the race only costs one extra LLM call.
+ */
+async function storeExtraction(deps: AppDeps, d: DocRow, llmRequirements: Requirement[]): Promise<void> {
+  if (d.orgId !== null) return; // never cache an org's own document (see cachedExtraction)
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const write = deps.db.update(tenderDocuments).set({
+      requirements: llmRequirements, extractorVersion: CURRENT_EXTRACTOR_VERSION, extractedAt: deps.clock.now(), extractedMethod: 'LLM',
+    }).where(and(eq(tenderDocuments.id, d.id), isNull(tenderDocuments.orgId))).execute();
+    write.catch(() => {}); // a rejection after the timeout below is not unhandled
+    await Promise.race([write, new Promise<never>((_r, reject) => {
+      timer = setTimeout(() => reject(new Error(`cache write took longer than ${STORE_EXTRACTION_TIMEOUT_MS} ms`)), STORE_EXTRACTION_TIMEOUT_MS);
+    })]);
+  } catch (e) {
+    // The cache is an optimisation: failing to write it must not fail the analysis.
+    deps.logger.warn('analyse: could not store the shared extraction', { documentId: d.id, error: (e as Error).message });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function analyseTender(
   deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer },
   /**
@@ -798,7 +837,7 @@ export async function analyseTender(
   let extractMs = 0;
   let llmMs = 0;
   let pageTotal = 0;
-  const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0, escalated: 0 };
+  const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0, escalated: 0, cached: 0 };
   // FR-051: pages the model did not read (beyond the 4 chunks, or chunks skipped / failed), added to the analysis notes.
   const docNotes: string[] = [];
   // 008/FR-039: one llm_usage row per call, with the provider's token counts; the first metered call fills the reservation.
@@ -825,7 +864,16 @@ export async function analyseTender(
       const provenance = (reqs: Requirement[]) => (d.textSource === 'ocr' ? markOcrRequirements(reqs) : reqs);
       const rules = extractRequirementsRules(pages, meta);
       extractMs += performance.now() - tx0;
-      // 008/FR-037: monthly AI quota used up → this analysis runs on rules only.
+      // 008/FR-072: a GeM-public document already extracted at the current version is reused — no LLM call. This runs
+      // BEFORE the "is an LLM available" check on purpose: a cache hit costs nothing and is public data, so it is never
+      // metered or quota-gated — an org without LLM access (no client, or the monthly AI quota used up: FR-037) still gets it.
+      // The cached items are the WHOLE document's extraction (every chunk read; see the store below), so nothing is unread.
+      // OCR-derived text (FR-052) never uses or fills the cache: its extraction must carry OCR provenance and the OCR
+      // text replaced the row's text after any earlier extraction, so a shared entry could be stale.
+      const cacheEligible = d.textSource !== 'ocr';
+      const cached = cacheEligible ? cachedExtraction(d) : null;
+      if (cached) { perDoc.push(provenance(mergeRequirements(rules, cached))); usedLlm = true; llmUse.covered++; llmUse.cached++; continue; }
+      // 008/FR-037: no LLM, or the monthly AI quota used up → this document runs on rules only.
       if (!completeJson) { perDoc.push(provenance(rules)); continue; }
       // FR-051: page-aligned chunks of ≤ 60k characters, at most 4 per document; each is one call under the analysis budget.
       const { chunks, unreadFromPage } = chunkPages(pages);
@@ -837,6 +885,8 @@ export async function analyseTender(
       let readAny = false;
       let attempted = false;
       let complete = true;
+      // 008/FR-072: shareable only when every chunk's reply was cacheable (a valid, non-empty requirements array).
+      let allCacheable = true;
       for (let ci = 0; ci < chunks.length; ci++) {
         const chunk = chunks[ci]!;
         const last = chunk.startPage + chunk.pages.length - 1;
@@ -859,7 +909,17 @@ export async function analyseTender(
         llmMs += performance.now() - tl0;
         llmUse.chars += r.inputChars;
         if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
+        // A chunk cut short by this analysis' remaining character budget is not a whole read of it → never shared.
+        const whole = promptChars(buildLlmPrompt(chunk.pages, current, chunkBudget, chunk.startPage)) === promptChars(buildLlmPrompt(chunk.pages, current, undefined, chunk.startPage));
+        if (!r.cacheable || !whole) allCacheable = false;
         if (r.used) { readAny = true; current = r.requirements; llmItems.push(...r.llmItems); } else { complete = false; unread.push([chunk.startPage, last]); }
+      }
+      // 008/FR-072: share the extraction only when the WHOLE document was read in this pass — every chunk read and
+      // cacheable, none skipped / failed / truncated, no pages beyond the chunk cap. The stored items are the union of
+      // the chunks' own items (deduped by the merge rules), the same thing a cache hit merges with the rules. The
+      // escalation tier below is per analysis and never stored. storeExtraction only writes GeM-public (org-null) rows.
+      if (cacheEligible && complete && readAny && allCacheable && unreadFromPage === undefined && unread.length === 0 && llmItems.length) {
+        await storeExtraction(deps, d, mergeRequirements([], llmItems));
       }
       if (!attempted) llmUse.skipped++;
       if (readAny && unread.length) {
@@ -887,9 +947,10 @@ export async function analyseTender(
       perDoc.push(provenance(current));
     }
     // Any document the LLM did not cover — skipped for budget, or a call that failed/timed out — gets the caveat (S4).
-    // 008/FR-037: with the monthly AI quota used up, no document went to the LLM — say why instead.
+    // 008/FR-037: with the monthly AI quota used up, no document went to the LLM — say why instead, unless every document
+    // was served from the shared extraction cache (FR-072): then the quota cost this analysis nothing and there is no gap.
     const warnings: AnalysisWarning[] = !deps.llm ? []
-      : !llmAllowed ? [{ code: 'llm_quota_reached' }]
+      : !llmAllowed ? (llmUse.covered === llmUse.total ? [] : [{ code: 'llm_quota_reached' }])
       : llmUse.covered < llmUse.total ? [{ code: 'llm_budget_exhausted', covered: llmUse.covered, total: llmUse.total }]
       : [];
     if (deps.llm && llmAllowed) deps.logger.info('analyse: llm budget', { tenderId: tender.id, ...llmUse, ms: elapsedSince(started) });

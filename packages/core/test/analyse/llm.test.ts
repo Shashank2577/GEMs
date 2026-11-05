@@ -163,3 +163,35 @@ describe('escalation (T088, FR-050, FR-048)', () => {
     expect((await escalateWithLlm(pages, rules, rules, llm, null)).used).toBe(false);
   });
 });
+
+describe('shared extraction cache version (008/FR-072)', () => {
+  it('CURRENT_EXTRACTOR_VERSION is pinned — changing it re-extracts every cached GeM document once; update this test only on purpose', async () => {
+    const { CURRENT_EXTRACTOR_VERSION } = await import('../../src/analyse/llm');
+    // v2 (004/US7): JSON-schema prompt + page-chunked reading (FR-051) changed the extraction, so v1 rows re-extract once.
+    expect(CURRENT_EXTRACTOR_VERSION).toBe('llm-extract-2026-11-v2');
+  });
+
+  it('enrichWithLlm returns the LLM-only requirements (what the cache stores) next to the merged list', async () => {
+    const reply = { requirements: [{ key: 'certificate', label: 'ISO 9001', value: 'ISO 9001', page: 2, quote: 'ISO 9001 certified', confidence: 0.8 }] };
+    const r = await enrichWithLlm(['p1', 'p2'], [rule('emd', '50,000', 50_000)], async () => reply, { documentId: 'd1', fileName: 'bid.pdf' });
+    expect(r.used).toBe(true);
+    expect(r.llm).toHaveLength(1);
+    expect(r.llmItems).toBe(r.llm);
+    expect(r.llm![0]).toMatchObject({ key: 'certificate', method: 'LLM', source: { documentId: 'd1', page: 2 } });
+    expect(r.requirements.map((x) => x.key)).toEqual(['emd', 'certificate']);
+    const failed = await enrichWithLlm(['p1'], [], async () => { throw new Error('x'); });
+    expect(failed.llm).toBeUndefined();
+    expect(r.cacheable).toBe(true);
+    expect(failed.cacheable).toBeFalsy();
+  });
+
+  it('an empty or malformed reply is used but not cacheable (review S1)', async () => {
+    const good = { key: 'certificate', label: 'ISO 9001', value: 'ISO 9001', confidence: 0.8 };
+    for (const reply of [{ requirements: [] }, [], { nope: 1 }, 'text', null, { requirements: [{ bogus: true }] }]) {
+      const r = await enrichWithLlm(['p1'], [], async () => reply);
+      expect(r.used).toBe(true);
+      expect(r.cacheable, JSON.stringify(reply)).toBe(false);
+    }
+    expect((await enrichWithLlm(['p1'], [], async () => [good])).cacheable).toBe(true);
+  });
+});
