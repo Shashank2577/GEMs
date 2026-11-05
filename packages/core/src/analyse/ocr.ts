@@ -12,6 +12,25 @@ export const OCR_MAX_BYTES_PER_CALL = 22 * 1024 * 1024;
 /** Requirements read from OCR text are capped at this confidence (FR-052). */
 export const OCR_MAX_CONFIDENCE = 0.8;
 
+/**
+ * Pages per OCR call made by the API (T091): 10 pages × 1,500 = 15,000 output tokens, under the adapter's
+ * non-streaming `max_tokens` cap (apps/api `MAX_NON_STREAMING_TOKENS`), and one call stays near NFR-001's 90 s.
+ */
+export const OCR_PAGES_PER_CALL = 10;
+/** On-demand OCR of one document: at most this many calls (150 pages, the text cap), sequentially. */
+export const OCR_MAX_CALLS_PER_DOCUMENT = 15;
+/** Timeout of one OCR call. */
+export const OCR_CALL_TIMEOUT_MS = 120_000;
+/** Wall-clock budget of on-demand OCR of one document; no new call starts after it. */
+export const OCR_DOCUMENT_BUDGET_MS = 10 * 60_000;
+/** OCR calls an analysis may make on its own for scanned documents (20 pages), inside the analysis budget. */
+export const OCR_MAX_CALLS_PER_ANALYSIS = 2;
+
+/** Requirements read from OCR text: marked `source.ocr` and capped at `OCR_MAX_CONFIDENCE` (FR-052). */
+export function markOcrRequirements<T extends { confidence: number; source: { ocr?: boolean } }>(reqs: T[]): T[] {
+  return reqs.map((r) => ({ ...r, confidence: Math.min(r.confidence, OCR_MAX_CONFIDENCE), source: { ...r.source, ocr: true } }));
+}
+
 export interface OcrPart {
   bytes: Uint8Array;
   /** 1-based page numbers of the original document covered by this part (inclusive). */

@@ -4,13 +4,16 @@
  * (rows, file names, tags and file contents); every request that leaves the API during an analysis is captured at the
  * HTTP boundary (real adapter, fake fetch) and must contain none of them.
  *
- * Adding a request path (e.g. OCR, T091): build its client with `capturingClient('ocr', …, sink)`, drive it, then call
- * `expectNoLeaks(sink)`; add a `describe` below next to 'analyse'.
+ * Adding a request path: build its client with `capturingClient('<tier>', …, sink)`, drive it, then call
+ * `expectNoLeaks(sink)`; add a `describe` below next to 'analyse' and 'OCR' (T091: the OCR request is pinned to exactly
+ * the PDF bytes + the fixed system prompt and instruction).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { companyProfiles, organizations, pastContracts, tenders, vaultDocuments } from '@tp/db';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
+import { OCR_PROMPT, OCR_SYSTEM } from '@tp/core/analyse/ocr';
 import { createApp } from '../src/app';
 import type { LlmClient } from '../src/deps';
 import { capturingClient, leaks, type CapturedRequest } from './llm-capture';
@@ -114,6 +117,66 @@ describe('analyse sends no company data to any LLM tier (FR-054, NFR-003)', () =
 
     expectNoLeaks(sink);
     // Nor the API key, which only travels in a header.
+    for (const s of sink) expect(s.body).not.toContain('sk-test');
+  });
+});
+
+describe('OCR sends only the document bytes and the fixed prompt (FR-052, FR-054)', () => {
+  async function scan(pages: number): Promise<Uint8Array> {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < pages; i++) doc.addPage([595, 842]).drawRectangle({ x: 40, y: 40, width: 500, height: 700, color: rgb(0.85, 0.85, 0.85) });
+    return doc.save();
+  }
+  const ocrReply = (_call: number, body: Record<string, unknown>) => {
+    const content = (body.messages as { content: { type: string }[] }[])[0]!.content;
+    expect(content[0]!.type).toBe('document');
+    return { pages: [{ page: 1, text: 'Bid Number: GEM/2026/B/1 EMD Amount 50000' }, { page: 2, text: 'Scope of work' }] };
+  };
+
+  /** The whole request: model, output budget, the fixed system prompt, one user message = [the PDF, the fixed prompt], the schema. */
+  function expectOnlyDocumentAndPrompt(body: string, pdf: Uint8Array) {
+    const b = JSON.parse(body) as Record<string, unknown>;
+    expect(Object.keys(b).sort()).toEqual(['max_tokens', 'messages', 'model', 'output_config', 'system']);
+    expect(b.system).toBe(OCR_SYSTEM);
+    const messages = b.messages as { role: string; content: Record<string, unknown>[] }[];
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.role).toBe('user');
+    expect(messages[0]!.content).toEqual([
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from(pdf).toString('base64') } },
+      { type: 'text', text: OCR_PROMPT },
+    ]);
+  }
+
+  it('on demand and inside analyse', async () => {
+    const sink: CapturedRequest[] = [];
+    const ocr = capturingClient('ocr', 'claude-opus-5-5', sink, ocrReply);
+    const enrichment = capturingClient('enrichment', 'claude-sonnet-5-5', sink);
+    const app = createApp({ ...ctx.deps, llm: enrichment, llmFor: (p) => (p === 'ocr' ? ocr : p === 'enrichment' ? enrichment : null) });
+    const pdf = await scan(2);
+    const newTender = async (i: number) => (await ctx.db.insert(tenders).values({
+      bidNumber: `GEM/2026/B/88${i}`, title: 'Scanned', sourceUrl: `https://bidplus.gem.gov.in/all-bids#privacy-ocr-${i}`, contentHash: `privacy-ocr-${i}`,
+      endAt: new Date('2026-11-28T09:30:00Z'),
+    }).returning())[0]!;
+    const uploadScan = async (tenderId: string) => {
+      const r = await request(app, 'POST', `/tenders/${tenderId}/documents`, { cookie: roles.analyst.cookie, form: { file: new File([pdf as BlobPart], 'scan.pdf', { type: 'application/pdf' }), kind: 'bid' } });
+      expect(r.status).toBe(201);
+      return r.body.id as string;
+    };
+
+    const t1 = await newTender(1);
+    const docId = await uploadScan(t1.id);
+    const r1 = await request(app, 'POST', `/tenders/${t1.id}/documents/${docId}/ocr`, { cookie: roles.analyst.cookie });
+    expect(r1.status, r1.text).toBe(200);
+
+    const t2 = await newTender(2);
+    await uploadScan(t2.id);
+    const r2 = await request(app, 'POST', `/tenders/${t2.id}/analyse`, { cookie: roles.analyst.cookie });
+    expect(r2.status, r2.text).toBe(201);
+
+    const ocrRequests = sink.filter((s) => s.tier === 'ocr');
+    expect(ocrRequests).toHaveLength(2);
+    for (const s of ocrRequests) expectOnlyDocumentAndPrompt(s.body, pdf);
+    expectNoLeaks(sink);
     for (const s of sink) expect(s.body).not.toContain('sk-test');
   });
 });

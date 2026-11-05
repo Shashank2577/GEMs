@@ -33,11 +33,22 @@ export interface BlobStore {
 
 // ───────────── LLM ─────────────
 
+/** A base64 PDF sent as a `document` content block (004/FR-052 OCR). */
+export interface LlmDocumentBlock { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } }
+
 export interface LlmRequest {
   system?: string;
+  /** The instruction text. With `documents` it follows them in the same user message. */
   prompt: string;
-  /** Default 2048. */
+  /** PDF document blocks placed before the prompt text (OCR only; never company data, 004/FR-054). */
+  documents?: LlmDocumentBlock[];
+  /**
+   * Default 2048. Requests are not streamed, so the adapter caps this at `MAX_NON_STREAMING_TOKENS`: a larger
+   * output budget would need streaming to keep the connection alive (callers split the work instead, e.g. OCR parts).
+   */
   maxTokens?: number;
+  /** Overrides the client's request timeout for this call (ms), e.g. OCR transcription of several pages. */
+  timeoutMs?: number;
   /** JSON Schema of the reply: sent as `output_config.format` (structured output, 004/FR-049) by `completeJson`. */
   jsonSchema?: Record<string, unknown>;
   /** Aborts the provider request (008/FR-031: a timed-out call stops spending tokens and isolate time). */

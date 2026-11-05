@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { OCR_JSON_SCHEMA, OCR_MAX_BYTES_PER_CALL, OCR_MAX_PAGES_PER_CALL, OcrSplitError, buildOcrRequest, parseOcrPages, splitPdfForOcr, toBase64 } from '../../src/analyse/ocr';
+import {
+  OCR_CALL_TIMEOUT_MS, OCR_DOCUMENT_BUDGET_MS, OCR_JSON_SCHEMA, OCR_MAX_BYTES_PER_CALL, OCR_MAX_CALLS_PER_ANALYSIS, OCR_MAX_CALLS_PER_DOCUMENT, OCR_MAX_CONFIDENCE,
+  OCR_MAX_PAGES_PER_CALL, OCR_PAGES_PER_CALL, OcrSplitError, buildOcrRequest, markOcrRequirements, parseOcrPages, splitPdfForOcr, toBase64,
+} from '../../src/analyse/ocr';
 
 async function pdf(pages: number): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -80,5 +83,27 @@ describe('parseOcrPages', () => {
     expect(parseOcrPages([{ page: 1, text: 'x' }], 1).pages).toEqual(['x']);
     expect(parseOcrPages('garbage', 2)).toEqual({ pages: ['', ''], missing: [1, 2] });
     expect(parseOcrPages({ pages: [{ page: 'one', text: 1 }] }, 1).missing).toEqual([1]);
+  });
+});
+
+describe('API OCR limits and provenance (T091, FR-052)', () => {
+  it('pins the per-call, per-document and per-analysis limits', () => {
+    expect([OCR_PAGES_PER_CALL, OCR_MAX_CALLS_PER_DOCUMENT, OCR_CALL_TIMEOUT_MS, OCR_DOCUMENT_BUDGET_MS, OCR_MAX_CALLS_PER_ANALYSIS])
+      .toEqual([10, 15, 120_000, 600_000, 2]);
+    // 15 calls of 10 pages cover the 150-page text cap; one call's output budget stays under the non-streaming cap (16k).
+    expect(OCR_PAGES_PER_CALL * OCR_MAX_CALLS_PER_DOCUMENT).toBe(150);
+    expect(buildOcrRequest({ bytes: new Uint8Array([1]), firstPage: 1, lastPage: OCR_PAGES_PER_CALL }).maxTokens).toBeLessThanOrEqual(16_000);
+  });
+
+  it('markOcrRequirements sets source.ocr and caps confidence at 0.8', () => {
+    const reqs: { key: string; confidence: number; source: { documentId?: string; page?: number; ocr?: boolean } }[] = [
+      { key: 'emd', confidence: 0.95, source: { documentId: 'd', page: 2 } },
+      { key: 'turnover_min', confidence: 0.6, source: {} },
+    ];
+    const out = markOcrRequirements(reqs);
+    expect(out).toEqual([
+      { key: 'emd', confidence: OCR_MAX_CONFIDENCE, source: { documentId: 'd', page: 2, ocr: true } },
+      { key: 'turnover_min', confidence: 0.6, source: { ocr: true } },
+    ]);
   });
 });

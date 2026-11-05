@@ -194,6 +194,12 @@ export async function usageFor(deps: Pick<AppDeps, 'db' | 'clock'>, orgId: strin
 export interface LlmUsageInput {
   orgId: string;
   analysisId?: string | null;
+  /**
+   * The analysis this call counts for when its row does not exist yet (auto-OCR runs before the analysis is inserted,
+   * 004/FR-052): stored as `analysis_ref` with `analysis_id` null; the analysis links the rows once inserted.
+   * Defaults to `analysisId`.
+   */
+  analysisRef?: string | null;
   /** Fill in this reservation row (see `reserveLlmSlot`) instead of inserting a new one. */
   reservationId?: string | null;
   kind: 'extract' | 'assist';
@@ -225,7 +231,7 @@ export async function recordLlmUsage(deps: Pick<AppDeps, 'db' | 'clock' | 'logge
       if (filled.length) return;
     }
     const row = {
-      orgId: u.orgId, analysisId: u.analysisId ?? null, analysisRef: u.analysisId ?? null, kind: u.kind, model: u.model, ...tokens,
+      orgId: u.orgId, analysisId: u.analysisId ?? null, analysisRef: u.analysisRef ?? u.analysisId ?? null, kind: u.kind, model: u.model, ...tokens,
       createdAt: deps.clock.now(),
     };
     try {
@@ -259,7 +265,7 @@ export type MeteredCompleteJson = (<T = unknown>(req: Parameters<NonNullable<App
  */
 export function meteredCompleteJson(
   deps: Pick<AppDeps, 'db' | 'clock' | 'logger' | 'llm'>,
-  ctx: { orgId: string; analysisId: string | null; kind: 'extract' | 'assist'; reservationId?: string | null },
+  ctx: { orgId: string; analysisId: string | null; analysisRef?: string | null; kind: 'extract' | 'assist'; reservationId?: string | null },
 ): MeteredCompleteJson {
   const llm = deps.llm;
   if (!llm) throw new Error('meteredCompleteJson: no LLM configured');
@@ -290,7 +296,7 @@ export function meteredCompleteJson(
         const fill = reservationId;
         reservationId = null;
         await recordLlmUsage(deps, {
-          orgId: ctx.orgId, analysisId: ctx.analysisId, kind: ctx.kind, reservationId: fill, model: r?.model || llm.model, inputTokens: r?.usage.inputTokens ?? 0, outputTokens: r?.usage.outputTokens ?? 0,
+          orgId: ctx.orgId, analysisId: ctx.analysisId, analysisRef: ctx.analysisRef, kind: ctx.kind, reservationId: fill, model: r?.model || llm.model, inputTokens: r?.usage.inputTokens ?? 0, outputTokens: r?.usage.outputTokens ?? 0,
         });
       }
       inFlight--;

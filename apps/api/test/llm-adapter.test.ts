@@ -1,6 +1,6 @@
 /** Anthropic adapter (004 T085, FR-049): structured output, refusal/max_tokens failures, usage reporting. */
 import { describe, expect, it } from 'vitest';
-import { createAnthropicClient, LlmError } from '../src/adapters/llm';
+import { createAnthropicClient, LlmError, MAX_NON_STREAMING_TOKENS } from '../src/adapters/llm';
 import { LLM_REQUIREMENTS_JSON_SCHEMA } from '@tp/core/analyse/llm';
 import type { Logger } from '../src/deps';
 
@@ -75,6 +75,29 @@ describe('createAnthropicClient', () => {
     await expect(http.completeJson({ prompt: 'P' })).rejects.toMatchObject({ name: 'LlmError', status: 529 });
     const bad = createAnthropicClient({ apiKey: 'k', model: 'm', fetch: fakeFetch(message({ content: [{ type: 'text', text: 'no json' }] })).f });
     await expect(bad.completeJson({ prompt: 'P' })).rejects.toBeInstanceOf(LlmError);
+  });
+
+  it('OCR (T091): document blocks go before the prompt text in one user message; max_tokens is capped for non-streaming', async () => {
+    const { f, sent } = fakeFetch(message({ content: [{ type: 'text', text: '{"pages":[]}' }] }));
+    const llm = createAnthropicClient({ apiKey: 'k', model: 'claude-opus-5-5', fetch: f });
+    const doc = { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: 'JVBERi0=' } };
+    await llm.completeJson({ system: 'OCR', prompt: 'Transcribe', documents: [doc], maxTokens: 64_000, jsonSchema: {} });
+    expect(sent[0].body.messages).toEqual([{ role: 'user', content: [doc, { type: 'text', text: 'Transcribe' }] }]);
+    expect(sent[0].body.max_tokens).toBe(MAX_NON_STREAMING_TOKENS);
+    expect(MAX_NON_STREAMING_TOKENS).toBeLessThanOrEqual(21_000);
+    for (const k of ['temperature', 'top_p', 'top_k', 'stream']) expect(sent[0].body).not.toHaveProperty(k);
+    // Without documents the content stays a plain string.
+    await llm.completeJson({ prompt: 'P', maxTokens: 100 });
+    expect(sent[1].body.messages).toEqual([{ role: 'user', content: 'P' }]);
+    expect(sent[1].body.max_tokens).toBe(100);
+  });
+
+  it('a per-request timeoutMs overrides the client timeout', async () => {
+    const hang = (async (_u: string, init: RequestInit) => new Promise((_r, reject) => {
+      init.signal!.addEventListener('abort', () => reject(new Error('aborted')));
+    })) as unknown as typeof fetch;
+    const llm = createAnthropicClient({ apiKey: 'k', model: 'm', fetch: hang, timeoutMs: 60_000 });
+    await expect(llm.complete({ prompt: 'P', timeoutMs: 20 })).rejects.toBeInstanceOf(LlmError);
   });
 
   it('the structured-output schema is strict and mirrors the item fields', () => {

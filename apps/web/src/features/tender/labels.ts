@@ -198,6 +198,7 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   'tender.document_uploaded': 'uploaded a document',
   'tender.document_fetched': 'fetched the bid document from GeM',
   'tender.document_fetch_failed': 'couldn’t fetch the updated bid document from GeM',
+  'tender.document_ocr': 'read a scanned document with AI OCR',
   'analysis.factor_overridden': 'overrode a factor',
   'analysis.rescored': 're-scored the analysis',
   'tender.dismissed': 'dismissed this tender',

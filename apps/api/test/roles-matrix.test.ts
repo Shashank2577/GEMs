@@ -77,6 +77,7 @@ const MATRIX: Entry[] = [
   // ── analyse ──
   { method: 'POST', path: '/api/tenders/:id/documents', min: 'analyst' },
   { method: 'DELETE', path: '/api/tenders/:id/documents/:docId', min: 'analyst' },
+  { method: 'POST', path: '/api/tenders/:id/documents/:docId/ocr', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/fetch-documents', min: 'analyst' },
   { method: 'POST', path: '/api/tenders/:id/analyse', min: 'analyst' },
   { method: 'POST', path: '/api/analyses/:id/override', min: 'bid_manager' },

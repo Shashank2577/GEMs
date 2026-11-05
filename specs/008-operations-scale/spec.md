@@ -567,6 +567,7 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   | `upload.org` | org | 120 / 60 min | `POST /api/vault`, `PUT /api/vault/:id/file`, `POST /api/tenders/:id/documents` |
   | `gem.fetch.org` | org | 30 / 60 min | `POST /api/tenders/:id/fetch-documents` |
   | `analyse.user` | user | 30 / 60 min | `POST /api/tenders/:id/analyse` |
+  | `ocr.org` | org | 20 / 60 min | `POST /api/tenders/:id/documents/:docId/ocr` (added by 004/FR-052, T091) |
   | `packet.org` | org | 30 / 60 min | `POST /api/workspaces/:id/packets` |
   | `api.user` | user or token | 600 / 60 s | all authenticated `/api/*` |
   | `api.ip` | client IP | 300 / 60 s | all unauthenticated `/api/*` except `/api/health` |

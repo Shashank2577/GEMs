@@ -37,13 +37,27 @@ export function parseJsonLoose<T = unknown>(text: string): T {
   throw new LlmError('Model reply was not valid JSON');
 }
 
+/**
+ * Highest `max_tokens` sent on a non-streaming request. Long generations must be streamed (the official SDKs refuse
+ * non-streaming requests whose `max_tokens` implies more than ~10 minutes, about 21k tokens, and idle connections get
+ * dropped); this adapter does not stream, so callers that need more output split the work (OCR: 10 pages per call,
+ * `OCR_PAGES_PER_CALL`). A reply that needs more than this ends with `max_tokens` → `LlmError`.
+ */
+export const MAX_NON_STREAMING_TOKENS = 16_000;
+
+/** The user message: plain text, or document blocks followed by the instruction text. */
+function userContent(req: LlmRequest): string | ({ type: 'text'; text: string } | NonNullable<LlmRequest['documents']>[number])[] {
+  if (!req.documents?.length) return req.prompt;
+  return [...req.documents, { type: 'text', text: req.prompt }];
+}
+
 export function createAnthropicClient(opts: AnthropicOptions): LlmClient {
   const f = opts.fetch ?? fetch;
   const base = (opts.baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '');
 
   async function complete(req: LlmRequest): Promise<LlmResult> {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 90_000);
+    const timer = setTimeout(() => ctrl.abort(), req.timeoutMs ?? opts.timeoutMs ?? 90_000);
     // The caller's signal (analysis budget, 008/FR-031) aborts the same fetch.
     const onAbort = () => ctrl.abort();
     if (req.signal?.aborted) ctrl.abort();
@@ -60,9 +74,9 @@ export function createAnthropicClient(opts: AnthropicOptions): LlmClient {
         // No sampling parameters (temperature/top_p are rejected by current models) and no assistant prefill.
         body: JSON.stringify({
           model: opts.model,
-          max_tokens: req.maxTokens ?? 2048,
+          max_tokens: Math.min(req.maxTokens ?? 2048, MAX_NON_STREAMING_TOKENS),
           ...(req.system ? { system: req.system } : {}),
-          messages: [{ role: 'user', content: req.prompt }],
+          messages: [{ role: 'user', content: userContent(req) }],
           // FR-049: structured output; the reply is then schema-valid JSON in the first text block.
           ...(req.jsonSchema ? { output_config: { format: { type: 'json_schema', schema: req.jsonSchema } } } : {}),
         }),

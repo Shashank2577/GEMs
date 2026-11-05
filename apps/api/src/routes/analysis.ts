@@ -6,6 +6,7 @@
  *   POST /tenders/:id/fetch-documents                 download from GeM              analyst+
  *   GET  /tenders/:id/documents/:docId/download       stream (?inline=1)             viewer+
  *   DELETE /tenders/:id/documents/:docId              remove own upload (204)        analyst+
+ *   POST /tenders/:id/documents/:docId/ocr            AI OCR of a scanned PDF → doc; 409 conflict / 502 ocr_failed / 503 ocr_unavailable  analyst+
  *   POST /tenders/:id/analyse                         rules (+LLM) → Analysis; 409 analysis_running / analysis_superseded  analyst+
  *   GET  /tenders/:id/analysis                        latest done Analysis (+lastAttempt) or 404  viewer+
  *   POST /analyses/:id/override                       {factorKey,status,reason}      bid_manager+
@@ -24,7 +25,7 @@ import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
 import { TENDER_DOC_TOO_LARGE, TENDER_DOC_UPLOAD_MAX_BYTES, bodyLimit } from '../middleware/body-limit';
 import { rateLimit } from '../middleware/rate-limit';
 import {
-  analyseTender, fetchGemDocuments, getTender, getTenderDocument, lastAttemptOf, latestAnalysis, latestDoneAnalysis, listTenderDocuments, overrideFactor,
+  analyseTender, fetchGemDocuments, getTender, getTenderDocument, lastAttemptOf, latestAnalysis, latestDoneAnalysis, listTenderDocuments, ocrTenderDocument, overrideFactor,
   removeTenderDocument, rescoreAnalysis, saveWeights, shownAnalysisDto, toAnalysisDto, toDocumentDto, uploadTenderDocument, uploadWarnings, weightsResponse,
 } from '../services/analyse';
 import type { AppEnv } from '../types';
@@ -75,6 +76,15 @@ analysisRoutes.delete('/tenders/:id/documents/:docId', requireRole('analyst'), a
   if (!docId.success) throw notFound('Document');
   await removeTenderDocument(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, docId: docId.data, viewer: c.var.org });
   return c.body(null, 204);
+});
+
+/** 004/FR-052: transcribe a scanned document with the OCR model (org-scoped like the other document routes). */
+analysisRoutes.post('/tenders/:id/documents/:docId/ocr', requireRole('analyst'), rateLimit('ocr.org'), async (c) => {
+  const tenderId = tenderIdOf(c.req.param('id'));
+  const docId = uuidSchema.safeParse(c.req.param('docId'));
+  if (!docId.success) throw notFound('Document');
+  const { doc, tender } = await ocrTenderDocument(c.var.deps, { orgId: orgId(c), userId: userId(c), tenderId, docId: docId.data, viewer: c.var.org });
+  return c.json(toDocumentDto(doc, tender.bidNumber));
 });
 
 analysisRoutes.get('/tenders/:id/documents/:docId/download', requireAuth, async (c) => {

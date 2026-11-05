@@ -26,6 +26,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'tender.analysed': return `checked eligibility${typeof m.score === 'number' ? ` (score ${m.score})` : ''} for`;
     case 'tender.document_uploaded': case 'tender.document_fetched': return 'added a bid document to';
     case 'tender.document_removed': return 'removed a bid document from';
+    case 'tender.document_ocr': return 'read a scanned bid document with AI OCR for';
     case 'tender.document_fetch_failed': return 'couldn’t fetch the updated bid document from GeM for';
     case 'analysis.factor_overridden': return 'overrode a scoring factor on';
     case 'analysis.rescored': return `re-scored${typeof m.score === 'number' ? ` (score ${m.score})` : ''}`;
@@ -75,7 +76,7 @@ export const KNOWN_ACTIONS = [
   'workspace.stage_changed', 'workspace.created', 'workspace.submitted', 'workspace.outcome_recorded', 'workspace.commented', 'workspace.comment_deleted',
   'workspace.assigned', 'workspace.item_overridden', 'workspace.override_removed', 'workspace.mapping_changed', 'workspace.due_changed',
   'workspace.assist_values_saved', 'workspace.packet_built', 'workspace.packet_failed', 'packet.built',
-  'tender.analysed', 'tender.document_uploaded', 'tender.document_fetched', 'tender.document_removed', 'tender.document_fetch_failed', 'analysis.factor_overridden', 'analysis.rescored',
+  'tender.analysed', 'tender.document_uploaded', 'tender.document_fetched', 'tender.document_removed', 'tender.document_fetch_failed', 'tender.document_ocr', 'analysis.factor_overridden', 'analysis.rescored',
   'vault.uploaded', 'vault.updated', 'vault.file_replaced', 'vault.deleted', 'vault.renewed', 'vault.reminders_run',
   'watchlist.created', 'watchlist.deleted',
   'profile.updated', 'profile.past_contract_added', 'profile.past_contract_updated', 'profile.past_contract_deleted',
