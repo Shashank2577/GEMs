@@ -30,7 +30,7 @@ import { createServer, type Server } from 'node:http';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { request as pwRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { test, expect, evidence, collectRunArtifacts, checkA11y, mockGem, gemAward, uniqueUser, noHorizontalOverflow, GEM_URL } from '../support/fixtures';
+import { test, expect, evidence, collectRunArtifacts, checkA11y, mockGem, gemAward, uniqueUser, noHorizontalOverflow, resetIngestionData, GEM_URL } from '../support/fixtures';
 
 const SPEC = '003', STORY = 'US6';
 const PORT = process.env.E2E_PORT || 8788;
@@ -55,14 +55,6 @@ const note = (type: string, description: string) => test.info().annotations.push
 type Creds = { email: string; password: string; id: string; name: string };
 type Saved = { owner: Creds; analyst: Creds; viewer: Creds; org2: Creds; ids: Record<string, string>; orgId: string };
 let S: Saved | undefined;
-
-/** Clean ingestion state (and the mock GeM) so the spec passes alone or after other 003 specs. Needs a database named *e2e*. */
-async function resetIngestionData(request: APIRequestContext) {
-  if (!/e2e/i.test(new URL(DB).pathname)) throw new Error(`refusing to truncate ${DB} (database name must contain "e2e")`);
-  sql('truncate tenders, ingestion_runs, notifications, watchlists cascade');
-  await mockGem(request, '/__admin/reset');
-  await mockGem(request, '/__admin/fail', { mode: 'off' });
-}
 
 async function shot(page: Page, name: string) {
   const project = test.info().project.name;
