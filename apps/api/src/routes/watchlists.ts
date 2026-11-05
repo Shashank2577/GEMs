@@ -14,8 +14,10 @@ import { matchTender } from '@tp/core/match/matcher';
 import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { notFound, validationError } from '../lib/errors';
+import { GEM_ONLY, visibleTenderSource } from '../lib/tender-scope';
 import { parseJson } from '../lib/validate';
 import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { rateLimit } from '../middleware/rate-limit';
 import { matchAndNotify } from '../services/ingest';
 import type { AppEnv } from '../types';
 import { decorateTenders } from './tenders';
@@ -27,11 +29,12 @@ const CANDIDATE_LIMIT = 5000;
 
 /**
  * Open tenders that could match the criteria: a cheap SQL pre-filter (state, value, keyword ILIKE)
- * followed by the exact matcher in JS.
+ * followed by the exact matcher in JS. `scope` limits the sources the caller's org may see
+ * (lib/tender-scope.ts; demo tenders only for demo orgs, 008/FR-016).
  */
-export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteriaDto): Promise<{ row: TenderRow; reasons: string[]; relevance: number }[]> {
+export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteriaDto, scope: SQL): Promise<{ row: TenderRow; reasons: string[]; relevance: number }[]> {
   const now = deps.clock.now();
-  const conds: SQL[] = [eq(tenders.status, 'open'), or(isNull(tenders.endAt), gte(tenders.endAt, now))!];
+  const conds: SQL[] = [scope, eq(tenders.status, 'open'), or(isNull(tenders.endAt), gte(tenders.endAt, now))!];
   if (criteria.states.length) conds.push(inArray(tenders.state, criteria.states));
   if (criteria.minValue != null) conds.push(or(isNull(tenders.estimatedValue), gte(tenders.estimatedValue, criteria.minValue))!);
   if (criteria.maxValue != null) conds.push(or(isNull(tenders.estimatedValue), sql`${tenders.estimatedValue} <= ${criteria.maxValue}`)!);
@@ -56,6 +59,7 @@ export async function candidateTenders(deps: AppDeps, criteria: WatchlistCriteri
 
 /** Re-evaluate a watchlist's matches: drop ones that no longer match, add new ones (no alerts). */
 async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect): Promise<number> {
+  // Only real GeM tenders are matched (matchAndNotify ignores demo rows; demo matches come from the seeder).
   const now = deps.clock.now();
   const existing = await deps.db.select({ id: tenderMatches.id, tenderId: tenderMatches.tenderId }).from(tenderMatches)
     .where(eq(tenderMatches.watchlistId, w.id));
@@ -66,7 +70,7 @@ async function refreshMatches(deps: AppDeps, w: typeof watchlists.$inferSelect):
     if (stale.length) await deps.db.delete(tenderMatches).where(inArray(tenderMatches.id, stale));
   }
   if (!w.active) return 0;
-  const cands = await candidateTenders(deps, w.criteria as WatchlistCriteriaDto);
+  const cands = await candidateTenders(deps, w.criteria as WatchlistCriteriaDto, GEM_ONLY);
   const r = await matchAndNotify(deps, cands.map((c) => c.row.id), now, { watchlistId: w.id, notify: false });
   return r.matchesCreated;
 }
@@ -124,11 +128,11 @@ watchlistsRoutes.get('/watchlists', requireAuth, async (c) => {
   return c.json({ items, total: items.length });
 });
 
-watchlistsRoutes.post('/watchlists/preview', requireAuth, async (c) => {
+watchlistsRoutes.post('/watchlists/preview', requireAuth, rateLimit('watchlist.preview.user'), async (c) => {
   const deps = c.var.deps;
   const { criteria } = await parseJson(c, watchlistPreviewSchema);
   if (criteriaIsEmpty(criteria)) return c.json({ count: 0, sample: [] });
-  const cands = await candidateTenders(deps, criteria);
+  const cands = await candidateTenders(deps, criteria, visibleTenderSource(c.var.org));
   cands.sort((a, b) => b.relevance - a.relevance || (a.row.endAt?.getTime() ?? 0) - (b.row.endAt?.getTime() ?? 0));
   const sample = await decorateTenders(deps, orgId(c), cands.slice(0, 5).map((x) => x.row));
   // Show the reasons this *draft* would produce.

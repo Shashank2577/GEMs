@@ -26,6 +26,16 @@ export interface RuntimeEnv {
   TRUST_PROXY?: string;
   /** "development" | "production" | "test" */
   NODE_ENV?: string;
+  /** Operator token for /api/admin/* (008/FR-042). Unset → admin routes answer 404. */
+  ADMIN_TOKEN?: string;
+  /** Sentry DSN; unset → error reporter is a no-op (008/FR-046). */
+  SENTRY_DSN?: string;
+  /** "debug" | "info" | "warn" | "error" (default info). */
+  LOG_LEVEL?: string;
+  /** /api/health reports `ingestion_stale` when the last successful sync is older than this (default 120). */
+  HEALTH_INGESTION_MAX_AGE_MIN?: string;
+  /** Minimum minutes between manual "Sync now" runs (008/FR-026, default 10). */
+  MANUAL_SYNC_COOLDOWN_MIN?: string;
 }
 
 export interface AppConfig {
@@ -39,6 +49,20 @@ export interface AppConfig {
   llmModel: string;
   /** Proxy whose client-IP header is trusted for rate limiting (002/FR-010). */
   trustProxy: TrustProxy;
+  /** Null when ADMIN_TOKEN is unset. */
+  adminToken: string | null;
+  /** Null when SENTRY_DSN is unset. */
+  sentryDsn: string | null;
+  logLevel: LogLevel;
+  healthIngestionMaxAgeMin: number;
+  manualSyncCooldownMin: number;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+function parseLogLevel(v: string | undefined): LogLevel {
+  const l = (v ?? '').toLowerCase();
+  return l === 'debug' || l === 'warn' || l === 'error' ? l : 'info';
 }
 
 export type TrustProxy = 'cloudflare' | 'xff' | 'none';
@@ -67,7 +91,17 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     mailFrom: env.MAIL_FROM || 'TenderPilot <alerts@tenderpilot.in>',
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
+    adminToken: env.ADMIN_TOKEN || null,
+    sentryDsn: env.SENTRY_DSN || null,
+    logLevel: parseLogLevel(env.LOG_LEVEL),
+    healthIngestionMaxAgeMin: positiveInt(env.HEALTH_INGESTION_MAX_AGE_MIN, 120),
+    manualSyncCooldownMin: positiveInt(env.MANUAL_SYNC_COOLDOWN_MIN, 10),
   };
+}
+
+function positiveInt(v: string | undefined, dflt: number): number {
+  const n = Number(v);
+  return v != null && v !== '' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : dflt;
 }
 
 export interface GemConfig {

@@ -6,7 +6,9 @@
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { AppDeps } from './deps';
+import { bodyLimits } from './middleware/body-limit';
 import { errorHandler, notFoundHandler } from './middleware/error';
+import { ipLimit } from './middleware/rate-limit';
 import { injectDeps, noStore } from './middleware/request';
 import { analysisRoutes } from './routes/analysis';
 import { assistRoutes } from './routes/assist';
@@ -55,6 +57,10 @@ export function createApp(deps: AppDeps) {
   const api = new Hono<AppEnv>();
   api.use('*', injectDeps(deps));
   api.use('*', noStore);
+  // 008/FR-021: 413 before any body is read (1 MB JSON, upload caps on multipart; routes add tighter caps).
+  api.use('*', bodyLimits);
+  // 008/FR-019 `api.ip` for requests without credentials (`api.user` is applied once authenticated, middleware/auth.ts).
+  api.use('*', ipLimit);
 
   api.get('/health', async (c) => {
     let db = false;
