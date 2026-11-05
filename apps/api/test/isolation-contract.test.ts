@@ -132,13 +132,13 @@ const FOREIGN: Record<string, () => Call> = {
   'GET /vault/:id/versions/:versionId/download': () => asB('GET', `/vault/${ids.vaultReplaced}/versions/${ids.vaultVersion}/download`),
   'PUT /workspaces/:id/assist-values': () => asB('PUT', `/workspaces/${ids.workspace}/assist-values`, { make: 'Hijack' }),
   'POST /workspaces/:id/submitted': () => asB('POST', `/workspaces/${ids.workspace}/submitted`, { note: 'Hijack' }),
+  'DELETE /org/invitations/:id': () => asB('DELETE', `/org/invitations/${ids.invitation}`),
+  'POST /org/invitations/:id/resend': () => asB('POST', `/org/invitations/${ids.invitation}/resend`),
+  'DELETE /me/sessions/:id': () => asB('DELETE', `/me/sessions/${ids.session}`),
 };
 
 /** Implemented routes not (yet) in the contract, swept the same way. */
 const FOREIGN_EXTRA: Record<string, () => Call> = {
-  'DELETE /org/invitations/:id': () => asB('DELETE', `/org/invitations/${ids.invitation}`),
-  'POST /org/invitations/:id/resend': () => asB('POST', `/org/invitations/${ids.invitation}/resend`),
-  'DELETE /me/sessions/:id': () => asB('DELETE', `/me/sessions/${ids.session}`),
   'GET /workspaces/:id/packets': () => asB('GET', `/workspaces/${ids.workspace}/packets`),
   'DELETE /workspaces/:id/overrides/:itemId': () => asB('DELETE', `/workspaces/${ids.workspace}/overrides/oem_authorization`),
   'POST /workspaces/:id/annexures/:key/preview': () =>
@@ -147,6 +147,7 @@ const FOREIGN_EXTRA: Record<string, () => Call> = {
 
 /** Parameter is public/global data; the call may succeed but must only affect org B. Run after the foreign sweep. */
 const GLOBAL: Record<string, { why: string; call: () => Call }> = {
+  'GET /auth/invite/:token': { why: 'public invitation preview by secret token; no org data without the token', call: () => async () => request(ctx.app, 'GET', '/auth/invite/not-a-real-token', {}) },
   'GET /tenders/:id': { why: 'GeM tenders are public', call: () => asB('GET', `/tenders/${ids.tender}`) },
   'POST /tenders/:id/seen': { why: 'marks B’s own matches', call: () => asB('POST', `/tenders/${ids.tender}/seen`) },
   'POST /tenders/:id/dismiss': { why: 'dismisses B’s own matches', call: () => asB('POST', `/tenders/${ids.tender}/dismiss`) },

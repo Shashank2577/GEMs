@@ -125,25 +125,39 @@ export async function failClosed<T>(p: Promise<T>): Promise<T> {
   }
 }
 
+interface Counter { key: string; kind: AttemptKind; opts: LimitOptions; rule: string }
+
+/**
+ * Reserve one attempt on the client-IP counter FIRST and stop (429) when that IP is over its limit, so a blocked IP
+ * cannot advance anybody's per-email counter (an attacker spraying one victim's email from a burnt IP cannot lock the
+ * victim out). Only then reserve on the per-email/per-user counter; when that one is over, the IP reservation is
+ * released again (the attempt was refused before any work, it should not cost the IP budget). `ip` null = unknown
+ * client IP: per-IP limits are skipped (see clientIp).
+ */
+export async function reserveIpThenKey(db: Db, ip: Counter | null, key: Counter, now: Date): Promise<void> {
+  // Fail CLOSED (008/FR-020): a counter write failure refuses the check (503) instead of letting a guess through.
+  if (ip) {
+    const i = await failClosed(hit(db, ip.key, ip.kind, ip.opts, now));
+    if (i.over) throw rateLimited(i.retryAfterSec, ip.rule);
+  }
+  const k = await failClosed(hit(db, key.key, key.kind, key.opts, now));
+  if (k.over) {
+    if (ip) await release(db, ip.key, ip.kind);
+    throw rateLimited(k.retryAfterSec, key.rule);
+  }
+}
+
 /**
  * Guard for credential checks (login, accept-invite existing user, change password).
- * `reserve` counts this attempt against the email and IP windows BEFORE the password is verified and
- * throws 429 when either is over the limit (so the 11th attempt fails even with the right password, and
+ * `reserve` counts this attempt against the IP and then the email window (reserveIpThenKey) BEFORE the password is
+ * verified and throws 429 when either is over the limit (so the 11th attempt fails even with the right password, and
  * parallel bursts cannot exceed the cap). `succeed` clears the email counter and releases the IP
  * reservation (the IP counter is not reset, so one valid account cannot clear an attacker's IP budget).
  */
 export function credentialLimiter(db: Db, email: string, ip: string | null, now: Date) {
   return {
     async reserve() {
-      const [e, i] = await failClosed(Promise.all([
-        hit(db, email, 'login_email', LOGIN_EMAIL_LIMIT, now),
-        ip ? hit(db, ip, 'login_ip', LOGIN_IP_LIMIT, now) : Promise.resolve(null),
-      ]));
-      const blocked = [
-        e.over ? { rule: 'auth.fail.email', retryAfterSec: e.retryAfterSec } : null,
-        i?.over ? { rule: 'auth.fail.ip', retryAfterSec: i.retryAfterSec } : null,
-      ].filter((b): b is { rule: string; retryAfterSec: number } => !!b);
-      if (blocked.length) throw worst(blocked);
+      await reserveIpThenKey(db, ip ? { key: ip, kind: 'login_ip', opts: LOGIN_IP_LIMIT, rule: 'auth.fail.ip' } : null, { key: email, kind: 'login_email', opts: LOGIN_EMAIL_LIMIT, rule: 'auth.fail.email' }, now);
     },
     async succeed() {
       await reset(db, email, 'login_email');
