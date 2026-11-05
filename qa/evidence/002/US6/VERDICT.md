@@ -58,3 +58,7 @@ One of the desktop passes is `sc11c`, an expected failure (`test.fail`) that rec
 ## Verdict
 
 `qa:approved` recommended: every US6 criterion met, evidence above; finding 1 is a pre-existing shared-component defect to file separately.
+
+## Round 2 / S1
+
+The role-change observation (`member.role_changed` read "changed the role of team") is fixed in 41c4afb: the target label is now the member's email, else name, else "a teammate". API and web unit tests added. E2E re-run after the fix: 30 passed (`US6-org-admin.e2e.ts`).
