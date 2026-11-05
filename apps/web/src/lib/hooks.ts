@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 export function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
@@ -13,6 +13,17 @@ export function useMediaQuery(query: string) {
 }
 
 export const useIsMobile = () => !useMediaQuery('(min-width: 768px)');
+
+function subscribeOnline(cb: () => void) {
+  window.addEventListener('online', cb);
+  window.addEventListener('offline', cb);
+  return () => { window.removeEventListener('online', cb); window.removeEventListener('offline', cb); };
+}
+
+/** `navigator.onLine`, live (007/FR-096). Assumes online during SSR / when the API is missing. */
+export function useOnline(): boolean {
+  return useSyncExternalStore(subscribeOnline, () => (typeof navigator === 'undefined' ? true : navigator.onLine), () => true);
+}
 
 /** Re-render every `ms` (for countdowns / relative times). */
 export function useNow(ms = 30_000) {

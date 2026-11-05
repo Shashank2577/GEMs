@@ -15,7 +15,7 @@ export function OemEditor({ value, onChange, errors, disabled }: {
   const update = (i: number, patch: Partial<OemAuthorizationDto>) => onChange(value.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const now = new Date();
   return (
-    <div className="grid gap-3">
+    <div className="grid grid-cols-1 gap-3">
       {value.length === 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-dashed bg-subtle px-4 py-4 text-sm text-muted-foreground">
           <Handshake className="size-5 shrink-0 text-primary" aria-hidden />
@@ -28,7 +28,7 @@ export function OemEditor({ value, onChange, errors, disabled }: {
         const docExpiry = (r.documentId && docs.data?.items.find((d) => d.id === r.documentId)?.expiryDate) || null;
         const offerDocExpiry = !disabled && !!docExpiry && r.validTill !== docExpiry;
         return (
-          <div key={i} className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1.4fr_10rem_1fr_2.5rem] lg:items-end">
+          <div key={i} className="grid grid-cols-1 gap-3 rounded-xl border bg-card p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1.4fr_10rem_1fr_2.5rem] lg:items-end">
             <Field label="OEM" required error={errors[`oemAuthorizations.${i}.oem`]}>
               <Input value={r.oem} disabled={disabled} onChange={(e) => update(i, { oem: e.target.value })} placeholder="e.g. Dell India" />
             </Field>

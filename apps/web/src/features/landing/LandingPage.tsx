@@ -555,6 +555,9 @@ function FinalCta() {
   );
 }
 
+/** WCAG 2.5.8: footer links are standalone targets, so they get a 24px-tall hit area. */
+const FOOTER_LINK = 'inline-flex min-h-6 items-center rounded-sm hover:text-foreground focus-ring';
+
 function SiteFooter() {
   return (
     <footer className="border-t">
@@ -573,7 +576,7 @@ function SiteFooter() {
             <p className="text-sm font-semibold">{h as string}</p>
             <ul className="mt-3 grid gap-2 text-sm text-muted-foreground">
               {(links as string[][]).map(([l, href]) => (
-                <li key={l}>{href!.startsWith('/') ? <Link to={href!} className="hover:text-foreground">{l}</Link> : <a href={href} className="hover:text-foreground">{l}</a>}</li>
+                <li key={l}>{href!.startsWith('/') ? <Link to={href!} className={FOOTER_LINK}>{l}</Link> : <a href={href} className={FOOTER_LINK}>{l}</a>}</li>
               ))}
             </ul>
           </div>
