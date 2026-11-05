@@ -1,0 +1,21 @@
+# sc9-bad-origin — project desktop — 2026-11-05T04:32:13.734Z
+### cookie POST /api/watchlists, Origin: https://evil.example
+> cookie + origin: https://evil.example
+< 403
+< content-type: application/json
+{"error":{"code":"bad_origin","message":"This request came from another website and was blocked. Reload TenderPilot and try again."}}
+
+### control: cookie POST with the app's own Origin
+> origin: http://localhost:8793
+< 200
+< ratelimit-remaining: 29
+< content-type: application/json
+{"count":5,"sample":[{"id":"cb22a128-efef-4d3f-82bc-54eeab19433e","source":"gem","bidNumber":"GEM/2026/B/6421021","gemBidId":"7421021","bidType":"bid","title":"Laptop - Notebook","items":[{"name":"Laptop - Notebook","quantity":18}],"category":"Laptop - Notebook","quantity":18,"ministry":"Kerala","department":"Kerala State IT Mission","organisation":null,"buyerOffice":"Kerala State IT Mission, Thiruvananthapuram","state":"Kerala","city":"Thiruvananthapuram","startAt":"2026-11-03T10:30:00.000Z","endAt":"2026-11-07T09:30:00.000Z","openingAt":null,"emdAmount":45000,"estimatedValue":1440000,"epbgPe
+
+### Bearer POST /api/watchlists/preview, Origin: https://evil.example, no cookie
+> authorization: Bearer tp_…7gg0
+< 200
+< ratelimit-remaining: 28
+< content-type: application/json
+{"count":5,"sample":[{"id":"cb22a128-efef-4d3f-82bc-54eeab19433e","source":"gem","bidNumber":"GEM/2026/B/6421021","gemBidId":"7421021","bidType":"bid","title":"Laptop - Notebook","items":[{"name":"Laptop - Notebook","quantity":18}],"category":"Laptop - Notebook","quantity":18,"ministry":"Kerala","department":"Kerala State IT Mission","organisation":null,"buyerOffice":"Kerala State IT Mission, Thiruvananthapuram","state":"Kerala","city":"Thiruvananthapuram","startAt":"2026-11-03T10:30:00.000Z","endAt":"2026-11-07T09:30:00.000Z","openingAt":null,"emdAmount":45000,"estimatedValue":1440000,"epbgPe
+

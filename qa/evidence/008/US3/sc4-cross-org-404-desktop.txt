@@ -1,0 +1,72 @@
+# sc4-cross-org-404 — project desktop — 2026-11-05T04:31:58.961Z
+### org B GET /api/workspaces/<orgA-id>
+> cookie: org B
+< 404
+< ratelimit-remaining: 597
+< content-type: application/json
+{"error":{"code":"not_found","message":"Bid workspace not found"}}
+
+### org B PATCH /api/workspaces/<orgA-id>
+> cookie: org B, body {"stage":"preparing"}
+< 404
+< ratelimit-remaining: 596
+< content-type: application/json
+{"error":{"code":"not_found","message":"Bid workspace not found"}}
+
+### org B DELETE /api/workspaces/<orgA-id>
+> cookie: org B
+< 404
+< content-type: application/json
+{"error":{"code":"not_found","message":"No API route for DELETE /api/workspaces/d2493fa6-1398-41fd-9374-4c0aa3c17cc5"}}
+
+### org B PATCH /api/watchlists/<orgA-id>
+> cookie: org B, body {"name":"hijacked"}
+< 404
+< ratelimit-remaining: 595
+< content-type: application/json
+{"error":{"code":"not_found","message":"Watchlist not found"}}
+
+### org B DELETE /api/watchlists/<orgA-id>
+> cookie: org B
+< 404
+< ratelimit-remaining: 594
+< content-type: application/json
+{"error":{"code":"not_found","message":"Watchlist not found"}}
+
+### org B GET /api/vault/<orgA-id>
+> cookie: org B
+< 404
+< ratelimit-remaining: 593
+< content-type: application/json
+{"error":{"code":"not_found","message":"Document not found"}}
+
+### org B PATCH /api/vault/<orgA-id>
+> cookie: org B, body {"name":"hijacked"}
+< 404
+< ratelimit-remaining: 592
+< content-type: application/json
+{"error":{"code":"not_found","message":"Document not found"}}
+
+### org B DELETE /api/vault/<orgA-id>
+> cookie: org B
+< 404
+< ratelimit-remaining: 591
+< content-type: application/json
+{"error":{"code":"not_found","message":"Document not found"}}
+
+### org B POST /api/workspaces/<orgA-id>/packets
+> cookie: org B, body {}
+< 404
+< ratelimit-remaining: 29
+< content-type: application/json
+{"error":{"code":"not_found","message":"Bid workspace not found"}}
+
+### org B POST /api/workspaces/<orgA-id>/comments
+> cookie: org B, body {"body":"hi"}
+< 404
+< ratelimit-remaining: 589
+< content-type: application/json
+{"error":{"code":"not_found","message":"Bid workspace not found"}}
+
+org A snapshot (workspace, watchlists, vault) identical before/after: true
+Route-coverage guard: apps/api/test/isolation-contract.test.ts (see API run output in VERDICT.md)
