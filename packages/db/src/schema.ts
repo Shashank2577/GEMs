@@ -195,6 +195,8 @@ export const vaultDocuments = pgTable('vault_documents', {
 }, (t) => ({
   orgIdx: index('vault_org_idx').on(t.orgId), typeIdx: index('vault_org_type_idx').on(t.orgId, t.type),
   shaIdx: index('vault_org_sha_idx').on(t.orgId, t.contentSha256),
+  // 005 T009 (NFR-004): the daily reminder scan filters on expiry_date across orgs.
+  expiryIdx: index('vault_expiry_idx').on(t.expiryDate),
 }));
 
 /** Previous files of a vault document, kept on renewal/replace (FR-065; at most 5 per document). */

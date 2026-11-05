@@ -1,0 +1,3416 @@
+{
+  "url": "http://localhost:8807/vault?doc=6dd34fa7-418d-4984-a516-1711c4aa6ab4",
+  "timestamp": "2026-11-05T04:21:37.642Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                },
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" class=\"rounded-md focus-ring\" href=\"/dashboard\">",
+                  "target": [
+                    ".px-4.h-14.justify-between > a[aria-label=\"TenderPilot home\"][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Collapse sidebar\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Collapse sidebar\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:r3:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"group flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted focus-ring\" aria-label=\"Organization: qa Traders mw31ghr73. Switch organization\">",
+                  "target": [
+                    "#radix-\\:r3\\:"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-8 w-full items-center gap-2 rounded-lg border bg-card px-2.5 text-[13px] text-muted-foreground shadow-xs transition-colors hover:border-foreground/15 hover:text-foreground focus-ring\">",
+                  "target": [
+                    ".pb-3 > .h-8.w-full.text-\\[13px\\]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/dashboard\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/tenders\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"tenders\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/watchlists\">",
+                  "target": [
+                    "a[href$=\"watchlists\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-sidebar-foreground.text-\\[13\\.5px\\][href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring bg-card text-foreground shadow-sm ring-1 ring-border\" href=\"/vault\">",
+                  "target": [
+                    ".ring-1"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/profile\">",
+                  "target": [
+                    "a[href$=\"profile\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/notifications\">",
+                  "target": [
+                    "a[href$=\"notifications\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"group relative flex h-9 items-center gap-3 rounded-lg px-2.5 text-[13.5px] font-medium transition-colors focus-ring text-sidebar-foreground hover:bg-muted hover:text-foreground\" href=\"/settings\">",
+                  "target": [
+                    "a[href$=\"settings\"]"
+                  ]
+                },
+                {
+                  "html": "<button class=\"ml-auto hidden h-8 w-full max-w-sm items-center gap-2 rounded-lg border bg-subtle px-3 text-[13px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground focus-ring md:mr-auto md:ml-0 md:flex\">",
+                  "target": [
+                    ".max-w-sm"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Theme: system\" id=\"radix-:r9:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r9\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications, 4 unr...\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications, 4 unread\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".flex-wrap.gap-2.shrink-0 > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\].bg-primary"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"More vault actions\" id=\"radix-:rn:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:rn\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"true\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".text-left.rounded-xl[type=\"button\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-label=\"ISO 9001:2015 quality management certificate, Expires in 10d\" class=\"absolute -translate-x-1/2 rounded-lg transition-transform hover:z-10 hover:scale-110 focus-ring\" data-state=\"closed\" style=\"left: 11.1111%; top: 40px;\">",
+                  "target": [
+                    ".transition-transform.hover\\:z-10.hover\\:scale-110:nth-child(6)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-label=\"CA certificate – average turnover (last 3 FYs), Expires in 25d\" class=\"absolute -translate-x-1/2 rounded-lg transition-transform hover:z-10 hover:scale-110 focus-ring\" data-state=\"closed\" style=\"left: 27.7778%; top: 40px;\">",
+                  "target": [
+                    ".transition-transform.hover\\:z-10.hover\\:scale-110:nth-child(7)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded-md bg-danger-soft px-2 py-1 text-xs font-semibold text-[hsl(350_74%_43%)] dark:text-danger hover:bg-danger/15 focus-ring\">1 doc</button>",
+                  "target": [
+                    ".px-2"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search title, number...\" aria-label=\"Search documents\" value=\"\">",
+                  "target": [
+                    ".placeholder\\:text-muted-foreground\\/70"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex items-center ju...\" aria-label=\"Document type\">",
+                  "target": [
+                    ".w-\\[11\\.5rem\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex items-center ju...\" aria-label=\"Sort\">",
+                  "target": [
+                    ".w-\\[10rem\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">",
+                  "target": [
+                    "div[aria-label=\"View\"] > .shadow-sm.transition-all[role=\"radio\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">",
+                  "target": [
+                    "div[aria-label=\"View\"] > .transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">All</button>",
+                  "target": [
+                    "div[aria-label=\"Category\"] > .shadow-sm.transition-all[role=\"radio\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Statutory</button>",
+                  "target": [
+                    "div[aria-label=\"Category\"] > .transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Financial</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Experience</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">OEM</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(5)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Quality</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(6)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Other</button>",
+                  "target": [
+                    ".transition-all.\\[\\&_svg\\]\\:size-3\\.5[role=\"radio\"]:nth-child(7)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open Cancelled cheque &amp; bank mandate – HDFC Bank\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open Make in India self-certificate (Class-I, 62% local content)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open CRAC – Central Railway desktop supply (₹58 L)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open CRAC – Pune Municipal Corporation CCTV (₹96 L)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open OEM authorisation – Dell Technologies (desktops &amp; servers)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open OEM authorisation – CP PLUS (CCTV)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open ISO 9001:2015 quality management certificate\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open CA certificate – average turnover (last 3 FYs)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open Audited balance sheet FY 2022-23\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open Audited balance sheet FY 2023-24\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open Audited balance sheet FY 2024-25\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open Certificate of incorporation\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(12) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open Udyam registration certificate (Micro)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open PAN card – Aarav Technologies Pvt Ltd\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"absolute inset-0 z-[1] rounded-xl focus-ring\" aria-label=\"Open GST registration certificate (Form GST REG-06)\"></button>",
+                  "target": [
+                    ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .z-\\[1\\].inset-0.absolute"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"min-h-dvh bg-background\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".bg-background"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"Cancelled cheque &amp; bank mandate – HDFC Bank\">Cancelled cheque &amp; bank mandate – HDFC Bank</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">Bank details / cancelled cheque</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 5 days ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 2p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(1) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"Make in India self-certificate (Class-I, 62% local content)\">Make in India self-certificate (Class-I, 62% local content)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">Make in India declaration</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 6 days ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(2) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"CRAC – Central Railway desktop supply (₹58 L)\">CRAC – Central Railway desktop supply (₹58 L)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">CRAC / completion certificate</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">Desktops</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(2) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(3) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added last week</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(3) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"CRAC – Pune Municipal Corporation CCTV (₹96 L)\">CRAC – Pune Municipal Corporation CCTV (₹96 L)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">CRAC / completion certificate</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">CCTV</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(2) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(3) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added last week</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(4) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"OEM authorisation – Dell Technologies (desktops &amp; servers)\">OEM authorisation – Dell Technologies (desktops &amp; servers)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">OEM authorisation</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-danger/20 bg-danger-soft text-[hsl(350_74%_43%)] dark:text-danger h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".border-danger\\/20"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">Dell</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(2) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">Desktops</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(3) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Expires 31 Oct 2026</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(5) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"OEM authorisation – CP PLUS (CCTV)\">OEM authorisation – CP PLUS (CCTV)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">OEM authorisation</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">CP PLUS</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(2) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">CCTV</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(3) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Expires 19 Apr 2027</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(6) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"ISO 9001:2015 quality management certificate\">ISO 9001:2015 quality management certificate</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">ISO certificate</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"mt-3 min-h-[20px] truncate font-mono text-xs text-muted-foreground\">QMS/IN/24/8812</div>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .min-h-\\[20px\\].font-mono.mt-3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-warning/25 bg-warning-soft text-[hsl(32_90%_32%)] dark:text-warning h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .flex-wrap.mt-3.gap-1\\.5 > .border-warning\\/25.bg-warning-soft.text-\\[hsl\\(32_90\\%_32\\%\\)\\]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">ISO 9001</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(2) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted:nth-child(3) > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Expires 15 Nov 2026</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(7) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"CA certificate – average turnover (last 3 FYs)\">CA certificate – average turnover (last 3 FYs)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">CA turnover certificate</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-warning/25 bg-warning-soft text-[hsl(32_90%_32%)] dark:text-warning h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .flex-wrap.mt-3.gap-1\\.5 > .border-warning\\/25.bg-warning-soft.text-\\[hsl\\(32_90\\%_32\\%\\)\\]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Expires 30 Nov 2026</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(8) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"Audited balance sheet FY 2022-23\">Audited balance sheet FY 2022-23</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">Audited balance sheet</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-border bg-transparent text-foreground h-5 px-1.5 text-2xs\">FY 2022-23</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .flex-wrap.mt-3.gap-1\\.5 > .bg-transparent.text-foreground.border-border"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 2 weeks ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(9) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"Audited balance sheet FY 2023-24\">Audited balance sheet FY 2023-24</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">Audited balance sheet</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-border bg-transparent text-foreground h-5 px-1.5 text-2xs\">FY 2023-24</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .flex-wrap.mt-3.gap-1\\.5 > .bg-transparent.text-foreground.border-border"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 2 weeks ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(10) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"Audited balance sheet FY 2024-25\">Audited balance sheet FY 2024-25</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">Audited balance sheet</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-sans italic opacity-70\">No number</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .min-h-\\[20px\\].font-mono.mt-3 > .italic.opacity-70.font-sans"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&amp;_svg]:size-3 [&amp;_svg]:shrink-0 border-border bg-transparent text-foreground h-5 px-1.5 text-2xs\">FY 2024-25</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .flex-wrap.mt-3.gap-1\\.5 > .bg-transparent.text-foreground.border-border"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 2 weeks ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(11) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"Certificate of incorporation\">Certificate of incorporation</h3>",
+          "target": [
+            "h3[title=\"Certificate of incorporation\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">Incorporation certificate</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(12) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"mt-3 min-h-[20px] truncate font-mono text-xs text-muted-foreground\">U72900PN2016PTC165432</div>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(12) > .min-h-\\[20px\\].font-mono.mt-3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(12) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(12) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 2 weeks ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(12) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(12) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"Udyam registration certificate (Micro)\">Udyam registration certificate (Micro)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">Udyam (MSE) certificate</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"mt-3 min-h-[20px] truncate font-mono text-xs text-muted-foreground\">UDYAM-MH-26-0012345</div>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .min-h-\\[20px\\].font-mono.mt-3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 2 weeks ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(13) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"PAN card – Aarav Technologies Pvt Ltd\">PAN card – Aarav Technologies Pvt Ltd</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">PAN card</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"mt-3 min-h-[20px] truncate font-mono text-xs text-muted-foreground\">AAJCA4721K</div>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .min-h-\\[20px\\].font-mono.mt-3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 3 weeks ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(14) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<h3 class=\"truncate text-sm font-semibold tracking-tight\" title=\"GST registration certificate (Form GST REG-06)\">GST registration certificate (Form GST REG-06)</h3>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .items-start.gap-3.flex > .flex-1.min-w-0 > h3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"truncate text-xs text-muted-foreground\">GST registration</p>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .items-start.gap-3.flex > .flex-1.min-w-0 > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"mt-3 min-h-[20px] truncate font-mono text-xs text-muted-foreground\">27AAJCA4721K1ZK</div>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .min-h-\\[20px\\].font-mono.mt-3"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"inline-flex items-center gap-1 whitespace-nowrap rounded-full border font-medium [&_svg]:size-3 [&_svg]:shrink-0 border-success/20 bg-success-soft text-[hsl(158_72%_27%)] dark:text-success h-5 px-1.5 text-2xs\">",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .flex-wrap.mt-3.gap-1\\.5 > .border-success\\/20.text-\\[hsl\\(158_72\\%_27\\%\\)\\].dark\\:text-success"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"truncate\">demo</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .flex-wrap.mt-3.gap-1\\.5 > .max-w-\\[7rem\\].border-border.bg-muted > .truncate"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span>Added 3 weeks ago</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > span:nth-child(1)"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "bgOverlap",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it is overlapped by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"uppercase\">PDF · 1p</span>",
+          "target": [
+            ".transition-\\[box-shadow\\,border-color\\,transform\\].hover\\:-translate-y-px.hover\\:shadow-md:nth-child(15) > .mt-auto.pt-4 > .pt-3.border-t.justify-between > .uppercase"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it is overlapped by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<iframe title=\"Preview of Cancelled cheque &amp; bank mandate – HDFC Bank\" src=\"/api/vault/6dd34fa7-418d-4984-a516-1711c4aa6ab4/download?inline=1&amp;v=2026-11-05T04%3A21%3A32.668Z#toolbar=0&amp;view=FitH\" class=\"h-[52vh] min-h-[320px] w-full bg-white\"></iframe>",
+                  "target": [
+                    "iframe"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<dt class=\"text-2xs font-medium uppercase tracking-wide text-muted-foreground\">",
+          "target": [
+            ".pl-\\[26px\\].py-2.min-w-0:nth-child(1) > dt"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "8.3pt (11px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<iframe title=\"Preview of Cancelled cheque &amp; bank mandate – HDFC Bank\" src=\"/api/vault/6dd34fa7-418d-4984-a516-1711c4aa6ab4/download?inline=1&amp;v=2026-11-05T04%3A21%3A32.668Z#toolbar=0&amp;view=FitH\" class=\"h-[52vh] min-h-[320px] w-full bg-white\"></iframe>",
+                  "target": [
+                    "iframe"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<dt class=\"text-2xs font-medium uppercase tracking-wide text-muted-foreground\">",
+          "target": [
+            ".pl-\\[26px\\].py-2.min-w-0:nth-child(2) > dt"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<iframe title=\"Preview of Cancelled cheque &amp; bank mandate – HDFC Bank\" src=\"/api/vault/6dd34fa7-418d-4984-a516-1711c4aa6ab4/download?inline=1&amp;v=2026-11-05T04%3A21%3A32.668Z#toolbar=0&amp;view=FitH\" class=\"h-[52vh] min-h-[320px] w-full bg-white\"></iframe>",
+                  "target": [
+                    "iframe"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<dd class=\"mt-0.5 break-words text-sm\">HDFC Bank, Baner Branch</dd>",
+          "target": [
+            ".pl-\\[26px\\].py-2.min-w-0:nth-child(2) > dd"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"text-xs text-muted-foreground\">Uploaded 5 days ago by QA qa mw31ghr73 · updated just now</p>",
+          "target": [
+            ".content-start > p"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "10.5pt (14px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscuring",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it partially overlaps other elements"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"min-w-0 flex-1 break-words\">cancelled-cheque-bank-mandate-hdfc-bank.pdf · 1001 B · replaced just now by QA qa mw31ghr73</span>",
+          "target": [
+            ".break-words.flex-1.min-w-0"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements"
+        }
+      ]
+    }
+  ],
+  "passes": 30
+}

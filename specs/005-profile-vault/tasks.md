@@ -40,8 +40,8 @@ task is sized at ≤ 1 day.
 **Purpose**: Demo data, E2E scaffolding, accessibility tooling and attribution
 
 - [x] T001 [P] Demo org seed with profile (Aarav Technologies), 5 past contracts and 15 vault documents with generated one-page PDFs (ISO +10 d, CA certificate +25 d, Dell OEM −5 d) in `packages/db/src/demo.ts` FR-001, FR-021
-- [ ] T002 [P] E2E scaffold for this spec: create `e2e/005-profile-vault/` and add helpers `makePdf(pages)`, `makePng()`, `uploadVaultDoc(request, {name, bytes, fields})`, `putProfile(request, body)`, `addPastContract(request, body)`, `inviteAs(request, role)` (returns a logged-in context for analyst/viewer) and `evidence005(page, story, name)` writing to `qa/evidence/005/<story>/` in `e2e/support/fixtures.ts` NFR-008 (#120)
-- [ ] T003 [P] Add `@axe-core/playwright` (exact version) to root `package.json` devDependencies and an `a11y(page, name)` helper in `e2e/support/fixtures.ts` that fails on serious/critical violations and saves the JSON report next to the evidence NFR-005 (#121)
+- [x] T002 [P] E2E scaffold for this spec: create `e2e/005-profile-vault/` and add helpers `makePdf(pages)`, `makePng()`, `uploadVaultDoc(request, {name, bytes, fields})`, `putProfile(request, body)`, `addPastContract(request, body)`, `inviteAs(request, role)` (returns a logged-in context for analyst/viewer) and `evidence005(page, story, name)` writing to `qa/evidence/005/<story>/` in `e2e/support/fixtures.ts` NFR-008 (#120)
+- [x] T003 [P] Add `@axe-core/playwright` (exact version) to root `package.json` devDependencies and an `a11y(page, name)` helper in `e2e/support/fixtures.ts` that fails on serious/critical violations and saves the JSON report next to the evidence NFR-005 (#121)
 - [x] T004 [P] Append to root `NOTICE` (create the file if 003 T003 has not landed yet, with the same header) the attribution for the erenmyeager15/india-government-tenders-scraper (Apache-2.0) GeM seller-document label vocabulary used in `packages/core/src/vault/status.ts` NFR-009 (#122)
 
 ---
@@ -54,7 +54,7 @@ task is sized at ≤ 1 day.
 - [x] T006 [P] Zod contracts and DTOs (`profileInputSchema`, `pastContractCreateSchema`/`UpdateSchema`, `vaultUploadFieldsSchema`, `vaultUpdateSchema`, `vaultQuerySchema`, `VAULT_MAX_BYTES` 20 MB, `VAULT_ALLOWED_MIME`, `CompanyProfileDto`, `PastContractDto`, `VaultDocumentDto`, `VaultSummary`) in `packages/core/src/contracts/vault.ts` FR-003, FR-008, FR-022, FR-024, FR-027
 - [x] T007 [P] Document-type catalog `DOC_TYPES` (20 types, categories, expiry flags, typical validity, per-FY, common-in-bids, keywords), `docTypeInfo`, `guessDocType`, `guessFinancialYear`, `suggestExpiry` in `packages/core/src/vault/status.ts` FR-025, FR-026
 - [x] T008 [P] Reminder job wired into the scheduled pipeline (ingestion → alerts → reminders, per-step isolation) in `apps/api/src/lib/scheduled.ts`, Worker `scheduled()` in `apps/api/src/worker.ts`, Node cron in `apps/api/src/node.ts` FR-043
-- [ ] T009 [P] Add index `vault_expiry_idx` on `vault_documents(expiry_date)` in `packages/db/src/schema.ts` and generate the migration in `packages/db/migrations/` (drizzle-kit) for the reminder scan NFR-004 (#123)
+- [x] T009 [P] Add index `vault_expiry_idx` on `vault_documents(expiry_date)` in `packages/db/src/schema.ts` and generate the migration in `packages/db/migrations/` (drizzle-kit) for the reminder scan NFR-004 (#123)
 
 **Checkpoint**: Foundation ready — user stories can proceed in parallel
 
@@ -224,9 +224,9 @@ task is sized at ≤ 1 day.
 
 **Purpose**: Documentation, accessibility fixes and review
 
-- [ ] T074 [P] Update `specs/001-gem-tender-copilot/contracts/api.md` (Profile & Vault section) and `specs/001-gem-tender-copilot/data-model.md` with the new endpoints (`/vault/reminders/run`, versions), `expectedUpdatedAt`, `nextReminder`, `content_sha256` and `vault_document_versions` FR-014, FR-052, FR-053, FR-064…FR-067 (#162)
-- [ ] T075 Fix any serious/critical axe violations reported by T022/T030/T043 on `/profile` and `/vault` (labels, contrast, focus order) in `apps/web/src/features/profile/` and `apps/web/src/features/vault/` NFR-005 (#163)
-- [ ] T076 Tenant-isolation sweep: grep every query in `apps/api/src/routes/profile.ts`, `apps/api/src/routes/vault.ts`, `apps/api/src/services/reminders.ts` for an `org_id` predicate and add a table-driven cross-org 404 test covering every vault/version/past-contract route in `apps/api/test/vault.test.ts` NFR-001, SC-005 (#164)
+- [x] T074 [P] Update `specs/001-gem-tender-copilot/contracts/api.md` (Profile & Vault section) and `specs/001-gem-tender-copilot/data-model.md` with the new endpoints (`/vault/reminders/run`, versions), `expectedUpdatedAt`, `nextReminder`, `content_sha256` and `vault_document_versions` FR-014, FR-052, FR-053, FR-064…FR-067 (#162)
+- [x] T075 Fix any serious/critical axe violations reported by T022/T030/T043 on `/profile` and `/vault` (labels, contrast, focus order) in `apps/web/src/features/profile/` and `apps/web/src/features/vault/` NFR-005 (#163)
+- [x] T076 Tenant-isolation sweep: grep every query in `apps/api/src/routes/profile.ts`, `apps/api/src/routes/vault.ts`, `apps/api/src/services/reminders.ts` for an `org_id` predicate and add a table-driven cross-org 404 test covering every vault/version/past-contract route in `apps/api/test/vault.test.ts` NFR-001, SC-005 (#164)
 - [ ] T077 Cairn review of all 005 changes (CONVENTIONS.md review checklist: correctness, security, tenancy, a11y, tests), resolve findings, then roll up the six `VERDICT.md` files into `qa/evidence/005/SUMMARY.md` NFR-008, SC-006 (#165)
 
 ---

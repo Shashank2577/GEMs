@@ -171,12 +171,13 @@ export async function putProfile(page: Page, data: unknown) {
   return page.request.put('/api/profile', { data });
 }
 
-// 1x1 PNG
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+// Distinct small PNG per upload: identical bytes in one org are refused as duplicates since US6 (FR-067).
+let pngSeq = 0;
+const uniquePng = () => makePng(1 + (++pngSeq % 500), 1);
 
 export async function uploadDoc(page: Page, fields: { type: string; title: string; expiryDate?: string }) {
   const multipart: Record<string, string | { name: string; mimeType: string; buffer: Buffer }> = {
-    file: { name: `${fields.type}.png`, mimeType: 'image/png', buffer: PNG },
+    file: { name: `${fields.type}.png`, mimeType: 'image/png', buffer: uniquePng() },
     type: fields.type, title: fields.title,
   };
   if (fields.expiryDate) multipart.expiryDate = fields.expiryDate;
