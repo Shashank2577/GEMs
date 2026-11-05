@@ -5,7 +5,7 @@
 import { and, asc, count, desc, eq, gt, isNull, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Hono } from 'hono';
-import { activityLog, apiTokens, invitations, memberships, organizations, users, type Db } from '@tp/db';
+import { activityLog, apiTokens, invitations, memberships, organizations, sessions, users, type Db } from '@tp/db';
 import {
   activityQuerySchema, changeRoleInputSchema, inviteInputSchema, updateOrgInputSchema,
   type ActivityItem, type CreatedInvitation, type Member, type MembersResponse, type PendingInvitation,
@@ -15,7 +15,8 @@ import { logActivity } from '../lib/activity';
 import { randomToken, sha256Hex } from '../lib/crypto';
 import { HttpError, conflict, forbidden, notFound } from '../lib/errors';
 import { parseJson, parseQuery } from '../lib/validate';
-import { orgId, requireAuth, requireRole, userId } from '../middleware/auth';
+import { firstMembership } from '../lib/session';
+import { orgId, requireAuth, requireRole, requireSession, userId } from '../middleware/auth';
 import type { AppEnv } from '../types';
 
 export const orgRoutes = new Hono<AppEnv>();
@@ -142,6 +143,25 @@ orgRoutes.delete('/org/invitations/:id', requireRole('bid_manager'), async (c) =
   if (!del.length) throw notFound('Invitation');
   await logActivity(db, { orgId: orgId(c), userId: userId(c), action: 'member.invite_revoked', entityType: 'invitation', entityId: id, meta: { email: del[0].email } });
   return c.json({ ok: true as const });
+});
+
+// 002/FR-027: leave the active organization. Registered before `/org/members/:userId` so "me" is never an id.
+orgRoutes.delete('/org/members/me', requireSession, async (c) => {
+  const { db } = c.var.deps;
+  const oid = orgId(c);
+  const uid = userId(c);
+  if (c.var.role === 'owner' && (await ownerCount(db, oid)) <= 1) {
+    throw new HttpError(409, 'last_owner', 'You are the last Owner of this organization. Make someone else an Owner before you leave.');
+  }
+  await db.transaction(async (tx) => {
+    await tx.delete(memberships).where(and(eq(memberships.orgId, oid), eq(memberships.userId, uid)));
+    await tx.delete(apiTokens).where(and(eq(apiTokens.orgId, oid), eq(apiTokens.userId, uid)));
+  });
+  await logActivity(db, { orgId: oid, userId: uid, action: 'member.left', entityType: 'user', entityId: uid, meta: { name: c.var.user.name, email: c.var.user.email, role: c.var.role } });
+  const next = await firstMembership(db, uid);
+  const nextOrgId = next?.org.id ?? null;
+  await db.update(sessions).set({ activeOrgId: nextOrgId }).where(eq(sessions.id, c.var.sessionId!));
+  return c.json({ ok: true as const, nextOrgId });
 });
 
 orgRoutes.patch('/org/members/:userId', requireRole('owner'), async (c) => {

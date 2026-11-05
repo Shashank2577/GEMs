@@ -344,6 +344,70 @@ describe('invitations & roles', () => {
   });
 });
 
+describe('DELETE /api/org/members/me — leave organization (002/FR-027)', () => {
+  it('removes own membership + own tokens for that org, logs member.left and moves the session to the next org', async () => {
+    const a = await seedOrgWithRoles(ctx.app, 'Leave Alpha');
+    const home = await signup(ctx.app, { orgName: 'Leave Home' });
+    // `home` joins Alpha as an analyst with their existing account, so they have two orgs.
+    const inv = await request(ctx.app, 'POST', '/api/org/invitations', { cookie: a.owner.cookie, json: { email: home.email, role: 'analyst' } });
+    const acc = await request(ctx.app, 'POST', '/api/auth/accept-invite', { cookie: home.cookie, json: { token: inv.body.inviteUrl.split('/invite/')[1] } });
+    expect(acc.body.org.name).toBe('Leave Alpha');
+    const alphaToken = (await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: home.cookie, json: { name: 'alpha ext' } })).body.token;
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: home.cookie, json: { orgId: home.me.org.id } });
+    const homeToken = (await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: home.cookie, json: { name: 'home ext' } })).body.token;
+    await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: home.cookie, json: { orgId: a.orgId } });
+
+    const r = await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: home.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true, nextOrgId: home.me.org.id });
+
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: home.cookie });
+    expect(me.body.org.id).toBe(home.me.org.id);
+    expect(me.body.orgs.map((o: any) => o.name)).toEqual(['Leave Home']);
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { bearer: alphaToken })).status).toBe(401);
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { bearer: homeToken })).status).toBe(200);
+
+    const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: a.owner.cookie });
+    expect(members.body.items.map((m: any) => m.email)).not.toContain(home.email);
+    const act = await request(ctx.app, 'GET', '/api/activity?entityType=user', { cookie: a.owner.cookie });
+    expect(act.body.items[0]).toMatchObject({ action: 'member.left', entityId: home.me.user.id, user: { id: home.me.user.id }, meta: { role: 'analyst' } });
+    // the switch back to the org they left is refused
+    expect((await request(ctx.app, 'POST', '/api/auth/switch-org', { cookie: home.cookie, json: { orgId: a.orgId } })).status).toBe(404);
+  });
+
+  it('leaving the only org returns nextOrgId null and the session has no organization', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const r = await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: a.viewer.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true, nextOrgId: null });
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: a.viewer.cookie });
+    expect(me.status).toBe(403);
+    expect(me.body.error.code).toBe('no_organization');
+  });
+
+  it('the last Owner gets 409 last_owner; a non-last Owner may leave', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const last = await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: a.owner.cookie });
+    expect(last.status).toBe(409);
+    expect(last.body.error.code).toBe('last_owner');
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: a.owner.cookie })).body.role).toBe('owner');
+
+    await request(ctx.app, 'PATCH', `/api/org/members/${a.bidManager.me.user.id}`, { cookie: a.owner.cookie, json: { role: 'owner' } });
+    expect((await request(ctx.app, 'DELETE', '/api/org/members/me', { cookie: a.owner.cookie })).status).toBe(200);
+    const members = await request(ctx.app, 'GET', '/api/org/members', { cookie: a.bidManager.cookie });
+    expect(members.body.items.filter((m: any) => m.role === 'owner').map((m: any) => m.userId)).toEqual([a.bidManager.me.user.id]);
+  });
+
+  it('is session-only: an API token gets 403 and nothing changes', async () => {
+    const a = await seedOrgWithRoles(ctx.app);
+    const token = (await request(ctx.app, 'POST', '/api/me/api-tokens', { cookie: a.analyst.cookie, json: { name: 'ext' } })).body.token;
+    const r = await request(ctx.app, 'DELETE', '/api/org/members/me', { bearer: token });
+    expect(r.status).toBe(403);
+    expect((await request(ctx.app, 'GET', '/api/auth/me', { cookie: a.analyst.cookie })).body.role).toBe('analyst');
+    expect((await request(ctx.app, 'DELETE', '/api/org/members/me')).status).toBe(401);
+  });
+});
+
 describe('organization isolation (Constitution IV)', () => {
   it('two orgs cannot see or touch each other\'s members, invitations or activity', async () => {
     const a = await seedOrgWithRoles(ctx.app, 'Org A');

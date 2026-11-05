@@ -5,8 +5,10 @@ import type {
 } from '@tp/core/contracts/auth';
 import type { ScoringWeights } from '@tp/core/contracts/analyse';
 import type { IngestionRunsResponse } from '@tp/core/contracts/identify';
+import { useNavigate } from 'react-router-dom';
+import { toast } from '@/components/ui/toaster';
 import { api, type Paged } from '@/lib/api';
-import { ME_KEY } from '@/lib/auth';
+import { ME_KEY, useAuth } from '@/lib/auth';
 
 export const settingsKeys = {
   members: ['org', 'members'] as const,
@@ -72,6 +74,21 @@ export const useInvite = () => useMembersMutation((b: { email: string; role: str
 export const useRevokeInvite = () => useMembersMutation((id: string) => api.delete(`/org/invitations/${id}`));
 export const useChangeRole = () => useMembersMutation(({ userId, role }: { userId: string; role: string }) => api.patch(`/org/members/${userId}`, { role }));
 export const useRemoveMember = () => useMembersMutation((userId: string) => api.delete(`/org/members/${userId}`));
+/**
+ * Leave the active org (002/FR-027): toast "You left <Org>." and land on the next org's dashboard, or on /login when
+ * none is left. Success handling lives on the hook (not `mutate()` callbacks) because signing out unmounts the page.
+ */
+export function useLeaveOrg() {
+  const { leaveOrg } = useAuth();
+  const navigate = useNavigate();
+  return useMutation({
+    mutationFn: () => leaveOrg(),
+    onSuccess: ({ orgName, nextOrgId }) => {
+      toast.success(`You left ${orgName}.`);
+      navigate(nextOrgId ? '/dashboard' : '/login', { replace: true });
+    },
+  });
+}
 
 // ── Notifications ──
 export function usePrefs() {

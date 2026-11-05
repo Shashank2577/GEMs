@@ -44,6 +44,11 @@ interface AuthContextValue {
   resetPassword: (input: { token: string; newPassword: string }) => Promise<Me>;
   logout: () => Promise<void>;
   switchOrg: (orgId: string) => Promise<Me>;
+  /**
+   * Leave the active organization (002/FR-027). The server moves the session to the next org; with none left the
+   * user is signed out. Resolves with the left org's name and `nextOrgId` (null = signed out).
+   */
+  leaveOrg: () => Promise<{ orgName: string; nextOrgId: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -79,6 +84,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const m = await api.post<Me>('/auth/switch-org', { orgId });
       setMe(m);
       return m;
+    },
+    leaveOrg: async () => {
+      const orgName = me?.org.name ?? 'the organization';
+      const { nextOrgId } = await api.delete<{ ok: true; nextOrgId: string | null }>('/org/members/me');
+      if (nextOrgId) {
+        setMe(await api.get<Me>('/auth/me'));
+      } else {
+        try { await api.post('/auth/logout'); } catch { /* the membership is gone either way */ }
+        setMe(null);
+      }
+      return { orgName, nextOrgId };
     },
   }), [me, meQuery.isLoading, loginM, signupM, inviteM, resetM, setMe]);
 

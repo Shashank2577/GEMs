@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { formatDateIST, relativeTime } from '@/lib/format';
 import { ROLE_LABEL, type Role } from '@/lib/types';
 import { copyText, useChangeRole, useInvite, useMembers, useRemoveMember, useRevokeInvite } from '../api';
+import { LeaveOrgPanel } from './LeaveOrgPanel';
 import { Panel, fieldErrors } from './Panel';
 
 export const ROLE_INFO: Record<Role, string> = {
@@ -104,6 +105,8 @@ export default function TeamSection() {
           ))}
         </dl>
       </Panel>
+
+      <LeaveOrgPanel members={q.data?.items} />
 
       <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} allowOwner={isOwner} />
       <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title={`Remove ${removing?.name}?`}

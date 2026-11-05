@@ -9,7 +9,7 @@
  *   PATCH  /past-contracts/:id     → PastContractDto                                      analyst+
  *   DELETE /past-contracts/:id     → { ok: true }                                         analyst+
  */
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { companyProfiles, pastContracts, vaultDocuments } from '@tp/db';
 import {
@@ -82,6 +82,18 @@ profileRoutes.put('/profile', requireRole('analyst'), async (c) => {
   // Merge: keys absent from the body keep their stored value.
   const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) as Partial<ProfileRow>;
   const now = c.var.deps.clock.now();
+  // Constitution IV: an OEM authorisation may only link a document from this org's vault.
+  const oemDocIds = (input.oemAuthorizations ?? []).map((o) => o.documentId).filter((id): id is string => !!id);
+  if (oemDocIds.length) {
+    const own = new Set((await db.select({ id: vaultDocuments.id }).from(vaultDocuments)
+      .where(and(eq(vaultDocuments.orgId, org), inArray(vaultDocuments.id, oemDocIds)))).map((d) => d.id.toLowerCase()));
+    const i = (input.oemAuthorizations ?? []).findIndex((o) => o.documentId && !own.has(o.documentId.toLowerCase()));
+    if (i >= 0) {
+      throw validationError(`oemAuthorizations.${i}.documentId: That document is not in your vault`, {
+        fields: { [`oemAuthorizations.${i}.documentId`]: 'That document is not in your vault' },
+      });
+    }
+  }
 
   await db.transaction(async (tx) => {
     // Lock the org's row so the concurrency check and the write are atomic (FR-014).
