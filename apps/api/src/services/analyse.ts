@@ -10,7 +10,7 @@
  */
 import { and, asc, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import {
-  analyses, companyProfiles, organizations, pastContracts, tenderDocuments, tenders, vaultDocuments,
+  analyses, companyProfiles, organizations, pastContracts, tenderDocuments, tenderEvents, tenders, vaultDocuments,
   type Requirement, type ScoreFactor,
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
@@ -199,11 +199,31 @@ export async function removeTenderDocument(deps: AppDeps, input: { orgId: string
 
 // ───────────── Fetch from GeM ─────────────
 
-export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
+/**
+ * FR-046: has a corrigendum changed the tender's document URL since the newest GeM copy was stored? Event times
+ * and `created_at` both come from the app clock (the fetch stamps `created_at` itself), so they compare.
+ */
+async function gemCopyOutdated(deps: AppDeps, tenderId: string, gemDocs: DocRow[]): Promise<boolean> {
+  if (!gemDocs.length) return false;
+  const newest = gemDocs.reduce((m, d) => (d.createdAt > m ? d.createdAt : m), gemDocs[0]!.createdAt);
+  const events = await deps.db.select({ changes: tenderEvents.changes }).from(tenderEvents)
+    .where(and(eq(tenderEvents.tenderId, tenderId), eq(tenderEvents.kind, 'corrigendum'), gt(tenderEvents.createdAt, newest)));
+  return events.some((e) => !!e.changes && 'documentUrl' in e.changes);
+}
+
+/**
+ * Download the tender's GeM bid document (public, shared by every org) once. A later call returns the stored copy,
+ * unless a corrigendum changed `documentUrl` after that copy was fetched (FR-046) or `refresh` is set: then the
+ * current document is downloaded as kind `corrigendum` and the earlier copy is kept. The 150-page text cap and
+ * `total_pages` handling are the same as for the first copy.
+ */
+export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer; refresh?: boolean }): Promise<{ documents: DocRow[]; fetched: number; tender: TenderRow }> {
   const tender = await getTender(deps, input.tenderId, input.viewer);
   const existing = (await listTenderDocuments(deps, tender.id, input.orgId)).filter((d) => d.orgId === null);
-  if (existing.length) return { documents: existing, fetched: 0, tender };
-  const ref = tender.gemBidId ?? tender.documentUrl;
+  const outdated = await gemCopyOutdated(deps, tender.id, existing);
+  if (existing.length && !outdated && !input.refresh) return { documents: existing, fetched: 0, tender };
+  // The URL a corrigendum published wins over the bid id; the first copy keeps the bid id first.
+  const ref = existing.length ? (tender.documentUrl ?? tender.gemBidId) : (tender.gemBidId ?? tender.documentUrl);
   if (!ref) throw new HttpError(422, 'no_gem_document', 'This tender has no GeM document link. Download the bid PDF from GeM and upload it here.');
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
@@ -227,21 +247,24 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
     throw new HttpError(502, 'gem_unavailable', msg);
   }
   const { pages, totalPages } = await extractOrThrow(got.bytes);
+  const text = joinPages(pages);
+  // A forced refresh that finds the same document stores nothing new.
+  if (input.refresh && !outdated && existing.some((d) => d.text === text && d.sizeBytes === got.bytes.length)) return { documents: existing, fetched: 0, tender };
   if (totalPages > pages.length) deps.logger.warn('analyse: GeM document truncated to the page cap', { tenderId: tender.id, pages: pages.length, totalPages });
   const id = crypto.randomUUID();
   const blobKey = `tenders/${tender.id}/gem/${id}.pdf`;
   await deps.blobs.put(blobKey, got.bytes, { contentType: 'application/pdf' });
   const fileName = `${tender.bidNumber.replace(/[^\w-]+/g, '-')}.pdf`;
   const [doc] = await deps.db.insert(tenderDocuments).values({
-    id, tenderId: tender.id, orgId: null, kind: 'bid', fileName, blobKey, sizeBytes: got.bytes.length,
-    pageCount: pages.length, totalPages, text: joinPages(pages), sourceUrl: got.url,
+    id, tenderId: tender.id, orgId: null, kind: existing.length ? 'corrigendum' : 'bid', fileName: existing.length ? fileName.replace(/\.pdf$/, '-corrigendum.pdf') : fileName,
+    blobKey, sizeBytes: got.bytes.length, pageCount: pages.length, totalPages, text, sourceUrl: got.url, createdAt: deps.clock.now(),
   }).returning();
   if (!tender.documentUrl) await deps.db.update(tenders).set({ documentUrl: got.url }).where(eq(tenders.id, tender.id));
   await logActivity(deps.db, {
     orgId: input.orgId, userId: input.userId, action: 'tender.document_fetched', entityType: 'tender', entityId: tender.id,
-    meta: { documentId: id, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), sourceUrl: got.url },
+    meta: { documentId: id, pages: pages.length, ...(totalPages > pages.length ? { totalPages } : {}), sourceUrl: got.url, ...(existing.length ? { kind: 'corrigendum' } : {}) },
   });
-  return { documents: [doc], fetched: 1, tender };
+  return { documents: [...existing, doc], fetched: 1, tender };
 }
 
 // ───────────── Analyse ─────────────
@@ -385,6 +408,17 @@ export async function analyseTender(
       // GeM busy (503) and over-long documents (422) are actionable for the user; anything else falls through.
       if (e instanceof HttpError && (e.status === 503 || e.code === 'document_too_long')) throw e;
       deps.logger.warn('analyse: auto-fetch of GeM document failed', { tenderId: tender.id, error: (e as Error).message });
+    }
+  } else if (tender.gemBidId || tender.documentUrl) {
+    // FR-046: a corrigendum changed the document URL after the GeM copy was fetched: pick up the new document too.
+    if (await gemCopyOutdated(deps, tender.id, docs.filter((d) => d.orgId === null))) {
+      try {
+        await fetchGemDocuments(deps, input);
+        docs = await listTenderDocuments(deps, tender.id, input.orgId);
+      } catch (e) {
+        if (e instanceof HttpError && (e.status === 503 || e.code === 'document_too_long')) throw e;
+        deps.logger.warn('analyse: re-fetch of the corrigendum GeM document failed', { tenderId: tender.id, error: (e as Error).message });
+      }
     }
   }
   if (!docs.length) {
