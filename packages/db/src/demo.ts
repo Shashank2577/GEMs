@@ -418,7 +418,7 @@ const EXTRA_ANALYSES: { idx: number; kind: Profile }[] = [{ idx: 7, kind: 'stron
  */
 export async function seedDemo(db: Db, opts: SeedDemoOptions): Promise<SeedDemoResult> {
   return db.transaction(async (tx) => {
-    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, opts.orgId)).for('update');
+    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, opts.orgId)).for('no key update');
     const result = await seedInTx(tx, opts);
     await opts.afterSeed?.(tx, result);
     return result;
@@ -770,7 +770,7 @@ export async function removeDemo(db: Db, opts: RemoveDemoOptions): Promise<Remov
   const demoContractNos = demoPastContracts(new Date(0)).map((p) => p.gemContractNo);
 
   const { result, blobKeys } = await db.transaction(async (tx) => {
-    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId)).for('update');
+    await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId)).for('no key update');
 
     const demoTenderIds = (await tx.select({ id: tenders.id }).from(tenders).where(or(
       eq(tenders.source, DEMO_MARK),
