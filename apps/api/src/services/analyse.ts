@@ -306,23 +306,33 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
     return inserted;
   });
 
+  const t0 = performance.now();
+  let extractMs = 0;
+  let llmMs = 0;
+  let pageTotal = 0;
   try {
     const ordered = [...docs].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.createdAt.getTime() - b.createdAt.getTime());
     const perDoc: Requirement[][] = [];
     let usedLlm = false;
     for (const d of ordered) {
+      const tx0 = performance.now();
       const pages = splitPages(d.text);
       if (!pages.length) continue;
+      pageTotal += pages.length;
       const meta = { documentId: d.id, fileName: d.fileName, estimatedValue: tender.estimatedValue };
       const rules = extractRequirementsRules(pages, meta);
+      extractMs += performance.now() - tx0;
       if (deps.llm) {
         const llm = deps.llm;
+        const tl0 = performance.now();
         const r = await enrichWithLlm(pages, rules, (req) => llm.completeJson(req), { documentId: d.id, fileName: d.fileName });
+        llmMs += performance.now() - tl0;
         if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
         usedLlm ||= r.used;
         perDoc.push(r.requirements);
       } else perDoc.push(rules);
     }
+    const ts0 = performance.now();
     const requirements = combineRequirements(perDoc, requirementsFromListing(tender));
     const company = await loadCompany(deps, input.orgId);
     const result = scoreTender({
@@ -332,14 +342,21 @@ export async function analyseTender(deps: AppDeps, input: { orgId: string; userI
     });
     const checklist = buildChecklist(requirements, company.profile);
     const summary = withPrefix(documentCheckPrefix(ordered, tender.bidNumber), result.summary);
+    const scoreMs = performance.now() - ts0;
     const [done] = await deps.db.update(analyses).set({
       status: 'done', method: usedLlm ? 'rules+llm' : 'rules', requirements, factors: result.factors, checklist,
       score: result.score, confidence: result.confidence, verdict: result.verdict, summary, error: null, stale: false,
       updatedAt: deps.clock.now(),
     }).where(eq(analyses.id, row.id)).returning();
+    // NFR-001: stage timings (ms) so slow stages are visible without a profiler.
+    const timing = {
+      extract_ms: Math.round(extractMs), llm_ms: Math.round(llmMs), score_ms: Math.round(scoreMs),
+      total_ms: Math.round(performance.now() - t0), pages: pageTotal, docs: ordered.length,
+    };
+    deps.logger.info('analyse: done', { tenderId: tender.id, analysisId: row.id, method: done.method, ...timing });
     await logActivity(deps.db, {
       orgId: input.orgId, userId: input.userId, action: 'tender.analysed', entityType: 'tender', entityId: tender.id,
-      meta: { analysisId: row.id, score: result.score, verdict: result.verdict, method: done.method, bidNumber: tender.bidNumber },
+      meta: { analysisId: row.id, score: result.score, verdict: result.verdict, method: done.method, bidNumber: tender.bidNumber, ...timing },
     });
     return { analysis: done, documents: ordered };
   } catch (e) {
