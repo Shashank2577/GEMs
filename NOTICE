@@ -45,8 +45,9 @@ listed here with its licence.
 
 3. GEM-SCRAPER — https://github.com/IshanMaheshwari-777/GEM-SCRAPER
    Licence: none. The upstream repository has no licence file, so no licence is claimed or granted here; the
-   heuristics were ported with the repository owner's approval (docs/delivery/TEAM_PLAYBOOK.md reference-scrapers
-   list; specs/006-apply-packet-assist/plan.md, T092).
+   heuristics were ported with THIS project's owner's approval (not the upstream author's;
+   docs/delivery/TEAM_PLAYBOOK.md reference-scrapers list; specs/006-apply-packet-assist/plan.md, T092). This is an
+   exception to .cairn/workflow/memory/constitution.md (Apache-2.0/MIT only) awaiting human ratification.
    Used in: packages/core/src/gem/award.ts (parseAwardResult — TypeScript port of the table heuristics of
    scrape_ra_schedule() in scraper.py: financial-table header keywords, rank / seller / last-numeric-cell price
    column rules, trophy/winner row marker, trailing portal-tag stripping), spec 006 T092. The fixture

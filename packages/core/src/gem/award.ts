@@ -15,8 +15,9 @@
  * `parseAwardResult` (T092; 006/FR-085) is the second, looser reader: it takes any saved GeM RA / bid-result
  * page and finds the rank/price evaluation table by its header words. Ported from `scrape_ra_schedule()` in
  * IshanMaheshwari-777/GEM-SCRAPER (scraper.py). That repository publishes no licence file; the heuristics were
- * ported with the repo owner's approval (docs/delivery/TEAM_PLAYBOOK.md reference-scrapers list; plan.md T092),
- * not under any licence — see NOTICE. Differences from upstream: the rank cell is never used as the price,
+ * ported with THIS project's owner's approval (docs/delivery/TEAM_PLAYBOOK.md reference-scrapers list; plan.md T092) —
+ * not the upstream author's, and not under any licence. This is an exception to the constitution's
+ * Apache-2.0/MIT-only rule awaiting human ratification — see NOTICE. Differences from upstream: the rank cell is never used as the price,
  * amount cells are never used as seller names, rows without a price are skipped, and the first winner-marked
  * row is taken (upstream keeps the last). Columns are taken from the header words when present, positionally otherwise.
  */
@@ -138,14 +139,14 @@ export interface AwardResult {
 // scrape_ra_schedule(): a table is the financial / evaluation table when its first row mentions one of these.
 const FINANCIAL_HEADER = ['rank', 'price', 'l1', 'financial', 'amount', 'total'];
 // ...and a row is the winner's when its markup carries one of these (fa-trophy, "winner", 🏆).
-const WINNER_MARK = ['trophy', 'winner', '🏆'];
+const WINNER_MARK = /\b(?:trophy|winner)\b|🏆/;
 const MAX_CELL_LENGTH = 2 * 1024;
 /** Amounts above this (1e13 rupees, the API's own cap) are not prices. */
 const MAX_AMOUNT = 1e13;
 
 /** Cell text as BeautifulSoup `get_text(strip=True)` would give it (tags dropped, entities decoded, spaces collapsed). */
 function cellText(inner: string): string {
-  return decodeEntities(inner.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+  return decodeEntities(inner.replace(/<[^<>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -223,7 +224,7 @@ export function parseAwardResult(input: string): AwardResult | null {
       // Price fallback: the last numeric cell (never the rank cell).
       for (let i = cells.length - 1; i >= 0 && price === null; i--) if (i !== rankAt) price = parseAmount(cells[i]!);
       if (!name || price === null) continue;
-      bidders.push({ rank: rank ? Number(rank) : 0, name, price, winner: WINNER_MARK.some((m) => lowerRow.includes(m)) });
+      bidders.push({ rank: rank ? Number(rank) : 0, name, price, winner: WINNER_MARK.test(lowerRow) });
     }
   }
   if (!bidders.length) return null;
