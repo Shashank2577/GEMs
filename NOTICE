@@ -9,7 +9,9 @@ listed here with its licence.
    Licence: Apache License 2.0
    Used in: packages/core/src/gem/client.ts (BidPlus /all-bids → /all-bids-data request shape and CSRF
    bootstrap), packages/core/src/gem/parse.ts (field names and the bid-type → document-route mapping),
-   packages/core/src/gem/normalize.ts (Solr response unwrapping approach).
+   packages/core/src/gem/normalize.ts (Solr response unwrapping approach), packages/core/src/vault/status.ts
+   (GeM seller-document label vocabulary: the buildEligibilitySummary eligibility labels in src/routes.ts, used
+   in GEM_SELLER_DOC_LABELS and DOC_TYPES keywords).
 
 2. gem-search — https://github.com/arush15june/gem-search
    Licence: MIT License, Copyright (c) 2026 Aarush Jain

@@ -55,6 +55,8 @@ export interface Readiness {
   /** Covered but worth a look (expiring soon, optional items missing). */
   warnings: { itemId: string; label: string; state: ReadinessState }[];
   canMarkReady: boolean;
+  /** False when there is no analysis (no checklist) — readiness is then 0 %, not 100 % (FR-009). */
+  analysed: boolean;
 }
 
 /** Closely related document types accepted as a fallback when the exact type is not in the vault. */
@@ -220,5 +222,6 @@ export function readiness(
     blockers,
     warnings,
     canMarkReady: blockers.length === 0,
+    analysed: true,
   };
 }

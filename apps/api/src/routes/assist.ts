@@ -53,5 +53,5 @@ assistRoutes.get('/assist/:workspaceId', requireAuth, async (c) => {
     tender: { bidNumber: t.bidNumber, title: t.title, quantity: t.quantity, hsnCodes: t.hsnCodes, items: t.items },
     profile, documents, deliveryDays: delivery,
   });
-  return c.json({ ...payload, stage: w.stage, readiness: { percent: r.percent, blockers: r.blockers.length }, workspaceUrl: `${base}/workspaces/${w.id}` });
+  return c.json({ ...payload, stage: w.stage, readiness: { percent: r.percent, blockers: r.blockers.length, analysed: r.analysed }, workspaceUrl: `${base}/workspaces/${w.id}` });
 });

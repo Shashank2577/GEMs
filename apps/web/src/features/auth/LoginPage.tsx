@@ -13,6 +13,15 @@ import { FormAlert } from './FormAlert';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** 429 → the server's "Too many attempts. Try again in N minutes." (002/FR-010); 400/401 → generic mismatch. */
+function loginError(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 429) return err.message;
+    if (err.status === 401 || err.status === 400) return 'That email and password don’t match. Please try again.';
+  }
+  return errorMessage(err);
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -37,7 +46,7 @@ export default function LoginPage() {
       toast.success(`Welcome back, ${me.user.name.split(' ')[0]}`);
       navigate(safeNext(params.get('next')), { replace: true });
     } catch (err) {
-      setFormError(err instanceof ApiError && (err.status === 401 || err.status === 400) ? 'That email and password don’t match. Please try again.' : errorMessage(err));
+      setFormError(loginError(err));
     } finally {
       setLoading(false);
     }
@@ -58,7 +67,7 @@ export default function LoginPage() {
         <Field
           label="Password"
           error={errors.password}
-          labelAside={<span className="text-xs text-muted-foreground">Forgot? Ask your org owner</span>}
+          labelAside={<Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">Forgot password?</Link>}
         >
           <PasswordInput name="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
