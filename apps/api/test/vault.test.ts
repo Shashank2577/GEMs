@@ -512,6 +512,19 @@ describe('expiry reminders — isolation, IST boundary, renewals and manual run 
     expect(acts.find((a) => (a.meta as { documents: number }).documents === 1)!.userId).toBe(e.bidManager.me.user.id);
   });
 
+  it('run with every member opted out of expiry reminders reports 0 notifications (FR-052)', async () => {
+    const h = await seedOrgWithRoles(ctx.app, 'Quiet Traders');
+    for (const who of [h.owner, h.bidManager, h.analyst, h.viewer]) {
+      const cur = await request(ctx.app, 'GET', '/me/notification-prefs', { cookie: who.cookie });
+      expect((await request(ctx.app, 'PUT', '/me/notification-prefs', { cookie: who.cookie, json: { ...cur.body, expiryReminders: false } })).status).toBe(200);
+    }
+    const id = await upload(h.analyst, 'ISO 9001 Quiet', '2026-11-14');
+    const r = await request(ctx.app, 'POST', '/vault/reminders/run', { cookie: h.bidManager.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ documents: 1, notifications: 0 });
+    expect(await expiryRows(id)).toHaveLength(0);
+  });
+
   it('IST boundary: at 2026-11-05T20:00Z (01:30 IST on the 6th) a document expiring 2026-11-05 is expired (FR-042)', async () => {
     const g = await seedOrgWithRoles(ctx.app, 'Midnight Traders');
     const id = await upload(g.analyst, 'ISO 14001 Midnight', '2026-11-05');
@@ -522,7 +535,8 @@ describe('expiry reminders — isolation, IST boundary, renewals and manual run 
 
       ctx.clock.set(new Date('2026-11-05T20:00:00Z'));
       const doc = await request(ctx.app, 'GET', `/vault/${id}`, { cookie: g.viewer.cookie });
-      expect(doc.body).toMatchObject({ status: 'expired', daysToExpiry: -1, nextReminder: null });
+      // The expiry notice is due now (IST day 2026-11-06).
+      expect(doc.body).toMatchObject({ status: 'expired', daysToExpiry: -1, nextReminder: { days: 0, date: '2026-11-06' } });
       const r = await runExpiryReminders(ctx.deps, { orgId: g.orgId });
       expect(r.documents).toBe(1);
       expect(await lastReminder(id)).toBe(0);
@@ -532,6 +546,7 @@ describe('expiry reminders — isolation, IST boundary, renewals and manual run 
       expect(inApp.every((n) => n.title === 'ISO 14001 Midnight has expired')).toBe(true);
       expect(inApp[0]!.body).toBe('Your ISO certificate "ISO 14001 Midnight" expired 1 day ago. Bids that need it will be blocked from "Ready to submit" until you upload the renewed copy.');
       expect(rows.every((n) => n.dedupeKey === `expiry:${id}:2026-11-05:0`)).toBe(true);
+      expect((await request(ctx.app, 'GET', `/vault/${id}`, { cookie: g.viewer.cookie })).body.nextReminder).toBeNull();
     } finally {
       ctx.clock.set(NOW);
     }

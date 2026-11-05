@@ -145,10 +145,13 @@ export default function VaultPage() {
 
   // Manual reminder run (FR-052): same job as the scheduler, for this org only.
   const runReminders = useRunReminders();
-  const sendReminders = () => runReminders.mutate(undefined, {
-    onSuccess: (r) => (r.documents > 0 ? toast.success(reminderRunMessage(r)) : toast.info(reminderRunMessage(r))),
-    onError: (err) => toast.error(errorMessage(err)),
-  });
+  const sendReminders = () => {
+    const id = toast.loading('Sending reminders…');
+    runReminders.mutate(undefined, {
+      onSuccess: (r) => (r.notifications > 0 ? toast.success(reminderRunMessage(r), { id }) : toast.info(reminderRunMessage(r), { id })),
+      onError: (err) => toast.error(errorMessage(err), { id }),
+    });
+  };
   useEffect(() => {
     if (params.get('upload') === '1' && can('analyst')) {
       openUpload(null, (params.get('uploadType') as DocType) || null);

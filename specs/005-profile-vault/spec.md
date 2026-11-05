@@ -302,10 +302,12 @@ lose eligible bids; reminders are a key reason to keep using the product.
    (demo org: **3**) and links to the vault.
 9. *(gap — FR-052)* **Given** a Bid Manager on `/vault`, **When** they choose **Send reminders now** (page header overflow
    menu), **Then** `POST /api/vault/reminders/run` runs the reminder job for their org only and returns **200**
-   `{documents, notifications}`; the toast reads "Reminders sent for <n> document(s)" or "No reminders due"; an Analyst gets
+   `{documents, notifications}`; the toast reads "Reminders sent for <n> document" / "Reminders sent for <n> documents"
+   (pluralised), or "No reminders due" when no notification was created (`notifications` = 0); an Analyst gets
    **403**; calling it twice the same day creates no duplicates.
 10. *(gap — FR-053)* **Given** the drawer of an expiring or expired document, **Then** the line "Next reminder: 7 days
-    before expiry (<date>)" or "All reminders sent" is shown under the expiry date.
+    before expiry (<date>)", "Next reminder: expiry notice (<date>)" (the post-expiry "has expired" reminder still to
+    come: today if due now, else the day after expiry) or "All reminders sent" is shown under the expiry date.
 
 ---
 
@@ -569,7 +571,9 @@ further 7/1-day reminders arrive for the old expiry.
 - **FR-052** *(gap)*: `POST /api/vault/reminders/run` (bid_manager+) MUST run `runExpiryReminders({orgId})` for the
   caller's org and return `{documents, notifications}`; the vault page MUST expose it as **Send reminders now**.
 - **FR-053** *(gap)*: The drawer MUST show the next reminder date (or "All reminders sent") for documents with an expiry
-  date, computed with `REMINDER_THRESHOLDS` and `last_reminder_days` (exposed as `nextReminder` on the DTO).
+  date, computed with `REMINDER_THRESHOLDS` and `last_reminder_days` (exposed as `nextReminder: {days, date} | null` on
+  the DTO). `days: 0` is the post-expiry notice (dated today if due now, else the day after expiry) and reads
+  "Next reminder: expiry notice (<date>)".
 
 **Experience & OEM (US5)**
 

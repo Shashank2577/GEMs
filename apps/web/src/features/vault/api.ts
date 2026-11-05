@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import type { VaultDocumentDto, VaultSummary, VaultUpdateInput } from '@tp/core/contracts/vault';
 import type { DocCategory, DocStatus, DocType } from '@tp/core/vault/status';
 import { api, apiFetch, type Paged } from '@/lib/api';
+import { notificationKeys } from '@/features/notifications/api';
 
 export interface VaultFilters { type?: DocType | null; status?: DocStatus | null; category?: DocCategory | null; q?: string; sort?: 'recent' | 'expiry' | 'title' | 'type' }
 
@@ -80,7 +81,7 @@ export function useRunReminders() {
     mutationFn: () => api.post<{ documents: number; notifications: number }>('/vault/reminders/run'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: vaultKeys.all });
-      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
 }

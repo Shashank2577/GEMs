@@ -75,12 +75,17 @@ describe('nextReminder (FR-053)', () => {
   it('after the 7-day reminder → 1 day before', () => {
     expect(nextReminder('2026-11-09', 7, NOW)).toEqual({ days: 1, date: '2026-11-08' });
   });
-  it('all reminders sent / passed → null', () => {
-    expect(nextReminder('2026-11-05', 1, NOW)).toBeNull();
-    expect(nextReminder('2026-11-04', 1, NOW)).toBeNull(); // expires today
-    expect(nextReminder('2026-11-03', 1, NOW)).toBeNull(); // expired
+  it('after the 1-day reminder → expiry notice (days 0) the day after expiry', () => {
+    expect(nextReminder('2026-11-05', 1, NOW)).toEqual({ days: 0, date: '2026-11-06' });
+    expect(nextReminder('2026-11-04', 1, NOW)).toEqual({ days: 0, date: '2026-11-05' }); // expires today
+  });
+  it('expiry notice due now (expired within 30 days, not yet sent) → today', () => {
+    expect(nextReminder('2026-11-03', 1, NOW)).toEqual({ days: 0, date: '2026-11-04' });
+    expect(nextReminder('2026-10-10', null, NOW)).toEqual({ days: 0, date: '2026-11-04' });
+  });
+  it('all reminders sent / too old → null', () => {
     expect(nextReminder('2026-11-03', 0, NOW)).toBeNull();
-    expect(nextReminder('2026-10-01', null, NOW)).toBeNull();
+    expect(nextReminder('2026-10-01', null, NOW)).toBeNull(); // expired > 30 days ago
   });
   it('uses the IST calendar day of now', () => {
     // 5 Nov 2026 01:30 IST — 30 days to 2026-12-05 in IST (29 by the UTC date).
