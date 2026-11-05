@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createFsBlobStore } from '../src/adapters/blob-fs';
 import { createMemoryBlobStore } from '../src/adapters/memory-blob';
 import { createAnthropicClient, parseJsonLoose } from '../src/adapters/llm';
@@ -13,6 +13,7 @@ import { hashPassword, verifyPassword, sha256Hex, randomToken } from '../src/lib
 import { slugify } from '../src/lib/slug';
 import { runScheduledJobs } from '../src/lib/scheduled';
 import type { BlobStore } from '../src/deps';
+import { createTestContext, request, seedOrgWithRoles, type TestContext } from './helpers';
 import { loadConfig } from '../src/env';
 import {
   HttpError, payloadTooLarge, paymentRequired, rateLimitMessage, serviceUnavailable, tooManyRequests, unprocessable,
@@ -195,5 +196,71 @@ describe('ops config and deps (008/T013)', () => {
     const throttled = createDeps({ env: {}, db: {} as never, blobs: createMemoryBlobStore(), logger: silentLogger });
     expect(throttled.gemLease).not.toBe(noopGemLease);
     expect(typeof throttled.gemLease.acquire).toBe('function');
+  });
+});
+
+describe('PATCH /org onboarding state (007 US3)', () => {
+  let ctx: TestContext;
+  beforeAll(async () => { ctx = await createTestContext(); });
+  afterAll(async () => { await ctx.close(); });
+
+  const activityActions = async (cookie: string) =>
+    (await request(ctx.app, 'GET', '/api/activity', { cookie })).body.items.map((i: { action: string }) => i.action) as string[];
+
+  it('merges keys, keeping existing ones, and writes no org.updated activity for ticks', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    const a = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { company: true } } });
+    expect(a.status).toBe(200);
+    const b = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { categories: true } } });
+    expect(b.body.onboardingState).toEqual({ company: true, categories: true });
+    expect(await activityActions(owner.cookie)).not.toContain('org.updated');
+  });
+
+  it('forbids analyst and viewer', async () => {
+    const { analyst, viewer } = await seedOrgWithRoles(ctx.app);
+    for (const u of [analyst, viewer]) {
+      const r = await request(ctx.app, 'PATCH', '/api/org', { cookie: u.cookie, json: { onboardingState: { company: true } } });
+      expect(r.status).toBe(403);
+    }
+  });
+
+  it('rejects unknown keys with details.fields.onboardingState', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    const r = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { bogus: true } } });
+    expect(r.status).toBe(400);
+    expect(r.body.error.details.fields.onboardingState).toBeTruthy();
+    const many = Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`k${i}`, true]));
+    const r2 = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: many } });
+    expect(r2.status).toBe(400);
+    expect(r2.body.error.details.fields.onboardingState).toBeTruthy();
+  });
+
+  it('logs onboarding.completed once with durationSec', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    ctx.clock.advance(95_000);
+    const r = await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { completed: true } } });
+    expect(r.status).toBe(200);
+    await request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { completed: true } } });
+    const list = (await request(ctx.app, 'GET', '/api/activity', { cookie: owner.cookie })).body.items as { action: string; meta: { durationSec?: number } }[];
+    const done = list.filter((i) => i.action === 'onboarding.completed');
+    expect(done).toHaveLength(1);
+    expect(done[0].meta.durationSec).toBeGreaterThanOrEqual(95);
+  });
+
+  it('concurrent completed PATCHes log onboarding.completed exactly once', async () => {
+    const { owner, bidManager } = await seedOrgWithRoles(ctx.app);
+    const rs = await Promise.all([owner, bidManager, owner, bidManager, owner].map((u) =>
+      request(ctx.app, 'PATCH', '/api/org', { cookie: u.cookie, json: { onboardingState: { completed: true } } })));
+    expect(rs.every((r) => r.status === 200 && r.body.onboardingState.completed === true)).toBe(true);
+    const list = (await request(ctx.app, 'GET', '/api/activity', { cookie: owner.cookie })).body.items as { action: string }[];
+    expect(list.filter((i) => i.action === 'onboarding.completed')).toHaveLength(1);
+  });
+
+  it('concurrent PATCHes of different onboarding keys all survive', async () => {
+    const { owner } = await seedOrgWithRoles(ctx.app);
+    const keys = ['company', 'categories', 'watchlist', 'documents'];
+    await Promise.all(keys.map((k) => request(ctx.app, 'PATCH', '/api/org', { cookie: owner.cookie, json: { onboardingState: { [k]: true } } })));
+    const me = await request(ctx.app, 'GET', '/api/auth/me', { cookie: owner.cookie });
+    expect(me.body.org.onboardingState).toEqual(Object.fromEntries(keys.map((k) => [k, true])));
   });
 });

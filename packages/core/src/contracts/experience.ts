@@ -53,6 +53,43 @@ export interface DashboardActivity extends ActivityItem {
 
 export interface SetupStep { key: string; label: string; description: string; done: boolean; href: string }
 
+/** Keys allowed in `organizations.onboarding_state` (FR-048). */
+export const ONBOARDING_KEYS = ['company', 'categories', 'watchlist', 'documents', 'skipped', 'completed', 'demo'] as const;
+export type OnboardingKey = (typeof ONBOARDING_KEYS)[number];
+
+/** A bid assigned to the signed-in user, shown in "My work" (FR-065). */
+export interface MyWorkItem {
+  workspaceId: string;
+  tenderId: string;
+  bidNumber: string;
+  title: string;
+  stage: DashboardStage;
+  dueAt: string | null;
+  endAt: string | null;
+}
+
+/** A bid waiting on a Go / No-go decision (FR-065). */
+export interface DecisionItem {
+  tenderId: string;
+  workspaceId: string | null;
+  bidNumber: string;
+  title: string;
+  score: number | null;
+  verdict: DashboardVerdict | null;
+  endAt: string | null;
+}
+
+/** Result of removing the demo dataset (FR-070). */
+export interface DemoRemoveResponse {
+  ok: true;
+  removed: boolean;
+  tenders: number;
+  watchlists: number;
+  workspaces: number;
+  vaultDocuments: number;
+  pastContracts: number;
+}
+
 export interface DashboardResponse {
   generatedAt: string;
   tiles: DashboardTiles;
@@ -80,6 +117,10 @@ export interface DashboardResponse {
   setupComplete: boolean;
   /** True when the org loaded the demo dataset. */
   demo: boolean;
+  /** Bids assigned to the signed-in user (FR-065). */
+  myWork?: MyWorkItem[];
+  /** Bids awaiting a Go / No-go decision (FR-065). */
+  awaitingDecision?: DecisionItem[];
 }
 
 export interface DemoSeedResponse {

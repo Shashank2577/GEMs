@@ -1,0 +1,7 @@
+Playwright (chromium) against http://localhost:8810, CSP enforced via the API's Content-Security-Policy header.
+Pages: /login, /dashboard, /settings/notifications at 1440x900 and 375x812 (signed in via UI).
+Console messages observed: 2 (both viewports)
+CSP violations ("Refused to ..." / Content Security Policy): 0
+Uncaught page errors: 0
+Other console errors: 2 = "Failed to load resource: 401 (Unauthorized)" - the anonymous GET /api/auth/me probe on /login
+(expected, see api-examples.md #1); not CSP related.

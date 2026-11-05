@@ -12,6 +12,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'workspace.submitted': return 'marked as submitted on GeM';
     case 'workspace.outcome_recorded': return m.result === 'won' ? 'recorded a win on' : 'recorded a loss on';
     case 'workspace.commented': return 'commented on';
+    case 'workspace.comment_deleted': return 'deleted a comment on';
     case 'workspace.assigned': return 'changed the owner of';
     case 'workspace.item_overridden': return 'overrode a checklist item on';
     case 'workspace.mapping_changed': return 'mapped documents for';
@@ -47,6 +48,7 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
     case 'member.removed': return 'removed';
     case 'member.left': return 'left the organization';
     case 'org.created': return 'created the organization';
+    case 'onboarding.completed': return 'finished setting up TenderPilot';
     case 'org.updated': return 'updated organization settings';
     case 'org.scoring_weights_updated': return 'tuned the scoring weights';
     case 'ingestion.run': return 'synced tenders from GeM';
@@ -58,12 +60,12 @@ export function describeActivity(a: Pick<DashboardActivity, 'action' | 'meta'>):
 }
 
 /** Actions whose target should not be printed after the sentence. */
-export const SELF_CONTAINED = new Set(['member.joined', 'member.left', 'vault.reminders_run', 'org.created', 'org.updated', 'org.scoring_weights_updated', 'ingestion.run', 'api_token.created', 'api_token.revoked', 'demo.seeded',
+export const SELF_CONTAINED = new Set(['member.joined', 'member.left', 'vault.reminders_run', 'org.created', 'org.updated', 'onboarding.completed', 'org.scoring_weights_updated', 'ingestion.run', 'api_token.created', 'api_token.revoked', 'demo.seeded',
   'annexure.template_updated', 'annexure.template_reset']);
 
 /** Every action the API writes to the activity log (kept in sync by activity.test.ts). */
 export const KNOWN_ACTIONS = [
-  'workspace.stage_changed', 'workspace.created', 'workspace.submitted', 'workspace.outcome_recorded', 'workspace.commented',
+  'workspace.stage_changed', 'workspace.created', 'workspace.submitted', 'workspace.outcome_recorded', 'workspace.commented', 'workspace.comment_deleted',
   'workspace.assigned', 'workspace.item_overridden', 'workspace.override_removed', 'workspace.mapping_changed', 'workspace.due_changed',
   'workspace.assist_values_saved', 'workspace.packet_built', 'workspace.packet_failed', 'packet.built',
   'tender.analysed', 'tender.document_uploaded', 'tender.document_fetched', 'tender.document_removed', 'analysis.factor_overridden',
@@ -72,5 +74,5 @@ export const KNOWN_ACTIONS = [
   'profile.updated', 'profile.past_contract_added', 'profile.past_contract_updated', 'profile.past_contract_deleted',
   'annexure.template_updated', 'annexure.template_reset',
   'member.invited', 'member.invite_revoked', 'member.invite_resent', 'member.joined', 'member.role_changed', 'member.removed', 'member.left',
-  'org.created', 'org.updated', 'org.scoring_weights_updated', 'ingestion.run', 'api_token.created', 'api_token.revoked', 'demo.seeded',
+  'org.created', 'org.updated', 'onboarding.completed', 'org.scoring_weights_updated', 'ingestion.run', 'api_token.created', 'api_token.revoked', 'demo.seeded',
 ] as const;

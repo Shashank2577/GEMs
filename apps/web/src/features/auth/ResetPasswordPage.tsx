@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, LinkIcon } from 'lucide-react';
+import { resetTtlText } from '@tp/core/contracts/auth';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/label';
 import { toast } from '@/components/ui/toaster';
@@ -43,7 +44,7 @@ export default function ResetPasswordPage() {
   if (invalid) {
     return (
       <AuthLayout docTitle="Reset link expired" title="This link has expired"
-        subtitle="Password reset links work once and expire after 1 hour."
+        subtitle={`Password reset links work once and expire after ${resetTtlText()}.`}
         footer={<Link to="/login" className="font-medium text-primary hover:underline">Back to sign in</Link>}>
         <div className="grid gap-5">
           <FormAlert>This password reset link is invalid, already used or has expired.</FormAlert>

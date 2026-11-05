@@ -94,7 +94,7 @@ the additions below are reflected there by task T005.
 ```text
 packages/core/src/contracts/
 ├── experience.ts            # DashboardResponse, DemoSeedResponse (+ MyWorkItem, DecisionItem, DemoRemoveResponse)  [extend]
-├── auth.ts                  # updateOrgInputSchema.onboardingState → whitelisted keys                               [extend]
+├── auth.ts                  # updateOrgInputSchema.onboardingState → z.record + superRefine whitelist                             [extend]
 ├── apply.ts                 # PIPELINE_STAGES, STAGES, STAGE_LABELS, workspaceUpdateSchema, WorkspaceCard           [read]
 └── plans.ts                 # PLANS (Starter/Pro/Enterprise)                                                         [new]
 packages/core/src/gem/award.ts   # parseBidResult(html) ported from arush15june/gem-search (MIT)                      [new, P3]

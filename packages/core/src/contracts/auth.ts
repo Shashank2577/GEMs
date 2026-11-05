@@ -3,6 +3,7 @@
  * preferences, API tokens and activity (contracts/api.md § Platform).
  */
 import { z } from 'zod';
+import { ONBOARDING_KEYS } from './experience';
 import { emailSchema, paginationQuerySchema, phoneE164Schema, roleSchema, type RoleName } from './common';
 
 export const PASSWORD_MIN_LENGTH = 8;
@@ -60,6 +61,12 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
 
 /** Minutes a password reset link stays valid. */
 export const PASSWORD_RESET_TTL_MINUTES = 60;
+
+/** Human duration of a reset link for emails and UI copy: 60 → "1 hour", 120 → "2 hours", 90 → "90 minutes". */
+export function resetTtlText(minutes: number = PASSWORD_RESET_TTL_MINUTES): string {
+  if (minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
 
 // ───────────── Sessions (002/FR-012) ─────────────
 
@@ -142,7 +149,15 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = { inApp: true, emai
  * created, so `inApp` is always `sent`.
  */
 export type TestAlertOutcome = 'sent' | 'skipped' | 'failed' | 'off';
-export interface TestAlertResult { inApp: 'sent'; email: TestAlertOutcome; whatsapp: TestAlertOutcome }
+/** Why a channel was `skipped`: the provider is not configured on this server, or the account has no mobile number. */
+export type TestAlertSkipReason = 'not_configured' | 'no_phone';
+export interface TestAlertResult {
+  inApp: 'sent';
+  email: TestAlertOutcome;
+  whatsapp: TestAlertOutcome;
+  /** Present only when a channel was `skipped` (optional, added after the first release: older servers omit it). */
+  skipReasons?: Partial<Record<'email' | 'whatsapp', TestAlertSkipReason>>;
+}
 export const TEST_ALERT_TITLE = 'Test alert from TenderPilot';
 
 // ───────────── API tokens ─────────────
@@ -185,7 +200,13 @@ export type ChangeRoleInput = z.infer<typeof changeRoleInputSchema>;
 export const updateOrgInputSchema = z.object({
   name: z.string().trim().min(2).max(160).optional(),
   /** Merged into the existing onboarding state (keys set to the given booleans). */
-  onboardingState: z.record(z.string(), z.boolean()).optional(),
+  onboardingState: z.record(z.string(), z.boolean()).superRefine((o, ctx) => {
+    // Whitelist (FR-048). Issues sit on the field itself so API errors map to `details.fields.onboardingState`.
+    const keys = Object.keys(o);
+    const bad = keys.filter((k) => !(ONBOARDING_KEYS as readonly string[]).includes(k));
+    if (bad.length) ctx.addIssue({ code: 'custom', message: `Unknown onboarding key: ${bad[0]}` });
+    if (keys.length > 16) ctx.addIssue({ code: 'custom', message: 'At most 16 onboarding keys' });
+  }).optional(),
   /** Replaces the scoring weights; `null` resets to defaults. */
   scoringWeights: z.record(z.string(), z.number().min(0).max(100)).nullable().optional(),
 });

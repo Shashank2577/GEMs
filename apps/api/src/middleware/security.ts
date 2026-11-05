@@ -1,4 +1,5 @@
 /**
+ * Security headers (002/FR-050) — see `securityHeaders` below — and
  * CSRF defence in depth (002/FR-028), on top of the SameSite=Lax session cookie.
  *
  * A cookie-authenticated request that can change state (anything but GET/HEAD) is rejected with 403 `bad_origin`
@@ -16,8 +17,9 @@
 import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { API_TOKEN_PREFIX } from '@tp/core/contracts/auth';
+import { BASE_SECURITY_HEADERS, HSTS_VALUE } from '@tp/core/security/headers';
 import { HttpError } from '../lib/errors';
-import { SESSION_COOKIE } from '../lib/session';
+import { SESSION_COOKIE, isHttps } from '../lib/session';
 import type { AppEnv } from '../types';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
@@ -48,4 +50,45 @@ export const originCheck = createMiddleware<AppEnv>(async (c, next) => {
   if (origin === appOrigin) return next();
   if (appOrigin && LOOPBACK.test(appOrigin) && LOOPBACK.test(origin)) return next();
   throw new HttpError(403, 'bad_origin', BAD_ORIGIN_MESSAGE);
+});
+
+// ───────────── Security headers (002/FR-050) ─────────────
+
+export interface SecurityHeaderOptions {
+  /** Content-Security-Policy for HTML responses (the SPA document); omitted for API responses. */
+  csp?: string;
+  /** Whether the response was served over https (adds HSTS). */
+  https: boolean;
+}
+
+/**
+ * Add the FR-050 headers to `headers` (mutates). A response the SPA itself shows in an `<iframe>` (an inline file
+ * preview: `content-disposition: inline`, e.g. `/api/vault/:id/download?inline=1`) may be framed by the same origin
+ * only (`SAMEORIGIN`); everything else is `DENY`. The CSP is only added to `text/html` responses.
+ */
+export function applySecurityHeaders(headers: Headers, opts: SecurityHeaderOptions): void {
+  for (const [k, v] of Object.entries(BASE_SECURITY_HEADERS)) headers.set(k, v);
+  if (/^\s*inline\b/i.test(headers.get('content-disposition') ?? '')) headers.set('X-Frame-Options', 'SAMEORIGIN');
+  if (opts.https) headers.set('Strict-Transport-Security', HSTS_VALUE);
+  if (opts.csp && (headers.get('content-type') ?? '').toLowerCase().startsWith('text/html')) {
+    headers.set('Content-Security-Policy', opts.csp);
+  }
+}
+
+/**
+ * Run after every handler (incl. errors and 404s) and set the FR-050 headers. The SPA server passes `csp` (a value, or
+ * a function evaluated only for HTML responses so it can follow a rebuilt index.html).
+ */
+export const securityHeaders = (opts: { csp?: string | (() => Promise<string | undefined>) } = {}) => createMiddleware(async (c, next) => {
+  await next();
+  const isHtml = (c.res.headers.get('content-type') ?? '').toLowerCase().startsWith('text/html');
+  const csp = isHtml ? (typeof opts.csp === 'function' ? await opts.csp() : opts.csp) : undefined;
+  const o = { csp, https: isHttps(c) };
+  try {
+    applySecurityHeaders(c.res.headers, o);
+  } catch {
+    // Immutable headers (a Response passed through from fetch): copy it first.
+    c.res = new Response(c.res.body, c.res);
+    applySecurityHeaders(c.res.headers, o);
+  }
 });

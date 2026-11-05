@@ -227,7 +227,7 @@ task is sized at ≤ 1 day.
 - [x] T074 [P] Update `specs/001-gem-tender-copilot/contracts/api.md` (Profile & Vault section) and `specs/001-gem-tender-copilot/data-model.md` with the new endpoints (`/vault/reminders/run`, versions), `expectedUpdatedAt`, `nextReminder`, `content_sha256` and `vault_document_versions` FR-014, FR-052, FR-053, FR-064…FR-067 (#162)
 - [x] T075 Fix any serious/critical axe violations reported by T022/T030/T043 on `/profile` and `/vault` (labels, contrast, focus order) in `apps/web/src/features/profile/` and `apps/web/src/features/vault/` NFR-005 (#163)
 - [x] T076 Tenant-isolation sweep: grep every query in `apps/api/src/routes/profile.ts`, `apps/api/src/routes/vault.ts`, `apps/api/src/services/reminders.ts` for an `org_id` predicate and add a table-driven cross-org 404 test covering every vault/version/past-contract route in `apps/api/test/vault.test.ts` NFR-001, SC-005 (#164)
-- [ ] T077 Cairn review of all 005 changes (CONVENTIONS.md review checklist: correctness, security, tenancy, a11y, tests), resolve findings, then roll up the six `VERDICT.md` files into `qa/evidence/005/SUMMARY.md` NFR-008, SC-006 (#165)
+- [x] T077 Cairn review of all 005 changes (CONVENTIONS.md review checklist: correctness, security, tenancy, a11y, tests), resolve findings, then roll up the six `VERDICT.md` files into `qa/evidence/005/SUMMARY.md` NFR-008, SC-006 (#165)
 
 ---
 

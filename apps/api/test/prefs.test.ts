@@ -98,7 +98,7 @@ describe('002/FR-034 POST /me/notifications/test', () => {
     const before = ctx.mailer.sent.length;
     const r = await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'off' });
+    expect(r.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'off', skipReasons: { email: 'not_configured' } });
     expect(ctx.mailer.sent.length).toBe(before + 1);
     expect(ctx.mailer.sent.at(-1)).toMatchObject({ to: u.email, subject: 'Test alert from TenderPilot' });
 
@@ -136,7 +136,7 @@ describe('002/FR-034 POST /me/notifications/test', () => {
     const mail = ctx.mailer.sent.length;
     const wa = ctx.whatsapp.sent.length;
     const r = await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie });
-    expect(r.body).toEqual({ inApp: 'sent', email: 'off', whatsapp: 'skipped' });
+    expect(r.body).toEqual({ inApp: 'sent', email: 'off', whatsapp: 'skipped', skipReasons: { whatsapp: 'not_configured' } });
     expect(ctx.mailer.sent.length).toBe(mail);
     expect(ctx.whatsapp.sent.length).toBe(wa + 1);
     expect(ctx.whatsapp.sent.at(-1)!.to).toBe('+919822012345');
@@ -188,14 +188,14 @@ describe('002/FR-034 POST /me/notifications/test', () => {
     await u.use(u.orgB); // org B keeps the defaults
     const wa = ctx.whatsapp.sent.length;
     const inB = await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie });
-    expect(inB.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'off' });
+    expect(inB.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'off', skipReasons: { email: 'not_configured' } });
     expect(ctx.whatsapp.sent.length).toBe(wa);
 
     ctx.clock.advance(61_000);
     await u.use(u.orgA);
     const inA = await request(ctx.app, 'POST', '/api/me/notifications/test', { cookie: u.cookie });
     expect(inA.status).toBe(200);
-    expect(inA.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'skipped' });
+    expect(inA.body).toEqual({ inApp: 'sent', email: 'skipped', whatsapp: 'skipped', skipReasons: { email: 'not_configured', whatsapp: 'not_configured' } });
     expect(ctx.whatsapp.sent.length).toBe(wa + 1);
     expect(ctx.whatsapp.sent.at(-1)!.to).toBe('+919822012345');
 
