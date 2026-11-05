@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AlertTriangle, CircleDot, FilePlus2, Gauge, History, Lock, RefreshCw, UserRoundPen, XCircle, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, CircleDot, ClipboardCheck, FilePlus2, Gauge, History, Lock, RefreshCw, Scale, Trophy, UserRoundPen, XCircle, type LucideIcon } from 'lucide-react';
 import type { TenderEventDto } from '@tp/core/contracts/identify';
 import type { ActivityItem } from '@tp/core/contracts/auth';
 import { Badge, Card, CardContent, EmptyState, ErrorState, SkeletonList, Tooltip } from '@/components/ui';
@@ -18,6 +18,10 @@ const EVENT_META: Record<TenderEventDto['kind'], { label: string; icon: LucideIc
   corrigendum: { label: 'Corrigendum issued', icon: AlertTriangle, cls: 'bg-warning-soft text-[hsl(32_90%_36%)] dark:text-warning' },
   closed: { label: 'Bid closed', icon: Lock, cls: 'bg-muted text-muted-foreground' },
   cancelled: { label: 'Bid cancelled', icon: XCircle, cls: 'bg-danger-soft text-danger' },
+  // 003/US6 results refresh: evaluation stages as GeM moves the bid along, then the award.
+  technical_evaluated: { label: 'Technical evaluation done on GeM', icon: ClipboardCheck, cls: 'bg-muted text-muted-foreground' },
+  financial_evaluated: { label: 'Financial evaluation done on GeM', icon: Scale, cls: 'bg-muted text-muted-foreground' },
+  awarded: { label: 'Awarded on GeM', icon: Trophy, cls: 'bg-primary-soft text-primary' },
 };
 
 function activityIcon(action: string): LucideIcon {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Requirement } from '@tp/core/contracts/analyse';
 import type { TenderDocumentDto } from '@tp/core/contracts/analyse';
-import { REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, analysisWarningText, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, friendlyAnalysisError, truncatedDocuments, isAnalysisRunning, mismatchedDocuments, staleReasonCopy, staleSinceCopy } from './labels';
+import { ACTIVITY_LABEL, OCR_REQUIREMENT_TOOLTIP, isOcrDocument, ocrActionState, unreadableDocumentNotice, unreadableDocuments, REQ_GROUPS, STALE_REASON_COPY, analysisPanelState, analysisWarningText, documentCheckPrefix, failedAttemptCopy, formatRequirementValue, friendlyAnalysisError, truncatedDocuments, isAnalysisRunning, mismatchedDocuments, staleReasonCopy, staleSinceCopy } from './labels';
 
 describe('staleReasonCopy (FR-043)', () => {
   it('falls back to the corrigendum copy when the reason is null or missing (legacy stale analyses)', () => {
@@ -144,5 +144,42 @@ describe('Re-score vs Re-analyse (004/FR-037)', () => {
     expect(STALE_REASONS.map((r) => canRescoreFor(r))).toEqual(STALE_REASONS.map((r) => isRescorableReason(r)));
     expect(staleReasonCopy('profile_changed')).toMatch(/Re-score to update the score\.$/);
     expect(staleReasonCopy('vault_changed')).toMatch(/Re-score to update the score\.$/);
+  });
+});
+
+describe('OCR labels and decisions (004/FR-052)', () => {
+  const doc = (needsOcr: boolean) => ({ needsOcr });
+  const on = { ocrAvailable: true, canRun: true, running: false };
+
+  it('offers the action only for documents the API says need OCR, when OCR is configured and the user is analyst+', () => {
+    expect(ocrActionState(doc(true), on)).toBe('available');
+    expect(ocrActionState(doc(false), on)).toBe('hidden');
+    expect(ocrActionState(doc(true), { ...on, ocrAvailable: false })).toBe('hidden');
+    expect(ocrActionState(doc(true), { ...on, canRun: false })).toBe('hidden');
+  });
+
+  it('review S7: follows needsOcr, not hasText — a scan with a few text pages still offers OCR; OCR text never does', () => {
+    expect(ocrActionState({ hasText: true, textSource: 'pdf', needsOcr: true } as never, on)).toBe('available');
+    expect(ocrActionState({ hasText: false, textSource: 'ocr', needsOcr: false } as never, on)).toBe('hidden');
+  });
+
+  it('shows the running state for the document being read', () => {
+    expect(ocrActionState(doc(true), { ...on, running: true })).toBe('running');
+  });
+
+  it('uses the spec notice without OCR and points at the action with it', () => {
+    expect(unreadableDocumentNotice('bid.pdf', false)).toBe("We couldn't read text from bid.pdf. Upload a text PDF or ask your admin to enable AI OCR.");
+    expect(unreadableDocumentNotice('bid.pdf', true)).toContain('Read with AI (OCR)');
+  });
+
+  it('lists only documents that need OCR and flags OCR text', () => {
+    expect(unreadableDocuments([{ needsOcr: false }, { needsOcr: true, id: 'x' }])).toEqual([{ needsOcr: true, id: 'x' }]);
+    // Has some text, but ≥ 80% of pages are empty → still listed (review S7).
+    expect(unreadableDocuments([{ hasText: true, needsOcr: true, id: 'y' }])).toEqual([{ hasText: true, needsOcr: true, id: 'y' }]);
+    expect(unreadableDocuments(undefined)).toEqual([]);
+    expect(isOcrDocument({ textSource: 'ocr' })).toBe(true);
+    expect(isOcrDocument({ textSource: 'pdf' })).toBe(false);
+    expect(OCR_REQUIREMENT_TOOLTIP).toBe('Read by AI from a scanned page — check against the original');
+    expect(ACTIVITY_LABEL['tender.document_ocr_failed']).toBe('couldn’t read a scanned document with AI OCR');
   });
 });

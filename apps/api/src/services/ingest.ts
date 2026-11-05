@@ -46,6 +46,13 @@ export interface RunIngestionOptions {
 
 export type IngestionRunRow = typeof ingestionRuns.$inferSelect;
 
+/**
+ * Listing runs only (003/US6): `ingestion_runs` also holds the daily results refresh (`kind = 'results'`,
+ * services/results.ts). Single-flight, paging plans, keyword rotation, the manual-sync cooldown and sync health all
+ * concern listing runs and must filter on this.
+ */
+export const LISTING_RUNS = eq(ingestionRuns.kind, 'listing');
+
 /** A run that has been "running" longer than this is considered dead and does not block new runs. */
 export const RUN_LOCK_MS = 15 * 60_000;
 
@@ -63,7 +70,7 @@ export class IngestionBusyError extends Error {
   }
 }
 
-/** True for a violation of `ingestion_runs_one_running_uq` (008/FR-025). */
+/** True for a violation of `ingestion_runs_one_running_uq` (008/FR-025; one running run per kind). */
 export function isOneRunningViolation(e: unknown): boolean {
   for (let cur: unknown = e, depth = 0; cur && depth < 3; cur = (cur as { cause?: unknown }).cause, depth++) {
     const pg = cur as { code?: string; constraint?: string };
@@ -73,7 +80,7 @@ export function isOneRunningViolation(e: unknown): boolean {
 }
 
 async function runningRun(deps: AppDeps): Promise<IngestionRunRow | null> {
-  const [r] = await deps.db.select().from(ingestionRuns).where(eq(ingestionRuns.status, 'running')).orderBy(desc(ingestionRuns.startedAt)).limit(1);
+  const [r] = await deps.db.select().from(ingestionRuns).where(and(LISTING_RUNS, eq(ingestionRuns.status, 'running'))).orderBy(desc(ingestionRuns.startedAt)).limit(1);
   return r ?? null;
 }
 
@@ -86,8 +93,8 @@ async function startRun(deps: AppDeps, trigger: IngestionRunRow['trigger'], now:
   try {
     return await deps.db.transaction(async (tx) => {
       await tx.update(ingestionRuns).set({ status: 'failed', error: 'Timed out (worker stopped)', finishedAt: now })
-        .where(and(eq(ingestionRuns.status, 'running'), lt(ingestionRuns.startedAt, new Date(now.getTime() - RUN_LOCK_MS))));
-      const [row] = await tx.insert(ingestionRuns).values({ trigger, status: 'running', startedAt: now }).returning();
+        .where(and(LISTING_RUNS, eq(ingestionRuns.status, 'running'), lt(ingestionRuns.startedAt, new Date(now.getTime() - RUN_LOCK_MS))));
+      const [row] = await tx.insert(ingestionRuns).values({ kind: 'listing', trigger, status: 'running', startedAt: now }).returning();
       return row;
     });
   } catch (e) {
@@ -108,7 +115,7 @@ export async function runIngestion(deps: AppDeps, opts: RunIngestionOptions = {}
   // Single-flight: cheap read-check first (gives the caller the running row), then the atomic reap + insert,
   // which the partial unique index makes race-free across isolates (FR-025).
   const [busy] = await db.select().from(ingestionRuns)
-    .where(and(eq(ingestionRuns.status, 'running'), gt(ingestionRuns.startedAt, new Date(now.getTime() - RUN_LOCK_MS))))
+    .where(and(LISTING_RUNS, eq(ingestionRuns.status, 'running'), gt(ingestionRuns.startedAt, new Date(now.getTime() - RUN_LOCK_MS))))
     .limit(1);
   if (busy) throw new IngestionBusyError(busy);
   const run = await startRun(deps, opts.trigger ?? 'cron', now);
@@ -239,6 +246,7 @@ export async function lastCleanListing(deps: AppDeps) {
   const [row] = await deps.db.select({ finishedAt: ingestionRuns.finishedAt, pagesFetched: ingestionRuns.pagesFetched, listingStop: ingestionRuns.listingStop })
     .from(ingestionRuns)
     .where(and(
+      LISTING_RUNS,
       isNotNull(ingestionRuns.finishedAt),
       or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial')),
       or(inArray(ingestionRuns.listingStop, [...CLEAN_LISTING_STOPS]), and(isNull(ingestionRuns.listingStop), eq(ingestionRuns.status, 'success'))),
@@ -297,7 +305,7 @@ export async function searchKeywordsForRun(deps: AppDeps): Promise<string[]> {
   if (!all.length) return [];
   if (all.length <= SEARCH_KEYWORDS_PER_RUN) return all;
   const [{ n }] = await deps.db.select({ n: sql<number>`count(*)::int` }).from(ingestionRuns)
-    .where(and(eq(ingestionRuns.trigger, 'cron'), or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial'))));
+    .where(and(LISTING_RUNS, eq(ingestionRuns.trigger, 'cron'), or(eq(ingestionRuns.status, 'success'), eq(ingestionRuns.status, 'partial'))));
   const start = (Number(n) * SEARCH_KEYWORDS_PER_RUN) % all.length;
   return Array.from({ length: SEARCH_KEYWORDS_PER_RUN }, (_, i) => all[(start + i) % all.length]);
 }
@@ -340,6 +348,9 @@ async function upsertTender(
     ...values,
     emdAmount: keep('emdAmount'), estimatedValue: keep('estimatedValue'), epbgPercent: keep('epbgPercent'),
     openingAt: keep('openingAt'), hsnCodes: values.hsnCodes.length ? values.hsnCodes : prev.hsnCodes,
+    // `awarded` comes from the results refresh (003/US6), never from a listing: a listing never downgrades it
+    // (a cancellation still wins).
+    status: prev.status === 'awarded' && values.status !== 'cancelled' ? 'awarded' as const : values.status,
   };
   const changes = diffTenders(prev, merged);
   if (!Object.keys(changes).length) {

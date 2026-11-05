@@ -5,7 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Bot, CheckCircle2, FileSearch, FileText, Gauge, History, ListChecks, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react';
+import { ArrowLeft, Bot, CheckCircle2, FileSearch, FileText, Gauge, History, ListChecks, Trophy, RefreshCw, ShieldCheck, Sparkles, TriangleAlert, Upload } from 'lucide-react';
 import type { AnalysisDto } from '@tp/core/contracts/analyse';
 import {
   Badge, Button, Card, EmptyState, ErrorState, Skeleton, SkeletonText, Tabs, TabsContent, TabsList, TabsTrigger, toast,
@@ -18,11 +18,12 @@ import { AnalysisPanel } from './AnalysisPanel';
 import { DocumentsTab } from './DocumentsTab';
 import { HistoryTab } from './HistoryTab';
 import { RequirementsTab } from './RequirementsTab';
+import { ResultTab } from './ResultTab';
 import { TenderHero } from './TenderHero';
-import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
-import { canRescoreFor, isAnalysisRunning, staleReasonCopy, staleSinceCopy } from './labels';
+import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useAnalysisCapabilities, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
+import { canRescoreFor, isAnalysisRunning, staleReasonCopy, staleSinceCopy, unreadableDocumentNotice } from './labels';
 
-const TABS = ['analysis', 'requirements', 'documents', 'history'] as const;
+const TABS = ['analysis', 'requirements', 'documents', 'result', 'history'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function TenderPage() {
@@ -36,6 +37,7 @@ export default function TenderPage() {
   const analysisQ = useAnalysis(id);
   const docs = useTenderDocuments(id);
   const analyse = useAnalyse(id);
+  const capabilities = useAnalysisCapabilities();
   const rescore = useRescore(id);
   const startBid = useStartBid(id);
   const dismiss = useDismiss(id);
@@ -65,6 +67,9 @@ export default function TenderPage() {
     wasRunning.current = running;
   }, [running, qc, id]);
 
+  const offerOcr = !!capabilities.data?.ocr && canAnalyse;
+  const scannedError = analyse.error instanceof ApiError && analyse.error.code === 'scanned_document' ? analyse.error : null;
+
   const runAnalyse = () => {
     if (analyseBlocked) return;
     setTab('analysis');
@@ -76,6 +81,9 @@ export default function TenderPage() {
         if (e instanceof ApiError && e.code === 'no_documents') {
           toast.error('Add the bid document first', { description: e.message, action: { label: 'Upload PDF', onClick: () => setTab('documents') } });
           setTab('documents');
+        } else if (e instanceof ApiError && e.code === 'scanned_document') {
+          // 008/FR-030 + 004/FR-052: only scans without text. The same notice also stays on the Analysis tab (below).
+          toast.error(e.message, { description: scannedFileNames(e).map((f) => unreadableDocumentNotice(f, offerOcr)).join(' '), action: { label: 'Open Documents', onClick: () => setTab('documents') } });
         } else if (isAnalysisRunningError(e)) {
           toast(e instanceof Error ? e.message : 'An analysis is already running for this tender', { description: 'The result will appear here when it finishes.' });
         } else toast.error(errorMessage(e, 'Analysis failed'));
@@ -139,6 +147,7 @@ export default function TenderPage() {
           <TabsTrigger value="analysis"><Gauge /> Analysis</TabsTrigger>
           <TabsTrigger value="requirements"><ListChecks /> Requirements {analysis?.requirements.length ? <Badge size="sm" className="tabular">{analysis.requirements.length}</Badge> : null}</TabsTrigger>
           <TabsTrigger value="documents"><FileText /> Documents {docCount ? <Badge size="sm" className="tabular">{docCount}</Badge> : null}</TabsTrigger>
+          <TabsTrigger value="result"><Trophy /> Result</TabsTrigger>
           <TabsTrigger value="history"><History /> History {t.hasCorrigendum && <span className="size-1.5 rounded-full bg-warning" aria-label="corrigendum" />}</TabsTrigger>
         </TabsList>
 
@@ -162,7 +171,10 @@ export default function TenderPage() {
               </RoleGate>
             </div>
           )}
-          {analyse.isPending ? <AnalysingState /> : analysisQ.isLoading ? <AnalysisSkeleton /> : analysisQ.isError ? (
+          {!analyse.isPending && scannedError && (
+            <ScannedDocumentNotice files={scannedFileNames(scannedError)} offerOcr={offerOcr} onOpenDocuments={() => setTab('documents')} />
+          )}
+          {analyse.isPending ? <AnalysingState withAi={!!capabilities.data?.ai} /> : analysisQ.isLoading ? <AnalysisSkeleton /> : analysisQ.isError ? (
             <ErrorState error={analysisQ.error} onRetry={() => analysisQ.refetch()} />
           ) : analysis ? (
             <AnalysisPanel analysis={analysis} tenderId={id} onReanalyse={runAnalyse} reanalysing={analyse.isPending} canAnalyse={canAnalyse} hasWorkspace={!!t.workspace} analyseDisabled={analyseBlocked} />
@@ -175,6 +187,9 @@ export default function TenderPage() {
         </TabsContent>
         <TabsContent value="documents">
           <DocumentsTab tenderId={id} hasGemLink={hasGemLink} hasAnalysis={!!analysis} onReanalyse={runAnalyse} />
+        </TabsContent>
+        <TabsContent value="result">
+          <ResultTab tenderId={id} />
         </TabsContent>
         <TabsContent value="history">
           <HistoryTab tenderId={id} events={t.events} />
@@ -266,6 +281,28 @@ function TenderSkeleton() {
       </Card>
       <Skeleton className="h-9 w-80" />
       <AnalysisSkeleton />
+    </div>
+  );
+}
+
+/** File names from a 422 `scanned_document` error (`details.documents`). */
+function scannedFileNames(e: ApiError): string[] {
+  const d = (e.details as { documents?: unknown } | undefined)?.documents;
+  return Array.isArray(d) ? d.filter((x): x is string => typeof x === 'string') : [];
+}
+
+/** Analysis tab: analyse refused because every document is a scan without text (US7 #8). */
+function ScannedDocumentNotice({ files, offerOcr, onOpenDocuments }: { files: string[]; offerOcr: boolean; onOpenDocuments: () => void }) {
+  return (
+    <div role="status" aria-label="Documents without readable text" data-testid="scanned-analysis-notice" className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning-soft/50 p-4 text-sm sm:flex-row sm:items-center">
+      <TriangleAlert className="size-5 shrink-0 text-warning" aria-hidden />
+      <div className="min-w-0 flex-1 break-words">
+        <p className="font-semibold">Analysis needs readable text</p>
+        {files.length > 0
+          ? <div className="grid gap-1">{files.map((f) => <p key={f}>{unreadableDocumentNotice(f, offerOcr)}</p>)}</div>
+          : <p>This PDF is a scan without text. Upload the text PDF from GeM or an OCR’d copy.</p>}
+      </div>
+      <Button size="sm" variant="secondary" onClick={onOpenDocuments}>{offerOcr ? 'Open Documents to read with AI' : 'Open Documents'}</Button>
     </div>
   );
 }

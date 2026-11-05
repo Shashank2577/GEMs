@@ -20,6 +20,7 @@ import { dashboardRoutes } from './routes/dashboard';
 import { demoRoutes } from './routes/demo';
 import { healthRoutes } from './routes/health';
 import { ingestionRoutes } from './routes/ingestion';
+import { insightsRoutes } from './routes/insights';
 import { notificationsRoutes } from './routes/notifications';
 import { orgRoutes } from './routes/org';
 import { packetsRoutes } from './routes/packets';
@@ -30,6 +31,7 @@ import { vaultRoutes } from './routes/vault';
 import { viewsRoutes } from './routes/views';
 import { watchlistsRoutes } from './routes/watchlists';
 import { workspacesRoutes } from './routes/workspaces';
+import { refreshResults, ResultsBusyError } from './services/results';
 import type { AppEnv } from './types';
 
 export type { AppEnv, AppVariables, AuthOrg, AuthUser } from './types';
@@ -45,6 +47,7 @@ export const routers = {
   watchlists: watchlistsRoutes,
   views: viewsRoutes,
   ingestion: ingestionRoutes,
+  insights: insightsRoutes,
   notifications: notificationsRoutes,
   analysis: analysisRoutes,
   profile: profileRoutes,
@@ -81,6 +84,20 @@ export function createApp(deps: AppDeps, opts: { testHooks?: boolean } = {}) {
   if (opts.testHooks && deps.config.environment !== 'production' && 'sent' in deps.mailer && Array.isArray(deps.mailer.sent)) {
     const mailer = deps.mailer as { sent: unknown[] };
     api.get('/__test/mail', (c) => c.json({ sent: mailer.sent }));
+  }
+
+  // 003/US6 E2E: run the daily results refresh now (skips the 10:00 IST daily gate, keeps the single-run guard and
+  // the 24 h per-tender recheck window). Same opt-in and production exclusion as the mail hook.
+  if (opts.testHooks && deps.config.environment !== 'production') {
+    api.post('/__test/results/refresh', async (c) => {
+      try {
+        const run = await refreshResults(c.var.deps, { trigger: 'manual' });
+        return c.json({ id: run.id, status: run.status, checked: run.tendersSeen, stored: run.tendersUpdated, awarded: run.tendersCreated, error: run.error });
+      } catch (e) {
+        if (e instanceof ResultsBusyError) return c.json({ error: { code: 'results_running', message: e.message } }, 409);
+        throw e;
+      }
+    });
   }
 
   for (const r of Object.values(routers)) api.route('/', r);
