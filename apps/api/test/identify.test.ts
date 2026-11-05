@@ -71,6 +71,34 @@ describe('GET /tenders', () => {
       ministries: await expected('ministry', sql`state = 'Maharashtra'`),
       categories: await expected('category', sql`state = 'Maharashtra'`),
     });
+    // One shared key (state + ministry): each facet leaves only its own filter out; total keeps both.
+    const mini = (await ctx.db.execute(sql`select ministry from tenders where state = 'Maharashtra' and status = 'open' and ministry is not null limit 1`)) as unknown as { rows: { ministry: string }[] };
+    const M = mini.rows[0]!.ministry;
+    const both = await get(`/tenders?state=Maharashtra&ministry=${encodeURIComponent(M)}`);
+    const msql = sql`ministry = ${M}`;
+    expect(both.body.facets).toEqual({
+      states: await expected('state', msql),
+      ministries: await expected('ministry', sql`state = 'Maharashtra'`),
+      categories: await expected('category', sql`state = 'Maharashtra' and ministry = ${M}`),
+    });
+    // Zero shared keys (all three filters set): every facet drops exactly its own filter.
+    const cat = ((await ctx.db.execute(sql`select category from tenders where state = 'Maharashtra' and ministry = ${M} and status = 'open' and category is not null limit 1`)) as unknown as { rows: { category: string }[] }).rows[0]!.category;
+    const trio = await get(`/tenders?state=Maharashtra&ministry=${encodeURIComponent(M)}&category=${encodeURIComponent(cat)}`);
+    expect(trio.body.facets).toEqual({
+      states: await expected('state', sql`ministry = ${M} and category = ${cat}`),
+      ministries: await expected('ministry', sql`state = 'Maharashtra' and category = ${cat}`),
+      categories: await expected('category', sql`state = 'Maharashtra' and ministry = ${M}`),
+    });
+    // NULL facet values: an open tender with a null state counts in total but is never a facet value.
+    await ctx.db.insert(tenders).values({
+      source: 'gem', sourceUrl: 'https://example.test/null-state-1', contentHash: 'null-state-hash', bidNumber: 'GEM/2026/B/9990001', title: 'Null state tender', ministry: M,
+      status: 'open', endAt: new Date(REF.getTime() + 10 * 86_400_000), state: null,
+    } as typeof tenders.$inferInsert);
+    const withNull = await get('/tenders');
+    expect(withNull.body.total).toBe(37);
+    expect(withNull.body.facets).toEqual({ states: await expected('state'), ministries: await expected('ministry'), categories: await expected('category') });
+    expect(withNull.body.facets.states.every((f: { value: unknown }) => f.value !== null && f.value !== '')).toBe(true);
+    await ctx.db.delete(tenders).where(eq(tenders.bidNumber, 'GEM/2026/B/9990001'));
     // Nothing matches: total 0 and empty facets (the () grouping set still yields its row).
     const none = await get('/tenders?q=zzzz-no-such-tender');
     expect(none.body).toMatchObject({ total: 0, items: [], facets: { states: [], ministries: [], categories: [] } });

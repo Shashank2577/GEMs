@@ -9,6 +9,7 @@
 # Without COOKIE a fresh owner is signed up per variant, so N requests per variant stay under the per-user API limit
 # (`api.user`, 600/min; one cookie for all 4×200 requests trips it on a fast host). For the 500k-tender check, load
 # the fixture first:
+# Repeated runs: auth.signup.ip allows only 20 signups/hour per IP (4 per run), so set COOKIE for repeats.
 #   DATABASE_URL=… pnpm --filter @tp/db exec tsx src/fixtures/bulk-tenders.ts --count 500000
 set -euo pipefail
 cd "$(dirname "$0")"
