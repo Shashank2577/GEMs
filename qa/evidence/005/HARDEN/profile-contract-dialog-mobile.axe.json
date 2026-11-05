@@ -1,0 +1,1135 @@
+{
+  "url": "http://localhost:8792/profile",
+  "timestamp": "2026-11-05T05:00:24.734Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Open navigation\">",
+                  "target": [
+                    ".-ml-1\\.5"
+                  ]
+                },
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" class=\"md:hidden\" href=\"/dashboard\">",
+                  "target": [
+                    ".md\\:hidden[aria-label=\"TenderPilot home\"][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Search\">",
+                  "target": [
+                    "button[aria-label=\"Search\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications, 4 unr...\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications, 4 unread\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"flex shrink-0 items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3 text-xs font-semibold focus-ring\">",
+                  "target": [
+                    ".py-1"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring bg-muted text-muted-foreground hover:text-foreground\">Company identity</button>",
+                  "target": [
+                    ".h-7.bg-muted.hover\\:text-foreground:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring bg-muted text-muted-foreground hover:text-foreground\">Registrations &amp; status</button>",
+                  "target": [
+                    ".h-7.bg-muted.hover\\:text-foreground:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring bg-primary text-primary-foreground\" aria-current=\"true\">Financials</button>",
+                  "target": [
+                    ".text-primary-foreground.bg-primary[aria-current=\"true\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring bg-muted text-muted-foreground hover:text-foreground\">Experience</button>",
+                  "target": [
+                    ".h-7.bg-muted.hover\\:text-foreground:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring bg-muted text-muted-foreground hover:text-foreground\">OEM authorisations</button>",
+                  "target": [
+                    ".h-7.bg-muted.hover\\:text-foreground:nth-child(5)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring bg-muted text-muted-foreground hover:text-foreground\">Categories &amp; reach</button>",
+                  "target": [
+                    ".h-7.bg-muted.hover\\:text-foreground:nth-child(6)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"h-7 shrink-0 rounded-full px-3 text-xs font-medium transition-colors focus-ring bg-muted text-muted-foreground hover:text-foreground\">Signatory &amp; contact</button>",
+                  "target": [
+                    ".h-7.bg-muted.hover\\:text-foreground:nth-child(7)"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-legalName\" placeholder=\"e.g. Sharma Infotech...\" autocomplete=\"organization\" aria-required=\"true\" value=\"Aarav Technologies P...\" style=\"\">",
+                  "target": [
+                    "#f-legalName"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-tradeName\" aria-describedby=\"f-tradeName-hint\" value=\"Aarav Tech\" style=\"\">",
+                  "target": [
+                    "#f-tradeName"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-incorporationDate\" type=\"date\" max=\"2026-11-05\" value=\"2016-03-14\" style=\"\">",
+                  "target": [
+                    "#f-incorporationDate"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-gstin\" maxlength=\"15\" placeholder=\"27AAPCS1234K1Z2\" autocomplete=\"off\" spellcheck=\"false\" aria-describedby=\"f-gstin-hint\" value=\"27AAJCA4721K1ZK\" style=\"\">",
+                  "target": [
+                    "#f-gstin"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-pan\" maxlength=\"10\" placeholder=\"AAPCS1234K\" autocomplete=\"off\" spellcheck=\"false\" aria-describedby=\"f-pan-hint\" value=\"AAJCA4721K\" style=\"\">",
+                  "target": [
+                    "#f-pan"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-cin\" maxlength=\"21\" placeholder=\"U72200MH2015PTC12345...\" spellcheck=\"false\" aria-describedby=\"f-cin-hint\" value=\"U72900PN2016PTC16543...\" style=\"\">",
+                  "target": [
+                    "#f-cin"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"Optional\" id=\"f-maxEmdCapacity\" aria-describedby=\"f-maxEmdCapacity-hin...\" value=\"15,00,000\" style=\"\">",
+                  "target": [
+                    "#f-maxEmdCapacity"
+                  ]
+                },
+                {
+                  "html": "<textarea class=\"flex w-full rounded-...\" id=\"f-address\" rows=\"2\" autocomplete=\"street-address\" style=\"\">",
+                  "target": [
+                    "#f-address"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" id=\"f-state\">",
+                  "target": [
+                    "#f-state"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-pincode\" inputmode=\"numeric\" placeholder=\"411001\" autocomplete=\"postal-code\" value=\"411045\" style=\"\">",
+                  "target": [
+                    "#f-pincode"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex rounded text-muted-foreground hover:text-foreground focus-ring\" aria-label=\"What is MSE?\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"What is MSE?\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"switch\" aria-checked=\"true\" data-state=\"checked\" value=\"on\" class=\"peer inline-flex h-5...\" aria-label=\"We are a registered ...\">",
+                  "target": [
+                    "button[aria-label=\"We are a registered MSE\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-udyamNumber\" placeholder=\"UDYAM-MH-26-0123456\" maxlength=\"19\" spellcheck=\"false\" value=\"UDYAM-MH-26-0012345\" style=\"\">",
+                  "target": [
+                    "#f-udyamNumber"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-8 px-3 text-[13px] bg-card text-foreground shadow-sm\">Micro</button>",
+                  "target": [
+                    ".\\[\\&_svg\\]\\:size-3\\.5.transition-all[role=\"radio\"]:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-8 px-3 text-[13px] text-muted-foreground hover:text-foreground\">Small</button>",
+                  "target": [
+                    ".\\[\\&_svg\\]\\:size-3\\.5.transition-all[role=\"radio\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-8 px-3 text-[13px] text-muted-foreground hover:text-foreground\">Medium</button>",
+                  "target": [
+                    ".\\[\\&_svg\\]\\:size-3\\.5.transition-all[role=\"radio\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" id=\"f-mseSocialCategory\" aria-describedby=\"f-mseSocialCategory-...\">",
+                  "target": [
+                    "#f-mseSocialCategory"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex rounded text-muted-foreground hover:text-foreground focus-ring\" aria-label=\"What is DPIIT startup?\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"What is DPIIT startup?\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"switch\" aria-checked=\"false\" data-state=\"unchecked\" value=\"on\" class=\"peer inline-flex h-5...\" aria-label=\"We are a DPIIT-recog...\">",
+                  "target": [
+                    ".p-4.gap-4.rounded-xl:nth-child(2) > .gap-4.items-start.justify-between > .w-9.border-transparent.data-\\[state\\=unchecked\\]\\:bg-input"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex rounded text-muted-foreground hover:text-foreground focus-ring\" aria-label=\"What is Make in India class?\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"What is Make in India class?\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"flex h-full flex-col gap-1 rounded-xl border p-3.5 text-left transition-all focus-ring disabled:cursor-not-allowed border-primary bg-primary-soft/50 shadow-[0_0_0_1px_hsl(var(--primary))]\">",
+                  "target": [
+                    ".bg-primary-soft\\/50"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"flex h-full flex-col gap-1 rounded-xl border p-3.5 text-left transition-all focus-ring disabled:cursor-not-allowed bg-card hover:border-foreground/20\">",
+                  "target": [
+                    ".p-3\\.5.h-full[role=\"radio\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"flex h-full flex-col gap-1 rounded-xl border p-3.5 text-left transition-all focus-ring disabled:cursor-not-allowed bg-card hover:border-foreground/20\">",
+                  "target": [
+                    ".p-3\\.5.h-full[role=\"radio\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-localContentPct\" type=\"number\" min=\"0\" max=\"100\" step=\"0.1\" aria-describedby=\"f-localContentPct-hi...\" value=\"62\" style=\"\">",
+                  "target": [
+                    "#f-localContentPct"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove ISO 9001:2015\">",
+                  "target": [
+                    "button[aria-label=\"Remove ISO 9001:2015\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove MII Class-I self-certificate\">",
+                  "target": [
+                    ".gap-6.grid > .gap-1\\.5.grid > .relative > .min-h-10.cursor-text.px-2 > .max-w-full.pl-2.pr-1:nth-child(2) > .hover\\:bg-black\\/5.opacity-70.hover\\:opacity-100"
+                  ]
+                },
+                {
+                  "html": "<input id=\"f-certifications\" placeholder=\"\" aria-describedby=\"f-certifications-hint\" aria-autocomplete=\"list\" class=\"h-6 min-w-[8rem] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground/70\" value=\"\" style=\"\">",
+                  "target": [
+                    "#f-certifications"
+                  ]
+                },
+                {
+                  "html": "<div class=\"group flex h-full min-w-0 flex-1 flex-col items-center justify-end\" tabindex=\"0\" aria-label=\"FY 2022-23: ₹1,82,30,000\" data-state=\"closed\">",
+                  "target": [
+                    "div[aria-label=\"FY 2022-23: ₹1,82,30,000\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"group flex h-full min-w-0 flex-1 flex-col items-center justify-end\" tabindex=\"0\" aria-label=\"FY 2023-24: ₹2,46,10,000\" data-state=\"closed\">",
+                  "target": [
+                    "div[aria-label=\"FY 2023-24: ₹2,46,10,000\"]"
+                  ]
+                },
+                {
+                  "html": "<div class=\"group flex h-full min-w-0 flex-1 flex-col items-center justify-end\" tabindex=\"0\" aria-label=\"FY 2024-25: ₹3,18,40,000\" data-state=\"closed\">",
+                  "target": [
+                    "div[aria-label=\"FY 2024-25: ₹3,18,40,000\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" aria-label=\"Financial year\" aria-invalid=\"false\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > .col-span-2.md\\:col-span-1:nth-child(1) > .data-\\[placeholder\\]\\:text-muted-foreground.\\[\\&\\>span\\]\\:truncate[aria-label=\"Financial year\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"0\" aria-label=\"Turnover FY 2022-23\" aria-invalid=\"false\" value=\"1,82,30,000\" style=\"\">",
+                  "target": [
+                    "input[aria-label=\"Turnover FY 2022-23\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"Optional\" aria-label=\"Net worth FY 2022-23\" value=\"64,90,000\" style=\"\">",
+                  "target": [
+                    "input[aria-label=\"Net worth FY 2022-23\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"true\" data-state=\"checked\" value=\"on\" class=\"peer size-4 shrink-0...\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > label > .rounded-\\[5px\\].data-\\[state\\=checked\\]\\:border-primary.data-\\[state\\=indeterminate\\]\\:border-primary"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Remove FY 2022-23\">",
+                  "target": [
+                    "button[aria-label=\"Remove FY 2022-23\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" aria-label=\"Financial year\" aria-invalid=\"false\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(2) > .col-span-2.md\\:col-span-1:nth-child(1) > .data-\\[placeholder\\]\\:text-muted-foreground.\\[\\&\\>span\\]\\:truncate[aria-label=\"Financial year\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"0\" aria-label=\"Turnover FY 2023-24\" aria-invalid=\"false\" value=\"2,46,10,000\" style=\"\">",
+                  "target": [
+                    "input[aria-label=\"Turnover FY 2023-24\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"Optional\" aria-label=\"Net worth FY 2023-24\" value=\"86,40,000\" style=\"\">",
+                  "target": [
+                    "input[aria-label=\"Net worth FY 2023-24\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"true\" data-state=\"checked\" value=\"on\" class=\"peer size-4 shrink-0...\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(2) > label > .rounded-\\[5px\\].data-\\[state\\=checked\\]\\:border-primary.data-\\[state\\=indeterminate\\]\\:border-primary"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Remove FY 2023-24\">",
+                  "target": [
+                    "button[aria-label=\"Remove FY 2023-24\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" aria-label=\"Financial year\" aria-invalid=\"false\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(3) > .col-span-2.md\\:col-span-1:nth-child(1) > .data-\\[placeholder\\]\\:text-muted-foreground.\\[\\&\\>span\\]\\:truncate[aria-label=\"Financial year\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"0\" aria-label=\"Turnover FY 2024-25\" aria-invalid=\"false\" value=\"3,18,40,000\" style=\"\">",
+                  "target": [
+                    "input[aria-label=\"Turnover FY 2024-25\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"Optional\" aria-label=\"Net worth FY 2024-25\" value=\"1,12,60,000\" style=\"\">",
+                  "target": [
+                    "input[aria-label=\"Net worth FY 2024-25\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"checkbox\" aria-checked=\"true\" data-state=\"checked\" value=\"on\" class=\"peer size-4 shrink-0...\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(3) > label > .rounded-\\[5px\\].data-\\[state\\=checked\\]\\:border-primary.data-\\[state\\=indeterminate\\]\\:border-primary"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Remove FY 2024-25\">",
+                  "target": [
+                    "button[aria-label=\"Remove FY 2024-25\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "div:nth-child(3) > .h-8.bg-transparent.transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".flex-wrap.justify-between.gap-2 > .h-8.bg-transparent.transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(1) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Actions for Supply o...\" id=\"radix-:r1u:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r1u\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(2) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Actions for CCTV sur...\" id=\"radix-:r20:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r20\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(3) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Actions for Managed ...\" id=\"radix-:r22:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r22\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(4) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Actions for Online U...\" id=\"radix-:r24:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r24\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(5) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Actions for Multifun...\" id=\"radix-:r26:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r26\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(6) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Actions for Supply o...\" id=\"radix-:r28:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:r28\\:"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"e.g. Dell India\" id=\":r2g:\" aria-required=\"true\" value=\"CP PLUS\" style=\"\">",
+                  "target": [
+                    "#\\:r2g\\:"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"e.g. Latitude laptop...\" id=\":r2h:\" value=\"IP cameras, NVRs\" style=\"\">",
+                  "target": [
+                    "#\\:r2h\\:"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" type=\"date\" id=\"f-oemAuthorizations....\" aria-describedby=\"f-oemAuthorizations....\" value=\"2027-04-19\" style=\"\">",
+                  "target": [
+                    "#f-oemAuthorizations\\.0\\.validTill"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" id=\"f-oemAuthorizations....\">",
+                  "target": [
+                    "#f-oemAuthorizations\\.0\\.documentId"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Remove CP PLUS\">",
+                  "target": [
+                    "button[aria-label=\"Remove CP PLUS\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"e.g. Dell India\" id=\":r2l:\" aria-required=\"true\" value=\"Dell Technologies\" style=\"\">",
+                  "target": [
+                    "#\\:r2l\\:"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"e.g. Latitude laptop...\" id=\":r2m:\" value=\"Desktops, notebooks,...\" style=\"\">",
+                  "target": [
+                    "#\\:r2m\\:"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" type=\"date\" id=\"f-oemAuthorizations....\" aria-describedby=\"f-oemAuthorizations....\" value=\"2026-10-31\" style=\"\">",
+                  "target": [
+                    "#f-oemAuthorizations\\.1\\.validTill"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" id=\"f-oemAuthorizations....\">",
+                  "target": [
+                    "#f-oemAuthorizations\\.1\\.documentId"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Remove Dell Technolo...\">",
+                  "target": [
+                    "button[aria-label=\"Remove Dell Technologies\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"e.g. Dell India\" id=\":r2q:\" aria-required=\"true\" value=\"D-Link India\" style=\"\">",
+                  "target": [
+                    "#\\:r2q\\:"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"e.g. Latitude laptop...\" id=\":r2r:\" value=\"Managed switches, Wi...\" style=\"\">",
+                  "target": [
+                    "#\\:r2r\\:"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" type=\"date\" id=\"f-oemAuthorizations....\" value=\"\" style=\"\">",
+                  "target": [
+                    "#f-oemAuthorizations\\.2\\.validTill"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" id=\"f-oemAuthorizations....\">",
+                  "target": [
+                    "#f-oemAuthorizations\\.2\\.documentId"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Remove D-Link India\">",
+                  "target": [
+                    "button[aria-label=\"Remove D-Link India\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    "div:nth-child(4) > .h-8.bg-transparent.transition-\\[color\\,background-color\\,border-color\\,box-shadow\\,transform\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove Desktop Computers\">",
+                  "target": [
+                    "button[aria-label=\"Remove Desktop Computers\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove Laptop - Notebook\">",
+                  "target": [
+                    "button[aria-label=\"Remove Laptop - Notebook\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove CCTV Cameras\">",
+                  "target": [
+                    "button[aria-label=\"Remove CCTV Cameras\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove Network Video Recorder\">",
+                  "target": [
+                    "button[aria-label=\"Remove Network Video Recorder\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove Network Switches\">",
+                  "target": [
+                    "button[aria-label=\"Remove Network Switches\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove Wireless Access Points\">",
+                  "target": [
+                    "button[aria-label=\"Remove Wireless Access Points\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove UPS\">",
+                  "target": [
+                    "button[aria-label=\"Remove UPS\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove Multifunction Machines\">",
+                  "target": [
+                    "button[aria-label=\"Remove Multifunction Machines\"]"
+                  ]
+                },
+                {
+                  "html": "<input id=\"f-categories\" placeholder=\"\" aria-describedby=\"f-categories-hint\" aria-autocomplete=\"list\" class=\"h-6 min-w-[8rem] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground/70\" value=\"\" style=\"\">",
+                  "target": [
+                    "#f-categories"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove 8471\">",
+                  "target": [
+                    "button[aria-label=\"Remove 8471\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove 8525\">",
+                  "target": [
+                    "button[aria-label=\"Remove 8525\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove 8517\">",
+                  "target": [
+                    "button[aria-label=\"Remove 8517\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove 8504\">",
+                  "target": [
+                    "button[aria-label=\"Remove 8504\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:bg-black/5 hover:opacity-100 focus-ring\" aria-label=\"Remove 8443\">",
+                  "target": [
+                    "button[aria-label=\"Remove 8443\"]"
+                  ]
+                },
+                {
+                  "html": "<input id=\"f-hsnCodes\" placeholder=\"\" aria-describedby=\"f-hsnCodes-hint\" aria-autocomplete=\"list\" class=\"h-6 min-w-[8rem] flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground/70\" value=\"\" style=\"\">",
+                  "target": [
+                    "#f-hsnCodes"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"font-medium text-primary hover:underline\">All India</button>",
+                  "target": [
+                    ".hover\\:underline.text-primary[type=\"button\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"text-muted-foreground hover:underline\">Clear</button>",
+                  "target": [
+                    ".hover\\:underline[type=\"button\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm shadow-xs hover:border-foreground/20 focus-ring\" aria-label=\"States: 5 selected\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"States: 5 selected\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:opacity-100 focus-ring\" aria-label=\"Remove Maharashtra\">",
+                  "target": [
+                    "button[aria-label=\"Remove Maharashtra\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:opacity-100 focus-ring\" aria-label=\"Remove Goa\">",
+                  "target": [
+                    "button[aria-label=\"Remove Goa\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:opacity-100 focus-ring\" aria-label=\"Remove Gujarat\">",
+                  "target": [
+                    "button[aria-label=\"Remove Gujarat\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:opacity-100 focus-ring\" aria-label=\"Remove Madhya Pradesh\">",
+                  "target": [
+                    "button[aria-label=\"Remove Madhya Pradesh\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"rounded p-0.5 opacity-70 hover:opacity-100 focus-ring\" aria-label=\"Remove Karnataka\">",
+                  "target": [
+                    "button[aria-label=\"Remove Karnataka\"]"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-signatoryName\" placeholder=\"Full name\" autocomplete=\"name\" value=\"Ananya Kulkarni\" style=\"\">",
+                  "target": [
+                    "#f-signatoryName"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-signatoryDesignati...\" placeholder=\"e.g. Director\" value=\"Director\" style=\"\">",
+                  "target": [
+                    "#f-signatoryDesignation"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-contactName\" value=\"Rohan Deshmukh\" style=\"\">",
+                  "target": [
+                    "#f-contactName"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-contactEmail\" type=\"email\" placeholder=\"bids@company.in\" autocomplete=\"email\" value=\"bids@aaravtech.in\" style=\"\">",
+                  "target": [
+                    "#f-contactEmail"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" id=\"f-contactPhone\" type=\"tel\" placeholder=\"98123 45678\" autocomplete=\"tel\" aria-describedby=\"f-contactPhone-hint\" value=\"+919822012345\" style=\"\">",
+                  "target": [
+                    "#f-contactPhone"
+                  ]
+                },
+                {
+                  "html": "<a class=\"font-medium text-primary hover:underline\" href=\"/vault\">document vault</a>",
+                  "target": [
+                    ".hover\\:underline[href$=\"vault\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/dashboard\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/tenders\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"tenders\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/vault\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"vault\"]"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-14 w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium text-muted-foreground focus-ring\">",
+                  "target": [
+                    "li:nth-child(5) > .text-\\[10\\.5px\\].h-14.flex-col"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"min-h-dvh bg-background\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".bg-background"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(6)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(6)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<header class=\"sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-xl sm:px-6\">",
+                  "target": [
+                    ".top-0"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" aria-label=\"Financial year\" aria-invalid=\"false\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > .col-span-2.md\\:col-span-1:nth-child(1) > .data-\\[placeholder\\]\\:text-muted-foreground.\\[\\&\\>span\\]\\:truncate[aria-label=\"Financial year\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"font-semibold tracking-tight text-[15px]\">Tender<span class=\"text-primary\">Pilot</span></span>",
+          "target": [
+            ".md\\:hidden[aria-label=\"TenderPilot home\"][href$=\"dashboard\"] > .gap-2\\.5.inline-flex > .text-\\[15px\\].tracking-tight.font-semibold"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "11.3pt (15px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<header class=\"sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-xl sm:px-6\">",
+                  "target": [
+                    ".top-0"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex h-9 w-full item...\" aria-label=\"Financial year\" aria-invalid=\"false\">",
+                  "target": [
+                    ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > .col-span-2.md\\:col-span-1:nth-child(1) > .data-\\[placeholder\\]\\:text-muted-foreground.\\[\\&\\>span\\]\\:truncate[aria-label=\"Financial year\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-primary\">Pilot</span>",
+          "target": [
+            ".md\\:hidden[aria-label=\"TenderPilot home\"][href$=\"dashboard\"] > .gap-2\\.5.inline-flex > .text-\\[15px\\].tracking-tight.font-semibold > .text-primary"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "13.5pt (18px)",
+                "fontWeight": "normal",
+                "messageKey": "imgNode",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<svg width=\"76\" height=\"76\" class=\"-rotate-90\">",
+                  "target": [
+                    ".scale-\\[0\\.42\\] > .shrink-0[role=\"img\"][aria-label=\"Profile 96% complete\"] > .-rotate-90[width=\"76\"][height=\"76\"]"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because element contains an image node"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"absolute inset-0 flex items-center justify-center text-lg font-semibold tabular tracking-tight\">96<span class=\"text-xs text-muted-foreground\">%</span></span>",
+          "target": [
+            ".scale-\\[0\\.42\\] > .shrink-0[role=\"img\"][aria-label=\"Profile 96% complete\"] > .text-lg.inset-0.tracking-tight"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".gap-1\\.5.grid:nth-child(7) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > .col-span-2.md\\:col-span-1:nth-child(2) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(1) > .col-span-2.md\\:col-span-1:nth-child(3) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(2) > .col-span-2.md\\:col-span-1:nth-child(2) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(2) > .col-span-2.md\\:col-span-1:nth-child(3) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(3) > .col-span-2.md\\:col-span-1:nth-child(2) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".md\\:grid-cols-\\[9rem_1fr_1fr_6rem_2\\.5rem\\].md\\:items-start.grid-cols-2:nth-child(3) > .col-span-2.md\\:col-span-1:nth-child(3) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span class=\"text-sm font-medium\">₹</span>",
+          "target": [
+            ".gap-1\\.5.grid:nth-child(4) > .relative > .relative.items-center.flex > .left-3.pointer-events-none.absolute > .text-sm.font-medium"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        }
+      ]
+    }
+  ],
+  "passes": 24
+}

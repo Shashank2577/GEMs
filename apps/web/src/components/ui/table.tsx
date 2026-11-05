@@ -40,6 +40,7 @@ export interface Column<T> {
   className?: string;
   /** Hidden in the mobile card view */
   hideOnMobile?: boolean;
+  /** Card title on mobile. Its cell is wrapped in a button there, so it must be non-interactive phrasing content (no links/buttons/inputs). */
   primary?: boolean;
 }
 
@@ -80,14 +81,23 @@ export function ResponsiveTable<T>({
       <ul className="grid gap-2 md:hidden">
         {rows.map((r) => (
           <li key={rowKey(r)}>
+            {/*
+              The card itself is not a button: cells may hold their own controls (e.g. a row-actions menu), and an
+              interactive element inside role=button is an axe `nested-interactive` violation (#493). Keyboard and
+              screen-reader users get a real <button> on the card title; its click (mouse, Enter or Space) bubbles to
+              the card's handler, which also keeps "tap anywhere on the card" working. Controls inside cells keep
+              stopping propagation as before.
+            */}
             <div
-              role={onRowClick ? 'button' : undefined}
-              tabIndex={onRowClick ? 0 : undefined}
+              data-row-card=""
               onClick={onRowClick ? () => onRowClick(r) : undefined}
-              onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter') onRowClick(r); } : undefined}
-              className={cn('rounded-xl border bg-card p-4 shadow-xs', onRowClick && 'cursor-pointer active:bg-muted/50 focus-ring')}
+              className={cn('rounded-xl border bg-card p-4 shadow-xs', onRowClick && 'cursor-pointer active:bg-muted/50')}
             >
-              <div className="font-medium">{primary.cell(r)}</div>
+              {onRowClick ? (
+                <button type="button" data-row-open="" className="block w-full min-w-0 rounded-md text-left font-medium focus-ring">{primary.cell(r)}</button>
+              ) : (
+                <div className="font-medium">{primary.cell(r)}</div>
+              )}
               <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 {columns.filter((c) => c !== primary && !c.hideOnMobile).map((c) => (
                   <div key={c.key} className="min-w-0">

@@ -19,7 +19,7 @@ export function TurnoverChart({ rows }: { rows: FinancialYearDto[] }) {
       <div className="relative flex h-36 items-end gap-2 sm:gap-3">
         {avg && (
           <div className="pointer-events-none absolute inset-x-0 border-t-2 border-dashed border-accent/70" style={{ bottom: `${(avg.avg / max) * 100}%` }} aria-hidden>
-            <span className="absolute -top-5 right-0 rounded bg-accent-soft px-1.5 text-2xs font-semibold text-accent">avg {formatINRCompact(avg.avg)}</span>
+            <span className="absolute -top-5 right-0 rounded bg-accent-soft px-1.5 text-2xs font-semibold text-[hsl(26_90%_32%)] dark:text-accent">avg {formatINRCompact(avg.avg)}</span>
           </div>
         )}
         {data.map((d) => (
@@ -68,7 +68,7 @@ export function FinancialsEditor({ value, onChange, errors, disabled }: {
           <p className="mt-1 text-xs text-muted-foreground">
             {avg ? <>Last {avg.years.length} FY{avg.years.length > 1 ? 's' : ''} ({[...avg.years].reverse().join(', ')}) · {formatINR(avg.avg)}</> : 'Add at least one year'}
           </p>
-          {missing.length > 0 && <p className="mt-2 text-xs font-medium text-warning">Missing: {missing.map((m) => `FY ${m}`).join(', ')}</p>}
+          {missing.length > 0 && <p className="mt-2 text-xs font-medium text-[hsl(32_90%_32%)] dark:text-warning">Missing: {missing.map((m) => `FY ${m}`).join(', ')}</p>}
         </div>
         <div className="sm:col-span-2"><TurnoverChart rows={value} /></div>
       </div>

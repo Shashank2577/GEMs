@@ -1,0 +1,441 @@
+{
+  "url": "http://localhost:8792/vault",
+  "timestamp": "2026-11-05T05:00:36.351Z",
+  "violations": [],
+  "incomplete": [
+    {
+      "id": "aria-hidden-focus",
+      "impact": "serious",
+      "tags": [
+        "cat.name-role-value",
+        "wcag2a",
+        "wcag412",
+        "TTv5",
+        "TT6.a",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-10.8.1"
+      ],
+      "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+      "help": "ARIA hidden element must not be focusable or contain focusable elements",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/aria-hidden-focus?application=playwright",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(1)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<a href=\"#main\" class=\"sr-only z-[60] rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3\">Skip to content</a>",
+                  "target": [
+                    ".z-\\[60\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Open navigation\">",
+                  "target": [
+                    ".-ml-1\\.5"
+                  ]
+                },
+                {
+                  "html": "<a aria-label=\"TenderPilot home\" class=\"md:hidden\" href=\"/dashboard\">",
+                  "target": [
+                    ".md\\:hidden[aria-label=\"TenderPilot home\"][href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"Search\">",
+                  "target": [
+                    "button[aria-label=\"Search\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex select-n...\" aria-label=\"Notifications, 4 unr...\" aria-haspopup=\"dialog\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "button[aria-label=\"Notifications, 4 unread\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" id=\"radix-:rg:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\" class=\"flex items-center gap-2 rounded-full focus-ring\" aria-label=\"Account menu\">",
+                  "target": [
+                    "#radix-\\:rg\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\">",
+                  "target": [
+                    ".flex-wrap.gap-2.shrink-0 > .hover\\:bg-primary\\/90.\\[box-shadow\\:inset_0_1px_0_0_hsl\\(0_0\\%_100\\%\\/0\\.14\\)\\,0_1px_2px_0_hsl\\(var\\(--shadow\\)\\/0\\.12\\)\\].bg-primary"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"relative inline-flex...\" aria-label=\"More vault actions\" id=\"radix-:rs:\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-state=\"closed\">",
+                  "target": [
+                    "#radix-\\:rs\\:"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"true\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".rounded-xl.text-left[type=\"button\"]:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".rounded-xl.text-left[type=\"button\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".rounded-xl.text-left[type=\"button\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" aria-pressed=\"false\" class=\"rounded-xl text-left focus-ring\">",
+                  "target": [
+                    ".rounded-xl.text-left[type=\"button\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"flex w-full min-w-0 items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-muted focus-ring\">",
+                  "target": [
+                    "li:nth-child(1) > .py-1\\.5.gap-2\\.5.px-1"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"flex w-full min-w-0 items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-muted focus-ring\">",
+                  "target": [
+                    "li:nth-child(2) > .py-1\\.5.gap-2\\.5.px-1"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"flex w-full min-w-0 items-center gap-2.5 rounded-lg px-1 py-1.5 text-left hover:bg-muted focus-ring\">",
+                  "target": [
+                    "li:nth-child(3) > .py-1\\.5.gap-2\\.5.px-1"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" class=\"inline-flex h-7 items-center gap-1 rounded-full border bg-card px-2.5 text-xs font-medium hover:border-primary/40 hover:text-primary focus-ring\">",
+                  "target": [
+                    ".hover\\:border-primary\\/40"
+                  ]
+                },
+                {
+                  "html": "<input class=\"flex w-full rounded-...\" placeholder=\"Search title, number...\" aria-label=\"Search documents\" value=\"\" style=\"\">",
+                  "target": [
+                    ".pl-9"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex items-center ju...\" aria-label=\"Document type\">",
+                  "target": [
+                    ".w-\\[11\\.5rem\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"combobox\" aria-expanded=\"false\" aria-autocomplete=\"none\" dir=\"ltr\" data-state=\"closed\" class=\"flex items-center ju...\" aria-label=\"Sort\">",
+                  "target": [
+                    ".w-\\[10rem\\]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">",
+                  "target": [
+                    "div[aria-label=\"View\"] > .transition-all.h-7[role=\"radio\"]:nth-child(1)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">",
+                  "target": [
+                    "div[aria-label=\"View\"] > .shadow-sm.transition-all[role=\"radio\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"true\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs bg-card text-foreground shadow-sm\">All</button>",
+                  "target": [
+                    "div[aria-label=\"Category\"] > .shadow-sm.transition-all[role=\"radio\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Statutory</button>",
+                  "target": [
+                    "div[aria-label=\"Category\"] > .transition-all.h-7[role=\"radio\"]:nth-child(2)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Financial</button>",
+                  "target": [
+                    ".transition-all.h-7[role=\"radio\"]:nth-child(3)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Experience</button>",
+                  "target": [
+                    ".transition-all.h-7[role=\"radio\"]:nth-child(4)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">OEM</button>",
+                  "target": [
+                    ".transition-all.h-7[role=\"radio\"]:nth-child(5)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Quality</button>",
+                  "target": [
+                    ".transition-all.h-7[role=\"radio\"]:nth-child(6)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" role=\"radio\" aria-checked=\"false\" class=\"inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-all focus-ring [&amp;_svg]:size-3.5 h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground\">Other</button>",
+                  "target": [
+                    ".transition-all.h-7[role=\"radio\"]:nth-child(7)"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(1) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(2) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(3) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(4) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(5) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(6) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(7) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(8) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(9) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(10) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(11) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(12) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(13) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(14) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<button type=\"button\" data-row-open=\"\" class=\"block w-full min-w-0 rounded-md text-left font-medium focus-ring\">",
+                  "target": [
+                    "li:nth-child(15) > .active\\:bg-muted\\/50.p-4[data-row-card=\"\"] > .block.text-left[data-row-open=\"\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/dashboard\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"dashboard\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/tenders\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"tenders\"]"
+                  ]
+                },
+                {
+                  "html": "<a class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-muted-foreground\" href=\"/pipeline\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\].h-14[href$=\"pipeline\"]"
+                  ]
+                },
+                {
+                  "html": "<a aria-current=\"page\" class=\"flex h-14 flex-col items-center justify-center gap-1 text-[10.5px] font-medium transition-colors focus-ring text-primary\" href=\"/vault\">",
+                  "target": [
+                    ".text-\\[10\\.5px\\][aria-current=\"page\"][href$=\"vault\"]"
+                  ]
+                },
+                {
+                  "html": "<button class=\"flex h-14 w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium text-muted-foreground focus-ring\">",
+                  "target": [
+                    "li:nth-child(5) > .text-\\[10\\.5px\\].h-14.flex-col"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"min-h-dvh bg-background\" data-aria-hidden=\"true\" aria-hidden=\"true\">",
+          "target": [
+            ".bg-background"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        },
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "focusable-modal-open",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+                  "target": [
+                    "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Check that focusable elements are not tabbable in the current state"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<span data-radix-focus-guard=\"\" tabindex=\"0\" data-aria-hidden=\"true\" aria-hidden=\"true\" style=\"outline: none; opacity: 0; position: fixed; pointer-events: none;\"></span>",
+          "target": [
+            "span[data-radix-focus-guard=\"\"][data-aria-hidden=\"true\"][aria-hidden=\"true\"]:nth-child(5)"
+          ],
+          "failureSummary": "Fix all of the following:\n  Check that focusable elements are not tabbable in the current state"
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=playwright",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "9.0pt (12px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<div class=\"block rounded-xl border bg-card p-4 shadow-xs sm:p-5 h-full\">",
+                  "target": [
+                    ".rounded-xl.text-left[type=\"button\"]:nth-child(4) > .sm\\:p-5.h-full.p-4"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"mt-1 flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground\">Renew to keep bidding</div>",
+          "target": [
+            ".rounded-xl.text-left[type=\"button\"]:nth-child(4) > .sm\\:p-5.h-full.p-4 > .items-end.mt-1.justify-between > .min-w-0 > .mt-1.gap-1\\.5.whitespace-nowrap"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        }
+      ]
+    }
+  ],
+  "passes": 23
+}
