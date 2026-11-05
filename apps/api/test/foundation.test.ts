@@ -277,7 +277,11 @@ describe('PATCH /org onboarding state (007 US3)', () => {
     const list = (await request(ctx.app, 'GET', '/api/activity', { cookie: owner.cookie })).body.items as { action: string; meta: { durationSec?: number } }[];
     const done = list.filter((i) => i.action === 'onboarding.completed');
     expect(done).toHaveLength(1);
-    expect(done[0].meta.durationSec).toBeGreaterThanOrEqual(95);
+    // durationSec = fake-clock now - organizations.created_at, and created_at comes from the database's real clock. The
+    // fake clock was set up slightly before the org was created, so real time elapsed in between shaves a little off
+    // the 95 s we advanced (94 s on a slow run). Assert the advance within a tolerance instead of an exact floor.
+    expect(done[0].meta.durationSec).toBeGreaterThanOrEqual(90);
+    expect(done[0].meta.durationSec).toBeLessThanOrEqual(100);
   });
 
   it('concurrent completed PATCHes log onboarding.completed exactly once', async () => {
