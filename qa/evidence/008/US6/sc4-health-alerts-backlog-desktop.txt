@@ -1,0 +1,17 @@
+# sc4-health-alerts-backlog — project desktop — 2026-11-05T05:55:31.590Z
+### Health with only control rows (in-app 90 min, email 10 min)
+> GET /api/health
+< 200
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: 9cdf5c0f-571b-4392-902c-4b64b043a986
+{"ok":true,"db":true,"version":"0.1.0","ingestion":{"lastSuccessAt":"2026-11-05T05:50:31.472Z","ageMinutes":5,"lastStatus":"success","state":"ok"},"alerts":{"pendingOlderThan30m":0},"reasons":[]}
+
+### Health with 3 email notifications pending 45 min
+> GET /api/health
+< 503  (11 ms)
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: 92c11f15-3e5d-46c8-a54a-40e87dd4406b
+{"ok":false,"db":true,"version":"0.1.0","ingestion":{"lastSuccessAt":"2026-11-05T05:50:31.472Z","ageMinutes":5,"lastStatus":"success","state":"ok"},"alerts":{"pendingOlderThan30m":3},"reasons":["alerts_backlog"]}
+

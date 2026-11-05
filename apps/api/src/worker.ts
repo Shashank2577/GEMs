@@ -2,12 +2,16 @@
  * Cloudflare Worker entry (Constitution VII): /api/* → Hono app with a per-request Neon pool and
  * R2 blob store; everything else → static SPA assets. Cron → ingestion → alerts → reminders.
  */
+import * as Sentry from '@sentry/cloudflare';
 import { createNeonDb } from '@tp/db';
 import { spaCspFor } from '@tp/core/security/headers';
 import { createApp } from './app';
 import { createDeps } from './adapters/index';
+import { createSentryReporter, sentryOptions } from './adapters/errors';
+import { createJsonLogger } from './adapters/logger';
+import { unreachableHealth } from './routes/health';
 import { createR2BlobStore, type R2BucketLike } from './adapters/blob-r2';
-import type { RuntimeEnv } from './env';
+import { loadConfig, type RuntimeEnv } from './env';
 import { runScheduledJobs } from './lib/scheduled';
 import { settleDeferred } from './lib/defer';
 import { applySecurityHeaders } from './middleware/security';
@@ -31,7 +35,10 @@ function envVars(env: WorkerEnv): RuntimeEnv {
 async function withDeps<T>(env: WorkerEnv, ctx: ExecutionContextLike, fn: (deps: ReturnType<typeof createDeps>) => Promise<T>): Promise<T> {
   if (!env.DATABASE_URL) throw new Error('DATABASE_URL secret is not set');
   const { db, close } = await createNeonDb(env.DATABASE_URL);
-  const deps = createDeps({ env: envVars(env), db, blobs: createR2BlobStore(env.BLOBS) });
+  const vars = envVars(env);
+  // 008/FR-046: events are only sent when SENTRY_DSN is set (withSentry below is inert without a DSN).
+  const errors = vars.SENTRY_DSN ? createSentryReporter(Sentry) : undefined;
+  const deps = createDeps({ env: vars, db, blobs: createR2BlobStore(env.BLOBS), errors });
   try {
     return await fn(deps);
   } finally {
@@ -59,15 +66,29 @@ export async function withSecurityHeaders(request: Request, res: Response): Prom
   return out;
 }
 
-export default {
+/**
+ * The per-request bootstrap (DB pool, deps) failed before the Hono app could run: JSON log line, Sentry event when a DSN
+ * is set (withSentry has initialised the client), and for /api/health the same `db_unreachable` body the route returns.
+ */
+export function bootstrapFailed(e: unknown, url: URL, env: WorkerEnv): Response {
+  const config = loadConfig(envVars(env));
+  createJsonLogger({ level: config.logLevel }).error('worker bootstrap failed', { path: url.pathname, error: (e as Error)?.message });
+  if (env.SENTRY_DSN) {
+    try { Sentry.captureException(e, { tags: { route: url.pathname === '/api/health' ? '/api/health' : 'bootstrap' } }); } catch { /* never mask the 503 */ }
+  }
+  const headers = { 'cache-control': 'no-store' };
+  if (/^\/api\/health\/?$/.test(url.pathname)) return Response.json(unreachableHealth(config.version), { status: 503, headers });
+  return Response.json({ error: { code: 'service_unavailable', message: 'Service temporarily unavailable' } }, { status: 503, headers });
+}
+
+const handler = {
   async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContextLike): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       try {
         return await withDeps(env, ctx, async (deps) => createApp(deps).fetch(request, env, ctx as never));
       } catch (e) {
-        console.error('[tp] worker bootstrap failed', (e as Error).message);
-        return Response.json({ error: { code: 'service_unavailable', message: 'Service temporarily unavailable' } }, { status: 503 });
+        return bootstrapFailed(e, url, env);
       }
     }
     return withSecurityHeaders(request, await env.ASSETS.fetch(request));
@@ -77,3 +98,8 @@ export default {
     ctx.waitUntil(withDeps(env, ctx, (deps) => runScheduledJobs(deps, { trigger: 'cron' })).then(() => undefined));
   },
 };
+
+export default Sentry.withSentry(
+  (env: WorkerEnv) => sentryOptions(loadConfig(envVars(env)), env.SENTRY_ENVIRONMENT),
+  handler as unknown as ExportedHandler<WorkerEnv>,
+) as unknown as typeof handler;

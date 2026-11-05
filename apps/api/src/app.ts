@@ -3,7 +3,6 @@
  * Everything lives under /api; each area router is mounted at "/api" and declares its full
  * sub-paths from contracts/api.md.
  */
-import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { AppDeps } from './deps';
 import { readOnlyTokenGuard } from './middleware/auth';
@@ -17,6 +16,7 @@ import { assistRoutes } from './routes/assist';
 import { authRoutes } from './routes/auth';
 import { dashboardRoutes } from './routes/dashboard';
 import { demoRoutes } from './routes/demo';
+import { healthRoutes } from './routes/health';
 import { ingestionRoutes } from './routes/ingestion';
 import { notificationsRoutes } from './routes/notifications';
 import { orgRoutes } from './routes/org';
@@ -35,6 +35,7 @@ export type { AppDeps } from './deps';
 
 /** All area routers, mounted at /api in this order. */
 export const routers = {
+  health: healthRoutes,
   auth: authRoutes,
   sessions: sessionsRoutes,
   org: orgRoutes,
@@ -69,17 +70,6 @@ export function createApp(deps: AppDeps, opts: { testHooks?: boolean } = {}) {
   api.use('*', ipLimit);
   // 006/FR-074: read-only API tokens may only GET (uses the credentials ipLimit resolved).
   api.use('*', readOnlyTokenGuard);
-
-  api.get('/health', async (c) => {
-    let db = false;
-    try {
-      await deps.db.execute(sql`select 1`);
-      db = true;
-    } catch (e) {
-      deps.logger.error('health: database unreachable', { error: (e as Error).message });
-    }
-    return c.json({ ok: db, db, version: deps.config.version }, db ? 200 : 503);
-  });
 
   // 003/NFR-008: E2E-only mail capture. Opt-in via E2E_TEST_HOOKS=1 on the Node server (never wired in worker.ts),
   // never in production, and only with the in-memory log mailer.

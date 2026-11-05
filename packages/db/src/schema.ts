@@ -522,7 +522,10 @@ export const comments = pgTable('comments', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
   createdAt: createdAt(),
-});
+}, (t) => ({
+  /** Comment thread per workspace (006/NFR-001). */
+  wsIdx: index('comments_ws_idx').on(t.workspaceId),
+}));
 
 export const annexureTemplates = pgTable('annexure_templates', {
   id: id(),
@@ -532,7 +535,10 @@ export const annexureTemplates = pgTable('annexure_templates', {
   body: text('body').notNull(), // {{placeholders}}
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (t) => ({
+  /** One override per (org, key) (006/FR-036). System templates (org_id NULL) are code, not rows. */
+  orgKeyUq: uniqueIndex('annexure_templates_org_key_uq').on(t.orgId, t.key),
+}));
 
 export interface PacketItem {
   kind: 'cover' | 'annexure' | 'vault' | 'tender_doc';

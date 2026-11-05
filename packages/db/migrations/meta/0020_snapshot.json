@@ -1,5 +1,5 @@
 {
-  "id": "495b2f03-d890-4bd0-8729-3e4470fb7e70",
+  "id": "e6871fdb-d49a-4cc9-8e15-08c9c826a57a",
   "prevId": "0cf2c5cb-2a07-461e-aed9-cb4d33b0acf7",
   "version": "7",
   "dialect": "postgresql",
@@ -433,7 +433,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "annexure_templates_org_key_uq": {
+          "name": "annexure_templates_org_key_uq",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "annexure_templates_org_id_organizations_id_fk": {
           "name": "annexure_templates_org_id_organizations_id_fk",
@@ -879,7 +901,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "comments_ws_idx": {
+          "name": "comments_ws_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "comments_org_id_organizations_id_fk": {
           "name": "comments_org_id_organizations_id_fk",
@@ -1643,19 +1681,6 @@
         "error": {
           "name": "error",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

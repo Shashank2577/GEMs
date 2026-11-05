@@ -428,7 +428,7 @@ describe('end-to-end: new bid published on GeM → matched → alert', () => {
     const before = (await get('/tenders?matched=1', team.owner)).body.total;
     const mockFetch = ctx.deps.fetch;
     const pub = await mockFetch(`${GEM}/__admin/publish`, { method: 'POST', body: JSON.stringify({ count: 1 }) });
-    expect((await pub.json()).published).toEqual(['GEM/2026/B/6421101']);
+    expect(((await pub.json()) as { published: string[] }).published).toEqual(['GEM/2026/B/6421101']);
     ctx.clock.advance(30 * 60_000);
     const run = await runIngestion(ctx.deps, { trigger: 'cron', pages: 1 });
     expect(run).toMatchObject({ tendersCreated: 1, matchesCreated: 1 });

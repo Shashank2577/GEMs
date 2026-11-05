@@ -1,0 +1,10 @@
+# sc5-health-db-unreachable — project desktop — 2026-11-05T05:55:32.333Z
+### Health while the database does not answer (lock held 9 s)
+> GET /api/health
+< 503  (3011 ms)
+< cache-control: no-store
+< content-type: application/json
+< x-request-id: d96e0628-6072-4118-b6bb-7b152c240c01
+{"ok":false,"db":false,"version":"0.1.0","ingestion":{"lastSuccessAt":null,"ageMinutes":null,"lastStatus":null,"state":"never"},"alerts":{"pendingOlderThan30m":0},"reasons":["db_unreachable"]}
+
+elapsed 3011 ms (requirement: within 3 s query timeout; allowing scheduling slack up to 4.5 s)

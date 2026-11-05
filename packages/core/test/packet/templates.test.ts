@@ -81,6 +81,14 @@ describe('renderAnnexurePdf', () => {
     }
   });
 
+  it('sets document metadata Title / Author / Creator (FR-044)', async () => {
+    const ctx = buildTemplateContext({ company, tender, now });
+    const doc = await PDFDocument.load(await renderAnnexurePdf('Authority Letter', 'Body.', ctx));
+    expect(doc.getTitle()).toBe('Authority Letter — GEM/2026/B/1234567');
+    expect(doc.getAuthor()).toBe('Sharma Infotech Private Limited');
+    expect(doc.getCreator()).toBe('TenderPilot');
+  });
+
   it('replaces ₹ and drops characters the PDF font cannot draw instead of throwing', async () => {
     const ctx = buildTemplateContext({ company: { ...company, legalName: 'शर्मा Sharma Traders' }, tender, now });
     const bytes = await renderAnnexurePdf('Test', 'Amount ₹ 5,000 — “quoted” → ok\n\n1. first\n2. second', ctx);
