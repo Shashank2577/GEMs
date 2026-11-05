@@ -27,14 +27,17 @@ export const noStore = createMiddleware<AppEnv>(async (c, next) => {
 
 /**
  * Security headers on every API response (spec 008 FR-013): nosniff, referrer and permissions policy, HSTS on HTTPS.
- * File streams (PDF preview/download — any response with `content-disposition`) may only be framed same-origin.
+ * File streams (PDF preview/download: any response with `content-disposition`, or a PDF / image content type) may
+ * only be framed same-origin.
  */
 export const securityHeaders = createMiddleware<AppEnv>(async (c, next) => {
   await next();
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) c.header(k, v);
   const trustProxy = (c.var.deps?.config.trustProxy ?? 'none') !== 'none';
   if (isHttpsRequest(c.req.url, c.req.header('x-forwarded-proto'), trustProxy)) c.header('strict-transport-security', HSTS);
-  if (c.res.headers.has('content-disposition') && !c.res.headers.has('content-security-policy')) {
+  const type = (c.res.headers.get('content-type') ?? '').toLowerCase();
+  const isFile = c.res.headers.has('content-disposition') || type.startsWith('application/pdf') || type.startsWith('image/');
+  if (isFile && !c.res.headers.has('content-security-policy')) {
     c.header('content-security-policy', FILE_FRAME_CSP);
   }
 });

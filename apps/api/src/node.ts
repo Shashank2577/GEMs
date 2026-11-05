@@ -57,6 +57,8 @@ export async function startNodeServer(env: NodeJS.ProcessEnv = process.env) {
       const https = isHttpsRequest(c.req.url, c.req.header('x-forwarded-proto'), trustProxy);
       for (const [k, v] of Object.entries(staticHeadersFor(rules, c.req.path, https))) if (k !== 'cache-control') c.header(k, v);
     });
+    // Config files of the static build are never served (Cloudflare does not serve them either).
+    server.get('/_headers', (c) => c.text('Not found', 404));
     server.use('/*', serveStatic({
       root,
       onFound: (path, c) => {

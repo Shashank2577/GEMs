@@ -209,7 +209,7 @@ flowchart LR
   WK --> R2B
   CR --> WK
   WK --> MAIN
-  DEV["Developer laptop:<br/>pnpm db:migrate (drizzle migrate) → pnpm deploy (vite build + wrangler deploy)"] -.-> MAIN
+  DEV["GitHub Actions deploy.yml (after ci-gate on main):<br/>vite build → pnpm db:migrate → wrangler deploy → smoke<br/>(staging first, production after approval)"] -.-> MAIN
   DEV -.-> WK
 ```
 

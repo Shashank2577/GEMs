@@ -13,17 +13,22 @@
 # Triggers:
 #   - workflow_call: from the `deploy` job in ci.yml, which runs only on a push to main after `ci-gate` succeeded,
 #     with `sha` = the pushed commit and `secrets: inherit`. A red ci never reaches this workflow.
-#   - workflow_dispatch: manual (re)deploy by an operator (`gh workflow run deploy.yml --ref main [-f sha=<sha>]`).
+#   - workflow_dispatch: manual (re)deploy by an operator (`gh workflow run deploy.yml --ref main [-f sha=<40-char sha>]`).
+#     The commit must be the full 40-char SHA of a commit already on origin/main ("Resolve version" fails otherwise),
+#     so an unreviewed branch commit can never reach staging or production.
 #   `workflow_run` is deliberately NOT used: it only fires for workflow files on the repository's default branch,
 #   which is currently not `main` (see docs/runbook.md § Deploy & rollback).
 #
-# Concurrency: both jobs share group `deploy` with cancel-in-progress false, set on the jobs (the same group on the
-# calling job in ci.yml would deadlock). One release step runs at a time and none is cancelled mid-flight; while a
-# production job waits for approval, newer staging deploys queue behind it (GitHub keeps only the newest pending one).
+# Concurrency: one group per environment, `deploy-staging` and `deploy-production`, cancel-in-progress false, set on
+# the jobs (a group on the calling job in ci.yml would deadlock). At most one deploy per environment runs at a time
+# and none is cancelled mid-flight. A production job waiting for approval does not block the next staging deploy;
+# within a group GitHub keeps only the newest pending job, so an older un-approved production run is superseded.
 #
-# Secrets (GitHub encrypted secrets; owners and rotation in docs/runbook.md § Secrets):
-#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, STAGING_DATABASE_URL (repo or `staging` environment),
-#   PROD_DATABASE_URL (`production` environment only, so only an approved job can read it).
+# Secrets: GitHub ENVIRONMENT secrets only (no repo secrets), so a job can read them only from its environment, and
+# both environments allow deployments from `main` only (owners and rotation in docs/runbook.md § Secrets):
+#   environment `staging`:    CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, STAGING_DATABASE_URL
+#   environment `production`: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PROD_DATABASE_URL (readable only after the
+#                             required reviewer approved the job)
 # Variables (optional): STAGING_URL (default https://staging.tenderpilot.in), PRODUCTION_URL (default
 #   https://app.tenderpilot.in) — must match the custom domains in wrangler.toml.
 name: deploy
@@ -59,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: deploy
+      group: deploy-staging
       cancel-in-progress: false
     environment:
       name: staging
@@ -71,9 +76,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
       - name: Resolve version
         id: version
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
         run: |
+          if [ -n "$INPUT_SHA" ] && ! [[ "$INPUT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::input sha must be a full 40-character commit SHA, got '$INPUT_SHA'"; exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$(git rev-parse HEAD) is not on origin/main; only commits on main are deployed"; exit 1
+          fi
           sha="$(git rev-parse HEAD)"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "sha7=${sha::7}" >> "$GITHUB_OUTPUT"
@@ -103,9 +118,12 @@ jobs:
           BASE_URL: ${{ vars.STAGING_URL || 'https://staging.tenderpilot.in' }}
           SHA7: ${{ steps.version.outputs.sha7 }}
         run: |
+          set +e
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           scripts/smoke.sh "$BASE_URL" "$SHA7" | tee -a "$GITHUB_STEP_SUMMARY"
+          rc=${PIPESTATUS[0]}
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
 
   production:
     name: production
@@ -113,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: deploy
+      group: deploy-production
       cancel-in-progress: false
     # Required reviewer(s) on this environment = the manual approval (Settings → Environments → production).
     environment:
@@ -149,6 +167,9 @@ jobs:
           BASE_URL: ${{ vars.PRODUCTION_URL || 'https://app.tenderpilot.in' }}
           SHA7: ${{ needs.staging.outputs.sha7 }}
         run: |
+          set +e
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           scripts/smoke.sh "$BASE_URL" "$SHA7" | tee -a "$GITHUB_STEP_SUMMARY"
+          rc=${PIPESTATUS[0]}
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"

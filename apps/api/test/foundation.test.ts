@@ -177,11 +177,17 @@ describe('security headers (008 FR-013)', () => {
     app.use('*', securityHeaders);
     app.get('/pdf', () => new Response('%PDF-1.7', { headers: { 'content-type': 'application/pdf', 'content-disposition': 'inline; filename="a.pdf"' } }));
     app.get('/own', () => new Response('x', { headers: { 'content-disposition': 'attachment', 'content-security-policy': "frame-ancestors 'none'" } }));
+    app.get('/bare-pdf', () => new Response('%PDF-1.7', { headers: { 'content-type': 'application/pdf' } }));
+    app.get('/png', () => new Response('x', { headers: { 'content-type': 'image/png' } }));
+    app.get('/json', (c) => c.json({ ok: true }));
     const pdf = await app.request('https://app.tenderpilot.in/pdf');
     expect(pdf.headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
     expect(pdf.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains');
     expectBase(pdf.headers);
     expect((await app.request('http://x/own')).headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
+    expect((await app.request('http://x/bare-pdf')).headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+    expect((await app.request('http://x/png')).headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+    expect((await app.request('http://x/json')).headers.get('content-security-policy')).toBeNull();
   });
 
   it('parses the Cloudflare _headers file the SPA ships and resolves headers per path (Node static server parity)', () => {
@@ -209,5 +215,49 @@ describe('security headers (008 FR-013)', () => {
     expect(isHttpsRequest('http://a/x', 'https', false)).toBe(false);
     expect(isHttpsRequest('http://a/x', 'https, http', true)).toBe(true);
     expect(isHttpsRequest('http://a/x', 'http', true)).toBe(false);
+  });
+});
+
+// ───────────── 008 FR-013: the Node static server sends the SPA headers from _headers (T033) ─────────────
+
+describe('Node static server headers (008 FR-013)', () => {
+  it('serves / and SPA routes with the _headers CSP + security headers, never serves /_headers, keeps API headers', async () => {
+    const dist = await mkdtemp(join(tmpdir(), 'tp-dist-'));
+    const { mkdir, writeFile, copyFile } = await import('node:fs/promises');
+    await writeFile(join(dist, 'index.html'), '<!doctype html><html><body><div id="root"></div></body></html>');
+    await copyFile(join(__dirname, '../../web/public/_headers'), join(dist, '_headers'));
+    await mkdir(join(dist, 'assets'));
+    await writeFile(join(dist, 'assets', 'app-abc.js'), 'console.log(1)');
+    const { startNodeServer } = await import('../src/node');
+    const { server, shutdown } = await startNodeServer({
+      PORT: '0', WEB_DIST: dist, DATABASE_URL: process.env.TEST_DATABASE_URL, NODE_ENV: 'test', LOG_REQUESTS: '0',
+    } as NodeJS.ProcessEnv);
+    try {
+      const csp = parseHeadersFile(readFileSync(join(dist, '_headers'), 'utf8'))[0]!.headers.find(([k]) => k === 'content-security-policy')![1];
+      for (const path of ['/', '/login']) {
+        const res = await server.request(`http://localhost${path}`);
+        expect(res.status, path).toBe(200);
+        expect(await res.text()).toContain('<div id="root">');
+        expect(res.headers.get('content-security-policy'), path).toBe(csp);
+        expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+        expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+        expect(res.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=()');
+        expect(res.headers.get('strict-transport-security')).toBeNull(); // plain http
+        expect(res.headers.get('cache-control')).toBe('no-cache');
+      }
+      const asset = await server.request('http://localhost/assets/app-abc.js');
+      expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+      expect(asset.headers.get('x-content-type-options')).toBe('nosniff');
+      const hidden = await server.request('http://localhost/_headers');
+      expect(hidden.status).toBe(404);
+      expect(await hidden.text()).not.toContain('Content-Security-Policy');
+      const api = await server.request('http://localhost/api/nope');
+      expect(api.status).toBe(404);
+      expect(api.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(api.headers.get('content-security-policy')).toBeNull(); // JSON: API headers only, not the HTML CSP
+    } finally {
+      await shutdown();
+      await rm(dist, { recursive: true, force: true });
+    }
   });
 });

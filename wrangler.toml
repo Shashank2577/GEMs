@@ -15,6 +15,7 @@ main = "apps/api/src/worker.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = false
+preview_urls = false
 routes = [{ pattern = "app.tenderpilot.in", custom_domain = true }]
 
 [limits]
@@ -45,9 +46,13 @@ enabled = true
 # Staging: same code and cron, own Worker, R2 bucket, Neon branch (`staging`) and secrets.
 # routes/vars/r2_buckets/triggers are declared explicitly so nothing from production leaks in.
 # GEM_BASE_URL is configurable per environment (point it at a mock to keep staging off GeM).
+# Staging must never message real customers: set NO RESEND_API_KEY / WHATSAPP_* secrets with --env staging (the
+# dispatcher marks those notifications `skipped`), and anonymise the Neon `staging` branch after every branch/reset —
+# see docs/runbook.md § "Staging must never message customers".
 [env.staging]
 name = "tenderpilot-staging"
 workers_dev = false
+preview_urls = false
 routes = [{ pattern = "staging.tenderpilot.in", custom_domain = true }]
 
 [env.staging.limits]
