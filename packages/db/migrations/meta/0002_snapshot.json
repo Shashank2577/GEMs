@@ -1,5 +1,5 @@
 {
-  "id": "2407f918-c8b0-4a2d-806a-8b5f2d13a820",
+  "id": "d5654a64-334b-443e-8800-7790e232a07e",
   "prevId": "509eb29b-7228-4adb-b904-e9493fffb983",
   "version": "7",
   "dialect": "postgresql",
@@ -211,25 +211,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "stale_reason": {
-          "name": "stale_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "stale_at": {
-          "name": "stale_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notes": {
-          "name": "notes",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
         },
         "created_by": {
           "name": "created_by",
@@ -1079,6 +1060,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "listing_stop": {
+          "name": "listing_stop",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "error": {
           "name": "error",
@@ -2154,13 +2141,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "text_source": {
-          "name": "text_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pdf'"
         },
         "created_at": {
           "name": "created_at",

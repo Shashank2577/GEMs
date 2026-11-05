@@ -72,7 +72,7 @@ task is sized at ≤ 1 day.
 
 ### Built
 
-- [x] T011 [US1] Create-or-get `POST /tenders/:id/workspace` with initial stage from analysis, owner, due = closing, auto-map of real matches, race handling and activity in `apps/api/src/routes/workspaces.ts` FR-001, FR-002
+- [x] T011 [US1] Create-or-get `POST /tenders/:id/workspace` with initial stage from analysis, owner, due = closing, empty stored mapping (auto picks resolved at read time; FR-002 amended), race handling and activity in `apps/api/src/routes/workspaces.ts` FR-001, FR-002
 - [x] T012 [US1] `GET /workspaces` (stage/mine/q, byStage) and `GET /workspaces/:id` in `apps/api/src/routes/workspaces.ts` and `listWorkspaceCards` in `apps/api/src/services/packet.ts` FR-010, FR-011, FR-022
 - [x] T013 [US1] `PATCH /workspaces/:id` with strict schema, member check, assignment notifications, `ready` guard (409 `not_ready` / `not_analysed`), position, `submittedAt`, minimal outcome in `apps/api/src/routes/workspaces.ts` FR-004, FR-005, FR-006, FR-012, FR-082
 - [x] T014 [P] [US1] Activity sentences for `workspace.*` actions in `apps/web/src/features/workspace/labels.tsx` FR-007
@@ -108,9 +108,9 @@ task is sized at ≤ 1 day.
 
 ### Remaining
 
-- [ ] T028 [P] [US2] API tests for edge cases: vault document deleted after explicit mapping → `missing`; auto item falls back to next best; a doc expiring in 12 days → `expiring`, in `warnings`, not a blocker; `other` item relevance ≥ 0.5 in `apps/api/test/workspace.test.ts` FR-013, FR-016, FR-017, FR-020 (#211)
-- [ ] T029 [P] [US2] Accessibility: give the Documents filter `role="tabpanel"` + `aria-controls`/`aria-labelledby`, arrow-key navigation between tabs, and an accessible name for the readiness ring ("Readiness 83 percent") in `apps/web/src/features/workspace/DocumentsStep.tsx` NFR-006 (#212)
-- [ ] T030 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in `qa/evidence/006/US2/` — scenarios 1–13: ring 83 % + texts, row states/badges (Auto-matched, FY 2024-25, Expired, Missing with "Upload Udyam registration", Generated + Preview), filter tabs 7/2/5 and empty filter, picker groups, pick other doc toast "Using “Balance sheet 2023-24”", Not available / Auto-match toasts, upload Udyam via vault → Ready + Auto-matched without mapping, 400 errors via API, `@mobile` 375 px stacking + popover ≤ 92 vw + no horizontal scroll, axe; spec `e2e/006-apply-packet-assist/US2-mapping-readiness.e2e.ts`; `VERDICT.md` FR-013…FR-024 (#214)
+- [x] T028 [P] [US2] API tests for edge cases: vault document deleted after explicit mapping → `missing`; auto item falls back to next best; a doc expiring in 12 days → `expiring`, in `warnings`, not a blocker; `other` item relevance ≥ 0.5 in `apps/api/test/workspace.test.ts` FR-013, FR-016, FR-017, FR-020 (#211)
+- [x] T029 [P] [US2] Accessibility: give the Documents filter `role="tabpanel"` + `aria-controls`/`aria-labelledby`, arrow-key navigation between tabs, and an accessible name for the readiness ring ("Readiness 83 percent") in `apps/web/src/features/workspace/DocumentsStep.tsx` NFR-006 (#212)
+- [x] T030 [US2] QA: Playwright E2E for US2 with evidence (screenshots, video, trace) in `qa/evidence/006/US2/` — scenarios 1–13: ring 83 % + texts, row states/badges (Auto-matched, FY 2024-25, Expired, Missing with "Upload Udyam (MSE) certificate", Generated + Preview), filter tabs 7/2/5 and empty filter, picker groups, pick other doc toast "Using “Balance sheet 2023-24”", Not available / Auto-match toasts, upload Udyam via vault → Ready + Auto-matched without mapping, 400 errors via API, `@mobile` 375 px stacking + popover ≤ 92 vw + no horizontal scroll, axe; spec `e2e/006-apply-packet-assist/US2-mapping-readiness.e2e.ts`; `VERDICT.md` FR-013…FR-024 (#214)
 
 **Checkpoint**: Readiness is trustworthy; guard inputs verified
 

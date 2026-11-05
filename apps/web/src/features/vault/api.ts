@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import type { VaultDocumentDto, VaultSummary, VaultUpdateInput } from '@tp/core/contracts/vault';
 import type { DocCategory, DocStatus, DocType } from '@tp/core/vault/status';
 import { api, apiFetch, ApiError, type Paged } from '@/lib/api';
+import { notificationKeys } from '@/features/notifications/api';
 
 export interface VaultFilters { type?: DocType | null; status?: DocStatus | null; category?: DocCategory | null; q?: string; sort?: 'recent' | 'expiry' | 'title' | 'type' }
 
@@ -71,6 +72,18 @@ export function useDeleteVault() {
 
 export function useVaultDoc(id: string | null) {
   return useQuery({ queryKey: ['vault', 'doc', id], queryFn: () => api.get<VaultDocumentDto>(`/vault/${id}`), enabled: !!id });
+}
+
+/** Manual "Send reminders now" (FR-052, bid_manager+). Refreshes the vault (next-reminder lines) and the bell. */
+export function useRunReminders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ documents: number; notifications: number }>('/vault/reminders/run'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: vaultKeys.all });
+      qc.invalidateQueries({ queryKey: notificationKeys.all });
+    },
+  });
 }
 
 /** Text of the toast shown when `?doc=<id>` points at a document that no longer exists (FR-040). */

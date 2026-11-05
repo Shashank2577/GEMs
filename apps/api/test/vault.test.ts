@@ -596,6 +596,157 @@ describe('vault delete unlinks OEM authorisations (T038)', () => {
   });
 });
 
+/** T046 (#141) + T050 (#142): reminder isolation, IST boundary, expiry edit restarts the cycle, email title, manual run endpoint. */
+describe('expiry reminders — isolation, IST boundary, renewals and manual run (T046, T050)', () => {
+  const upload = async (who: { cookie: string }, title: string, expiryDate: string) => {
+    const r = await request(ctx.app, 'POST', '/vault', { cookie: who.cookie, form: { file: file(await pdf(1), `${title}.pdf`), type: 'iso', title, expiryDate } });
+    expect(r.status).toBe(201);
+    return r.body.id as string;
+  };
+  const expiryRows = (docId: string) => ctx.db.select().from(notifications).where(and(eq(notifications.kind, 'expiry'), eq(notifications.link, `/vault?doc=${docId}`)));
+  const lastReminder = async (docId: string) => (await ctx.db.select().from(vaultDocuments).where(eq(vaultDocuments.id, docId)))[0]!.lastReminderDays;
+
+  it('POST /vault/reminders/run: bid manager and owner 200, analyst and viewer 403, idempotent, own org only, logs activity (FR-052)', async () => {
+    const e = await seedOrgWithRoles(ctx.app, 'Manual Run Traders');
+    const f = await seedOrgWithRoles(ctx.app, 'Bystander Traders');
+    const mine = await upload(e.analyst, 'ISO 9001 Manual', '2026-11-14');
+    const theirs = await upload(f.analyst, 'ISO 9001 Bystander', '2026-11-14');
+
+    for (const who of [e.analyst, e.viewer]) {
+      const r = await request(ctx.app, 'POST', '/vault/reminders/run', { cookie: who.cookie });
+      expect(r.status).toBe(403);
+      expect(r.body.error.message).toBe('You need to be at least a Bid Manager to do that');
+    }
+    expect(await lastReminder(mine)).toBeNull();
+    expect((await request(ctx.app, 'POST', '/vault/reminders/run')).status).toBe(401);
+
+    const r1 = await request(ctx.app, 'POST', '/vault/reminders/run', { cookie: e.bidManager.cookie });
+    expect(r1.status).toBe(200);
+    expect(r1.body.documents).toBe(1);
+    expect(r1.body.notifications).toBeGreaterThan(0);
+    expect(r1.body.notifications).toBe((await expiryRows(mine)).length);
+    expect(await lastReminder(mine)).toBe(30);
+    // Another org's due document is untouched.
+    expect(await lastReminder(theirs)).toBeNull();
+    expect(await expiryRows(theirs)).toHaveLength(0);
+
+    // Same day again → nothing new, for bid manager and owner alike.
+    const r2 = await request(ctx.app, 'POST', '/vault/reminders/run', { cookie: e.bidManager.cookie });
+    expect(r2.status).toBe(200);
+    expect(r2.body).toEqual({ documents: 0, notifications: 0 });
+    const r3 = await request(ctx.app, 'POST', '/vault/reminders/run', { cookie: e.owner.cookie });
+    expect(r3.status).toBe(200);
+    expect(r3.body).toEqual({ documents: 0, notifications: 0 });
+    expect(await expiryRows(mine)).toHaveLength(r1.body.notifications);
+
+    const acts = await ctx.db.select().from(activityLog).where(and(eq(activityLog.orgId, e.orgId), eq(activityLog.action, 'vault.reminders_run')));
+    expect(acts).toHaveLength(3);
+    expect(acts.map((a) => a.meta)).toEqual(expect.arrayContaining([
+      { documents: 1, notifications: r1.body.notifications },
+      { documents: 0, notifications: 0 },
+    ]));
+    expect(acts.find((a) => (a.meta as { documents: number }).documents === 1)!.userId).toBe(e.bidManager.me.user.id);
+  });
+
+  it('run with every member opted out of expiry reminders reports 0 notifications (FR-052)', async () => {
+    const h = await seedOrgWithRoles(ctx.app, 'Quiet Traders');
+    for (const who of [h.owner, h.bidManager, h.analyst, h.viewer]) {
+      const cur = await request(ctx.app, 'GET', '/me/notification-prefs', { cookie: who.cookie });
+      expect((await request(ctx.app, 'PUT', '/me/notification-prefs', { cookie: who.cookie, json: { ...cur.body, expiryReminders: false } })).status).toBe(200);
+    }
+    const id = await upload(h.analyst, 'ISO 9001 Quiet', '2026-11-14');
+    const r = await request(ctx.app, 'POST', '/vault/reminders/run', { cookie: h.bidManager.cookie });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ documents: 1, notifications: 0 });
+    expect(await expiryRows(id)).toHaveLength(0);
+  });
+
+  it('IST boundary: at 2026-11-05T20:00Z (01:30 IST on the 6th) a document expiring 2026-11-05 is expired (FR-042)', async () => {
+    const g = await seedOrgWithRoles(ctx.app, 'Midnight Traders');
+    const id = await upload(g.analyst, 'ISO 14001 Midnight', '2026-11-05');
+    try {
+      // 23:30 IST on the 5th: still valid on its expiry date.
+      ctx.clock.set(new Date('2026-11-05T18:00:00Z'));
+      expect((await request(ctx.app, 'GET', `/vault/${id}`, { cookie: g.viewer.cookie })).body).toMatchObject({ status: 'expiring', daysToExpiry: 0 });
+
+      ctx.clock.set(new Date('2026-11-05T20:00:00Z'));
+      const doc = await request(ctx.app, 'GET', `/vault/${id}`, { cookie: g.viewer.cookie });
+      // The expiry notice is due now (IST day 2026-11-06).
+      expect(doc.body).toMatchObject({ status: 'expired', daysToExpiry: -1, nextReminder: { days: 0, date: '2026-11-06' } });
+      const r = await runExpiryReminders(ctx.deps, { orgId: g.orgId });
+      expect(r.documents).toBe(1);
+      expect(await lastReminder(id)).toBe(0);
+      const rows = await expiryRows(id);
+      const inApp = rows.filter((n) => n.channel === 'in_app');
+      expect(inApp.length).toBeGreaterThan(0);
+      expect(inApp.every((n) => n.title === 'ISO 14001 Midnight has expired')).toBe(true);
+      expect(inApp[0]!.body).toBe('Your ISO certificate "ISO 14001 Midnight" expired 1 day ago. Bids that need it will be blocked from "Ready to submit" until you upload the renewed copy.');
+      expect(rows.every((n) => n.dedupeKey === `expiry:${id}:2026-11-05:0`)).toBe(true);
+      expect((await request(ctx.app, 'GET', `/vault/${id}`, { cookie: g.viewer.cookie })).body.nextReminder).toBeNull();
+    } finally {
+      ctx.clock.set(NOW);
+    }
+  });
+
+  it('editing the expiry after a sent reminder restarts the cycle with a new dedupe key; email titles carry "[<Org name>]" (FR-045, FR-049)', async () => {
+    const d = await seedOrgWithRoles(ctx.app, 'Renewal Traders');
+    const id = await upload(d.analyst, 'ISO 27001 Renewal', '2026-11-14');
+
+    const first = await runExpiryReminders(ctx.deps, { orgId: d.orgId });
+    expect(first.documents).toBe(1);
+    const sent = await expiryRows(id);
+    expect(sent.length).toBe(first.notifications);
+    expect(sent.every((n) => n.dedupeKey === `expiry:${id}:2026-11-14:30`)).toBe(true);
+    const emails = sent.filter((n) => n.channel === 'email');
+    const inApps = sent.filter((n) => n.channel === 'in_app');
+    expect(emails.length).toBeGreaterThan(0);
+    expect(emails.every((n) => n.title === '[Renewal Traders] ISO 27001 Renewal expires in 10 days' && n.status === 'pending')).toBe(true);
+    expect(inApps.every((n) => n.title === 'ISO 27001 Renewal expires in 10 days' && n.status === 'sent')).toBe(true);
+    expect((await request(ctx.app, 'GET', `/vault/${id}`, { cookie: d.viewer.cookie })).body.nextReminder).toEqual({ days: 7, date: '2026-11-07' });
+
+    // Renewed: expiry moves out by 10 days → last_reminder_days reset, same threshold is sent again under a new key.
+    const patch = await request(ctx.app, 'PATCH', `/vault/${id}`, { cookie: d.analyst.cookie, json: { expiryDate: '2026-11-24' } });
+    expect(patch.status).toBe(200);
+    expect(patch.body.nextReminder).toEqual({ days: 30, date: '2026-11-04' });
+    expect(await lastReminder(id)).toBeNull();
+    const second = await runExpiryReminders(ctx.deps, { orgId: d.orgId });
+    expect(second).toEqual({ documents: 1, notifications: first.notifications });
+    const all = await expiryRows(id);
+    expect(all).toHaveLength(first.notifications * 2);
+    const fresh = all.filter((n) => n.dedupeKey === `expiry:${id}:2026-11-24:30`);
+    expect(fresh).toHaveLength(first.notifications);
+    expect(fresh.filter((n) => n.channel === 'email').every((n) => n.title === '[Renewal Traders] ISO 27001 Renewal expires in 20 days')).toBe(true);
+    expect(await lastReminder(id)).toBe(30);
+    expect(await runExpiryReminders(ctx.deps, { orgId: d.orgId })).toEqual({ documents: 0, notifications: 0 });
+  });
+
+  it('reminders are org-isolated: a member only of org B gets none for org A documents (FR-051)', async () => {
+    const a = await seedOrgWithRoles(ctx.app, 'Alpha Isolation Traders');
+    const b = await seedOrgWithRoles(ctx.app, 'Beta Isolation Traders');
+    const docA = await upload(a.analyst, 'ISO 9001 Alpha', '2026-11-14');
+
+    // Scoped to org B → org A's due document is not processed.
+    expect(await runExpiryReminders(ctx.deps, { orgId: b.orgId })).toEqual({ documents: 0, notifications: 0 });
+    expect(await lastReminder(docA)).toBeNull();
+
+    // Unscoped scheduler run → only org A members are notified.
+    await runExpiryReminders(ctx.deps);
+    const rows = await expiryRows(docA);
+    const aMembers = new Set([a.owner, a.bidManager, a.analyst, a.viewer].map((m) => m.me.user.id));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((n) => aMembers.has(n.userId) && n.orgId === a.orgId)).toBe(true);
+    for (const m of [b.owner, b.bidManager, b.analyst, b.viewer]) {
+      const theirs = await ctx.db.select().from(notifications).where(and(eq(notifications.userId, m.me.user.id), eq(notifications.kind, 'expiry')));
+      expect(theirs, m.email).toHaveLength(0);
+    }
+    for (const m of [a.owner, b.owner]) {
+      const bell = await request(ctx.app, 'GET', '/notifications', { cookie: m.cookie });
+      expect(bell.status).toBe(200);
+      expect(JSON.stringify(bell.body).includes(`/vault?doc=${docA}`)).toBe(m === a.owner);
+    }
+  });
+});
+
 /** Review fixes on PR #477: stored names stay within filesystem limits and headers stay well-formed (FR-030). */
 describe('safeFileName / contentDisposition', () => {
   const bytes = (x: string) => new TextEncoder().encode(x).length;

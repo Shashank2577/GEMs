@@ -1,0 +1,44 @@
+{
+  "api": {
+    "tiles": {
+      "newMatchesToday": 8,
+      "closingThisWeek": 11,
+      "activeBids": 13,
+      "emdAtStake": 1177000,
+      "winRate": 67,
+      "expiringDocs": 3
+    },
+    "pipeline": {
+      "identified": 3,
+      "analysing": 2,
+      "go": 2,
+      "preparing": 2,
+      "ready": 1,
+      "submitted": 3,
+      "won": 2,
+      "lost": 1,
+      "dropped": 0
+    }
+  },
+  "sql": {
+    "newMatchesToday": 8,
+    "closingThisWeek": 11,
+    "activeBids": 13,
+    "emdAtStake": 1177000,
+    "won": 2,
+    "lost": 1,
+    "expiringDocs": 3,
+    "winRate": 67,
+    "pipeline": {
+      "identified": 3,
+      "analysing": 2,
+      "go": 2,
+      "preparing": 2,
+      "ready": 1,
+      "submitted": 3,
+      "won": 2,
+      "lost": 1,
+      "dropped": 0
+    }
+  }
+}

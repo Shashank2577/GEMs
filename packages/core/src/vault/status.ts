@@ -74,6 +74,29 @@ export function reminderDue(doc: { expiryDate: string | Date | null | undefined;
   return threshold;
 }
 
+/**
+ * The next reminder still to be sent for a document (FR-053), or null when none is left or there is no
+ * expiry date ("All reminders sent").
+ * - A reminder already due (`reminderDue`, including the post-expiry notice) goes out on the next scheduler
+ *   tick, so its date is today (IST).
+ * - Otherwise the next unsent "N days before expiry" threshold of `REMINDER_THRESHOLDS`, dated expiry − N.
+ * - Otherwise, if the document has not expired yet and the expiry notice was not sent, `days: 0` = the
+ *   "has expired" notice, dated the day after expiry.
+ */
+export function nextReminder(
+  expiryDate: string | Date | null | undefined, lastReminderDays: number | null | undefined, now: Date,
+): { days: number; date: string } | null {
+  const left = daysUntilExpiry(expiryDate, now);
+  if (left == null) return null;
+  const due = reminderDue({ expiryDate, lastReminderDays }, now);
+  if (due != null) return { days: due, date: istDate(now) };
+  const expiry = dateOnly(expiryDate!)!;
+  const next = REMINDER_THRESHOLDS.find((t) => t < left && (lastReminderDays == null || t < lastReminderDays));
+  if (next != null) return { days: next, date: new Date(expiry - next * DAY).toISOString().slice(0, 10) };
+  if (left >= 0 && lastReminderDays !== 0) return { days: 0, date: new Date(expiry + DAY).toISOString().slice(0, 10) };
+  return null;
+}
+
 /** Human copy for a reminder threshold. */
 export function reminderCopy(threshold: number, daysToExpiry: number): string {
   if (threshold === 0 || daysToExpiry < 0) {

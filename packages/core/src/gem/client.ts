@@ -134,7 +134,7 @@ export class GemClient {
     return parseBidPlusResponse(json);
   }
 
-  /** Fetch and normalise one listing page. Docs without a bid number are dropped. */
+  /** Fetch and normalise one listing page. Docs without a bid number are dropped (> 50 % missing already failed as format drift in parseBidPlusResponse). */
   async fetchTenders(opts: FetchPageOptions & { now?: Date } = {}): Promise<{ tenders: NormalizedTender[]; numFound: number; rawCount: number }> {
     const page = await this.fetchPage(opts);
     const tenders = page.docs.map((d) => parseBidPlusDoc(d, { baseUrl: this.baseUrl, now: opts.now })).filter((t): t is NormalizedTender => !!t);
