@@ -50,6 +50,42 @@ export class GemError extends Error {
   }
 }
 
+/** Upper bound on a bid-result page body; anything beyond is not read (007/T033). */
+export const MAX_RESULT_BYTES = 1024 * 1024;
+
+/**
+ * Response text, reading at most `maxBytes`: a declared content-length above the cap is refused, an undeclared
+ * oversized body is cut off (the stream is cancelled) and the prefix returned.
+ */
+export async function readTextCapped(res: Response, maxBytes: number): Promise<string> {
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await res.body?.cancel().catch(() => {});
+    throw new GemError(`GeM response too large (${declared} bytes)`, res.status);
+  }
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const room = maxBytes - total;
+    if (value.length >= room) {
+      chunks.push(value.subarray(0, room));
+      total += room;
+      await reader.cancel().catch(() => {});
+      break;
+    }
+    chunks.push(value);
+    total += value.length;
+  }
+  const buf = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { buf.set(c, off); off += c.length; }
+  return new TextDecoder().decode(buf);
+}
+
 export const DEFAULT_USER_AGENT = 'TenderPilot/0.1 (+https://tenderpilot.in/bot; public BidPlus listings only)';
 
 export class GemClient {
@@ -155,7 +191,7 @@ export class GemClient {
     });
     if (res.status === 404) return null;
     if (!res.ok) throw new GemError(`GeM bid result failed: HTTP ${res.status}`, res.status, res.status >= 500);
-    return { html: await res.text(), url: `${this.baseUrl}${path}` };
+    return { html: await readTextCapped(res, MAX_RESULT_BYTES), url: `${this.baseUrl}${path}` };
   }
 
   // ───────────── internals ─────────────

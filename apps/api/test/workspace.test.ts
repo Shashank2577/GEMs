@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { activityLog, analyses, bidWorkspaces, notifications, tenders, type ChecklistItem } from '@tp/db';
 import { createMockGem } from '../../../tools/mock-gem/src/app';
+import { HINT_ORG_LIMIT } from '../src/routes/workspaces';
+import { hit, reset } from '../src/lib/rate-limit';
 import { createTestContext, request, seedOrgWithRoles, signup, type TestContext } from './helpers';
 import { NOW, seedAnalysis, seedApply, seedTender, upload } from './workspace-fixtures';
 
@@ -508,7 +510,7 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
       expect((await request(ctx.app, 'GET', '/tenders/not-a-uuid/result-hint', { cookie: demo.analyst.cookie })).status).toBe(404);
     });
 
-    it('reads the public result page through the GeM adapter and returns L1 (no seller names); cached on repeat', async () => {
+    it('reads the public result page through the GeM adapter and returns L1 (no seller names); a repeat within 15 min → 429, no GeM call', async () => {
       const t = await tenderOf('lost');
       const before = mock.state.requests.results;
       const r = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
@@ -520,8 +522,43 @@ describe('pipeline API on the demo org (007/T027; FR-020, FR-023, FR-024)', () =
       ]);
       expect(JSON.stringify(r.body)).not.toContain('Kaveri');
       expect(mock.state.requests.results).toBe(before + 1);
-      await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+      const again = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+      expect(again.status).toBe(429);
+      expect(again.body.error.code).toBe('rate_limited');
       expect(mock.state.requests.results).toBe(before + 1);
+    });
+
+    it('the per-bid limit is DB-backed: it holds across two separately created app instances (Workers build deps per request)', async () => {
+      const t = await tenderOf('preparing');
+      const second = await createTestContext({ now: NOW, keepData: true, gemBaseUrl: GEM, fetch: async (input, init) => mock.app.fetch(new Request(input as string, init)) });
+      try {
+        const before = mock.state.requests.results;
+        expect((await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie })).status).toBe(200);
+        const other = await request(second.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.bidManager.cookie });
+        expect(other.status).toBe(429);
+        expect(other.headers.get('retry-after')).toBe(String(15 * 60));
+        expect(mock.state.requests.results).toBe(before + 1);
+        // 15 minutes later the bid may be fetched again (from either instance).
+        second.clock.advance(15 * 60_000);
+        expect((await request(second.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.bidManager.cookie })).status).toBe(200);
+        expect(mock.state.requests.results).toBe(before + 2);
+      } finally {
+        await second.close();
+      }
+    });
+
+    it('caps lookups at 20 per org per hour (429, no GeM call)', async () => {
+      const t = await tenderOf('analysing');
+      for (let i = 0; i < HINT_ORG_LIMIT.limit; i++) await hit(ctx.db, demo.orgId, 'gem_result_org', HINT_ORG_LIMIT, NOW);
+      try {
+        const before = mock.state.requests.results;
+        const r = await request(ctx.app, 'GET', `/tenders/${t.id}/result-hint`, { cookie: demo.analyst.cookie });
+        expect(r.status).toBe(429);
+        expect(r.body.error.code).toBe('rate_limited');
+        expect(mock.state.requests.results).toBe(before);
+      } finally {
+        await reset(ctx.db, demo.orgId, 'gem_result_org');
+      }
     });
 
     it('degrades to { available: false } when GeM is down or the tender has no GeM id', async () => {
@@ -568,6 +605,8 @@ describe('position renumbering (007/T036; FR-033)', () => {
       expect(r.status).toBe(200);
       if (Number.isInteger(r.body.position) && r.body.position === 2) renumbered++;
       inserted.push(id);
+      const now = await column('identified');
+      expect(new Set(now.map((c) => c.position)).size).toBe(now.length); // positions stay distinct after every step
     }
     const final = await column('identified');
     expect(final.map((c) => c.id)).toEqual([a, ...[...inserted].reverse(), b]);

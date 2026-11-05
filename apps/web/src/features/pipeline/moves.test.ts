@@ -28,6 +28,6 @@ describe('parseRupees / outcomePayload (FR-030)', () => {
   });
   it('reports field errors for bad amounts and notes over 2000 characters', () => {
     const r = outcomePayload('won', { l1: 'abc', ours: '1', notes: 'x'.repeat(2001) });
-    expect(r).toEqual({ ok: false, errors: { l1: expect.any(String), notes: 'Keep notes under 2000 characters' } });
+    expect(r).toEqual({ ok: false, errors: { l1: expect.any(String), notes: 'Keep notes to 2000 characters or fewer' } });
   });
 });

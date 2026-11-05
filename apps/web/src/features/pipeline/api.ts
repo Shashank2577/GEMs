@@ -39,7 +39,7 @@ export function useRecordOutcome() {
   });
 }
 
-/** Optional L1 suggestion read from GeM's public result page (007/T033). Never blocks the dialog. */
+/** Optional L1 suggestion read from GeM’s public result page (007/T033). Never blocks the dialog: errors (incl. 429 rate_limited) just mean no hint link; no toast. */
 export function useResultHint(tenderId: string | null) {
   return useQuery({
     queryKey: ['tenders', tenderId, 'result-hint'],

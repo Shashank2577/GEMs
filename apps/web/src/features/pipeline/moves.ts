@@ -35,7 +35,7 @@ export function outcomePayload(result: 'won' | 'lost', f: OutcomeForm):
   const ours = parseRupees(f.ours);
   if (Number.isNaN(l1)) errors.l1 = 'Enter an amount in rupees, e.g. 29,50,000';
   if (Number.isNaN(ours)) errors.ours = 'Enter an amount in rupees, e.g. 29,50,000';
-  if (f.notes.length > NOTES_MAX) errors.notes = `Keep notes under ${NOTES_MAX} characters`;
+  if (f.notes.length > NOTES_MAX) errors.notes = `Keep notes to ${NOTES_MAX} characters or fewer`;
   if (Object.keys(errors).length) return { ok: false, errors };
   const notes = f.notes.trim();
   return { ok: true, outcome: { result, l1Price: l1, ourPrice: ours, notes: notes || null } };

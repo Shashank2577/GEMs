@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { bidResultPath, parseBidResult } from '../../src/gem/award';
-import { GemClient, GemError } from '../../src/gem/client';
+import { GemClient, GemError, readTextCapped } from '../../src/gem/client';
 
 const html = readFileSync(join(__dirname, '../fixtures/gem/bid-result.html'), 'utf8');
 
@@ -36,6 +36,30 @@ describe('parseBidResult', () => {
     expect(r.l1Price).toBe(1200);
   });
 
+  it('never lets a row without a price borrow the next row\'s price or level', () => {
+    const r = parseBidResult(`<table>
+      <tr><td class="productDtl">1</td><td><span>No Price Traders</span></td><td>withdrawn</td><td><strong>-</strong></td></tr>
+      <tr><td class="productDtl">2</td><td><span>Priced Ltd</span></td><td><span class="bid_price">5000</span></td><td><strong>L1</strong></td></tr>
+    </table>`);
+    expect(r.bidders).toEqual([{ rank: 2, company: 'Priced Ltd', price: 5000, level: 'L1' }]);
+    expect(r.l1Price).toBe(5000);
+  });
+
+  it('handles a 10k-row page without prices quickly, and caps very large input', () => {
+    const rows = Array.from({ length: 10_000 }, (_, i) => `<tr><td class="productDtl">${i + 1}</td><td><span>Seller ${i}</span></td><td>—</td></tr>`).join('');
+    const t0 = performance.now();
+    expect(parseBidResult(`<table>${rows}</table>`).bidders).toEqual([]);
+    expect(performance.now() - t0).toBeLessThan(500);
+    const huge = `${'x'.repeat(600 * 1024)}${html}`; // the real rows sit beyond the 512 KB cap
+    expect(parseBidResult(huge).bidders).toEqual([]);
+  });
+
+  it('decodes only valid code points; out-of-range and surrogate entities stay raw', () => {
+    const row = (name: string) => `<tr><td class="productDtl">1</td><td><span>${name}</span></td><td><span class="bid_price">1</span></td><td><strong>L1</strong></td></tr>`;
+    expect(parseBidResult(row('A &#x41; &#66; &amp; Co')).bidders[0]!.company).toBe('A A B & Co');
+    expect(parseBidResult(row('Bad &#x110000; &#xD800; &#55296; &#99999999999;')).bidders[0]!.company).toBe('Bad &#x110000; &#xD800; &#55296; &#99999999999;');
+  });
+
   it('builds the public result-view path', () => {
     expect(bidResultPath('8100037')).toBe('/bidding/bid/getBidResultView/8100037');
   });
@@ -65,5 +89,26 @@ describe('GemClient.fetchBidResultHtml', () => {
     await expect(client(down, sleeps).fetchBidResultHtml('1')).rejects.toBeInstanceOf(GemError);
     expect(n).toBe(2);
     expect(sleeps).toContain(5);
+  });
+});
+
+describe('readTextCapped (result page body cap)', () => {
+  it('refuses a declared content-length above the cap', async () => {
+    const res = new Response('x'.repeat(10), { headers: { 'content-length': String(2 * 1024 * 1024) } });
+    await expect(readTextCapped(res, 1024 * 1024)).rejects.toBeInstanceOf(GemError);
+  });
+
+  it('stops reading an undeclared stream after N bytes', async () => {
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(ctrl) { pulled++; ctrl.enqueue(new TextEncoder().encode('a'.repeat(1000))); }, // endless
+    });
+    const text = await readTextCapped(new Response(stream), 4500);
+    expect(text).toHaveLength(4500);
+    expect(pulled).toBeLessThan(10);
+  });
+
+  it('returns small bodies whole', async () => {
+    expect(await readTextCapped(new Response('<html>ok</html>'), 1024)).toBe('<html>ok</html>');
   });
 });

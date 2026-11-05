@@ -30,7 +30,7 @@ export function OutcomeDialog({ target, onClose }: { target: OutcomeTarget | nul
   const won = target.result === 'won';
   const set = (k: keyof OutcomeForm) => (v: string) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: undefined })); };
   const amountHint = (s: string) => { const n = parseRupees(s); return n !== null && Number.isFinite(n) ? formatINR(n) : undefined; };
-  const gemL1 = hint.data?.available && hint.data.l1Price ? hint.data.l1Price : null;
+  const gemL1 = hint.data?.available && hint.data.l1Price != null ? hint.data.l1Price : null;
 
   const submit = () => {
     const p = outcomePayload(target.result, form);
@@ -56,7 +56,7 @@ export function OutcomeDialog({ target, onClose }: { target: OutcomeTarget | nul
         <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); submit(); }} noValidate>
           <Field label="L1 price (₹)" error={errors.l1}
             hint={amountHint(form.l1) ?? 'The lowest price GeM disclosed after the bid'}
-            labelAside={gemL1 ? (
+            labelAside={gemL1 != null ? (
               <button type="button" className="rounded text-xs font-medium text-primary underline-offset-2 hover:underline focus-ring"
                 onClick={() => set('l1')(String(gemL1))}>
                 Use L1 from GeM: {formatINR(gemL1)}
