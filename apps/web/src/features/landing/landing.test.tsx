@@ -29,7 +29,7 @@ describe('PLANS config (007/FR-086)', () => {
     expect(signupPlan('pro')?.name).toBe('Pro');
     expect(signupPlan('Starter')?.name).toBe('Starter');
     for (const bad of [null, undefined, '', 'gold', 'enterprise', 'trial', '<script>', 'pro,starter']) expect(signupPlan(bad)).toBeNull();
-    expect(trialNote(signupPlan('pro')!)).toBe('You’re starting a 14-day free trial of Pro — no card needed.');
+    expect(trialNote(signupPlan('pro')!)).toBe('You’re starting a 14-day free trial of Pro — no card needed. The trial includes 10 analyses and 1 GB of vault; Pro’s limits apply once you move to it.');
   });
 });
 

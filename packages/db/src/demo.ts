@@ -740,9 +740,11 @@ export interface RemoveDemoResult {
  * migration and a write path for no extra safety. The rules mirror the seeder's own natural keys:
  *   - org work on a demo tender (`source = 'demo'`, `raw.demo = true`, or the seeder fingerprint
  *     `content_hash = 'demo-' || bid_number` — the same rules as apps/api/src/lib/tender-scope.ts): workspaces with
- *     their comments and packets, analyses, matches, and bid documents the org uploaded to those tenders. Demo tenders
- *     are visible only to demo orgs, so anything a user did on them (a moved card, a comment) is demo data too
- *     (spec edge case "demo removal after the user edited demo rows");
+ *     their comments and packets, the analyses the seeder wrote (`analyses.seeded`), matches, and bid documents the org
+ *     uploaded to those tenders. Demo tenders are visible only to demo orgs, so anything a user did on them (a moved
+ *     card, a comment) is demo data too (spec edge case "demo removal after the user edited demo rows") — except an
+ *     analysis the user ran, which stays so it keeps counting toward the monthly quota (008/FR-036; the tender is
+ *     global and never deleted). Removed packets keep counting through `packet_ledger`;
  *   - watchlists: exactly the ids the seeder inserted, recorded in the org's `demo.seeded` activity entry
  *     (`meta.watchlistIds`; a repeat seed that re-creates a deleted demo watchlist appends its id). A watchlist the
  *     user made — even one with a demo name, before seeding (the seed skips that name) or re-created after deleting
@@ -815,8 +817,10 @@ export async function removeDemo(db: Db, opts: RemoveDemoOptions): Promise<Remov
     ))).returning({ id: activityLog.id });
     const removedWs = await tx.delete(bidWorkspaces)
       .where(and(eq(bidWorkspaces.orgId, orgId), anyOf(bidWorkspaces.id, demoWsIds))).returning({ id: bidWorkspaces.id });
+    // Only the analyses the seeder wrote: one the user ran on a demo tender stays (demo tenders are global and never
+    // deleted) and keeps counting toward the monthly quota (008/FR-036).
     const removedAnalyses = await tx.delete(analyses)
-      .where(and(eq(analyses.orgId, orgId), anyOf(analyses.tenderId, demoTenderIds))).returning({ id: analyses.id });
+      .where(and(eq(analyses.orgId, orgId), eq(analyses.seeded, true), anyOf(analyses.tenderId, demoTenderIds))).returning({ id: analyses.id });
     const removedMatches = await tx.delete(tenderMatches).where(and(eq(tenderMatches.orgId, orgId), or(
       anyOf(tenderMatches.tenderId, demoTenderIds), anyOf(tenderMatches.watchlistId, demoWlIds),
     ))).returning({ id: tenderMatches.id });

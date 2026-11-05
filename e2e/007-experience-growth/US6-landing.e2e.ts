@@ -432,7 +432,7 @@ test('US6-11 Pro CTA → /signup?plan=pro shows the trial note; Starter passes ?
   await pro.click();
   await expect(page).toHaveURL(/\/signup\?plan=pro$/);
   const note = page.getByTestId('plan-trial-note');
-  await expect(note).toHaveText('You’re starting a 14-day free trial of Pro — no card needed.');
+  await expect(note).toHaveText('You’re starting a 14-day free trial of Pro — no card needed. The trial includes 10 analyses and 1 GB of vault; Pro’s limits apply once you move to it.');
   await evidence007(page, STORY, 'us6-11-signup-pro-trial-note');
 
   // Starter
@@ -440,7 +440,7 @@ test('US6-11 Pro CTA → /signup?plan=pro shows the trial note; Starter passes ?
   await expect(page.locator('#lp-shell')).toHaveCount(0);
   await page.locator('#pricing div.rounded-2xl', { has: page.getByRole('heading', { name: 'Starter', exact: true }) }).getByRole('link', { name: 'Start free trial' }).click();
   await expect(page).toHaveURL(/\/signup\?plan=starter$/);
-  await expect(page.getByTestId('plan-trial-note')).toHaveText('You’re starting a 14-day free trial of Starter — no card needed.');
+  await expect(page.getByTestId('plan-trial-note')).toHaveText('You’re starting a 14-day free trial of Starter — no card needed. The trial includes 10 analyses and 1 GB of vault; Starter’s limits apply once you move to it.');
 
   // Unknown / enterprise / empty are ignored.
   for (const v of ['gold', 'enterprise', '', '%3Cscript%3E', '__proto__']) {

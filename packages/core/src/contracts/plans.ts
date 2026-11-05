@@ -306,7 +306,14 @@ export function signupPlan(value: string | null | undefined): Plan | null {
   return PLANS.find((p) => p.key === key) ?? null;
 }
 
-/** Sign-up trial note for a known plan, e.g. "You’re starting a 14-day free trial of Pro — no card needed." */
+/**
+ * Sign-up trial note for a known plan, e.g. "You’re starting a 14-day free trial of Pro — no card needed. The trial
+ * includes 10 analyses and 1 GB of vault; Pro’s limits apply once you move to it." The first sentence is 007 US6
+ * scenario 11's wording; the second says the org gets the trial's own limits (PLAN_LIMITS.trial), not the chosen
+ * plan's (review NIT-d).
+ */
 export function trialNote(plan: Pick<Plan, 'name'>): string {
-  return `You’re starting a ${TRIAL_DAYS}-day free trial of ${plan.name} — no card needed.`;
+  const t = PLAN_LIMITS.trial;
+  return `You’re starting a ${TRIAL_DAYS}-day free trial of ${plan.name} — no card needed. `
+    + `The trial includes ${t.analysesPerMonth} analyses and ${t.vaultBytes! / GB} GB of vault; ${plan.name}’s limits apply once you move to it.`;
 }

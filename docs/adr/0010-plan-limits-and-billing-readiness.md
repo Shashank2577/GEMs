@@ -25,8 +25,12 @@ The decision stands; the details below supersede the sketch in Decision 1–5 wh
 - **Quota integrity** — analyses and watchlists are checked and inserted under the org row lock
   (`SELECT … FOR NO KEY UPDATE`); seats, vault and packets are check-then-insert (a race can overshoot by the
   concurrent requests — accepted, not a cost risk). The AI slot is reserved in the analysis' quota transaction as a
-  0-token `llm_usage` row and counted on `llm_usage.analysis_ref` (no FK), so deleting analyses never returns AI
-  quota. Only rows the demo seeder wrote (`analyses.seeded`) are outside the quota.
+  0-token `llm_usage` row (`reserved = true`, inserted after the analysis with `analysis_id` set) and counted on
+  `llm_usage.analysis_ref` (no FK), so deleting analyses never returns AI quota; the reservation is released by id
+  only when no call was metered, decided in-process after in-flight calls settle. Only rows the demo seeder wrote
+  (`analyses.seeded`) are outside the quota, and `DELETE /api/demo` deletes only those. Packets are counted on the
+  FK-free `packet_ledger` (written with each packet, removed only when its build fails), so deleting a packet with its
+  demo workspace does not return packet quota.
 - **Subscriptions (FR-042)** — append-only `subscriptions (org_id, plan, status, started_at, ends_at, note, created_by)`
   written by `POST /api/admin/orgs/:id/plan` (Bearer `ADMIN_TOKEN`, ≥ 32 characters, else the endpoint stays 404).
 - **Usage (FR-039)** — `GET /api/org/usage` → `{plan, trialEndsAt, period, usage, limits}`; Settings → Plan & usage.

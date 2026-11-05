@@ -7,14 +7,14 @@
  * The plan is read from the database on every call (no caching beyond one request, FR-043); `enterprise` is never
  * limited. Monthly counters use the IST calendar month (`istMonthPeriod`).
  *
- * Serialisation (review N2): analyses (`reserveAnalysisQuota`) and watchlists check and insert under the org row lock,
+ * Serialisation (review N2): analyses (`checkAnalysisQuota`) and watchlists check and insert under the org row lock,
  * so concurrent requests cannot overshoot those limits. Seats, vault bytes and packets are check-then-insert without
  * the lock: two requests racing past the check can overshoot by at most the concurrent requests (one invite, one file,
  * one packet each). Accepted — they are not a cost risk like the LLM, and the next request sees the real count.
  */
-import { and, count, countDistinct, eq, gt, gte, isNotNull, isNull, lt, ne, sum } from 'drizzle-orm';
+import { and, count, countDistinct, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sum } from 'drizzle-orm';
 import {
-  analyses, invitations, llmUsage, memberships, organizations, packets, vaultDocuments, vaultDocumentVersions, watchlists,
+  analyses, invitations, llmUsage, memberships, organizations, packetLedger, vaultDocuments, vaultDocumentVersions, watchlists,
   type Db,
 } from '@tp/db';
 import {
@@ -66,9 +66,10 @@ export async function usedOf(db: DbOrTx, orgId: string, limit: PlanLimitKey, now
       return num(r?.n);
     }
     case 'packetsPerMonth': {
-      // The demo seeder writes no packets, so every packet a user built counts — demo workspace or not (review S2).
-      const [r] = await db.select({ n: count() }).from(packets)
-        .where(and(eq(packets.orgId, orgId), gte(packets.createdAt, start), lt(packets.createdAt, end), ne(packets.status, 'failed')));
+      // Every packet a user built counts — demo workspace or not (review S2) — and keeps counting once deleted (e.g. by
+      // `DELETE /demo`, review SF-1): the FK-free ledger, written with the packet and removed only when its build fails.
+      const [r] = await db.select({ n: count() }).from(packetLedger)
+        .where(and(eq(packetLedger.orgId, orgId), gte(packetLedger.createdAt, start), lt(packetLedger.createdAt, end)));
       return num(r?.n);
     }
     case 'vaultBytes': {
@@ -104,19 +105,13 @@ export async function assertWithinPlan(
 }
 
 /**
- * Analyse quota (FR-036, FR-037), to be called inside the transaction that inserts the `analyses` row: locks the org
- * row (`SELECT … FOR NO KEY UPDATE`) so concurrent analyses of one org are counted one at a time, throws 402 when the
- * monthly analyses are used up, and reports whether this analysis may still use the LLM.
- *
- * With `llm` given (an LLM is configured) and the AI quota not used up, it also RESERVES the AI slot in the same
- * transaction: a 0-token `llm_usage` reservation row (`kind: 'extract'`, `analysis_ref` = the new analysis id) that
- * counts at once, so concurrent analyses cannot all get AI past the quota (review S1). The first LLM call of the
- * analysis fills that row in (`meteredCompleteJson`'s `reservationId`); an analysis that ends with no metered LLM
- * call gives the slot back (`releaseLlmReservation`).
+ * Analyse quota (FR-036, FR-037), to be called inside the transaction that inserts the `analyses` row, BEFORE that
+ * insert: locks the org row (`SELECT … FOR NO KEY UPDATE`) so concurrent analyses of one org are counted one at a
+ * time, throws 402 when the monthly analyses are used up, and reports whether this analysis may still use the LLM.
+ * When it may (and an LLM is configured), the caller then inserts the `analyses` row and reserves the AI slot with
+ * `reserveLlmSlot` in the same transaction (review S1, NEW-B1).
  */
-export async function reserveAnalysisQuota(
-  deps: Pick<AppDeps, 'clock'>, tx: DbOrTx, orgId: string, llm?: { analysisRef: string; model: string } | null,
-): Promise<{ llmAllowed: boolean; reservationId: string | null }> {
+export async function checkAnalysisQuota(deps: Pick<AppDeps, 'clock'>, tx: DbOrTx, orgId: string): Promise<{ llmAllowed: boolean }> {
   const { plan } = await loadPlan(tx, orgId, { forUpdate: true });
   let llmAllowed = true;
   if (plan !== 'enterprise') {
@@ -124,24 +119,50 @@ export async function reserveAnalysisQuota(
     const llmMax = limitsFor(plan).llmAnalysesPerMonth;
     if (llmMax != null) llmAllowed = (await usedOf(tx, orgId, 'llmAnalysesPerMonth', deps.clock.now())) < llmMax;
   }
-  if (!llm || !llmAllowed) return { llmAllowed, reservationId: null };
-  const [row] = await tx.insert(llmUsage).values({
-    orgId, analysisRef: llm.analysisRef, kind: 'extract', model: llm.model, inputTokens: 0, outputTokens: 0, createdAt: deps.clock.now(),
-  }).returning({ id: llmUsage.id });
-  return { llmAllowed, reservationId: row!.id };
+  return { llmAllowed };
 }
 
 /**
- * At the end of an analysis: give back an AI slot reserved by `reserveAnalysisQuota` that no metered LLM call filled
- * in (no call made, or none reached the provider). A filled row has `analysis_id` set and is kept. A call still in
- * flight that settles later finds the row gone and inserts its own (`recordLlmUsage`). Never throws.
+ * RESERVE the AI slot of a just-inserted analysis, in the transaction that inserted it (after `checkAnalysisQuota`):
+ * a 0-token `llm_usage` row (`kind: 'extract'`, `analysis_id` and `analysis_ref` = the analysis) that counts at once,
+ * so concurrent analyses cannot all get AI past the quota (review S1). The first metered LLM call fills in its model
+ * and tokens (`meteredCompleteJson`); `analysis_id` is set here, never by the fill, so a later delete of the analysis
+ * (FK `ON DELETE SET NULL`) cannot make the fill fail (review NEW-B1). Returns the reservation id.
  */
-export async function releaseLlmReservation(deps: Pick<AppDeps, 'db' | 'logger'>, reservationId: string): Promise<void> {
+export async function reserveLlmSlot(
+  deps: Pick<AppDeps, 'clock'>, tx: DbOrTx, r: { orgId: string; analysisId: string; model: string },
+): Promise<string> {
+  const [row] = await tx.insert(llmUsage).values({
+    orgId: r.orgId, analysisId: r.analysisId, analysisRef: r.analysisId, kind: 'extract', model: r.model, inputTokens: 0, outputTokens: 0,
+    reserved: true, createdAt: deps.clock.now(),
+  }).returning({ id: llmUsage.id });
+  return row!.id;
+}
+
+/**
+ * Give back an AI slot reserved by `reserveLlmSlot`: delete that row by id. Only `LlmMeter` calls it, and only when no
+ * LLM call of the analysis was metered (the decision is in-process, never read from `analysis_id`, review NEW-B1).
+ * Never throws.
+ */
+async function releaseLlmReservation(deps: Pick<AppDeps, 'db' | 'logger'>, reservationId: string): Promise<void> {
   try {
-    await deps.db.delete(llmUsage).where(and(eq(llmUsage.id, reservationId), isNull(llmUsage.analysisId)));
+    await deps.db.delete(llmUsage).where(eq(llmUsage.id, reservationId));
   } catch (e) {
     deps.logger.error('llm usage: releasing the reservation failed', { reservationId, error: (e as Error).message });
   }
+}
+
+/**
+ * Release the unfilled reservations (`reserved = true`) of analyses that were just marked timed out (review NIT-a): a
+ * run that died (process crash) before its own release leaves one behind, which would otherwise count as an AI
+ * analysis for the month. A reservation a call already filled in (`reserved = false`, even with 0 tokens for an
+ * aborted call) is kept; a call of that run settling even later inserts its own row (`recordLlmUsage`).
+ */
+export async function releaseAbandonedReservations(tx: DbOrTx, orgId: string, analysisIds: string[]): Promise<void> {
+  if (!analysisIds.length) return;
+  await tx.delete(llmUsage).where(and(
+    eq(llmUsage.orgId, orgId), eq(llmUsage.reserved, true), inArray(llmUsage.analysisRef, analysisIds),
+  ));
 }
 
 /** FR-039 usage summary for `GET /org/usage`. */
@@ -173,7 +194,7 @@ export async function usageFor(deps: Pick<AppDeps, 'db' | 'clock'>, orgId: strin
 export interface LlmUsageInput {
   orgId: string;
   analysisId?: string | null;
-  /** Fill in this reservation row (see `reserveAnalysisQuota`) instead of inserting a new one. */
+  /** Fill in this reservation row (see `reserveLlmSlot`) instead of inserting a new one. */
   reservationId?: string | null;
   kind: 'extract' | 'assist';
   model: string;
@@ -181,39 +202,79 @@ export interface LlmUsageInput {
   outputTokens: number;
 }
 
-/** Insert one `llm_usage` row. Never throws: metering must not fail the user's request. */
+/** SQLSTATE of a database error, also when the driver wraps it (`cause`). */
+function sqlState(e: unknown): string | undefined {
+  let x = e as { code?: unknown; cause?: unknown } | undefined;
+  for (let i = 0; i < 3 && x; i++, x = x.cause as typeof x) if (typeof x.code === 'string') return x.code;
+  return undefined;
+}
+
+/**
+ * Record one LLM call in `llm_usage`. Never throws: metering must not fail the user's request.
+ * With `reservationId`, fills in that reservation's model and tokens — never `analysis_id`, which the reservation
+ * already holds (review NEW-B1). Otherwise inserts a row; if the analysis was deleted meanwhile (e.g. by `DELETE /demo`,
+ * SQLSTATE 23503 on `analysis_id`) it is inserted without that link but keeps `analysis_ref`, so the tokens and the
+ * AI slot are still metered.
+ */
 export async function recordLlmUsage(deps: Pick<AppDeps, 'db' | 'clock' | 'logger'>, u: LlmUsageInput): Promise<void> {
   const tokens = { inputTokens: Math.max(0, Math.round(u.inputTokens)), outputTokens: Math.max(0, Math.round(u.outputTokens)) };
   try {
     if (u.reservationId) {
-      const filled = await deps.db.update(llmUsage).set({ analysisId: u.analysisId ?? null, model: u.model, ...tokens })
+      const filled = await deps.db.update(llmUsage).set({ model: u.model, ...tokens, reserved: false })
         .where(eq(llmUsage.id, u.reservationId)).returning({ id: llmUsage.id });
       if (filled.length) return;
     }
-    await deps.db.insert(llmUsage).values({
+    const row = {
       orgId: u.orgId, analysisId: u.analysisId ?? null, analysisRef: u.analysisId ?? null, kind: u.kind, model: u.model, ...tokens,
       createdAt: deps.clock.now(),
-    });
+    };
+    try {
+      await deps.db.insert(llmUsage).values(row);
+    } catch (e) {
+      if (sqlState(e) !== '23503' || !row.analysisId) throw e;
+      await deps.db.insert(llmUsage).values({ ...row, analysisId: null });
+    }
   } catch (e) {
     deps.logger.error('llm usage: insert failed', { orgId: u.orgId, error: (e as Error).message });
   }
 }
 
+/** `llm.completeJson`, metered; `finish()` ends the analysis's use of it (see `meteredCompleteJson`). */
+export type MeteredCompleteJson = (<T = unknown>(req: Parameters<NonNullable<AppDeps['llm']>['completeJson']>[0]) => Promise<T>) & {
+  finish: () => Promise<void>;
+};
+
 /**
  * `llm.completeJson` that writes one `llm_usage` row per call with the provider's token counts. A call that reached
  * the model is metered even when its reply was unusable, and so is a call that timed out or was aborted while in
  * flight (0 tokens if none were reported — the provider may still bill it, review N3); a call that failed before
- * reaching the provider (no usage, not aborted, e.g. connection refused) is not. With `reservationId`, the first call
- * fills in that reservation row instead of inserting one, so an analysis has one row per call either way.
+ * reaching the provider (no usage, not aborted, e.g. connection refused) is not. With `reservationId`, the first
+ * metered call fills in that reservation row instead of inserting one, so an analysis has one row per call either way.
+ *
+ * `finish()` — call it when the analysis ends, whatever the outcome. The reservation is given back (deleted by id)
+ * only if NO call of this analysis was metered, decided from this in-process state and never from the row's
+ * `analysis_id`, which a delete of the analysis nulls (review NEW-B1). If a call is still in flight (e.g. it timed
+ * out on our side but has not settled), the decision waits until it settles, so the slot is never briefly free while
+ * that call may still be billed (review NIT-b). Never throws.
  */
 export function meteredCompleteJson(
   deps: Pick<AppDeps, 'db' | 'clock' | 'logger' | 'llm'>,
   ctx: { orgId: string; analysisId: string | null; kind: 'extract' | 'assist'; reservationId?: string | null },
-) {
+): MeteredCompleteJson {
   const llm = deps.llm;
   if (!llm) throw new Error('meteredCompleteJson: no LLM configured');
   let reservationId = ctx.reservationId ?? null;
-  return async <T = unknown>(req: Parameters<typeof llm.completeJson>[0]): Promise<T> => {
+  let metered = false;
+  let finished = false;
+  let inFlight = 0;
+  const releaseIfUnused = async () => {
+    if (!finished || metered || inFlight > 0 || !reservationId) return;
+    const id = reservationId;
+    reservationId = null;
+    await releaseLlmReservation(deps, id);
+  };
+  const call = async <T = unknown>(req: Parameters<typeof llm.completeJson>[0]): Promise<T> => {
+    inFlight++;
     let reported: Pick<LlmResult, 'model' | 'usage'> | null = null;
     let ok = false;
     try {
@@ -224,11 +285,17 @@ export function meteredCompleteJson(
       const r = reported as Pick<LlmResult, 'model' | 'usage'> | null;
       const inFlightAbort = !!(req as { signal?: AbortSignal }).signal?.aborted;
       if (r || ok || inFlightAbort) {
-        await recordLlmUsage(deps, {
-          orgId: ctx.orgId, analysisId: ctx.analysisId, kind: ctx.kind, reservationId, model: r?.model || llm.model, inputTokens: r?.usage.inputTokens ?? 0, outputTokens: r?.usage.outputTokens ?? 0,
-        });
+        // Synchronously, before any await: a concurrent `finish()` must already see this call as metered.
+        metered = true;
+        const fill = reservationId;
         reservationId = null;
+        await recordLlmUsage(deps, {
+          orgId: ctx.orgId, analysisId: ctx.analysisId, kind: ctx.kind, reservationId: fill, model: r?.model || llm.model, inputTokens: r?.usage.inputTokens ?? 0, outputTokens: r?.usage.outputTokens ?? 0,
+        });
       }
+      inFlight--;
+      await releaseIfUnused();
     }
   };
+  return Object.assign(call, { finish: async () => { finished = true; await releaseIfUnused(); } });
 }

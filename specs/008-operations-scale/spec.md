@@ -654,13 +654,19 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   …)` (402) with `details {limit, used, max, plan, resetsAt?}`. The analyse check and insert MUST be serialised per org
   (row lock) so concurrent requests cannot exceed the limit. Failed analyses/packets do not count, nor do the analyses
   the demo seeder inserts (`analyses.seeded`, 007/FR-065); everything a user runs counts, whatever the tender's source
-  (a real PDF uploaded to a demo tender, a packet on a demo workspace). Seats, vault and packet checks are not
-  serialised (a race overshoots by at most the concurrent requests); resending an expired invitation counts one seat.
+  (a real PDF uploaded to a demo tender, a packet on a demo workspace), and keeps counting after a delete:
+  `DELETE /api/demo` removes only the seeder's analyses, and packets are counted on the FK-free `packet_ledger`
+  (one row per build, removed only when that build fails or is interrupted), not on `packets`. Seats, vault and packet
+  checks are not serialised (a race overshoots by at most the concurrent requests); resending an expired invitation
+  counts one seat.
 - **FR-037** *(gap)*: When `llmAnalysesPerMonth` is exhausted but `analysesPerMonth` is not, analysis MUST run
   rules-only and carry warning `llm_quota_reached` ("Monthly AI review limit reached — this analysis used rules only.").
-  The AI slot MUST be reserved in the same transaction as the analyses quota (a 0-token `llm_usage` reservation row,
-  given back if no LLM call is metered) and counted on `llm_usage.analysis_ref` (no foreign key), so concurrent
-  analyses cannot overshoot it and deleting analyses (e.g. `DELETE /api/demo`) never gives AI analyses back.
+  The AI slot MUST be reserved in the same transaction as the analyses quota (a 0-token `llm_usage` reservation row
+  with `reserved = true`, inserted after the `analyses` row with its `analysis_id` set) and counted on
+  `llm_usage.analysis_ref` (no foreign key), so concurrent analyses cannot overshoot it and deleting analyses never
+  gives AI analyses back. The first metered call fills in only model and tokens; the slot is given back (by id) only
+  when no call of the analysis was metered, decided in-process once every in-flight call has settled — never from
+  `analysis_id`. A run marked timed out releases its still-unfilled reservation.
 - **FR-038** *(gap)*: Middleware `requireActivePlan` MUST return 402 `plan_expired` for writes when `plan = 'trial'` and
   `trial_ends_at < now()`. Allowed while expired: all `GET`/`HEAD`; `/api/auth/*` (login, logout, switch-org, accept-invite); `PATCH /api/me`,
   `POST /api/me/password`, `/api/me/sessions*` (002 FR-012), `DELETE /api/me/api-tokens/:id`;
@@ -669,7 +675,7 @@ a fixed-clock fixture deletes exactly the expected rows and R2 objects.
   `DELETE /api/org/members/me` and `DELETE /api/org/invitations/:id` (they only reduce usage); `/api/admin/*`
   (operator token, FR-042).
 - **FR-039** *(gap)*: Table `llm_usage (id, org_id, analysis_id null, analysis_ref null, kind 'extract'|'assist', model, input_tokens,
-  output_tokens, created_at)` MUST be written once per LLM call from `services/analyse.ts` (and any other LLM caller);
+  output_tokens, reserved, created_at)` MUST be written once per LLM call from `services/analyse.ts` (and any other LLM caller);
   `GET /api/org/usage` (any member) MUST return `{plan, trialEndsAt, period:{start,end}, usage:{seats, watchlists,
   analysesThisMonth, llmAnalysesThisMonth, vaultBytes, packetsThisMonth, llmTokensThisMonth:{input,output}},
   limits: PLAN_LIMITS[plan]}`.

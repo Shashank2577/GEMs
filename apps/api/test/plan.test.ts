@@ -5,7 +5,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
 import {
-  activityLog, analyses, bidWorkspaces, invitations, llmUsage, organizations, subscriptions, tenders, vaultDocuments, watchlists,
+  activityLog, analyses, bidWorkspaces, invitations, llmUsage, organizations, packetLedger, packets, subscriptions, tenders, vaultDocuments,
+  watchlists,
 } from '@tp/db';
 import { generateBidPdf, getSampleBidSpec } from '@tp/core/analyse/sample-bid';
 import { PLAN_LIMITS, WATCHLIST_LIMIT, type PlanKey } from '@tp/core/contracts/plans';
@@ -111,6 +112,9 @@ async function seedPackets(orgId: string, n: number, at = NOW) {
   if (n) {
     await ctx.db.execute(sql`insert into packets (org_id, workspace_id, status, created_at)
       select ${orgId}::uuid, ${w!.id}::uuid, 'ready', ${iso}::timestamptz from generate_series(1, ${n})`);
+    // What `buildWorkspacePacket` writes with each packet: the FK-free ledger `packetsPerMonth` counts (review SF-1).
+    await ctx.db.execute(sql`insert into packet_ledger (packet_id, org_id, created_at)
+      select id, org_id, created_at from packets where workspace_id = ${w!.id}::uuid`);
   }
   return w!;
 }
@@ -364,10 +368,53 @@ describe('analyse quota (T084)', () => {
     const a = await request(ctx.app, 'POST', `/tenders/${t.tenderId}/analyse`, { cookie: o.analyst.cookie });
     expect(a.status, a.text).toBe(201);
     // A packet built on a demo workspace (e.g. from the org's real vault documents) counts too.
-    await ctx.db.execute(sql`insert into packets (org_id, workspace_id, status, created_at) values (${o.orgId}::uuid, ${t.workspaceId}::uuid, 'ready', ${NOW.toISOString()}::timestamptz)`);
+    const p = await request(ctx.app, 'POST', `/workspaces/${t.workspaceId}/packets`, { cookie: o.analyst.cookie, json: {} });
+    expect(p.status, p.text).toBe(201);
+    expect(p.body.status).toBe('ready');
     const u = await request(ctx.app, 'GET', '/org/usage', { cookie: o.viewer.cookie });
     expect(u.body.usage.analysesThisMonth).toBe(1);
     expect(u.body.usage.packetsThisMonth).toBe(1);
+  });
+
+  it('DELETE /demo keeps the analysis a user ran on a demo tender, and it and a packet built on a demo workspace still count (review SF-1)', async () => {
+    const o = await newOrg();
+    expect((await request(ctx.app, 'POST', '/demo/seed', { cookie: o.owner.cookie, json: {} })).status).toBeLessThan(300);
+    const t = await demoTender(o.orgId);
+    const up = await request(ctx.app, 'POST', `/tenders/${t.tenderId}/documents`, { cookie: o.analyst.cookie, form: { file: pdfFile('Real bid.pdf'), kind: 'bid' } });
+    expect(up.status, up.text).toBe(201);
+    const a = await request(ctx.app, 'POST', `/tenders/${t.tenderId}/analyse`, { cookie: o.analyst.cookie });
+    expect(a.status, a.text).toBe(201);
+    const p = await request(ctx.app, 'POST', `/workspaces/${t.workspaceId}/packets`, { cookie: o.analyst.cookie, json: {} });
+    expect(p.status, p.text).toBe(201);
+    const seededBefore = await ctx.db.select({ id: analyses.id }).from(analyses).where(and(eq(analyses.orgId, o.orgId), eq(analyses.seeded, true)));
+    expect(seededBefore.length).toBeGreaterThan(0);
+
+    const del = await request(ctx.app, 'DELETE', '/demo', { cookie: o.owner.cookie });
+    expect(del.status, del.text).toBeLessThan(300);
+    // The seeder's analyses are gone; the user's own analysis stays (the demo tender is global and never deleted).
+    expect(await ctx.db.select().from(analyses).where(and(eq(analyses.orgId, o.orgId), eq(analyses.seeded, true)))).toHaveLength(0);
+    expect(await ctx.db.select({ id: analyses.id }).from(analyses).where(eq(analyses.id, a.body.id))).toHaveLength(1);
+    // The packet went with its demo workspace, but its ledger row did not.
+    expect(await ctx.db.select().from(packets).where(eq(packets.id, p.body.id))).toHaveLength(0);
+    expect(await ctx.db.select().from(packetLedger).where(eq(packetLedger.packetId, p.body.id))).toHaveLength(1);
+    const u = await request(ctx.app, 'GET', '/org/usage', { cookie: o.viewer.cookie });
+    expect(u.body.usage.analysesThisMonth).toBe(1);
+    expect(u.body.usage.packetsThisMonth).toBe(1);
+  });
+
+  it('a failed or interrupted packet build does not count (its ledger row is removed)', async () => {
+    const o = await newOrg();
+    const w = await seedPackets(o.orgId, 0);
+    // A build whose item cannot be loaded fails — simulate with a stuck `building` packet older than the stale window.
+    const old = new Date(Date.now() - 60 * 60 * 1000);
+    const [stuck] = await ctx.db.insert(packets).values({ orgId: o.orgId, workspaceId: w.id, status: 'building', createdAt: old }).returning();
+    await ctx.db.insert(packetLedger).values({ packetId: stuck!.id, orgId: o.orgId, createdAt: NOW });
+    expect((await usageFor(ctx.deps, o.orgId)).usage.packetsThisMonth).toBe(1);
+    // Opening the workspace's packets recovers the stuck build as failed (006/FR-057).
+    const list = await request(ctx.app, 'GET', `/workspaces/${w.id}`, { cookie: o.viewer.cookie });
+    expect(list.status, list.text).toBe(200);
+    expect((await ctx.db.select({ status: packets.status }).from(packets).where(eq(packets.id, stuck!.id)))[0]!.status).toBe('failed');
+    expect((await usageFor(ctx.deps, o.orgId)).usage.packetsThisMonth).toBe(0);
   });
 });
 
@@ -438,8 +485,112 @@ describe('LLM metering (T085)', () => {
     expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(1);
     const del = await request(ctx.app, 'DELETE', '/demo', { cookie: o.owner.cookie });
     expect(del.status, del.text).toBeLessThan(300);
-    expect(await ctx.db.select().from(analyses).where(eq(analyses.id, a.body.id))).toHaveLength(0);
     expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(1);
+    // Since review SF-1 `DELETE /demo` keeps the user's analysis; any other delete of it (e.g. the tender's cascade)
+    // must not give the AI slot back either.
+    await ctx.db.delete(analyses).where(eq(analyses.id, a.body.id));
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(1);
+  });
+
+  /** A fake LLM whose calls wait until the test releases them; `started` resolves when call `i` (0-based) starts. */
+  function gatedLlm(usage = { inputTokens: 1234, outputTokens: 56 }) {
+    const gates: Array<() => void> = [];
+    const starts: Array<() => void> = [];
+    const started = [0, 1].map((i) => new Promise<void>((r) => { starts[i] = r; }));
+    let n = 0;
+    const llm: LlmClient = {
+      ...fakeLlm().llm,
+      completeJson: async <T>(_req: unknown, opts?: { onUsage?: (r: { model: string; usage: typeof usage }) => void }) => {
+        const i = n++;
+        await new Promise<void>((r) => { gates[i] = r; starts[i]?.(); });
+        opts?.onUsage?.({ model: 'fake-model-2026', usage });
+        return { requirements: [] } as T;
+      },
+    };
+    return { llm, started, release: (i: number) => gates[i]!() };
+  }
+
+  it('the analysis deleted while its LLM call is in flight: the call is still metered and the AI slot kept (review NEW-B1)', async () => {
+    const o = await newOrg();
+    const t = await analysableTender(o.analyst.cookie);
+    const g = gatedLlm();
+    const pending = request(appWith({ llm: g.llm }), 'POST', `/tenders/${t.id}/analyse`, { cookie: o.analyst.cookie });
+    await g.started[0];
+    const [running] = await ctx.db.select({ id: analyses.id }).from(analyses).where(and(eq(analyses.orgId, o.orgId), eq(analyses.status, 'running')));
+    // The reservation is born with its analysis link (inserted after the analyses row, same transaction).
+    const [reservation] = await ctx.db.select().from(llmUsage).where(eq(llmUsage.orgId, o.orgId));
+    expect(reservation).toMatchObject({ analysisId: running!.id, analysisRef: running!.id, reserved: true, inputTokens: 0 });
+    await ctx.db.delete(analyses).where(eq(analyses.id, running!.id));
+    g.release(0);
+    const r = await pending;
+    expect(r.status, r.text).toBe(409);
+    expect(r.body.error.code).toBe('analysis_superseded');
+    const rows = await ctx.db.select().from(llmUsage).where(eq(llmUsage.orgId, o.orgId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: reservation!.id, analysisId: null, analysisRef: running!.id, reserved: false, inputTokens: 1234, outputTokens: 56 });
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(1);
+  });
+
+  it('the analysis deleted after its first LLM call, during the second: both calls metered, slot kept (review NEW-B1)', async () => {
+    const o = await newOrg();
+    const t = await analysableTender(o.analyst.cookie, 2);
+    const g = gatedLlm();
+    const pending = request(appWith({ llm: g.llm }), 'POST', `/tenders/${t.id}/analyse`, { cookie: o.analyst.cookie });
+    await g.started[0];
+    g.release(0);
+    await g.started[1];
+    const [running] = await ctx.db.select({ id: analyses.id }).from(analyses).where(and(eq(analyses.orgId, o.orgId), eq(analyses.status, 'running')));
+    await ctx.db.delete(analyses).where(eq(analyses.id, running!.id));
+    g.release(1);
+    const r = await pending;
+    expect(r.status, r.text).toBe(409);
+    const rows = await ctx.db.select().from(llmUsage).where(eq(llmUsage.orgId, o.orgId));
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row).toMatchObject({ analysisId: null, analysisRef: running!.id, inputTokens: 1234, outputTokens: 56, reserved: false });
+    const u = await usageFor(ctx.deps, o.orgId);
+    expect(u.usage.llmAnalysesThisMonth).toBe(1);
+    expect(u.usage.llmTokensThisMonth).toEqual({ input: 2 * 1234, output: 2 * 56 });
+  });
+
+  it('a timed-out run releases its unfilled reservation, but keeps a filled 0-token row (review NIT-a)', async () => {
+    const o = await newOrg();
+    const t = await analysableTender(o.analyst.cookie);
+    const t2 = await analysableTender(o.analyst.cookie);
+    const old = new Date(NOW.getTime() - 3 * 60 * 1000);
+    const [dead] = await ctx.db.insert(analyses).values({ orgId: o.orgId, tenderId: t.id, status: 'running', createdAt: old, updatedAt: old }).returning();
+    const [dead2] = await ctx.db.insert(analyses).values({ orgId: o.orgId, tenderId: t2.id, status: 'running', createdAt: old, updatedAt: old }).returning();
+    // dead: a crash left the reservation unfilled. dead2: its call was aborted in flight and filled with 0 tokens (N3).
+    await ctx.db.insert(llmUsage).values([
+      { orgId: o.orgId, analysisId: dead!.id, analysisRef: dead!.id, kind: 'extract', model: 'm', reserved: true, createdAt: old },
+      { orgId: o.orgId, analysisId: dead2!.id, analysisRef: dead2!.id, kind: 'extract', model: 'm', reserved: false, createdAt: old },
+    ]);
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(2);
+    for (const x of [t, t2]) expect((await request(ctx.app, 'POST', `/tenders/${x.id}/analyse`, { cookie: o.analyst.cookie })).status).toBe(201);
+    expect((await ctx.db.select({ status: analyses.status }).from(analyses).where(eq(analyses.id, dead!.id)))[0]!.status).toBe('failed');
+    const rows = await ctx.db.select({ ref: llmUsage.analysisRef }).from(llmUsage).where(eq(llmUsage.orgId, o.orgId));
+    expect(rows.map((x) => x.ref)).toEqual([dead2!.id]);
+    expect((await usageFor(ctx.deps, o.orgId)).usage.llmAnalysesThisMonth).toBe(1);
+  });
+
+  it('a call that settles after the analysis ended keeps the reservation until then (review NIT-b)', async () => {
+    const o = await newOrg();
+    const g = gatedLlm();
+    const [a] = await ctx.db.insert(analyses).values({ orgId: o.orgId, tenderId: (await newTender()).id, status: 'running' }).returning();
+    const [res] = await ctx.db.insert(llmUsage).values({ orgId: o.orgId, analysisId: a!.id, analysisRef: a!.id, kind: 'extract', model: 'm', reserved: true }).returning();
+    const call = meteredCompleteJson({ ...ctx.deps, llm: g.llm }, { orgId: o.orgId, analysisId: a!.id, kind: 'extract', reservationId: res!.id });
+    const inFlight = call({ system: 's', prompt: 'p' } as never);
+    await g.started[0];
+    await call.finish(); // the analysis gave up on the call (e.g. our timeout) — the call has not settled yet
+    expect(await ctx.db.select().from(llmUsage).where(eq(llmUsage.id, res!.id))).toHaveLength(1);
+    g.release(0);
+    await inFlight;
+    const rows = await ctx.db.select().from(llmUsage).where(eq(llmUsage.orgId, o.orgId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: res!.id, inputTokens: 1234, reserved: false });
+    // With no metered call at all, finish() gives the slot back.
+    const [res2] = await ctx.db.insert(llmUsage).values({ orgId: o.orgId, analysisId: a!.id, analysisRef: a!.id, kind: 'extract', model: 'm', reserved: true }).returning();
+    await meteredCompleteJson({ ...ctx.deps, llm: g.llm }, { orgId: o.orgId, analysisId: a!.id, kind: 'extract', reservationId: res2!.id }).finish();
+    expect(await ctx.db.select().from(llmUsage).where(eq(llmUsage.id, res2!.id))).toHaveLength(0);
   });
 
   it('concurrent analyses cannot all get AI past the quota: the slot is reserved in the quota transaction (review S1)', async () => {

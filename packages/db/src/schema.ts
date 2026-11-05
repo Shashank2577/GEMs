@@ -572,6 +572,17 @@ export const packets = pgTable('packets', {
   createdAt: createdAt(),
 }, (t) => ({ wsIdx: index('packets_ws_idx').on(t.workspaceId) }));
 
+/**
+ * One row per packet a user built (008/FR-036), written with the `packets` row and removed only when that build fails.
+ * `packet_id` has no foreign key, so deleting the packet (e.g. with its demo workspace by `DELETE /demo`) does not give
+ * the monthly packet back: `packetsPerMonth` counts this ledger, not `packets`.
+ */
+export const packetLedger = pgTable('packet_ledger', {
+  packetId: uuid('packet_id').primaryKey(),
+  orgId: uuid('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  createdAt: createdAt(),
+}, (t) => ({ orgIdx: index('packet_ledger_org_idx').on(t.orgId, t.createdAt) }));
+
 // ───────────── Notifications & activity ─────────────
 
 export const notifications = pgTable('notifications', {
@@ -586,6 +597,10 @@ export const notifications = pgTable('notifications', {
   dedupeKey: text('dedupe_key'),
   status: text('status').$type<'pending' | 'sent' | 'failed' | 'skipped' | 'read'>().notNull().default('pending'),
   error: text('error'),
+  /** Delivery attempts made so far (email / WhatsApp); FR-047 retries transient failures up to 3. */
+  attempts: integer('attempts').notNull().default(0),
+  /** Earliest time the dispatcher may (re)try this row; also the claim lease while a dispatcher holds it. */
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
   sentAt: timestamp('sent_at', { withTimezone: true }),
   readAt: timestamp('read_at', { withTimezone: true }),
   createdAt: createdAt(),
@@ -639,5 +654,10 @@ export const llmUsage = pgTable('llm_usage', {
   model: text('model').notNull(),
   inputTokens: integer('input_tokens').notNull().default(0),
   outputTokens: integer('output_tokens').notNull().default(0),
+  /**
+   * A 0-token reservation of an analysis's AI slot not yet filled in by a metered call (review S1/NEW-B1). Lets the
+   * timeout sweep release reservations a crashed run left behind without touching filled 0-token rows (aborted calls).
+   */
+  reserved: boolean('reserved').notNull().default(false),
   createdAt: createdAt(),
 }, (t) => ({ orgIdx: index('llm_usage_org_idx').on(t.orgId, t.createdAt) }));

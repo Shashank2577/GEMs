@@ -34,7 +34,7 @@ import type { AppDeps } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, forbidden, notFound, unprocessable } from '../lib/errors';
 import { canSeeTender, type TenderViewer } from '../lib/tender-scope';
-import { assertWithinPlan, meteredCompleteJson, releaseLlmReservation, reserveAnalysisQuota } from '../lib/plan';
+import { assertWithinPlan, checkAnalysisQuota, meteredCompleteJson, releaseAbandonedReservations, reserveLlmSlot } from '../lib/plan';
 import { markStale } from './staleness';
 
 type TenderRow = typeof tenders.$inferSelect;
@@ -290,8 +290,11 @@ const lockAnalyses = (tx: Tx, orgId: string, tenderId: string) =>
 /** Under the lifecycle lock: `running` rows of this org+tender older than the timeout become failed "timed out" (FR-028). */
 async function expireTimedOutRuns(tx: Tx, orgId: string, tenderId: string, now: Date) {
   const cutoff = new Date(now.getTime() - ANALYSIS_RUNNING_TIMEOUT_MS);
-  await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
-    .where(and(eq(analyses.orgId, orgId), eq(analyses.tenderId, tenderId), eq(analyses.status, 'running'), lte(analyses.createdAt, cutoff)));
+  const expired = await tx.update(analyses).set({ status: 'failed', error: ANALYSIS_TIMED_OUT, updatedAt: now })
+    .where(and(eq(analyses.orgId, orgId), eq(analyses.tenderId, tenderId), eq(analyses.status, 'running'), lte(analyses.createdAt, cutoff)))
+    .returning({ id: analyses.id });
+  // 008/FR-037: a run that died before releasing its unfilled AI reservation does not keep the slot (review NIT-a).
+  await releaseAbandonedReservations(tx, orgId, expired.map((r) => r.id));
 }
 
 /** A `running` analysis older than this is treated as failed ("timed out") (FR-028). */
@@ -404,19 +407,22 @@ export async function analyseTender(
   // for the same org+tender until commit, so the check and the insert cannot interleave.
   // 008/FR-036/FR-037: the monthly quota is then checked under the org row lock (`SELECT … FOR UPDATE`), so concurrent
   // analyses of one org (any tender) are counted and inserted one at a time and cannot overshoot the limit.
-  // Lock order is always advisory (org+tender) → org row. The AI slot is reserved in the same transaction (review S1).
-  const analysisId = crypto.randomUUID();
+  // Lock order is always advisory (org+tender) → org row. The AI slot is reserved in the same transaction (review S1),
+  // after the analyses insert, so the reservation row is born with its `analysis_id` (review NEW-B1).
   const { row, llmAllowed, reservationId } = await deps.db.transaction(async (tx) => {
     await lockAnalyses(tx, input.orgId, tender.id);
     await expireTimedOutRuns(tx, input.orgId, tender.id, now);
     const scope = and(eq(analyses.orgId, input.orgId), eq(analyses.tenderId, tender.id), eq(analyses.status, 'running'));
     const [running] = await tx.select({ id: analyses.id }).from(analyses).where(scope).limit(1);
     if (running) throw new HttpError(409, 'analysis_running', 'An analysis is already running for this tender');
-    const quota = await reserveAnalysisQuota(deps, tx, input.orgId, deps.llm ? { analysisRef: analysisId, model: deps.llm.model } : null);
+    const quota = await checkAnalysisQuota(deps, tx, input.orgId);
     const [inserted] = await tx.insert(analyses).values({
-      id: analysisId, orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
+      orgId: input.orgId, tenderId: tender.id, status: 'running', method: 'rules', createdBy: input.userId, createdAt: now, updatedAt: now,
     }).returning();
-    return { row: inserted!, llmAllowed: quota.llmAllowed, reservationId: quota.reservationId };
+    const reservation = deps.llm && quota.llmAllowed
+      ? await reserveLlmSlot(deps, tx, { orgId: input.orgId, analysisId: inserted!.id, model: deps.llm.model })
+      : null;
+    return { row: inserted!, llmAllowed: quota.llmAllowed, reservationId: reservation };
   });
   // Every write to this row from here on is guarded by `status = 'running'`: if a newer request marked
   // it timed out (and maybe replaced it), the late finisher changes nothing and logs nothing (FR-028).
@@ -427,7 +433,7 @@ export async function analyseTender(
   let llmMs = 0;
   let pageTotal = 0;
   const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
-  // 008/FR-039: one llm_usage row per call, with the provider's token counts; the first call fills the reservation.
+  // 008/FR-039: one llm_usage row per call, with the provider's token counts; the first metered call fills the reservation.
   const completeJson = deps.llm && llmAllowed
     ? meteredCompleteJson(deps, { orgId: input.orgId, analysisId: row.id, kind: 'extract', reservationId })
     : null;
@@ -527,8 +533,9 @@ export async function analyseTender(
     throw new HttpError(500, 'analysis_failed', 'The analysis failed. Please try again; if it keeps failing, upload a cleaner PDF.');
   } finally {
     // 008/FR-037: an analysis with no metered LLM call (documents skipped for budget, provider unreachable, or it failed
-    // first) is not an AI analysis — give the reserved slot back (a filled reservation is kept).
-    if (reservationId) await releaseLlmReservation(deps, reservationId);
+    // first) is not an AI analysis — the meter gives the reserved slot back; a metered one keeps it, even when the
+    // analysis row was deleted meanwhile (review NEW-B1).
+    await completeJson?.finish();
   }
 }
 
