@@ -45,7 +45,7 @@ task is sized at ≤ 1 day.
 - [x] T001 [P] Playwright E2E stack (`pnpm e2e`, mock-gem :4011, API + SPA :8788), `evidence()` and `collectRunArtifacts()` helpers in `e2e/support/fixtures.ts` and `e2e/support/start-api.sh` NFR-010
 - [x] T002 [P] Create `e2e/006-apply-packet-assist/` and add `seedApplyFixture(request)` in `e2e/support/seed-apply.ts` (mirror `apps/api/test/workspace-fixtures.ts::seedApply` via public API + a direct `@tp/db` insert for tender/analysis, with tender `endAt` = now + 15 d and Dell MAF expiry = now − 35 d; returns ids and per-role storage states) NFR-010 (#193)
 - [x] T003 [P] Extension E2E helper `launchWithExtension()` in `e2e/support/extension.ts` (build `apps/extension/dist` once, compute the unpacked id like `smoke.e2e.mjs`, serve `apps/extension/test/fixtures/gem-form.html` on `http://localhost:<port>/gem-form.html`, open `chrome-extension://<id>/popup.html`) NFR-010 (#195)
-- [x] T004 [P] Append to root `NOTICE` the attributions for ports in this spec: `IshanMaheshwari-777_GEM-SCRAPER/scraper.py` + `ra_page_dump.html` (no licence file — copied with the user's approval) and `erenmyeager15_india-government-tenders-scraper/src/{pdf.ts,run-budget.ts}` (Apache-2.0) NFR-009 (#197)
+- [x] T004 [P] Append to root `NOTICE` the attributions for ports in this spec (the former GEM-SCRAPER entry was removed — clean-room implementation from `award-parser-spec.md` (issue #537)): `erenmyeager15_india-government-tenders-scraper/src/{pdf.ts,run-budget.ts}` (Apache-2.0) NFR-009 (#197)
 
 ---
 
@@ -252,7 +252,7 @@ task is sized at ≤ 1 day.
 ### Remaining
 
 - [x] T091 [US7] Show open blockers in the confirm dialog ("<n> checklist item(s) were still open: …") and log `openBlockers` in `workspace.submitted` meta in `apps/web/src/features/workspace/SubmitStep.tsx`, `apps/api/src/routes/workspaces.ts`; API test in `apps/api/test/workspace.test.ts` FR-084 (#282)
-- [x] T092 [P] [US7] Port `scrape_ra_schedule` table heuristics from `/home/user/refs/IshanMaheshwari-777_GEM-SCRAPER/scraper.py` into pure `parseAwardResult(html): { l1Price, l1Seller, bidders: {name, rank, price}[] } | null` in `packages/core/src/gem/award.ts` (DOM-free table tokenizer, Indian number parsing); fixture `packages/core/test/fixtures/gem/ra-result.html` is synthetic, built to the heuristics' table structure (the reference `ra_page_dump.html` is a GeM home page with no evaluation table); tests in `packages/core/test/gem/award.test.ts` FR-085 (#284)
+- [x] T092 [P] [US7] Clean-room implementation from `award-parser-spec.md` (issue #537) of pure `parseAwardResult(html): { l1Price, l1Seller, bidders: {name, rank, price}[] } | null` in `packages/core/src/gem/award-result.ts` (DOM-free table tokenizer, Indian number parsing); fixture `packages/core/test/fixtures/gem/ra-result.html` is a synthetic page built for our own parser tests; tests in `packages/core/test/gem/award.test.ts` and `award-result.test.ts` FR-085 (#284)
 - [x] T093 [US7] "Suggest from GeM result" file picker in the Record result dialog (client-side parse, prefill L1 price + seller note, "No price table found in this page." when null) in `apps/web/src/features/workspace/SubmitStep.tsx` FR-085 (#285)
 - [x] T094 [P] [US7] API test: after recording an outcome with prices, `GET /assist/:id` contains neither price nor any outcome field in `apps/api/test/assist.test.ts` FR-083, NFR-005 (#286)
 - [x] T095 [US7] QA: Playwright E2E for US7 with evidence (screenshots, video, trace) in `qa/evidence/006/US7/` — scenarios 1–10: Done on GeM card, dialog with 3 checkboxes (confirm disabled until all ticked), Mark as submitted toast + card + Submit step check + activity, 409s for won/lost/dropped via API, Record result dialog validation ("Enter a number", ₹ preview), Won with L1 29,50,000 → card + header badge + activity sentence, Lost toast "Result recorded", stage-only Won stores minimal outcome, negative price 400, open-blockers notice (after T091), GeM result suggestion with the fixture HTML (after T093); desktop + `@mobile` + axe; spec `e2e/006-apply-packet-assist/US7-submission-outcome.e2e.ts`; `VERDICT.md` FR-079…FR-086 (#287)
@@ -266,6 +266,7 @@ task is sized at ≤ 1 day.
 - [x] T096 [P] Update the Apply section of `specs/001-gem-tender-copilot/contracts/api.md` with the new errors/endpoints (`invalid_transition`, `nothing_to_override`, `unknown_placeholder`, `packet_too_large`, `DELETE …/comments/:commentId`, token `scope`) FR-008, FR-027, FR-033, FR-041, FR-056, FR-074 (#288)
 - [x] T097 [P] dnd-kit screen-reader announcements for packet reordering ("Picked up <title>. Position 3 of 8." …) in `apps/web/src/features/workspace/PacketStep.tsx` NFR-006 (#289)
 - [x] T098 Cairn review of the 006 changes (spec ↔ code traceability, Constitution I checklist) and QA summary `qa/evidence/006/SUMMARY.md` linking the seven `VERDICT.md` files SC-006 (#290)
+- [x] T099 [US7] Clean-room rewrite of parseAwardResult (#537)
 
 ---
 
