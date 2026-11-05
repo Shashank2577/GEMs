@@ -57,6 +57,14 @@ export const canRescoreFor = (reason: StaleReason | null | undefined) => isResco
 
 export const staleReasonCopy = (reason: StaleReason | null | undefined) => STALE_REASON_COPY[reason ?? 'corrigendum'] ?? STALE_REASON_COPY.corrigendum;
 
+/** "since 2 hours ago" for the stale banner (FR-043); null when the analysis predates `stale_at`. */
+export function staleSinceCopy(staleAt: string | null | undefined, now: Date = new Date()): string | null {
+  if (!staleAt) return null;
+  const rel = relativeTime(staleAt, now);
+  if (rel === '—') return null;
+  return rel === 'just now' ? 'just now' : `since ${rel}`;
+}
+
 export const DOC_TYPE_LABEL: Record<string, string> = {
   gst: 'GST', pan: 'PAN', udyam: 'Udyam', startup_dpiit: 'DPIIT', incorporation: 'Incorporation', balance_sheet: 'Balance sheet', itr: 'ITR',
   ca_turnover_certificate: 'CA certificate', oem_authorization: 'OEM authorisation', crac: 'CRAC', work_order: 'Work order', iso: 'ISO', bis: 'BIS',

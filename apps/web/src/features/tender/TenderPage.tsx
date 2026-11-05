@@ -20,7 +20,7 @@ import { HistoryTab } from './HistoryTab';
 import { RequirementsTab } from './RequirementsTab';
 import { TenderHero } from './TenderHero';
 import { isAnalysisRunningError, tenderKeys, useAnalyse, useAnalysis, useDismiss, useRescore, useStartBid, useTender, useTenderDocuments } from './api';
-import { canRescoreFor, isAnalysisRunning, staleReasonCopy } from './labels';
+import { canRescoreFor, isAnalysisRunning, staleReasonCopy, staleSinceCopy } from './labels';
 
 const TABS = ['analysis', 'requirements', 'documents', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -146,7 +146,10 @@ export default function TenderPage() {
             <div role="status" className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning-soft/60 p-4 sm:flex-row sm:items-center">
               <TriangleAlert className="size-5 shrink-0 text-[hsl(32_90%_36%)] dark:text-warning" aria-hidden />
               <div className="min-w-0 flex-1 text-sm">
-                <div className="font-semibold">Re-analysis needed</div>
+                <div className="font-semibold">
+                  Re-analysis needed
+                  {staleSinceCopy(analysis?.staleAt) && <span className="ml-2 text-xs font-normal text-muted-foreground">{staleSinceCopy(analysis?.staleAt)}</span>}
+                </div>
                 <div className="text-muted-foreground">{staleReasonCopy(analysis?.staleReason)}</div>
               </div>
               <RoleGate min="analyst">
