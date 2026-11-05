@@ -79,15 +79,25 @@ export interface DecisionItem {
   endAt: string | null;
 }
 
-/** Result of removing the demo dataset (FR-070). */
+/** Rows removed by `DELETE /api/demo` (007/FR-065). All zeros (and `profileReset: false`) when there was nothing left. */
+export interface DemoRemovedCounts {
+  workspaces: number;
+  analyses: number;
+  matches: number;
+  comments: number;
+  notifications: number;
+  activity: number;
+  pastContracts: number;
+  vaultDocuments: number;
+  watchlists: number;
+  /** True when the company profile still held the demo company and was reset to empty (US4-14). */
+  profileReset: boolean;
+}
+
+/** Result of removing the demo dataset: `DELETE /api/demo` (007/FR-065). Demo tenders are global and stay. */
 export interface DemoRemoveResponse {
   ok: true;
-  removed: boolean;
-  tenders: number;
-  watchlists: number;
-  workspaces: number;
-  vaultDocuments: number;
-  pastContracts: number;
+  removed: DemoRemovedCounts;
 }
 
 export interface DashboardResponse {
