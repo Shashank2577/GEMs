@@ -1,0 +1,7 @@
+PATCH /api/org  Origin: https://evil.example (cookie) -> 403 bad_origin "This request came from another website and was blocked. Reload TenderPilot and try again."
+POST  /api/org/invitations {} Origin: evil (cookie)   -> 403 bad_origin  (before validation)
+PATCH /api/org  Origin: http://localhost:8790.evil.example -> 403 bad_origin
+PATCH /api/org  Origin: http://localhost:8790 (cookie)       -> 200
+PATCH /api/org  no Origin (cookie)                -> 200
+GET   /api/org  Origin: evil (cookie)             -> 200
+PATCH /api/org  Origin: evil + Bearer tp_...      -> 200

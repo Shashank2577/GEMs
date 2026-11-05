@@ -1,0 +1,71 @@
+## QA verdict — APPROVED
+
+**Work item:** #5 · **PR:** #495 · **Reviewer:** qa (claude-code/Sonnet 5.5) · **Session:** https://claude.ai/code/session_01BUi6mFdfjz9y1F3zKYmWQB
+
+Tests: `e2e/002/US3-roles-tenancy.e2e.ts` (desktop): **15 passed, 0 failed** (`E2E_PORT=8790 E2E_GEM_PORT=4013 E2E_DB_NAME=tenderpilot_e2e_us3 pnpm exec playwright test e2e/002/US3`). Multi-role org built via API (`POST /api/org/invitations` inviteUrl token + `accept-invite` in fresh contexts); the subject of each walkthrough is signed in on the `page` fixture.
+API suite: **360 passed, 1 skipped (pre-existing), 0 failed** across 20 files, incl. `roles-matrix` (60), `isolation` (4), `security` (6), `auth` (30), see [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/api-tests.txt).
+
+### Acceptance criteria
+
+| # | Criterion (spec US3) | Verdict | Evidence |
+|---|---|---|---|
+| 1a | sc1: Viewer calling Analyst+ endpoints (`POST /api/watchlists`, `POST /api/vault`, `PUT /api/profile`) gets **403** `forbidden` | met | sc1 test asserts status+code on all three; [sc1-viewer-api-403-context.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc1-viewer-api-403-context.png) |
+| 1b | sc1: message is "You need to be at least an Analyst to do that" | met | exact-message assertion in sc1 test; full role x route matrix: `roles-matrix.test.ts` 60/60 in [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/api-tests.txt) |
+| 2a | sc2: Analyst on Bid Manager+ endpoints (`PATCH /api/org`, `POST /api/org/invitations`, `PUT /api/scoring-weights`, `POST /api/ingestion/run`, `POST /api/demo/seed`, override) gets 403 | met | sc2 test, all six calls; [sc2-analyst-org-readonly.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc2-analyst-org-readonly.png) |
+| 2b | sc2: message "You need to be at least a Bid Manager to do that" | met | exact-message assertion in sc2 test |
+| 3a | sc3: Bid Manager on `PATCH`/`DELETE /api/org/members/:userId` gets 403 | met | sc3 test; target member unchanged afterwards |
+| 3b | sc3: message "Only an Owner can do that" | met | exact-message assertion; UI shows no role selects/trash: [sc3-bid-manager-team-no-owner-actions.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc3-bid-manager-team-no-owner-actions.png) |
+| 4a | sc4: sole Owner demoted -> **409** `last_owner` "An organization needs at least one Owner. Make someone else an Owner first." | met | sc4 test (exact message); [sc4-sole-owner-intact.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc4-sole-owner-intact.png); API `auth.test.ts` "cannot demote or remove the last owner" |
+| 4b | sc4: sole Owner removed -> **409** `last_owner` "You cannot remove the last Owner of the organization." | met | sc4 test (exact message); membership unchanged |
+| 4c | sc4: "by themselves or another owner request" | met (partly API) | self-request via e2e; after promoting a second Owner, the new sole Owner demoting self is 409 again (sc4 test). A distinct second-Owner request against the last Owner cannot exist (the requester would then be a second Owner), so no further case applies. |
+| 5a | sc5: Owner changes Asha Analyst -> Bid Manager in the row select; `PATCH /api/org/members/:userId` returns the updated member | met | sc5 test asserts 200 body `{userId, role:'bid_manager', name, email}`; [sc5-before-role-change.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc5-before-role-change.png) |
+| 5b | sc5: toast "Asha is now Bid Manager" | met (copy note) | Toast reads "Asha Sharma is now Bid manager" (full name, label casing from `ROLE_LABEL`). Test matches case-insensitively; see finding 1. [sc5-after-role-change-toast.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc5-after-role-change-toast.png) |
+| 5c | sc5: Asha's very next request is evaluated with the new role (no re-login) | met | same cookie jar: `GET /api/auth/me` role = bid_manager; `POST /api/ingestion/run` was 403 before and is not 403 after (sc5 test) |
+| 6a | sc6: trash icon + "Remove member" in dialog "Remove Asha?"; membership and Asha's API tokens for this org deleted | met | [sc6-remove-dialog.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc6-remove-dialog.png); sc6 test asserts DB row counts for memberships and api_tokens = 0 and that her bearer token stops working |
+| 6b | sc6: toast "Asha was removed" | met | [sc6-removed-toast.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc6-removed-toast.png) |
+| 6c | sc6: next request -> 403 `no_organization` (no other org) | met | sc6 test |
+| 6d | sc6: or falls back to her next org | met | sc6b test; [sc6b-fell-back-to-next-org.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc6b-fell-back-to-next-org.png) |
+| 6e | sc6: her past activity stays in the log | met | sc6 test: `watchlist.created` by Asha and `member.removed` both present in `/api/activity` afterwards |
+| 7a | sc7: member of B requesting A's members, invitations, activity, tender analyses, vault documents, workspaces, packets, notifications, API tokens by id -> **404** `not_found` (never 403, never data) | met | [sc7-cross-org-matrix.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc7-cross-org-matrix.txt) (18 by-id calls, all 404 not_found; includes member role/remove, invitation revoke/resend, watchlist, API token, workspace/comments/packets, tender analysis, assist, vault read/download/delete); B's lists contain none of A's rows; [sc7-org-b-opens-org-a-workspace.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc7-org-b-opens-org-a-workspace.png). Whole by-id sweep incl. notification mark-read, packet download, override, switch-org: `isolation.test.ts` in [api-tests.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/api-tests.txt) |
+| 7b | sc7: nothing in A is modified | met | sc7 test re-reads A afterwards: member role, pending invitation, watchlist name, token, workspace stage unchanged; API isolation test asserts rows unchanged |
+| 8a | sc8: Viewer's sidebar card shows "View-only access" | met | [sc8-dashboard-view-only-card.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-dashboard-view-only-card.png) |
+| 8b | sc8: write actions not rendered: Invite teammate, Create watchlist, Upload, Save weights, Sync now, role selects, trash icons | met | [sc8-watchlists-no-create.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-watchlists-no-create.png), [sc8-vault-no-upload.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-vault-no-upload.png), [sc8-team-no-invite-selects-trash.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-team-no-invite-selects-trash.png), [sc8-scoring-explained.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-scoring-explained.png), [sc8-sync-no-sync-now.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-sync-no-sync-now.png); counts asserted 0. Analyst/Bid Manager/Owner contrast: [sc8b-analyst-watchlists-can-create.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8b-analyst-watchlists-can-create.png), [sc8b-analyst-vault-upload-no-reminders.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8b-analyst-vault-upload-no-reminders.png), [sc8b-bid-manager-team-invite-yes-roles-no.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8b-bid-manager-team-invite-yes-roles-no.png), [sc8b-owner-team-all-actions.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8b-owner-team-all-actions.png) |
+| 8c | sc8: read-only forms explain why, e.g. "Only Bid Managers and Owners can rename the organization." | met | [sc8-org-rename-explained.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-org-rename-explained.png) (field disabled, no Save), also scoring ("Only Bid Managers and Owners can change scoring weights.") and [sc8-profile-view-only.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc8-profile-view-only.png) |
+| 9a | sc9 (gap): role lowered while page open; mutation returns 403 -> toast shows the server message | met | [sc9-forbidden-toast.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc9-forbidden-toast.png): toast "You need to be at least a Bid Manager to do that", exactly one toast |
+| 9b | sc9: app refetches `/api/auth/me` so the UI immediately hides actions the new role cannot perform | met | test asserts a `GET /api/auth/me` after the 403; [sc9-bid-manager-sees-sync-now.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc9-bid-manager-sees-sync-now.png) -> [sc9-action-hidden-after-refetch.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc9-action-hidden-after-refetch.png) (Sync now gone, "View-only access" shown, no reload) |
+| 10a | sc10 (gap): non-last Owner/any member "Leave organization" + confirm -> `DELETE /api/org/members/me` removes membership and tokens for that org | met | [sc10a-leave-panel.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc10a-leave-panel.png), [sc10a-leave-dialog.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc10a-leave-dialog.png); sc10a asserts 200 `{ok:true,nextOrgId}`, memberships/api_tokens rows 0, `member.left` in activity |
+| 10b | sc10: switched to next org | met | [sc10a-switched-to-next-org.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc10a-switched-to-next-org.png): lands on /dashboard, `/api/auth/me` org = B, role analyst |
+| 10c | sc10: or signed out to `/login` with "You left <Org>." when none left | met | [sc10b-left-signed-out.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc10b-left-signed-out.png); `/api/auth/me` then 401 |
+| 10d | sc10: last Owner gets **409** `last_owner` | met | [sc10c-last-owner-409-toast.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc10c-last-owner-409-toast.png), [sc10c-sole-owner-warning.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc10c-sole-owner-warning.png); membership row still present; API `auth.test.ts` "last Owner gets 409 last_owner; a non-last Owner may leave" |
+| 11a | sc11 (gap): cookie-authenticated mutating request with foreign `Origin` -> **403** `bad_origin` | met | [sc11-origin-check.txt](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc11-origin-check.txt): `PATCH /api/org` Origin https://evil.example -> 403 bad_origin; look-alike origin also rejected |
+| 11b | sc11: rejected before any handler runs | met | `POST /api/org/invitations` with an invalid body and foreign Origin is 403 bad_origin (not 400) and org name unchanged after the rejected PATCH; `security.test.ts` "before the handler runs" |
+| 11c | sc11: not over-blocking (same Origin, no Origin, GET, bearer pass) | met | same file: 200 for each; [sc11-origin-check-controls-pass.png](https://github.com/Shashank2577/GEMs/blob/story/GEM-5-roles-isolation/qa/evidence/002/US3/sc11-origin-check-controls-pass.png); `security.test.ts` 6/6 |
+
+Videos (one per test, desktop): `*.webm` in this folder. Total evidence about 8 MB. No traces committed.
+
+### Findings
+
+1. **observation** — Role-change toast copy differs slightly from the spec text.
+   - Observed: toast "Asha Sharma is now Bid manager" (`TeamSection.tsx` builds `${m.name} is now ${ROLE_LABEL[role]}`; `ROLE_LABEL.bid_manager` = "Bid manager").
+   - Expected (spec sc5): "Asha is now Bid Manager" (first name, capital M). Product-wide label casing is "Bid manager"; judged wording-equivalent, not blocking.
+   - Where: `apps/web/src/features/settings/sections/TeamSection.tsx`, `apps/web/src/lib/types.ts`
+2. **observation** — Dev-only caveat: in `development` the Origin check also accepts any loopback origin (documented in `security.ts`, covered by test "in development, loopback origins ... in production they are not"). Not reachable in production configuration.
+3. **observation (environment, not product)** — `e2e/support/start-api.sh` calls `scripts/local-pg.sh`, which tries to start a per-worktree Postgres on :5433 and fails when another worktree's instance already owns the port. Worked around by creating the DB manually and passing `E2E_DATABASE_URL`.
+
+### Not checked
+
+- Mobile viewport (@mobile) for these screens: US3 criteria are role/tenancy behaviour; not exercised.
+- Email-based or webhook paths for invites (US2 scope).
+- Every one of the ~60 role-matrix routes through the UI: covered at API level only (roles-matrix 60/60); the UI walkthroughs cover the actions named in the criteria.
+- Real multi-process/concurrency races (e.g. two Owners demoting each other simultaneously): not tested.
+- Activity-log rendering of `member.left` in the dashboard (US6 scope); only the API log entry was asserted.
+
+An approval covers what is in the table above. It is not a statement that the change is free of defects.
+
+### Bug issues filed
+
+None (nothing blocking; observations above are not filed).
+
+### Verdict
+
+**qa:approved**: all 11 scenarios (including gap scenarios 9, 10, 11) are met with evidence.

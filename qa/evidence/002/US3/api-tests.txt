@@ -1,0 +1,89 @@
+# pnpm --filter @tp/api exec vitest run   (TEST_DATABASE_URL=postgres://tp:tp@localhost:5433/tenderpilot_test_us3)  2026-11-05T03:44:43Z
+ Test Files  20 passed | 1 skipped (21)
+      Tests  360 passed | 1 skipped (361)
+   Duration  46.05s (transform 1.07s, setup 0ms, collect 13.34s, tests 28.46s, environment 3ms, prepare 1.17s)
+failed tests: 0
+
+## per-file counts
+test/roles-matrix.test.ts: 60 passed
+test/isolation.test.ts: 4 passed
+test/security.test.ts: 6 passed
+test/auth.test.ts: 30 passed
+
+## roles-matrix, isolation, security, and auth (org isolation + leave) test names
+✓ test/auth.test.ts > DELETE /api/org/members/me — leave organization (002/FR-027) > removes own membership + own tokens for that org, logs member.left and moves the session to the next org
+✓ test/auth.test.ts > DELETE /api/org/members/me — leave organization (002/FR-027) > leaving the only org returns nextOrgId null and the session has no organization
+✓ test/auth.test.ts > DELETE /api/org/members/me — leave organization (002/FR-027) > the last Owner gets 409 last_owner; a non-last Owner may leave
+✓ test/auth.test.ts > DELETE /api/org/members/me — leave organization (002/FR-027) > is session-only: an API token gets 403 and nothing changes
+✓ test/auth.test.ts > organization isolation (Constitution IV) > two orgs cannot see or touch each other's members, invitations or activity
+✓ test/auth.test.ts > organization isolation (Constitution IV) > activity supports filters and pagination
+✓ test/isolation.test.ts > org B cannot read, update or delete org A’s resources by id (404, never 403, never data) > every by-id route answers 404 not_found and A’s rows are unchanged
+✓ test/isolation.test.ts > org B’s lists and aggregates never include org A’s rows > lists, tender detail, activity and dashboard are scoped
+✓ test/isolation.test.ts > org B’s lists and aggregates never include org A’s rows > A’s API token stays bound to org A (it never acts in B’s org)
+✓ test/isolation.test.ts > org B cannot reference org A’s ids from its own resources > mapping, packet items, past-contract CRAC links and assignees reject A’s ids
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/auth/signup
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/auth/login
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/auth/logout
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/auth/forgot-password
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/auth/reset-password
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/auth/accept-invite
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/auth/switch-org
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PATCH /api/me
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/me/password
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PUT /api/me/notification-prefs
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/me/api-tokens
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/me/api-tokens/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/me/sessions/revoke-others
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/me/sessions/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PATCH /api/org
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/org/invitations
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/org/invitations/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/org/invitations/:id/resend
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/org/members/me
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PATCH /api/org/members/:userId
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/org/members/:userId
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/tenders/:id/seen
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/tenders/:id/dismiss
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/watchlists/preview
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/watchlists
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PATCH /api/watchlists/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/watchlists/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/ingestion/run
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/notifications/read-all
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/notifications/:id/read
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/tenders/:id/documents
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/tenders/:id/documents/:docId
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/tenders/:id/fetch-documents
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/tenders/:id/analyse
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/analyses/:id/override
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PUT /api/scoring-weights
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PUT /api/profile
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/past-contracts
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PATCH /api/past-contracts/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/past-contracts/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/vault/reminders/run
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/vault
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PATCH /api/vault/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PUT /api/vault/:id/file
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/vault/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/tenders/:id/workspace
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PATCH /api/workspaces/:id
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PUT /api/workspaces/:id/mapping
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/workspaces/:id/overrides
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/workspaces/:id/overrides/:itemId
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/workspaces/:id/comments
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PUT /api/workspaces/:id/assist-values
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/workspaces/:id/submitted
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > PUT /api/annexure-templates/:key
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > DELETE /api/annexure-templates/:key
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/workspaces/:id/annexures/:key/preview
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/workspaces/:id/packets
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > POST /api/demo/seed
+✓ test/roles-matrix.test.ts > role matrix: every mutating route × every role (FR-022) > session-only routes refuse API tokens (403) even for an owner
+✓ test/roles-matrix.test.ts > matrix completeness guard (SC-003) > every mutating route registered on the app has exactly one matrix entry, and no entry is stale
+✓ test/security.test.ts > Origin check middleware > rejects a cookie-authenticated mutation from a foreign Origin with 403 bad_origin before the handler runs
+✓ test/security.test.ts > Origin check middleware > "Origin: null" (sandboxed iframe, file://) and a look-alike origin are rejected too
+✓ test/security.test.ts > Origin check middleware > allows the APP_URL origin, a missing Origin, and safe methods from any origin
+✓ test/security.test.ts > Origin check middleware > bearer-token requests are exempt even from a foreign Origin
+✓ test/security.test.ts > Origin check middleware > requests without a session cookie are not affected (login / signup errors stay as before)
+✓ test/security.test.ts > Origin check middleware > in development, loopback origins (Vite dev server) are accepted; in production they are not
