@@ -16,8 +16,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq, isNotNull } from 'drizzle-orm';
-import { bidWorkspaces, notifications, tenderMatches, tenders } from '@tp/db';
+import { and, eq, isNotNull, or } from 'drizzle-orm';
+import { bidWorkspaces, notifications, tenderDocuments, tenderMatches, tenders } from '@tp/db';
 import { createTestContext, request, signup, type SignedUp, type TestContext, type TestResponse } from './helpers';
 import { NOW, file, pdf, seedApply } from './workspace-fixtures';
 
@@ -322,5 +322,14 @@ describe('cross-org isolation sweep (contracts/api.md)', () => {
       expect(r.status, `${route}: ${r.text.slice(0, 200)}`).toBeLessThan(500);
     }
     expect(await snapshotOrgA()).toBe(before);
+  });
+
+  it('008/US7 FR-072: the shared extraction cache never holds an org-owned document (invariant after the sweep)', async () => {
+    const [{ n }] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(tenderDocuments)
+      .where(and(isNotNull(tenderDocuments.orgId), or(isNotNull(tenderDocuments.requirements), isNotNull(tenderDocuments.extractorVersion), isNotNull(tenderDocuments.extractedMethod))));
+    expect(n).toBe(0);
+    // Org A's uploaded tender document exists (positive control) and is not cached.
+    const [own] = await ctx.db.select().from(tenderDocuments).where(eq(tenderDocuments.id, ids.tenderDoc!));
+    expect(own).toMatchObject({ orgId: A.org.orgId, requirements: null, extractedMethod: null });
   });
 });

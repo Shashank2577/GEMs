@@ -14,7 +14,7 @@ import {
   type Requirement, type ScoreFactor,
 } from '@tp/db';
 import { buildChecklist } from '@tp/core/analyse/checklist';
-import { buildLlmPrompt, enrichWithLlm, promptChars } from '@tp/core/analyse/llm';
+import { CURRENT_EXTRACTOR_VERSION, buildLlmPrompt, enrichWithLlm, mergeRequirements, promptChars } from '@tp/core/analyse/llm';
 import {
   PdfPageLimitError, PdfTextError, extractPdf, isPdf, isScannedDocument, joinPages, looksScanned, splitPages,
 } from '@tp/core/analyse/pdf-text';
@@ -363,6 +363,29 @@ export function withTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms: nu
   return Promise.race([call(ctrl.signal), expired]).finally(() => clearTimeout(timer));
 }
 
+/**
+ * 008/FR-072 shared extraction cache — tenant isolation: ONLY documents fetched from GeM (`org_id IS NULL`, public data
+ * every org sees) are ever cached or reused. An org's own upload is never written to or read from the cache, so no
+ * requirement derived from one tenant's document can appear in another tenant's analysis.
+ */
+export function cachedExtraction(d: Pick<DocRow, 'orgId' | 'requirements' | 'extractorVersion' | 'extractedMethod'>): Requirement[] | null {
+  if (d.orgId !== null) return null;
+  if (d.extractedMethod !== 'LLM' || d.extractorVersion !== CURRENT_EXTRACTOR_VERSION || !Array.isArray(d.requirements)) return null;
+  return d.requirements;
+}
+
+async function storeExtraction(deps: AppDeps, d: DocRow, llmRequirements: Requirement[]): Promise<void> {
+  if (d.orgId !== null) return; // never cache an org's own document (see cachedExtraction)
+  try {
+    await deps.db.update(tenderDocuments).set({
+      requirements: llmRequirements, extractorVersion: CURRENT_EXTRACTOR_VERSION, extractedAt: deps.clock.now(), extractedMethod: 'LLM',
+    }).where(and(eq(tenderDocuments.id, d.id), isNull(tenderDocuments.orgId)));
+  } catch (e) {
+    // The cache is an optimisation: failing to write it must not fail the analysis.
+    deps.logger.warn('analyse: could not store the shared extraction', { documentId: d.id, error: (e as Error).message });
+  }
+}
+
 export async function analyseTender(
   deps: AppDeps, input: { orgId: string; userId: string; tenderId: string; viewer: TenderViewer },
   /**
@@ -427,7 +450,7 @@ export async function analyseTender(
     // No LLM call starts or runs past this point, so the final write lands a fixed reserve before both the overall
     // budget and the 2-minute running timeout (FR-028): two worst-case slow calls cannot make the run look timed out.
     const llmDeadlineMs = Math.min(limits.budgetMs, ANALYSIS_RUNNING_TIMEOUT_MS) - LLM_FINISH_RESERVE_MS;
-    const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0 };
+    const llmUse = { calls: 0, chars: 0, covered: 0, skipped: 0, total: 0, cached: 0 };
     for (const d of ordered) {
       const tx0 = performance.now();
       const pages = splitPages(d.text);
@@ -438,6 +461,9 @@ export async function analyseTender(
       const rules = extractRequirementsRules(pages, meta);
       extractMs += performance.now() - tx0;
       if (!deps.llm) { perDoc.push(rules); continue; }
+      // 008/FR-072: a GeM-public document already extracted at the current version is reused — no LLM call.
+      const cached = cachedExtraction(d);
+      if (cached) { perDoc.push(mergeRequirements(rules, cached)); usedLlm = true; llmUse.covered++; llmUse.cached++; continue; }
       const llm = deps.llm;
       const elapsed = elapsedSince(started);
       const remaining = limits.maxChars - llmUse.chars;
@@ -457,6 +483,10 @@ export async function analyseTender(
       llmUse.chars += r.inputChars;
       if (r.error) deps.logger.warn('analyse: LLM enrichment failed; using rules only', { tenderId: tender.id, error: r.error });
       if (r.used) llmUse.covered++;
+      // Only a whole-document extraction is shared: one cut short by this analysis' character budget is not.
+      if (r.used && r.llm && promptChars(buildLlmPrompt(pages, rules, docBudget)) === promptChars(buildLlmPrompt(pages, rules))) {
+        await storeExtraction(deps, d, r.llm);
+      }
       usedLlm ||= r.used;
       perDoc.push(r.requirements);
     }

@@ -11,6 +11,13 @@ import { MULTI_KEYS, requirementId } from './rules';
 /** Matches `LlmClient.completeJson` in apps/api (`deps.llm`). */
 export type CompleteJson = (req: { system?: string; prompt: string; maxTokens?: number }) => Promise<unknown>;
 
+/**
+ * Version of the LLM extraction (prompt, model choice, parser). 008/FR-072: GeM-public documents keep the requirements
+ * extracted at this version in `tender_documents` and every org's analysis reuses them; bumping this constant makes
+ * the next analysis of each document re-extract it once. A test pins the value so a change is always deliberate.
+ */
+export const CURRENT_EXTRACTOR_VERSION = 'llm-extract-2026-11-v1';
+
 /** The LLM's confidence is capped so a clean RULE match (0.95) is never displaced. */
 export const LLM_MAX_CONFIDENCE = 0.9;
 const MAX_CHARS = 60_000;
@@ -144,6 +151,8 @@ export interface LlmExtractResult {
   error?: string;
   /** Characters sent to the LLM (0 when not called). */
   inputChars: number;
+  /** The LLM's own requirements before the merge (set when `used`), what the shared extraction cache stores. */
+  llm?: Requirement[];
 }
 
 /** Run the LLM extractor and merge; on any failure, fall back to the rule results. */
@@ -160,7 +169,7 @@ export async function enrichWithLlm(
   try {
     const reply = await completeJson(prompt);
     const llm = parseLlmRequirements(reply, src);
-    return { requirements: mergeRequirements(rules, llm), used: true, inputChars };
+    return { requirements: mergeRequirements(rules, llm), used: true, inputChars, llm };
   } catch (e) {
     return { requirements: rules, used: false, error: (e as Error).message, inputChars };
   }

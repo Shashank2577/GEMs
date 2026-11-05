@@ -76,3 +76,21 @@ describe('LLM prompt character cap (008/FR-031)', () => {
     expect((await enrichWithLlm(['text'], [], null)).inputChars).toBe(0);
   });
 });
+
+describe('shared extraction cache version (008/FR-072)', () => {
+  it('CURRENT_EXTRACTOR_VERSION is pinned — changing it re-extracts every cached GeM document once; update this test only on purpose', async () => {
+    const { CURRENT_EXTRACTOR_VERSION } = await import('../../src/analyse/llm');
+    expect(CURRENT_EXTRACTOR_VERSION).toBe('llm-extract-2026-11-v1');
+  });
+
+  it('enrichWithLlm returns the LLM-only requirements (what the cache stores) next to the merged list', async () => {
+    const reply = { requirements: [{ key: 'certificate', label: 'ISO 9001', value: 'ISO 9001', page: 2, quote: 'ISO 9001 certified', confidence: 0.8 }] };
+    const r = await enrichWithLlm(['p1', 'p2'], [rule('emd', '50,000', 50_000)], async () => reply, { documentId: 'd1', fileName: 'bid.pdf' });
+    expect(r.used).toBe(true);
+    expect(r.llm).toHaveLength(1);
+    expect(r.llm![0]).toMatchObject({ key: 'certificate', method: 'LLM', source: { documentId: 'd1', page: 2 } });
+    expect(r.requirements.map((x) => x.key)).toEqual(['emd', 'certificate']);
+    const failed = await enrichWithLlm(['p1'], [], async () => { throw new Error('x'); });
+    expect(failed.llm).toBeUndefined();
+  });
+});
