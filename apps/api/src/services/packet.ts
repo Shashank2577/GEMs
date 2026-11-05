@@ -22,7 +22,7 @@ import { buildPacket, type BuildItem } from '@tp/core/packet/build';
 import { docStatus } from '@tp/core/vault/status';
 import type { AppDeps } from '../deps';
 import { HttpError, notFound } from '../lib/errors';
-import { toAnalysisDto } from './analyse';
+import { latestDoneAnalysis, toAnalysisDto } from './analyse';
 
 export type WorkspaceRow = typeof bidWorkspaces.$inferSelect;
 type TenderRow = typeof tenders.$inferSelect;
@@ -50,18 +50,16 @@ export async function getTenderRow(deps: AppDeps, id: string): Promise<TenderRow
   return t;
 }
 
+/** Latest DONE analysis (a failed/running attempt has no factors or checklist; FR-029). */
 export async function latestAnalysis(deps: AppDeps, org: string, tenderId: string): Promise<AnalysisRow | null> {
-  const [a] = await deps.db.select().from(analyses)
-    .where(and(eq(analyses.orgId, org), eq(analyses.tenderId, tenderId)))
-    .orderBy(desc(analyses.createdAt)).limit(1);
-  return a ?? null;
+  return latestDoneAnalysis(deps, tenderId, org);
 }
 
 export async function latestAnalyses(deps: AppDeps, org: string, tenderIds: string[]): Promise<Map<string, AnalysisRow>> {
   const out = new Map<string, AnalysisRow>();
   if (!tenderIds.length) return out;
   const rows = await deps.db.select().from(analyses)
-    .where(and(eq(analyses.orgId, org), inArray(analyses.tenderId, tenderIds))).orderBy(desc(analyses.createdAt));
+    .where(and(eq(analyses.orgId, org), inArray(analyses.tenderId, tenderIds), eq(analyses.status, 'done'))).orderBy(desc(analyses.createdAt));
   for (const r of rows) if (!out.has(r.tenderId)) out.set(r.tenderId, r);
   return out;
 }
