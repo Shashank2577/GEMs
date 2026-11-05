@@ -31,7 +31,7 @@ async function call<T>(s: Settings, path: string): Promise<T> {
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json())?.error?.message ?? msg; } catch { /* ignore */ }
-    throw new ApiError(res.status, res.status === 401 ? 'The API token is invalid or was revoked. Create a new one in TenderPilot → Settings → API tokens.' : msg);
+    throw new ApiError(res.status, res.status === 401 ? 'The API token is invalid, expired or was revoked. Create a new one in TenderPilot → Settings → API tokens.' : msg);
   }
   return res.json() as Promise<T>;
 }
