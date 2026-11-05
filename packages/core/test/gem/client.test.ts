@@ -154,4 +154,73 @@ describe('extractCsrfToken', () => {
     expect(extractCsrfToken(html)).toBe(TOKEN);
   });
   it('returns null when absent', () => expect(extractCsrfToken('<html/>')).toBeNull());
+
+  describe('byte-capped bid document download (FR-008)', () => {
+    const pdfStream = (chunks: number, chunkBytes: number, onCancel: () => void, onPull?: () => void) => {
+      let sent = 0;
+      return new ReadableStream<Uint8Array>({
+        pull(c) {
+          onPull?.();
+          if (sent >= chunks) return c.close();
+          const chunk = new Uint8Array(chunkBytes).fill(0x20);
+          if (sent === 0) chunk.set(new TextEncoder().encode('%PDF-1.7'));
+          sent++;
+          c.enqueue(chunk);
+        },
+        cancel() { onCancel(); },
+      });
+    };
+
+    for (const advertised of [true, false]) {
+      it(`aborts above the cap with GemError code too_large, without retrying (content-length ${advertised ? 'advertised' : 'absent'})`, async () => {
+        let canceled = false;
+        let pulls = 0;
+        const { f, calls } = fakeGem((c) => (c.url.includes('showbid')
+          ? new Response(pdfStream(10, 400, () => { canceled = true; }, () => { pulls++; }), { headers: advertised ? { 'content-type': 'application/pdf', 'content-length': '4000' } : { 'content-type': 'application/pdf' } })
+          : undefined));
+        const time = fakeTime();
+        const gem = new GemClient(f, { baseUrl: 'http://gem.test', minIntervalMs: 0, sleep: time.sleep, now: time.now, maxDocumentBytes: 1000 });
+        const err = await gem.fetchBidDocument('7421001').catch((e) => e);
+        expect(err).toBeInstanceOf(GemError);
+        expect(err).toMatchObject({ code: 'too_large', retryable: false });
+        expect(calls.filter((c) => c.url.includes('showbid'))).toHaveLength(1);
+        expect(canceled).toBe(true);
+        expect(pulls).toBeLessThan(10); // stopped streaming early
+      });
+    }
+
+    it('accepts a document exactly at the cap and reassembles the chunks', async () => {
+      const { f } = fakeGem((c) => (c.url.includes('showbid') ? new Response(pdfStream(4, 250, () => {})) : undefined));
+      const time = fakeTime();
+      const gem = new GemClient(f, { baseUrl: 'http://gem.test', minIntervalMs: 0, sleep: time.sleep, now: time.now, maxDocumentBytes: 1000 });
+      const doc = await gem.fetchBidDocument('7421001');
+      expect(doc.bytes.byteLength).toBe(1000);
+      expect(new TextDecoder().decode(doc.bytes.slice(0, 8))).toBe('%PDF-1.7');
+    });
+
+    it('keeps the request deadline through the body read and cancels a trickling body (FR-005)', async () => {
+      let canceled = false;
+      const neverCloses = new ReadableStream<Uint8Array>({
+        start(c) { c.enqueue(new TextEncoder().encode('%PDF-1.7')); }, // first chunk, then silence
+        cancel() { canceled = true; },
+      });
+      const { f } = fakeGem((c) => (c.url.includes('showbid') ? new Response(neverCloses, { headers: { 'content-type': 'application/pdf' } }) : undefined));
+      const time = fakeTime();
+      const gem = new GemClient(f, { baseUrl: 'http://gem.test', minIntervalMs: 0, sleep: time.sleep, now: time.now, timeoutMs: 50 });
+      const err = await gem.fetchBidDocument('7421001').catch((e) => e);
+      expect(err).toBeInstanceOf(GemError);
+      expect(err).toMatchObject({ code: 'timeout', retryable: true });
+      expect(err.message).toMatch(/timed out/);
+      expect(canceled).toBe(true);
+    });
+
+    it('defaults to a 25 MB cap', async () => {
+      const { f } = fakeGem((c) => (c.url.includes('showbid')
+        ? new Response('%PDF-1.7', { headers: { 'content-length': String(25 * 1024 * 1024 + 1) } })
+        : undefined));
+      const time = fakeTime();
+      const gem = new GemClient(f, { baseUrl: 'http://gem.test', minIntervalMs: 0, sleep: time.sleep, now: time.now });
+      await expect(gem.fetchBidDocument('1')).rejects.toMatchObject({ code: 'too_large' });
+    });
+  });
 });

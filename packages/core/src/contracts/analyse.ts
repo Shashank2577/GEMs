@@ -42,6 +42,13 @@ export type ScoringWeightsInput = z.infer<typeof scoringWeightsSchema>;
 /** GET/PUT /scoring-weights response. */
 export interface ScoringWeights { weights: Record<FactorKey, number>; defaults: Record<FactorKey, number>; custom: boolean }
 
+/** Why an analysis became stale (FR-043). */
+export const STALE_REASONS = ['corrigendum', 'document_added', 'document_removed', 'profile_changed', 'vault_changed', 'weights_changed'] as const;
+export type StaleReason = (typeof STALE_REASONS)[number];
+
+/** Non-blocking upload warnings (FR-010). */
+export interface TenderDocumentWarning { code: 'bid_number_mismatch'; found: string }
+
 /** Tender document (GeM-fetched when orgId is null, else uploaded by the org). Text is omitted. */
 export interface TenderDocumentDto {
   id: string;
@@ -54,8 +61,15 @@ export interface TenderDocumentDto {
   sourceUrl: string | null;
   hasText: boolean;
   source: 'gem' | 'upload';
+  /** Where the stored text came from: the PDF text layer or OCR (FR-052). */
+  textSource: 'pdf' | 'ocr';
+  /** Bid number printed on page 1 when it differs from the tender's (FR-010), else null. */
+  bidNumberFound: string | null;
   createdAt: string;
 }
+
+/** POST /tenders/:id/documents response (201). */
+export interface UploadTenderDocumentResponse extends TenderDocumentDto { warnings: TenderDocumentWarning[] }
 
 export type AnalysisStatus = 'pending' | 'running' | 'done' | 'failed';
 export type Verdict = 'go' | 'review' | 'no_go';
@@ -75,6 +89,10 @@ export interface AnalysisDto {
   summary: string | null;
   error: string | null;
   stale: boolean;
+  staleReason: StaleReason | null;
+  staleAt: string | null;
+  /** Analysis notes, e.g. pages not read by AI (FR-051). */
+  notes: string[];
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;

@@ -4,7 +4,7 @@ import {
   FileBadge, FileCheck2, FileSpreadsheet, FileText, Flag, Handshake, Landmark, ReceiptText, ScrollText, ShieldCheck, Sparkles,
   Timer, Truck, type LucideIcon,
 } from 'lucide-react';
-import type { FactorStatus, Requirement, TenderDocKind } from '@tp/core/contracts/analyse';
+import type { FactorStatus, Requirement, StaleReason, TenderDocKind } from '@tp/core/contracts/analyse';
 import { formatDateIST, formatINR } from '@/lib/format';
 
 export const FACTOR_ICON: Record<string, LucideIcon> = {
@@ -36,6 +36,18 @@ export const STATUS_META: Record<FactorStatus, StatusMeta> = {
 };
 
 export const DOC_KIND_LABEL: Record<TenderDocKind, string> = { bid: 'Bid document', atc: 'ATC', corrigendum: 'Corrigendum', boq: 'BOQ', other: 'Other' };
+
+/** Stale-banner body per reason (FR-043). Analyses marked stale before reasons existed are corrigenda. */
+export const STALE_REASON_COPY: Record<StaleReason, string> = {
+  corrigendum: 'A corrigendum changed this bid after it was analysed. The score below may be outdated.',
+  document_added: 'A document was added since this analysis. Re-analyse to include it.',
+  document_removed: 'A document was removed since this analysis. Re-analyse to update the score.',
+  profile_changed: 'Your company profile changed since this analysis. Re-analyse to update the score.',
+  vault_changed: 'Your document vault changed since this analysis. Re-analyse to update the score.',
+  weights_changed: 'Scoring weights changed since this analysis. Re-analyse to update the score.',
+};
+
+export const staleReasonCopy = (reason: StaleReason | null | undefined) => STALE_REASON_COPY[reason ?? 'corrigendum'] ?? STALE_REASON_COPY.corrigendum;
 
 export const DOC_TYPE_LABEL: Record<string, string> = {
   gst: 'GST', pan: 'PAN', udyam: 'Udyam', startup_dpiit: 'DPIIT', incorporation: 'Incorporation', balance_sheet: 'Balance sheet', itr: 'ITR',

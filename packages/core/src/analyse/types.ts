@@ -15,7 +15,7 @@ export interface Requirement {
   value?: string | number | boolean | null;
   numeric?: number | null;
   mandatory: boolean;
-  source: { documentId?: string; fileName?: string; page?: number; quote?: string };
+  source: { documentId?: string; fileName?: string; page?: number; quote?: string; ocr?: boolean };
   method: 'RULE' | 'LLM' | 'MANUAL';
   confidence: number;
 }
