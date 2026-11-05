@@ -1,0 +1,19 @@
+$ pnpm exec tsx scripts/e2e-summary.ts qa/.runs/us1-flaky-probe/results.json
+## E2E results: PASSED (with flaky tests)
+
+| total | passed | failed | flaky | skipped |
+|---:|---:|---:|---:|---:|
+| 1 | 0 | 0 | 1 | 0 |
+
+total: 1 · passed: 0 · failed: 0 · flaky: 1 · skipped: 0
+
+### Flaky (passed on retry)
+
+- flaky.probe.ts › fails on the first attempt, passes on retry
+
+_Source: `qa/.runs/us1-flaky-probe/results.json`. Traces, videos and the HTML report are in the `e2e-evidence-<run_id>` artifact._
+
+
+trace files kept under outputDir (retries: 1, trace: 'on'):
+  qa/.runs/us1-flaky-probe/artifacts/flaky.probe.ts-fails-on-the-first-attempt-passes-on-retry/trace.zip
+  qa/.runs/us1-flaky-probe/artifacts/flaky.probe.ts-fails-on-the-first-attempt-passes-on-retry-retry1/trace.zip

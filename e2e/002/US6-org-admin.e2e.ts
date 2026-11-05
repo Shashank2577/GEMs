@@ -279,7 +279,7 @@ test('sc4 Scoring weights: change Turnover -> shares update, PUT persists, "Cust
   await expect(page.getByText('Default weights', { exact: true })).toBeVisible();
   const turnover = page.locator('#w-turnover');
   await expect(turnover).toHaveAttribute('min', '0');
-  await expect(turnover).toHaveAttribute('max', '50');
+  await expect(turnover).toHaveAttribute('max', '100'); // 004/US4 FR-036: same 0-100 range the API accepts
   const oldV = before.defaults.turnover!;
   const newV = oldV === 30 ? 20 : 30;
   const sum = Object.values(before.weights).reduce((a, b) => a + b, 0);
@@ -298,7 +298,7 @@ test('sc4 Scoring weights: change Turnover -> shares update, PUT persists, "Cust
   expect(put.status()).toBe(200);
   expect(JSON.parse(put.request().postData()!)).toMatchObject({ turnover: newV });
   await expect(toast(page, 'Scoring weights saved')).toBeVisible();
-  await expect(toast(page, 'New analyses use them; re-run an analysis to rescore it.')).toBeVisible();
+  await expect(toast(page, 'New analyses use them; open a tender and Re-score to update an existing result.') /* wording since 004/US4 */).toBeVisible();
   await expect(page.getByText('Custom weights', { exact: true })).toBeVisible();
   const saved = await (await bm.api.get('/api/scoring-weights')).json();
   expect(saved.custom).toBe(true);
@@ -775,7 +775,7 @@ test('sc7d Activity log states: skeleton while loading, error with Retry then re
   const gate = new Promise<void>((res) => { release = res; });
   await page.route('**/api/activity?*', async (route) => { await gate; await route.continue(); });
   await page.goto('/settings/activity');
-  const skeleton = page.getByRole('status', { name: 'Loading' });
+  const skeleton = page.getByRole('status', { name: 'Loading', exact: true }); // exact: the route-level "Loading page" skeleton may show too
   await expect(skeleton).toBeVisible();
   await expect(rowsOf(page)).toHaveCount(0);
   await ev(page, 'sc7-state-skeleton');

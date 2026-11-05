@@ -1,0 +1,85 @@
+# Definition-of-Done gate for story PRs (spec 008 US1 FR-004): QA verdict exists and is approved, no criterion
+# "not met", screenshot + video evidence present and linked, commit trailers present (merge commits and commits already on
+# the base branch exempt), PR body has "Closes #n"/"Part of #n" and no unticked box ("- [~]" = deferral). Pattern adapted from ai-sdlc
+# dod-check.yml (MIT, NOTICE §3); the check itself is scripts/dod-check.ts (no remote script fetch).
+# Docs-only PRs skip the check; `dod` itself always runs (if: always()) so it fails when `dod-changes` errors instead of
+# being skipped (a skipped job would satisfy the required check).
+name: dod
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, edited, labeled, unlabeled, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dod-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dod-changes:
+    name: dod-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Docs-only path filter
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # --no-renames: moving code into docs/ lists the old path too, so it is not docs-only.
+          docs="$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA" | scripts/docs-only.sh)"
+          echo "code=$([ "$docs" = "true" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+
+  dod:
+    name: dod
+    needs: dod-changes
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CHANGES_RESULT: ${{ needs.dod-changes.result }}
+      CODE: ${{ needs.dod-changes.outputs.code }}
+    steps:
+      - name: Path filter result
+        id: gate
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then echo "::error::dod-changes did not succeed ($CHANGES_RESULT)"; exit 1; fi
+          if [ "$CODE" != "true" ]; then echo "Docs-only PR: Definition-of-Done check skipped." | tee -a "$GITHUB_STEP_SUMMARY"; fi
+          echo "run=$CODE" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.run == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.gate.outputs.run == 'true'
+      - name: Definition-of-Done check
+        if: steps.gate.outputs.run == 'true'
+        env:
+          # Event data via env (never interpolated into the script); refreshed from the API with the read-only token.
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec tsx scripts/dod-check.ts

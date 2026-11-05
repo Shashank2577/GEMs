@@ -1,0 +1,11 @@
+# GET repos/Shashank2577/GEMs/branches/main/protection
+{"message":"Resource not accessible by integration","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","status":"403"}gh: Resource not accessible by integration (HTTP 403)
+
+# GET .../protection/required_status_checks
+{"message":"Resource not accessible by integration","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-status-checks-protection","status":"403"}gh: Resource not accessible by integration (HTTP 403)
+
+# GET repos/Shashank2577/GEMs/branches/main (protected + protection fields)
+{"name":"main","protected":true,"protection":{"enabled":true,"required_status_checks":{"checks":[{"app_id":15368,"context":"typecheck"},{"app_id":15368,"context":"unit"},{"app_id":15368,"context":"api"},{"app_id":15368,"context":"e2e"},{"app_id":15368,"context":"migrations-additive"},{"app_id":15368,"context":"dod"},{"app_id":15368,"context":"ci-gate"}],"contexts":["typecheck","unit","api","e2e","migrations-additive","dod","ci-gate"],"enforcement_level":"everyone"}}}
+
+# apply run
+{"conclusion":"success","event":"workflow_dispatch","head_sha":"6d9c8bf90285b804dfd8fe3db24396b6c3cb8bfe","html_url":"https://github.com/Shashank2577/GEMs/actions/runs/42030082097","id":42030082097,"name":"apply-branch-protection"}

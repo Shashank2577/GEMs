@@ -1,0 +1,129 @@
+{
+  "runId": 41957939940,
+  "sha": "3b175b08fccc3f65d115760ec428ac07c9cc4176",
+  "url": "https://github.com/Shashank2577/GEMs/actions/runs/41957939940",
+  "startedAt": "2026-11-05T02:52:01Z",
+  "completedAt": "2026-11-05T02:55:30Z",
+  "jobs": [
+    {
+      "name": "changes",
+      "conclusion": "success",
+      "started": "2026-11-05T02:52:03Z",
+      "completed": "2026-11-05T02:52:09Z",
+      "steps": [
+        {
+          "name": "Docs-only path filter",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "typecheck",
+      "conclusion": "success",
+      "started": "2026-11-05T02:52:03Z",
+      "completed": "2026-11-05T02:52:46Z",
+      "steps": [
+        {
+          "name": "pnpm install --frozen-lockfile",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm typecheck",
+          "conclusion": "success"
+        },
+        {
+          "name": "Typecheck scripts/ and e2e/",
+          "conclusion": "success"
+        },
+        {
+          "name": "Audit production dependencies (continue-on-error)",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "unit",
+      "conclusion": "success",
+      "started": "2026-11-05T02:52:10Z",
+      "completed": "2026-11-05T02:52:31Z",
+      "steps": [
+        {
+          "name": "Unit tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Repo tooling tests",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "migrations-additive",
+      "conclusion": "success",
+      "started": "2026-11-05T02:52:11Z",
+      "completed": "2026-11-05T02:52:28Z",
+      "steps": [
+        {
+          "name": "Destructive SQL",
+          "conclusion": "success"
+        },
+        {
+          "name": "Schema drift",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "api",
+      "conclusion": "success",
+      "started": "2026-11-05T02:52:33Z",
+      "completed": "2026-11-05T02:53:23Z",
+      "steps": [
+        {
+          "name": "Initialize containers (postgres:16)",
+          "conclusion": "success"
+        },
+        {
+          "name": "API integration tests",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "e2e",
+      "conclusion": "success",
+      "started": "2026-11-05T02:53:25Z",
+      "completed": "2026-11-05T02:55:25Z",
+      "steps": [
+        {
+          "name": "Install Playwright Chromium",
+          "conclusion": "success"
+        },
+        {
+          "name": "E2E (Playwright)",
+          "conclusion": "success"
+        },
+        {
+          "name": "E2E job summary",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload QA evidence",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "ci-gate",
+      "conclusion": "success",
+      "started": "2026-11-05T02:55:27Z",
+      "completed": "2026-11-05T02:55:30Z",
+      "steps": [
+        {
+          "name": "All CI jobs passed or were skipped",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+# Deploy hand-off (spec 008 US1 scenario 8 / FR-007). PLACEHOLDER: US2 task T036 replaces the `deploy` job below with
+# the real `staging` and `production` jobs (web build → db:migrate → wrangler deploy --var APP_VERSION:<sha> → smoke).
+#
+# Triggers:
+#   - workflow_call: from the `deploy` job in ci.yml, which runs only on a push to main after `ci-gate` succeeded.
+#     (`workflow_run` is not used: it only fires for workflow files on the repository's default branch, which is
+#     currently not `main`.) A red `ci` therefore never reaches this workflow.
+#   - workflow_dispatch: manual (re)deploy of a ref by an operator.
+# Concurrency is set on the job (not on the calling job in ci.yml, which would deadlock on the same group):
+# one deploy at a time, never cancelled mid-flight.
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit to deploy (defaults to the triggering commit)
+        type: string
+        required: false
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to deploy (defaults to the selected ref)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy (placeholder until T036)
+        env:
+          SHA: ${{ inputs.sha || github.sha }}
+          REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "Deploying ${SHA} (ref ${REF}, triggered by ${EVENT})"
+          echo "No-op: staging/production jobs arrive with spec 008 US2 task T036." | tee -a "$GITHUB_STEP_SUMMARY"

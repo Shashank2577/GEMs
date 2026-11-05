@@ -1,0 +1,34 @@
+# captured 2026-11-05T12:50:32Z
+# main = 6d9c8bf90285b804dfd8fe3db24396b6c3cb8bfe
+
+## PR #563 [002/fix] Make US6 sc5c independent of tenders left by earlier tests head=d39841a070e9b80568750714177c53d6eb83b6d1 mergeable=true mergeable_state=blocked behind_by=0
+  api	in_progress	null
+  dod	completed	success
+  dod-changes	completed	success
+  migrations-additive	completed	success
+  unit	completed	success
+  dod	completed	failure
+  typecheck	completed	success
+  dod-changes	completed	cancelled
+  changes	completed	success
+
+## PR #544 [008/US1] Playbook: merge step under branch protection head=1d954cf5ed2b8210f41ef00452326f57085b6949 mergeable=true mergeable_state=clean behind_by=0
+  deploy	completed	skipped
+  ci-gate	completed	success
+  e2e	completed	skipped
+  e2e-shard-${{ matrix.shard }}	completed	skipped
+  api	completed	skipped
+  unit	completed	skipped
+  migrations-additive	completed	skipped
+  dod	completed	success
+  dod-changes	completed	success
+  typecheck	completed	success
+  changes	completed	success
+
+## PR #564 [003/US6] Bid results, award status and competitor intelligence head=e39174b6d2df01f3aae52bd770770c66c686abcb mergeable=false mergeable_state=dirty behind_by=4
+
+## PR #562 [007/fix] US2-6 e2e: second org cannot see demo tenders (008/FR-016) head=84f041b23bf23552e5dfc1f147de870dce9a9617 mergeable=false mergeable_state=dirty behind_by=1
+
+## PR #560 [004/US7] AI enrichment and OCR for scanned documents with Claude head=7b2277019cb7dd30cf91fcebb399470abb14df75 mergeable=false mergeable_state=dirty behind_by=4
+
+## PR #492 [008/US2] Ordered, audited releases to Cloudflare + Neon with staging, custom domain, secrets and backups head=de3b25b2c9e7fb3bb8a955ef090d0adb680334ed mergeable=false mergeable_state=dirty behind_by=53
