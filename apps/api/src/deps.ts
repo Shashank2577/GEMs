@@ -80,6 +80,12 @@ export interface Mailer {
   /** False when no provider key is configured; `send` then logs and returns `{skipped:true}`. */
   readonly configured: boolean;
   send(msg: EmailMessage): Promise<SendResult>;
+  /**
+   * 008/FR-074: send many messages in as few provider calls as possible (Resend `/emails/batch`, ≤ 100 per call).
+   * Results are in input order. A failed provider call rejects (every message of that call counts as failed).
+   * Optional so simple test doubles need only `send`; callers fall back to one `send` per message.
+   */
+  sendMany?(msgs: EmailMessage[]): Promise<SendResult[]>;
 }
 
 export interface WhatsAppMessage {

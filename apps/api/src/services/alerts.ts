@@ -7,7 +7,7 @@
  */
 import { and, eq, inArray } from 'drizzle-orm';
 import { notificationPrefs, notifications, organizations, tenders, users } from '@tp/db';
-import type { AppDeps } from '../deps';
+import type { AppDeps, EmailMessage } from '../deps';
 
 type NotificationRow = typeof notifications.$inferSelect;
 
@@ -135,11 +135,14 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   // Group: instant → one message per row; daily → one digest per (user, org, channel).
   const digestGroups = new Map<string, typeof pending>();
   const digestDue = istHour(now) >= DIGEST_HOUR_IST;
+  // 008/FR-074: instant emails go out together via Mailer.sendMany (Resend /emails/batch, ≤ 100 per call).
+  const instantEmails: typeof pending = [];
   for (const p of pending) {
     const daily = p.frequency === 'daily' && p.n.kind === 'tender_match';
+    if (!daily && p.n.channel === 'email') { instantEmails.push(p); continue; }
     if (!daily) {
       try {
-        const r = await sendOne(deps, p, tenderById, now);
+        const r = await sendOne(deps, p, tenderById, now); // WhatsApp (instant emails are batched below)
         await mark([p.n.id], r.skipped ? 'skipped' : 'sent', r.skipped ? r.reason ?? 'Channel not configured' : null);
       } catch (e) {
         logger.warn('notification send failed', { id: p.n.id, channel: p.n.channel, error: errMsg(e) });
@@ -154,6 +157,8 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
     g.push(p);
     digestGroups.set(key, g);
   }
+
+  await sendInstantEmails(deps, instantEmails, tenderById, now, mark);
 
   for (const [key, group] of digestGroups) {
     const [userId, orgId, channel] = key.split('|');
@@ -206,25 +211,68 @@ export async function dispatchNotifications(deps: AppDeps, opts: { limit?: numbe
   return report;
 }
 
+/** Most messages one `Mailer.sendMany` call is given (= Resend's batch limit, adapters/mailer.ts). */
+export const EMAIL_BATCH_SIZE = 100;
+const EMAIL_NOT_CONFIGURED = 'Email is not configured (RESEND_API_KEY)';
+
+function instantEmail(deps: AppDeps, p: { n: NotificationRow; email: string; orgName: string }, tenderById: Map<string, TenderRow>, now: Date): EmailMessage {
+  const { config } = deps;
+  const tender = tenderById.get(tenderIdFromLink(p.n.link) ?? '');
+  const heading = p.n.kind === 'tender_match' ? 'A new GeM tender matches your watchlist' : p.n.title;
+  return {
+    to: p.email,
+    subject: p.n.title,
+    html: renderAlertEmail({ heading, intro: p.n.kind === 'tender_match' ? 'Act early — the best bids are prepared well before the deadline.' : p.n.body, rows: [{ n: p.n, tender }], appUrl: config.appUrl, orgName: p.orgName, now }),
+    text: textVersion([p], config.appUrl),
+  };
+}
+
+/**
+ * Instant (non-digest) email rows: ≤ EMAIL_BATCH_SIZE messages per provider call via `Mailer.sendMany`; a failed call
+ * marks its rows failed and the next batch still goes. Mailers without `sendMany` get one `send` per row.
+ */
+async function sendInstantEmails(
+  deps: AppDeps, rows: { n: NotificationRow; email: string; orgName: string }[], tenderById: Map<string, TenderRow>, now: Date,
+  mark: (ids: string[], status: 'sent' | 'skipped' | 'failed', error?: string | null) => Promise<void>,
+): Promise<void> {
+  const { mailer, logger } = deps;
+  for (let i = 0; i < rows.length; i += EMAIL_BATCH_SIZE) {
+    const chunk = rows.slice(i, i + EMAIL_BATCH_SIZE);
+    const msgs = chunk.map((p) => instantEmail(deps, p, tenderById, now));
+    if (!mailer.sendMany) {
+      for (const [j, p] of chunk.entries()) {
+        try {
+          const r = await mailer.send(msgs[j]!);
+          await mark([p.n.id], r.skipped ? 'skipped' : 'sent', r.skipped ? EMAIL_NOT_CONFIGURED : null);
+        } catch (e) {
+          logger.warn('notification send failed', { id: p.n.id, channel: 'email', error: errMsg(e) });
+          await mark([p.n.id], 'failed', errMsg(e));
+        }
+      }
+      continue;
+    }
+    try {
+      const results = await mailer.sendMany(msgs);
+      const skipped = chunk.filter((_, j) => results[j]?.skipped).map((p) => p.n.id);
+      await mark(chunk.filter((_, j) => !results[j]?.skipped).map((p) => p.n.id), 'sent');
+      await mark(skipped, 'skipped', EMAIL_NOT_CONFIGURED);
+    } catch (e) {
+      logger.warn('email batch send failed', { count: chunk.length, error: errMsg(e) });
+      await mark(chunk.map((p) => p.n.id), 'failed', errMsg(e));
+    }
+  }
+}
+
 async function sendOne(
   deps: AppDeps,
-  p: { n: NotificationRow; email: string; phone: string | null; orgName: string },
+  p: { n: NotificationRow; phone: string | null },
   tenderById: Map<string, TenderRow>,
   now: Date,
 ): Promise<{ skipped: boolean; reason?: string }> {
-  const { mailer, whatsapp, config } = deps;
+  const { whatsapp, config } = deps;
   const tender = tenderById.get(tenderIdFromLink(p.n.link) ?? '');
   const url = `${config.appUrl}${p.n.link ?? ''}`;
-  if (p.n.channel === 'email') {
-    const heading = p.n.kind === 'tender_match' ? 'A new GeM tender matches your watchlist' : p.n.title;
-    const r = await mailer.send({
-      to: p.email,
-      subject: p.n.title,
-      html: renderAlertEmail({ heading, intro: p.n.kind === 'tender_match' ? 'Act early — the best bids are prepared well before the deadline.' : p.n.body, rows: [{ n: p.n, tender }], appUrl: config.appUrl, orgName: p.orgName, now }),
-      text: textVersion([p], config.appUrl),
-    });
-    return r.skipped ? { skipped: true, reason: 'Email is not configured (RESEND_API_KEY)' } : { skipped: false };
-  }
+  // Instant emails are batched by sendInstantEmails; this sends one WhatsApp message.
   if (!p.phone) return { skipped: true, reason: 'No mobile number on the account' };
   const closes = tender?.endAt ? istDate(tender.endAt) : '';
   const r = await whatsapp.send({
