@@ -15,11 +15,14 @@ export const MAX_TENDER_DOC_PAGES = 300;
 /** Share of pages with an empty text layer at which a PDF counts as a scan (FR-030, US4 scenario 9). */
 export const SCANNED_EMPTY_PAGE_RATIO = 0.8;
 
-/** At most this many LLM calls per analysis; the rest of the documents are read by rules only (FR-031). */
-export const MAX_LLM_CALLS_PER_ANALYSIS = 2;
+/**
+ * At most this many LLM calls per analysis (automatic OCR, enrichment chunks and escalation); the rest is read by rules
+ * only (008/FR-031, raised from 2 by 004/FR-051 for chunked reading — ~5× the worst-case cost, see ADR-0008 amendment).
+ */
+export const MAX_LLM_CALLS_PER_ANALYSIS = 8;
 
-/** Total characters sent to the LLM in one analysis (FR-031). */
-export const MAX_LLM_INPUT_CHARS = 90_000;
+/** Total characters sent to the LLM in one analysis (008/FR-031; 8 × 60,000-character chunks, 004/FR-051). */
+export const MAX_LLM_INPUT_CHARS = 480_000;
 
 /** Timeout of one LLM call (FR-031). */
 export const LLM_CALL_TIMEOUT_MS = 60_000;

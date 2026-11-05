@@ -15,7 +15,12 @@ export interface RuntimeEnv {
   GEM_MIN_INTERVAL_MS?: string;
   GEM_MAX_PAGES?: string;
   ANTHROPIC_API_KEY?: string;
+  /** Enrichment model (default claude-sonnet-5-5). */
   LLM_MODEL?: string;
+  /** Scanned-PDF transcription model (default claude-opus-5-5); only used when ANTHROPIC_API_KEY is set (004/FR-050). */
+  LLM_OCR_MODEL?: string;
+  /** Optional adjudicator for blocking requirements the rules are unsure about (e.g. claude-fable-5-1); unset = off. */
+  LLM_ESCALATION_MODEL?: string;
   LLM_BASE_URL?: string;
   RESEND_API_KEY?: string;
   MAIL_FROM?: string;
@@ -62,6 +67,10 @@ export interface AppConfig {
   logRequests: boolean;
   mailFrom: string;
   llmModel: string;
+  /** Model for OCR of scanned PDFs (004/FR-050). */
+  llmOcrModel: string;
+  /** Model that adjudicates uncertain blocking requirements; null = escalation off. */
+  llmEscalationModel: string | null;
   /** Proxy whose client-IP header is trusted for rate limiting (002/FR-010). */
   trustProxy: TrustProxy;
   /** Max Σ stored input size of a packet build before it is refused with 413 (006/FR-056, NFR-003). */
@@ -93,6 +102,7 @@ function parseTrustProxy(v: string | undefined): TrustProxy {
 }
 
 export const DEFAULT_LLM_MODEL = 'claude-sonnet-5-5';
+export const DEFAULT_LLM_OCR_MODEL = 'claude-opus-5-5';
 export const DEFAULT_GEM_BASE_URL = 'https://bidplus.gem.gov.in';
 export const DEFAULT_GEM_USER_AGENT = 'TenderPilot/0.1 (+https://tenderpilot.in/bot; public BidPlus listings only)';
 export const APP_VERSION = '0.1.0';
@@ -131,6 +141,8 @@ export function loadConfig(env: RuntimeEnv): AppConfig {
     logRequests: truthy(env.LOG_REQUESTS, environment !== 'test'),
     mailFrom: env.MAIL_FROM || 'TenderPilot <alerts@tenderpilot.in>',
     llmModel: env.LLM_MODEL || DEFAULT_LLM_MODEL,
+    llmOcrModel: env.LLM_OCR_MODEL || DEFAULT_LLM_OCR_MODEL,
+    llmEscalationModel: env.LLM_ESCALATION_MODEL?.trim() || null,
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     packetMaxInputBytes: positiveInt(env.PACKET_MAX_INPUT_BYTES, DEFAULT_PACKET_MAX_INPUT_BYTES),
     adminToken: parseAdminToken(env.ADMIN_TOKEN),

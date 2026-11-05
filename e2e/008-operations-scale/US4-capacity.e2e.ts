@@ -307,7 +307,8 @@ test('sc6 feed, watchlist preview and dashboard responses carry list columns onl
 // ═════════════ scenario 7 — LLM budget per analysis ═════════════
 
 for (const phone of [false, true]) {
-  test(`sc7 tender with 5 documents + LLM: ≤ 2 LLM calls, ≤ 90,000 chars, < 120 s, warning "AI review covered 2 of 5 documents; the rest were checked by rules only."${phone ? ' @mobile' : ''}`, async ({ page }) => {
+  // Caps amended by 004/FR-051 (8 calls, 480,000 chars; 008/FR-031 note): 10 one-chunk documents overflow the 8 calls.
+  test(`sc7 tender with 10 documents + LLM: ≤ 8 LLM calls, ≤ 480,000 chars, < 120 s, warning "AI review covered 8 of 10 documents; the rest were checked by rules only."${phone ? ' @mobile' : ''}`, async ({ page }) => {
     test.skip(phone && PROJECT() !== 'mobile', 'phone variant runs in the mobile project');
     test.skip(!phone && PROJECT() === 'mobile', 'desktop variant');
     test.setTimeout(150_000);
@@ -321,28 +322,30 @@ for (const phone of [false, true]) {
       ['nogo-experience.pdf', 'boq', 'BOQ'], ['synthetic-tender.pdf', 'other', 'Other'],
     ];
     const { readFileSync } = await import('node:fs');
-    for (const [name, kind] of files) {
-      const r = await uploadApi(page.request, tender.id, pdfFile(name, readFileSync(join(BIDS, name))), kind);
-      expect(r.status(), await r.text()).toBe(201);
+    for (const copy of ['', '-copy']) {
+      for (const [name, kind] of files) {
+        const r = await uploadApi(page.request, tender.id, pdfFile(name.replace(/\.pdf$/, `${copy}.pdf`), readFileSync(join(BIDS, name))), kind);
+        expect(r.status(), await r.text()).toBe(201);
+      }
     }
-    t.add(`tender ${tender.bidNumber} has ${docCount(tender.id)} documents (bid, ATC, corrigendum, BOQ, other)`);
+    t.add(`tender ${tender.bidNumber} has ${docCount(tender.id)} documents (bid, ATC, corrigendum, BOQ, other; each twice)`);
     llmCalls.length = 0;
     await page.goto(`/tenders/${tender.id}`);
     const started = Date.now();
     await page.getByRole('button', { name: /Analyse eligibility/ }).first().click();
     const warn = page.getByTestId('analysis-warnings');
-    await expect(warn).toContainText('AI review covered 2 of 5 documents; the rest were checked by rules only.', { timeout: 120_000 });
+    await expect(warn).toContainText('AI review covered 8 of 10 documents; the rest were checked by rules only.', { timeout: 120_000 });
     const wall = Date.now() - started;
     const totalChars = llmCalls.reduce((n, c) => n + c.chars, 0);
     t.add(`LLM calls made by this analysis: ${llmCalls.length}; characters sent per call: [${llmCalls.map((c) => c.chars).join(', ')}]; total ${totalChars}`);
     t.add(`wall clock click → warning visible: ${wall} ms`);
-    expect(llmCalls.length).toBeLessThanOrEqual(2);
+    expect(llmCalls.length).toBeLessThanOrEqual(8);
     expect(llmCalls.length).toBeGreaterThan(0);
-    expect(totalChars).toBeLessThanOrEqual(90_000);
+    expect(totalChars).toBeLessThanOrEqual(480_000);
     expect(wall).toBeLessThan(120_000);
     const a = await (await page.request.get(`/api/tenders/${tender.id}/analysis`)).json();
     t.add(`GET analysis → method=${a.method} warnings=${JSON.stringify(a.warnings)}`);
-    expect(a.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 2, total: 5 }]);
+    expect(a.warnings).toEqual([{ code: 'llm_budget_exhausted', covered: 8, total: 10 }]);
     await shot(page, 'sc7-analysis-budget-warning');
     t.save();
   });

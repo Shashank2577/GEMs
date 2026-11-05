@@ -196,7 +196,7 @@ flowchart LR
   subgraph "Cloudflare account"
     direction TB
     DNS["workers.dev today → custom domain (MUST)"]
-    WK["Worker tenderpilot<br/>compatibility_date 2025-09-01, nodejs_compat<br/>vars: APP_URL, GEM_BASE_URL, LLM_MODEL, MAIL_FROM<br/>secrets: DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY, WHATSAPP_*"]
+    WK["Worker tenderpilot<br/>compatibility_date 2025-09-01, nodejs_compat<br/>vars: APP_URL, GEM_BASE_URL, LLM_MODEL (+ optional LLM_OCR_MODEL, LLM_ESCALATION_MODEL), MAIL_FROM<br/>secrets: DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY, WHATSAPP_*"]
     AS["Assets binding ASSETS<br/>run_worker_first=/api/*<br/>SPA fallback"]
     R2B["R2 BLOBS = tenderpilot-blobs"]
     CR["Cron */30"]

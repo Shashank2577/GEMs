@@ -31,8 +31,8 @@ The skill's prerequisite script could not resolve a feature directory (no `.cair
 
 ## Coverage
 
-Every FR has at least one task; the remaining open work is US7 (T085 to T094, FR-047 to FR-054), T035a, and the closing tasks T095 (US7 stub), T100 (US7 pending).
+Every FR has at least one task; US7 (T085 to T095, FR-047 to FR-054) is done and QA-approved (PR #560, pending merge); the only open task is T035a (needs-human, #554). T099 and T100 were closed in the US7 roll-up.
 
 ## Next actions
 
-Proceed with US7. Re-run this analysis after the US7 PR to confirm T095 and T100 can be closed.
+US7 is built and QA-approved. After PR #560 merges, update the pinned SHAs in `qa/evidence/004/SUMMARY.md` to the squash SHA. Remaining: T035a (real GeM PDFs, needs-human) and the product sign-off on the AI cost increase (see SUMMARY follow-ups).
