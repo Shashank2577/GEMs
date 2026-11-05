@@ -1,9 +1,10 @@
 /**
- * Cloudflare Worker entry (Constitution VII): /api/* → Hono app with a per-request Neon pool and
- * R2 blob store; everything else → static SPA assets. Cron → ingestion → alerts → reminders.
+ * Cloudflare Worker entry (Constitution VII): /api/* → Hono app with a per-request `pg` pool over the Hyperdrive
+ * binding (008/FR-075, ADR-0002) and the R2 blob store; everything else → static SPA assets.
+ * Cron → ingestion → alerts → reminders → cleanups → housekeeping.
  */
 import * as Sentry from '@sentry/cloudflare';
-import { createNeonDb } from '@tp/db';
+import { createNodeDb } from '@tp/db';
 import { spaCspFor } from '@tp/core/security/headers';
 import { createApp } from './app';
 import { createDeps } from './adapters/index';
@@ -16,8 +17,14 @@ import { runScheduledJobs } from './lib/scheduled';
 import { settleDeferred } from './lib/defer';
 import { applySecurityHeaders } from './middleware/security';
 
+/** The part of Cloudflare's `Hyperdrive` binding the Worker uses. */
+export interface HyperdriveLike { connectionString: string }
+
 export interface WorkerEnv extends RuntimeEnv {
-  DATABASE_URL: string;
+  /** 008/FR-075: `[[hyperdrive]] binding = "HYPERDRIVE"` (caching disabled) in wrangler.toml — the normal path. */
+  HYPERDRIVE?: HyperdriveLike;
+  /** Break-glass only: the Neon pooled (`-pooler`) URL, used when no Hyperdrive binding is configured. */
+  DATABASE_URL?: string;
   BLOBS: R2BucketLike;
   ASSETS: { fetch(req: Request): Promise<Response> };
 }
@@ -32,10 +39,24 @@ function envVars(env: WorkerEnv): RuntimeEnv {
   return { NODE_ENV: 'production', TRUST_PROXY: 'cloudflare', ...env };
 }
 
+/** Per-request pool size on the Worker: Hyperdrive owns the origin pool, so a few client connections suffice (FR-075). */
+export const WORKER_DB_POOL_MAX = 5;
+export const NO_DATABASE_MESSAGE = 'No database configured: bind HYPERDRIVE ([[hyperdrive]] in wrangler.toml) or set the DATABASE_URL secret';
+
+/** The connection string the Worker uses: the Hyperdrive binding, else the DATABASE_URL secret (break-glass). */
+export function workerDatabaseUrl(env: Pick<WorkerEnv, 'HYPERDRIVE' | 'DATABASE_URL'>): string {
+  const url = env.HYPERDRIVE?.connectionString || env.DATABASE_URL;
+  if (!url) throw new Error(NO_DATABASE_MESSAGE);
+  return url;
+}
+
 async function withDeps<T>(env: WorkerEnv, ctx: ExecutionContextLike, fn: (deps: ReturnType<typeof createDeps>) => Promise<T>): Promise<T> {
-  if (!env.DATABASE_URL) throw new Error('DATABASE_URL secret is not set');
-  const { db, close } = await createNeonDb(env.DATABASE_URL);
-  const vars = envVars(env);
+  // One `pg` driver everywhere (ADR-0002): through Hyperdrive the per-request pool's connect is a cheap local hop.
+  const url = workerDatabaseUrl(env);
+  const { db, close } = await createNodeDb(url, { max: WORKER_DB_POOL_MAX });
+  // DATABASE_URL doubles as the GeM lease's per-database clock-cache key (adapters/index.ts); with Hyperdrive that is
+  // the binding's connection string. Never logged (the JSON logger redacts it).
+  const vars = { ...envVars(env), DATABASE_URL: url };
   // 008/FR-046: events are only sent when SENTRY_DSN is set (withSentry below is inert without a DSN).
   const errors = vars.SENTRY_DSN ? createSentryReporter(Sentry) : undefined;
   const deps = createDeps({ env: vars, db, blobs: createR2BlobStore(env.BLOBS), errors });

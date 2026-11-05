@@ -1,6 +1,6 @@
 /** 008/US6: Worker entry wiring (FR-044, FR-046) without a database or SENTRY_DSN. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import worker, { type WorkerEnv } from '../src/worker';
+import worker, { NO_DATABASE_MESSAGE, WORKER_DB_POOL_MAX, workerDatabaseUrl, type WorkerEnv } from '../src/worker';
 
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
 const env = (extra: Partial<WorkerEnv> = {}) => ({
@@ -37,8 +37,25 @@ describe('worker default export (withSentry-wrapped)', () => {
     });
     expect(err).toHaveBeenCalledTimes(1);
     const line = JSON.parse(String(err.mock.calls[0]![0]));
-    expect(line).toMatchObject({ level: 'error', msg: 'worker bootstrap failed', path: '/api/health', error: 'DATABASE_URL secret is not set' });
+    expect(line).toMatchObject({ level: 'error', msg: 'worker bootstrap failed', path: '/api/health', error: NO_DATABASE_MESSAGE });
     expect(JSON.stringify(line)).not.toContain('tp_abc');
+  });
+
+  it('008/FR-075: the database is the Hyperdrive binding (DATABASE_URL only as break-glass), pool max 5', () => {
+    expect(WORKER_DB_POOL_MAX).toBe(5);
+    expect(workerDatabaseUrl({ HYPERDRIVE: { connectionString: 'postgres://hd/db' }, DATABASE_URL: 'postgres://neon-pooler/db' })).toBe('postgres://hd/db');
+    expect(workerDatabaseUrl({ DATABASE_URL: 'postgres://neon-pooler/db' })).toBe('postgres://neon-pooler/db');
+    expect(() => workerDatabaseUrl({})).toThrow(NO_DATABASE_MESSAGE);
+  });
+
+  it('008/FR-075: with a Hyperdrive binding (pointed at the test Postgres) /api/health reaches the DB through the pg driver', async () => {
+    const waits: Promise<unknown>[] = [];
+    const res = await worker.fetch(new Request('https://app.example.in/api/health'),
+      env({ HYPERDRIVE: { connectionString: process.env.TEST_DATABASE_URL! } }), { waitUntil: (p: Promise<unknown>) => { waits.push(p); }, passThroughOnException: () => {} });
+    const body = await res.json() as { db: boolean; version: string };
+    expect(body).toMatchObject({ db: true, version: '9.9.9' });
+    await Promise.all(waits); // the per-request pool is closed after the response
+    expect(waits.length).toBeGreaterThan(0);
   });
 
   it('bootstrap failure on other /api routes → 503 service_unavailable', async () => {

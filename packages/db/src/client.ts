@@ -5,19 +5,16 @@ import * as schema from './schema';
 export type Db = ReturnType<typeof drizzlePg<typeof schema>>;
 export { schema };
 
-/** Local / CI / Node: node-postgres pool. `logger` sees every query (e.g. query counting in tests, 002/NFR-001). */
-export async function createNodeDb(url: string, opts: { logger?: Logger } = {}): Promise<{ db: Db; close: () => Promise<void> }> {
+/**
+ * The one database factory (008/FR-075, ADR-0002): node-postgres `pg` Pool, used by Node (local, CI, E2E) and by the
+ * Cloudflare Worker, where `url` is the Hyperdrive binding's `connectionString` (pg runs under `nodejs_compat`).
+ * `max` is the pool size: 10 for the long-lived Node server; the Worker opens a small per-request pool (5) because
+ * Hyperdrive, not the isolate, owns the pool of origin connections to Neon.
+ * `logger` sees every query (e.g. query counting in tests, 002/NFR-001).
+ */
+export async function createNodeDb(url: string, opts: { logger?: Logger; max?: number } = {}): Promise<{ db: Db; close: () => Promise<void> }> {
   const pg = await import('pg');
-  const pool = new pg.default.Pool({ connectionString: url, max: 10 });
+  const pool = new pg.default.Pool({ connectionString: url, max: opts.max ?? 10 });
   const db = drizzlePg(pool, { schema, logger: opts.logger });
-  return { db, close: () => pool.end() };
-}
-
-/** Cloudflare Workers: Neon serverless Pool over WebSockets (supports transactions). */
-export async function createNeonDb(url: string): Promise<{ db: Db; close: () => Promise<void> }> {
-  const { Pool } = await import('@neondatabase/serverless');
-  const { drizzle } = await import('drizzle-orm/neon-serverless');
-  const pool = new Pool({ connectionString: url });
-  const db = drizzle(pool, { schema }) as unknown as Db;
   return { db, close: () => pool.end() };
 }

@@ -1,5 +1,7 @@
 # TenderPilot — one Worker serves the API (/api/*) and the SPA (static assets), runs the cron
-# pipeline, and stores files in R2. Database: Neon Postgres (DATABASE_URL secret).
+# pipeline, and stores files in R2. Database: Neon Postgres through Cloudflare Hyperdrive (binding HYPERDRIVE, one
+# `pg` driver, 008/FR-075); the DATABASE_URL secret (Neon pooled `-pooler` URL) is only a break-glass fallback and is
+# what `pnpm db:migrate` uses.
 #
 # Secrets (wrangler secret put <NAME>): DATABASE_URL, ANTHROPIC_API_KEY, RESEND_API_KEY,
 #   WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, SENTRY_DSN. Optional ones may be omitted (features degrade to no-ops).
@@ -21,6 +23,15 @@ run_worker_first = ["/api/*"]
 binding = "BLOBS"
 bucket_name = "tenderpilot-blobs"
 
+# 008/FR-075, ADR-0002: Postgres via Hyperdrive. The config is created once per environment with the Neon POOLED
+# connection string and caching DISABLED (Hyperdrive's query cache would serve stale reads after writes):
+#   wrangler hyperdrive create tenderpilot-db --connection-string="$NEON_POOLED_URL" --caching-disabled
+# then paste its id below (docs/runbook.md § Hyperdrive). `wrangler dev` uses localConnectionString (local Postgres).
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "00000000000000000000000000000000" # replace with `wrangler hyperdrive create … --caching-disabled` output
+localConnectionString = "postgres://tp:tp@localhost:5433/tenderpilot"
+
 [triggers]
 crons = ["*/30 * * * *"]
 
@@ -38,3 +49,11 @@ TRUST_PROXY = "cloudflare"
 
 [observability]
 enabled = true
+
+# Staging Hyperdrive (008/FR-075): bindings are not inherited by environments. The staging config is created from the
+# Neon `staging` branch's pooled URL (`wrangler hyperdrive create tenderpilot-db-staging … --caching-disabled`).
+# When [env.staging] (spec 008 US2) is merged, this table belongs to it; it is declared here so the binding exists.
+[[env.staging.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "00000000000000000000000000000001" # replace with the staging Hyperdrive config id
+localConnectionString = "postgres://tp:tp@localhost:5433/tenderpilot"
