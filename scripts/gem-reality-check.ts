@@ -151,12 +151,12 @@ async function main() {
 
   // ───────────── 2. documents ─────────────
   say();
-  say('## 2. Bid documents (GET /showbidDocument/{id}) and our eligibility rules');
+  say('## 2. Bid documents (route chosen per bid type: /showbidDocument, /showradocumentPdf, …) and our eligibility rules');
   const candidates = tenders.filter((t) => t.gemBidId || t.documentUrl).slice(0, DOCS);
   const docSummaries: unknown[] = [];
   const allMissed: string[] = [];
   for (const t of candidates) {
-    const id = t.gemBidId ?? t.documentUrl!;
+    const id = t.documentUrl ?? t.gemBidId!;
     say();
     say(`### ${t.bidNumber} — ${t.title.slice(0, 80)}`);
     try {
@@ -185,8 +185,17 @@ async function main() {
       else say('- ✅ every expected label that appears was extracted');
       docSummaries.push({ bidNumber: t.bidNumber, file, pages: pdf.totalPages, chars: text.length, requirementKeys: [...byKey.keys()], missed: missed.length });
     } catch (e) {
-      say(`- ❌ ${(e as Error).message}`);
-      docSummaries.push({ bidNumber: t.bidNumber, error: (e as Error).message });
+      say(`- ❌ ${(e as Error).message}  (tried ${id})`);
+      // Probe: show exactly what GeM sent back, so we can see HTML / captcha / redirect instead of guessing.
+      let probe: Record<string, unknown> = {};
+      try {
+        const r = await fetch(id, { redirect: 'manual', headers: { 'user-agent': UA, accept: 'application/pdf,*/*;q=0.8', referer: `${BASE}/all-bids` } });
+        const body = new Uint8Array(await r.arrayBuffer());
+        probe = { status: r.status, contentType: r.headers.get('content-type'), location: r.headers.get('location'), bytes: body.length, head: new TextDecoder().decode(body.slice(0, 400)).replace(/\s+/g, ' ') };
+        save(`docs/${sanitize(t.bidNumber)}.probe.bin`, body.slice(0, 20000));
+      } catch (pe) { probe = { probeError: (pe as Error).message }; }
+      say(`- probe: ${JSON.stringify(probe)}`);
+      docSummaries.push({ bidNumber: t.bidNumber, tried: id, error: (e as Error).message, probe });
     }
   }
   save('documents.json', JSON.stringify(docSummaries, null, 2));
