@@ -1,0 +1,977 @@
+{
+  "docs": [
+    {
+      "id": "10135114",
+      "b_id": [
+        10135114
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765901"
+      ],
+      "b_category_name": [
+        "COMN CABLE TRENCH"
+      ],
+      "b_total_quantity": [
+        19
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "COMN CABLE TRENCH"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8173555"
+      ],
+      "b_id_parent": [
+        10049535
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "21ER_CONSIGNEE2"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135139",
+      "b_id": [
+        10135139
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765906"
+      ],
+      "b_category_name": [
+        "Green Grass (Rajka)"
+      ],
+      "b_total_quantity": [
+        23467
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Green Grass (Rajka)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8226897"
+      ],
+      "b_id_parent": [
+        10111521
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_live_seed_gras_gree"
+      ],
+      "b.b_created_by": [
+        "Chauhan_12"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135127",
+      "b_id": [
+        10135127
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765903"
+      ],
+      "b_category_name": [
+        "Cleaning Lamp Oil XS-58 Cleaner XS 775/S-753"
+      ],
+      "b_total_quantity": [
+        53
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Cleaning Lamp Oil XS-58 Cleaner XS 775/S-753"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8111620"
+      ],
+      "b_id_parent": [
+        9978773
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "Karandeep571asc"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135109",
+      "b_id": [
+        10135109
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765900"
+      ],
+      "b_category_name": [
+        "FUEL PUMP E4,ARMATURE ASSY,WATER PUMP,SHAFT ASSY,FAN BELT S4,PRESSURE PLATE ASSY,FIELD COIL ASSY,MA"
+      ],
+      "b_total_quantity": [
+        10
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        10
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "FUEL PUMP E4,ARMATURE ASSY,WATER PUMP,SHAFT ASSY,FAN BELT S4,PRESSURE PLATE ASSY,FIELD COIL ASSY,MASTER CYL ASSY,SET BIG AND BEARING,DRAG LINK STEERING"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8165216"
+      ],
+      "b_id_parent": [
+        10040089
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Prakash_Shukla"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135106",
+      "b_id": [
+        10135106
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765899"
+      ],
+      "b_category_name": [
+        "UTP Cable,8 Port Switch,HDMI Cable 20 Mtr,Outdoor PoE Switch 8 Port,HDMI to VGA Converter,Crimping "
+      ],
+      "b_total_quantity": [
+        25
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        9
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "UTP Cable,8 Port Switch,HDMI Cable 20 Mtr,Outdoor PoE Switch 8 Port,HDMI to VGA Converter,Crimping Tool,USB Cable 20 Mtr,Media Converter,HDMI Splitter"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8128321"
+      ],
+      "b_id_parent": [
+        9998087
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Aishwaryababu"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135147",
+      "b_id": [
+        10135147
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765909"
+      ],
+      "b_category_name": [
+        "A1 Size Reel to sheet Digital 4 Color Production Printing Machine with Front both side digital head"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "A1 Size Reel to sheet Digital 4 Color Production Printing Machine with Front both side digital heads"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8114495"
+      ],
+      "b_id_parent": [
+        9982202
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "ddpns.ah"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Infrastructure and Industrial Development Department Uttar Pradesh"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135144",
+      "b_id": [
+        10135144
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765908"
+      ],
+      "b_category_name": [
+        "F1 5120-001187 PLRS SNP NSE 115 MM,H2 4020-000077 RPE CIR HWSRW 3 SRND 8 MM DIA,H2 9320-000016 SHT "
+      ],
+      "b_total_quantity": [
+        5297
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        5
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "F1 5120-001187 PLRS SNP NSE 115 MM,H2 4020-000077 RPE CIR HWSRW 3 SRND 8 MM DIA,H2 9320-000016 SHT RBR SLDBLK 200CMX100CMX6 0MM,K5 7310-000615 ETRC KTE,K5 7920-000019 BRSH SRB HD UION"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7994384"
+      ],
+      "b_id_parent": [
+        9844424
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Libynco_9"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135161",
+      "b_id": [
+        10135161
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765911"
+      ],
+      "b_category_name": [
+        "LV7 TMB 2641 2910 0117 CLUTCH MASTER CYLINDER 19.05 DIA,LV7 TMB 2786 1599 9933 ALTERNATOR 12V 55AMP"
+      ],
+      "b_total_quantity": [
+        939
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        17
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "LV7 TMB 2641 2910 0117 CLUTCH MASTER CYLINDER 19.05 DIA,LV7 TMB 2786 1599 9933 ALTERNATOR 12V 55AMP,LV7 TMB 2618 5454 4605 FLASHER 24V,LV6 MT6 2525 2015 6305 V BELT 1280MM LONG,LV6 MT6 2600 2015 6305 FAN BELT,LV7 MARUTI 37100M83100 LOCK ASSY STEERING,LV7 MARUTI 83720M80111 TRIM DOOR LH,LV7 MARUTI 09471M12075 BULB 12V 5W,LV7 STLN X 2703700 SHAFT SEAL,LV7 STLN VF F 7865200 DOOR TRIM PANNEL RH,LV7 TMB 2574 3325 3104 AUXAL ROLLER BRG,LV7 TMB 2576 8110 0152 ASSY REAR VIEW MIRROR OUTER RH,LV7 TMB 2618 5454 4603 FLASHER 24V,LV7 TATA 6212 0300 121 BULB 21W TS 29201,LV7 MARUTI 28140 82C00 BOOT GEAR SHIFT LEVER,LV7 TMB 6212 0510 075 LAMP 24V 2W,LV7 STLN 2920 72 0471172 IGNITION SWITCH"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8178385"
+      ],
+      "b_id_parent": [
+        10055136
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "BUYER14@12ROU"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135156",
+      "b_id": [
+        10135156
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765910"
+      ],
+      "b_category_name": [
+        "Ardox Corrosion Presentive (Ardox 396/1E8)"
+      ],
+      "b_total_quantity": [
+        40
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Ardox Corrosion Presentive (Ardox 396/1E8)"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8114543"
+      ],
+      "b_id_parent": [
+        9982259
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "Karandeep571asc"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135123",
+      "b_id": [
+        10135123
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765902"
+      ],
+      "b_category_name": [
+        "Pearl Millet Flour or Bajra Flour (V2) (Defence),Sorghum Flour or Jowar Flour (V2) (Defence),Finger"
+      ],
+      "b_total_quantity": [
+        9500
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        3
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T22:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Pearl Millet Flour or Bajra Flour (V2) (Defence),Sorghum Flour or Jowar Flour (V2) (Defence),Finger Millet Flour or Ragi Flour (V2) (Defence)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8144994"
+      ],
+      "b_id_parent": [
+        10017021
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_fo61163888_cere_cere_pear,home_fo61163888_cere_flou_so46473525,home_fo61163888_cere_cere_fing"
+      ],
+      "b.b_created_by": [
+        "375@supplydepot"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    }
+  ],
+  "numFound": 46397,
+  "start": 20
+}

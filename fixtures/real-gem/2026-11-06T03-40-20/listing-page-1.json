@@ -1,0 +1,1321 @@
+{
+  "docs": [
+    {
+      "id": "10135244",
+      "b_id": [
+        10135244
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765922"
+      ],
+      "b_category_name": [
+        "LV7 TATA 033 000 1040 SOLENOID,LV7 TATA 2641 7270 0101 ASSY PADDING DOOR LH,LV7 TATA 2574 5442 0104"
+      ],
+      "b_total_quantity": [
+        408
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        13
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "LV7 TATA 033 000 1040 SOLENOID,LV7 TATA 2641 7270 0101 ASSY PADDING DOOR LH,LV7 TATA 2574 5442 0104 ASSY TAIL LAMP LH,LV7 TATA 2530 017910 ASSY CLUTCH MASTER CYL 23.81 DIA,LV7 TMB 2786 0798 9942 FUEL WATER SEPARATOR,LV7 TMB 2574 7241 0105 SPG BRAKE CHAMBER REPAIR KIT MSP 5 1,LV7 TMB 2523 0715 0104 COLD SP KIT,LV7 TMB 6210 000334 BLINKER GLASS LH,LV7 LD CVD X 3922400 TP GAUGE,LV7 STLN VF 680 72 0001681 SPEEDOMETER,LV7 STLN VF F 2215500 ELECTRONIC LASHER SCP 24V,LV7 STLN F 2310500 BLACKOUT HEAD LAMP,LV7 TMB 2625 8081 FIELD COIL ASSY"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8185401"
+      ],
+      "b_id_parent": [
+        10063629
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "BUYER14@12ROU"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135242",
+      "b_id": [
+        10135242
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765921"
+      ],
+      "b_category_name": [
+        "Anti-termites Valvi/Dimaka Nemotodes"
+      ],
+      "b_total_quantity": [
+        15000
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Anti-termites Valvi/Dimaka Nemotodes"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8191344"
+      ],
+      "b_id_parent": [
+        10070363
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "tanjaiflysafe"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135252",
+      "b_id": [
+        10135252
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765923"
+      ],
+      "b_category_name": [
+        "INTERACTIVE DISPLAY"
+      ],
+      "b_total_quantity": [
+        2
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "INTERACTIVE DISPLAY"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7884012"
+      ],
+      "b_id_parent": [
+        9717600
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "HALHDTPURCHASE1"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Defence Production"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135267",
+      "b_id": [
+        10135267
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765924"
+      ],
+      "b_category_name": [
+        "COMPOSITE HOLLOW POLYMER INSULATOR TO DRG NO. 34780000466 REV. 00 FOR 765KV CT"
+      ],
+      "b_total_quantity": [
+        5
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "COMPOSITE HOLLOW POLYMER INSULATOR TO DRG NO. 34780000466 REV. 00 FOR 765KV CT"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8155772"
+      ],
+      "b_id_parent": [
+        10029464
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "356_72_008"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Heavy Industries and Public Enterprises"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Heavy Industry"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135294",
+      "b_id": [
+        10135294
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765931"
+      ],
+      "b_category_name": [
+        "CLIMATE CONTROL SYSTEM,VOLTAGE STABILIZER,WIRE,CASING AND CAPING,20A MCB SWITCH"
+      ],
+      "b_total_quantity": [
+        27
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        5
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "CLIMATE CONTROL SYSTEM,VOLTAGE STABILIZER,WIRE,CASING AND CAPING,20A MCB SWITCH"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8190443"
+      ],
+      "b_id_parent": [
+        10069306
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Ravi@874"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135282",
+      "b_id": [
+        10135282
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765930"
+      ],
+      "b_category_name": [
+        "REPAIR AND MAINT OF PTZ CAMERA ALONGWITH ITS ACCESSORIES AND INSTALLATION"
+      ],
+      "b_total_quantity": [
+        78
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "REPAIR AND MAINT OF PTZ CAMERA ALONGWITH ITS ACCESSORIES AND INSTALLATION"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8004813"
+      ],
+      "b_id_parent": [
+        9856532
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "mdalam"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135281",
+      "b_id": [
+        10135281
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765929"
+      ],
+      "b_category_name": [
+        "Gabapentin 100 mg Tab,Glucosamine 750 mg plus Diacerin 50 mg plus Methylsulfonylmethane 250 mg Tab,"
+      ],
+      "b_total_quantity": [
+        23280
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        26
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Gabapentin 100 mg Tab,Glucosamine 750 mg plus Diacerin 50 mg plus Methylsulfonylmethane 250 mg Tab,Lansoprazole 15 mg Cap,Norethisteron 10 mg Tab,Nortryptilline 10 mg Tab,Pancreatin 170 mg Plus Activated Dimethicone 80 mg Tab,Penecillin G Potassium 400 mg Tab,Racecadotril 100 mg Cap,Taurine 500 mg plus Acetylcystine 150 mg Tab,Tab Sodium Bicarbonate 1000 mg,Tab Thyroxine 37.5 mcg,Tab Thyroxine 12.5 mcg,Tab Cinatapride 1 mg,Tab Metformin SR 850 mg,Tab Chlorthalidone 6.25 mg,Tab Chlorthalidone 12.5 mg,Tab Atorvastatin 40 mg,Methimazole 5 mg Tab,Tab Methylcobalamine 1500 mcg plus Alpha Lipoic Acid 100 mcg plus,Tab Flupenthixol 5 mg plus Melitracen 10 mg,Tab Amitryptilline 10 mg,Tab Chloroquine 500mg,Formoterol 6 mcg plus Glycopyrolate 25 mcg Capsule,Brinzolamide 1 percentage eye drop 10 mg per ml,Inj Methylcobalamin 1000 mcg plus Vit B6 Pyridoxine 100,Ketoconazole Soap 75g"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8186804"
+      ],
+      "b_id_parent": [
+        10065272
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Dglpechs"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135279",
+      "b_id": [
+        10135279
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765928"
+      ],
+      "b_category_name": [
+        "Temperature controlled soldering station"
+      ],
+      "b_total_quantity": [
+        14
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Temperature controlled soldering station"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7906973"
+      ],
+      "b_id_parent": [
+        9743958
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_el65016436_elec_sold_temp"
+      ],
+      "b.b_created_by": [
+        "Buyer@LP1"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135275",
+      "b_id": [
+        10135275
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765927"
+      ],
+      "b_category_name": [
+        "Fentanyl Citrate 50 mcg per ml, 2 ml Inj,Fentanyl 50 mcgperml,10 ml Inj,Morphine 15 mg, 1 ml Inj,Pr"
+      ],
+      "b_total_quantity": [
+        274470
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        32
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        1
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7850447"
+      ],
+      "b_id_parent": [
+        9679399
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Buyer2CHEC"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [
+        {
+          "bs_id": "6635909",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 4",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635910",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 5",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635911",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 6",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635912",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 7",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635913",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 8",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635914",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 9",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635915",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 10",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635916",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 11",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635917",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 12",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635918",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 13",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635919",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 14",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635920",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 15",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635921",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 16",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635922",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 19",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635923",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 20",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635924",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 21",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635925",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 22",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635926",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 23",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635927",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 26",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635928",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 27",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635929",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 28",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635930",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 29",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635931",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 30",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635932",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 31",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635933",
+          "bs_bid_id": "10135275",
+          "bs_title": "Schedule 32",
+          "bs_status": "0"
+        }
+      ],
+      "parent_bid_schedule": [
+        {
+          "bs_id": "6143496",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 1",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6143497",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 2",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6143498",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 3",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6143499",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 4",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143500",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 5",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143501",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 6",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143502",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 7",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143503",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 8",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143504",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 9",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143505",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 10",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143506",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 11",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143507",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 12",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143508",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 13",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143509",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 14",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143510",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 15",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143511",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 16",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143512",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 17",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6143513",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 18",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6143514",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 19",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143515",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 20",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143516",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 21",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143517",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 22",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143518",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 23",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143519",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 24",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6143520",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 25",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6143521",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 26",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143522",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 27",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143523",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 28",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143524",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 29",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143525",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 30",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143526",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 31",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6143527",
+          "bs_bid_id": "9679399",
+          "bs_title": "Schedule 32",
+          "bs_status": "0"
+        }
+      ]
+    },
+    {
+      "id": "10135274",
+      "b_id": [
+        10135274
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765926"
+      ],
+      "b_category_name": [
+        "Tab Iguratimod 25 mg,Tab Isosorbide Mononitrate 30 mg,Tab Lacosamide 200 mg,Tab Lacosamide 50 mg,Ta"
+      ],
+      "b_total_quantity": [
+        50000
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        21
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Tab Iguratimod 25 mg,Tab Isosorbide Mononitrate 30 mg,Tab Lacosamide 200 mg,Tab Lacosamide 50 mg,Tab Levocetirizine 10 mg,Tab Metoprolol 12.5 mg,Tab Moxonidine 0.3 mg,Tab Naproxen 500 mg,Tab Serratiopeptidase 5 mg,Tab Sildenafil 20 mg,Tab Tadalafil 10 mg,Tab Teneligliptin 20 mg,Tab Tranexamic Acid 500 mg plus Mefenamic Acid 250 mg,Benedipine Hcl 4 mg Tab,Brivaracetam 50 mg Tab Cap,Bromelain 180 mg plus Trypsin 96 mg plus Rutoside 200 mg Tab,Clindamycin 100 mg plus Clotrimazole 100 mg vaginal pessary,Duloxetine 30 mg Tab,Tab Ezetemibe 10 mg,Fexofenadine 120 mg plus Montelukast 10 mg Tab,Fluconazole 150 mg plus Azithromycin 1 gm plus Secnidazole 1 gm"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8186145"
+      ],
+      "b_id_parent": [
+        10064521
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Dglpechs"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    }
+  ],
+  "numFound": 46397,
+  "start": 0
+}

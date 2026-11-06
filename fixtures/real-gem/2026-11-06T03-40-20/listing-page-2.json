@@ -1,0 +1,965 @@
+{
+  "docs": [
+    {
+      "id": "10135271",
+      "b_id": [
+        10135271
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765925"
+      ],
+      "b_category_name": [
+        "Online UPS (>10 KVA) With Battery"
+      ],
+      "b_total_quantity": [
+        2
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T09:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Online UPS (>10 KVA) With Battery"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7673546"
+      ],
+      "b_id_parent": [
+        9478586
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_el34134111_elec_powe_on13435366"
+      ],
+      "b.b_created_by": [
+        "SCITO_413AFS"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135219",
+      "b_id": [
+        10135219
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765920"
+      ],
+      "b_category_name": [
+        "Tea CTC"
+      ],
+      "b_total_quantity": [
+        700
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T07:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Tea CTC"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8180935"
+      ],
+      "b_id_parent": [
+        10058235
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "naseef"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135192",
+      "b_id": [
+        10135192
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765915"
+      ],
+      "b_category_name": [
+        "F1 5120-0000028 HAMRS TNMNS CRSNG 340 GMS FTD,F1 5120-0000093 PLER SELNG LD 150MM,W8 5410-000013 1 "
+      ],
+      "b_total_quantity": [
+        1439
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        5
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T00:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-10T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "F1 5120-0000028 HAMRS TNMNS CRSNG 340 GMS FTD,F1 5120-0000093 PLER SELNG LD 150MM,W8 5410-000013 1 RF THRGH TY SPNTR RF,H4 8135-000089 PAER WRPNG BRWN UGLZED 735MMX1,Y3 6230-000107 3 TRCH HD JNTA 300TL TY"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8039156"
+      ],
+      "b_id_parent": [
+        9896010
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "LPJCO_9"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135188",
+      "b_id": [
+        10135188
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765914"
+      ],
+      "b_category_name": [
+        "Professional Training Services (Version 2) - offline; Weekdays"
+      ],
+      "b_total_quantity": [
+        20
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T00:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-10T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Professional Training Services (Version 2) - offline; Weekdays"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8221922"
+      ],
+      "b_id_parent": [
+        10105723
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_tr64181578_prof"
+      ],
+      "b.b_created_by": [
+        "sanjitbnk"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135187",
+      "b_id": [
+        10135187
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765913"
+      ],
+      "b_category_name": [
+        "Professional Training Services (Version 2) - offline; Weekdays"
+      ],
+      "b_total_quantity": [
+        20
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T00:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Professional Training Services (Version 2) - offline; Weekdays"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8221417"
+      ],
+      "b_id_parent": [
+        10105159
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_tr64181578_prof"
+      ],
+      "b.b_created_by": [
+        "sanjitbnk"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135200",
+      "b_id": [
+        10135200
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765917"
+      ],
+      "b_category_name": [
+        "Revolving Chair (V5),Desk and Bench Set for Classroom/Training Area,Steel Almirah / Cabinets (V4),M"
+      ],
+      "b_total_quantity": [
+        255
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        8
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T00:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-10T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Revolving Chair (V5),Desk and Bench Set for Classroom/Training Area,Steel Almirah / Cabinets (V4),Metal Shelving Racks (Adjustable Type) conforming To Is 1883 (V2),Modular Table / Meeting Table / Centre Table (V2),Modular Table / Meeting Table / Centre Table (V2),Steel Almirah / Cabinets (V4),Metal Storage Cabinet"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8101064"
+      ],
+      "b_id_parent": [
+        9966747
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_fu14684684_acco_fu82806882_re71201828,home_fu14684684_clas_gene_desk,home_fu14684684_acco_fu82806882_st05844582,home_mate_mate_shel_me52670574,home_fu14684684_acco_offi_mo51130563,home_fu14684684_acco_fu82806882_me16478581"
+      ],
+      "b.b_created_by": [
+        "buyer@gecmadhubani"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Science & Technology Department Bihar"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135196",
+      "b_id": [
+        10135196
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765916"
+      ],
+      "b_category_name": [
+        "Motivational Bd of Unit achievements with accessories"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T00:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-10T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Motivational Bd of Unit achievements with accessories"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8198922"
+      ],
+      "b_id_parent": [
+        10079080
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "Adjutant_6r"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135201",
+      "b_id": [
+        10135201
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765918"
+      ],
+      "b_category_name": [
+        "repair of dehumidifier,repair of pedestal fan,repair of plate for direct sheer test apparatus,repai"
+      ],
+      "b_total_quantity": [
+        26
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        13
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T00:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-10T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "repair of dehumidifier,repair of pedestal fan,repair of plate for direct sheer test apparatus,repair of steel plate,switch for core cutter machine,repair of cable for centrifuge extractor,repair of adaptor for cement test machine,repair to vibration machine,repair to distillation plant,repair to humidity chamber,repair of changeover,repair of valves,service charge"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8180285"
+      ],
+      "b_id_parent": [
+        10057430
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "GECTLBuyer@2024"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135207",
+      "b_id": [
+        10135207
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765919"
+      ],
+      "b_category_name": [
+        "Plywood for General Purposes Marked to IS 303 (V3),Plywood for General Purposes Marked to IS 303 (V"
+      ],
+      "b_total_quantity": [
+        2792
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        30
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T00:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-10T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "Plywood for General Purposes Marked to IS 303 (V3),Plywood for General Purposes Marked to IS 303 (V3),Plywood for General Purposes Marked to IS 303 (V3),Plywood for General Purposes Marked to IS 303 (V3),Plywood for General Purposes Marked to IS 303 (V3),Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Cast Copper Alloy Screw Down Bib Taps and Stop Valves for Water Services conforming to IS 781,Cast Copper Alloy Screw Down Bib Taps and Stop Valves for Water Services conforming to IS 781,Cast Copper Alloy Screw Down Bib Taps and Stop Valves for Water Services conforming to IS 781,Cast Copper Alloy Screw Down Bib Taps and Stop Valves for Water Services conforming to I"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8182175"
+      ],
+      "b_id_parent": [
+        10059825
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_mine_none_engi_pl46403535,home_stru_plum_fauc_co26775645,home_dist_flui_valv_cast,home_stru_plum_sani_ba28166822,home_stru_plum_fauc_pl63113354,home_mate_cont_tank_ro87540757,home_dome_do65723251_bath_ba41273766,home_stru_plum_sani_st53551121,home_stru_plum_nons_to45544432,home_dist_pipe_pi48203545_mall"
+      ],
+      "b.b_created_by": [
+        "cweprakash"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135173",
+      "b_id": [
+        10135173
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765912"
+      ],
+      "b_category_name": [
+        "PROCUREMENT OF MATTRESS COIR"
+      ],
+      "b_total_quantity": [
+        110
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-06T23:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T09:00:00Z"
+      ],
+      "bd_category_name": [
+        "PROCUREMENT OF MATTRESS COIR"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8002823"
+      ],
+      "b_id_parent": [
+        9854073
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "LOGONAYK"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    }
+  ],
+  "numFound": 46397,
+  "start": 10
+}
