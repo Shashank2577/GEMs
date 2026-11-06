@@ -42,7 +42,7 @@ const lines: string[] = [];
 const say = (s = '') => { lines.push(s); console.log(s); };
 const save = (name: string, data: string | Uint8Array) => writeFileSync(join(OUT, name), data);
 
-const gem = new GemClient(fetch, { baseUrl: BASE, userAgent: UA, minIntervalMs: 1500, maxRetries: 1, timeoutMs: 30_000 });
+const gem = new GemClient(fetch, { baseUrl: BASE, userAgent: UA, minIntervalMs: 1500, maxRetries: 1, timeoutMs: 60_000 });
 
 /** What each normalised tender field would be in a healthy parse; used for the null-rate table. */
 const CHECK_FIELDS: (keyof NormalizedTender)[] = [
@@ -62,8 +62,8 @@ const EXPECT: { label: string; re: RegExp; key: string }[] = [
   { label: 'Documents required from seller', re: /document\s+required\s+from\s+seller/i, key: 'document' },
   { label: 'Bid end date', re: /bid\s+end\s+date/i, key: 'bid_end' },
   { label: 'Evaluation method', re: /evaluation\s+method/i, key: 'evaluation_method' },
-  { label: 'Estimated bid value', re: /estimated\s+bid\s+value/i, key: 'estimated_value' },
-  { label: 'OEM authorisation', re: /\bOEM\b.*\b(authori[sz]ation|certificate)\b/i, key: 'oem_auth' },
+  { label: 'Estimated bid value', re: /estimated\s+bid\s+value[^a-z]{0,20}\d/i, key: 'estimated_value' },
+  { label: 'OEM authorisation', re: /\b(OEM|manufacturer)\s+(authori[sz]ation|certificate)\b/i, key: 'oem_auth' },
 ];
 
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : 'n/a');
