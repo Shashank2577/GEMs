@@ -1,0 +1,965 @@
+{
+  "docs": [
+    {
+      "id": "10125797",
+      "b_id": [
+        10125797
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764897"
+      ],
+      "b_category_name": [
+        "Selection of Laboratories for Testing of Products/Material - Aspen 3200 Reagents: Dilunet-Lyse-clea"
+      ],
+      "b_total_quantity": [
+        9
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        3
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-05T14:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T14:00:00Z"
+      ],
+      "bd_category_name": [
+        "Selection of Laboratories for Testing of Products/Material - Aspen 3200 Reagents: Dilunet-Lyse-cleaner; Buyer to use custom filter to input technical specification of the product/material so that service provider may provide price offering accordingl..,Selection of Laboratories for Testing of Products/Material - Laboratory kits used for PHC; Buyer to use custom filter to input technical specification of the product/material so that service provider may provide price offering accordingly; Laboratory..,Selection of Laboratories for Testing of Products/Material - Laboratory kits used for Sub centers; Buyer to use custom filter to input technical specification of the product/material so that service provider may provide price offering accordingly; La.."
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8195189"
+      ],
+      "b_id_parent": [
+        10074694
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_test_sele"
+      ],
+      "b.b_created_by": [
+        "phc.balambha"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Health & Family Welfare Department Gujarat"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10124908",
+      "b_id": [
+        10124908
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764812"
+      ],
+      "b_category_name": [
+        "Facility Management Services - LumpSum Based - Nagar Panchayat Sahanpur; Supply and Installation of"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-05T13:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T13:00:00Z"
+      ],
+      "bd_category_name": [
+        "Facility Management Services - LumpSum Based - Nagar Panchayat Sahanpur; Supply and Installation of 10 Nos Solar Water Cooler as per estimate; Consumables to be provided by service provider (inclusive in contract cost)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8188090"
+      ],
+      "b_id_parent": [
+        10066711
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_fa85086605_fa43870134"
+      ],
+      "b.b_created_by": [
+        "buycon1.np.sahanpur@gembuyer.in"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Urban Development Department Uttar Pradesh"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10124022",
+      "b_id": [
+        10124022
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764727"
+      ],
+      "b_category_name": [
+        "Lock Assembly Steering,Brake Hose,Assembly Hose,Hose Assembly,Wind Shield Glass"
+      ],
+      "b_total_quantity": [
+        8
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        5
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-05T12:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T12:00:00Z"
+      ],
+      "bd_category_name": [
+        "Lock Assembly Steering,Brake Hose,Assembly Hose,Hose Assembly,Wind Shield Glass"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8195040"
+      ],
+      "b_id_parent": [
+        10074515
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Gurlal@buyer302"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10123263",
+      "b_id": [
+        10123263
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764629"
+      ],
+      "b_category_name": [
+        "Fixed Computer Workstation (V2),Computer Monitor (V2)"
+      ],
+      "b_total_quantity": [
+        2
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        2
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-05T11:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T11:00:00Z"
+      ],
+      "bd_category_name": [
+        "Fixed Computer Workstation (V2),Computer Monitor (V2)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8187739"
+      ],
+      "b_id_parent": [
+        10066312
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_info_comp_comp_fi74635204,home_info_comp_co36451542_co13332378"
+      ],
+      "b.b_created_by": [
+        "mf@15933"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10123289",
+      "b_id": [
+        10123289
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764634"
+      ],
+      "b_category_name": [
+        "Staionery and general store items"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-05T11:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T11:00:00Z"
+      ],
+      "bd_category_name": [
+        "Staionery and general store items"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8185987"
+      ],
+      "b_id_parent": [
+        10064346
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "r.raghu@gem2018"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Defence Production"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10123422",
+      "b_id": [
+        10123422
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764658"
+      ],
+      "b_category_name": [
+        "Western Blotting Apparatus"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-05T11:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T11:00:00Z"
+      ],
+      "bd_category_name": [
+        "Western Blotting Apparatus"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8135082"
+      ],
+      "b_id_parent": [
+        10005695
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "beighm@uok.edu.in"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Higher Education Department Jammu and Kashmir"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10101946",
+      "b_id": [
+        10101946
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/761696"
+      ],
+      "b_category_name": [
+        "Spotting Scope"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-10-31T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T11:00:00Z"
+      ],
+      "bd_category_name": [
+        "Spotting Scope"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8100383"
+      ],
+      "b_id_parent": [
+        9965961
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_labo_meas_view_spot"
+      ],
+      "b.b_created_by": [
+        "NITHESH_V"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Defence Production"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10122325",
+      "b_id": [
+        10122325
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764509"
+      ],
+      "b_category_name": [
+        "COALESCER CARTRIDGE (TYPE-M),SEPRATOR CARTRIDGE (TYPE-M)"
+      ],
+      "b_total_quantity": [
+        18
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        2
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T19:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T10:39:34Z"
+      ],
+      "bd_category_name": [
+        "COALESCER CARTRIDGE (TYPE-M),SEPRATOR CARTRIDGE (TYPE-M)"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8184312"
+      ],
+      "b_id_parent": [
+        10062394
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "lpcell2018"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10119855",
+      "b_id": [
+        10119855
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764279"
+      ],
+      "b_category_name": [
+        "Phenyl white,Phenyl black,Toilet cleaner,Floor cleaner,Bathroom freshner,Handwash,Utensil cleaner w"
+      ],
+      "b_total_quantity": [
+        4067
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        27
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T14:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T10:00:34Z"
+      ],
+      "bd_category_name": [
+        "Phenyl white,Phenyl black,Toilet cleaner,Floor cleaner,Bathroom freshner,Handwash,Utensil cleaner with scrubber,Washing powder,Bleaching powder,Broom hard,Broom stick bamboo,Pochha cloth,Duster,Glass cleaner,Room freshner,Mop with handle,Dustpan,Mop with plastic bucket,bucket plastic 20 ltr,toilet bucket plastic 5 ltr,Mug plastic,Cob web brush,Toilet brush plastic,Napthelene ball,cistern block toilet cleaner,Soap toilet,Broom soft"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7958329"
+      ],
+      "b_id_parent": [
+        9802955
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "ADJT_273"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10123107",
+      "b_id": [
+        10123107
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764603"
+      ],
+      "b_category_name": [
+        "Bearing OEM Part No 0603023222,Filter OEM Part No 2321511140,Dozer Bolt OEM Part No 0600006016,Doze"
+      ],
+      "b_total_quantity": [
+        122
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        22
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-05T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-06T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "Bearing OEM Part No 0603023222,Filter OEM Part No 2321511140,Dozer Bolt OEM Part No 0600006016,Dozer Control Valve OE Part No 275022200,Dozer Gasket OEM Part No 040102177400,Dozer Gasket OEM Part No 040102177400,TATA HITACHI Hose OEM Part No 2323200510,TATA HITACHI Seal Kit OEM Part No TR8276,TATA HITACHI Seal Kit complete OEM Part No 7002054000,Cover Assembly OEM Part No 1543011222,Dozer Disc Main Clutch Assembly OEM Part No 110MC 02019,Clutch Disc assembly OEM Part No 275022200,Dozer Pin OEM Part No 0275023135,Hose complete set OEM Part No 0275023120,Seal kit OEM Part No 236801010001,Seal Kit OEM Part No 2327013361,Filter Baby OEM Part No 0275023120,Air cleaner filter OEM Part No 275022200,Hydraulic Cylinder Seal Kit,Rubber Hydraulic Hose,Cap Fuel Tank,Bushing 060.0 x 070.0"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8163095"
+      ],
+      "b_id_parent": [
+        10037649
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "QM236ENGR"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    }
+  ],
+  "numFound": 3434503,
+  "start": 0
+}

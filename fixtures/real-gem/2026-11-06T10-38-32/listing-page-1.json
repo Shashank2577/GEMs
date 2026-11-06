@@ -1,0 +1,988 @@
+{
+  "docs": [
+    {
+      "id": "10138459",
+      "b_id": [
+        10138459
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766334"
+      ],
+      "b_category_name": [
+        "649-SI0064 (Printing and supply of\" Serviceable\" tag Size: 90mm x 140 mm)"
+      ],
+      "b_total_quantity": [
+        450000
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "649-SI0064 (Printing and supply of\" Serviceable\" tag Size: 90mm x 140 mm)"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8046327"
+      ],
+      "b_id_parent": [
+        9904205
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "buyer278.halh.or@gembuyer.in"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Defence Production"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138650",
+      "b_id": [
+        10138650
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766359"
+      ],
+      "b_category_name": [
+        "Mackeral,Basa,Surmai,Pomfret Black,Pomfret White,Snapper Red,Snapper White,Tuna,Rohu,Tiger Prawns"
+      ],
+      "b_total_quantity": [
+        24151
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        10
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "Mackeral,Basa,Surmai,Pomfret Black,Pomfret White,Snapper Red,Snapper White,Tuna,Rohu,Tiger Prawns"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7958542"
+      ],
+      "b_id_parent": [
+        9803209
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "hqgna.lap.socontract"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138640",
+      "b_id": [
+        10138640
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766358"
+      ],
+      "b_category_name": [
+        "Electrometer with Resistivity Test fixture, Probe Station its accessories&Electrometer control syst"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "Electrometer with Resistivity Test fixture, Probe Station its accessories&Electrometer control system"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7872292"
+      ],
+      "b_id_parent": [
+        9704409
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "pomrpu"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "PMO"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Atomic Energy"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138626",
+      "b_id": [
+        10138626
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766356"
+      ],
+      "b_category_name": [
+        "Fruit - Chickoos Kalipati,Fruit - Chickoos Bhuripati,Fruit - Chickoos Pala,Fruit - Grapes Sultana,F"
+      ],
+      "b_total_quantity": [
+        323360
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        47
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "Fruit - Chickoos Kalipati,Fruit - Chickoos Bhuripati,Fruit - Chickoos Pala,Fruit - Grapes Sultana,Fruit - Grapes Thompson Seedless,Fruit - Grapes Black Seedless Moondrop,Fruit - Mango Kesar,Fruit - Mango Dasheri,Fruit - Mango Chausa,Fruit - Mango Alphonso,Fruit - Banana Robusta,Fruit - Banana Rasthali,Fruit - Banana Elachi,Fruit - Orange Nagpur, Amravati, Akola,Fruit - Red Plum,Fruit - Custard Apple Local Sitaphal,Fruit - Custard Apple Saharanpur Local,Fruit - Kiwi,Fruit - Apricot New Castle,Fruit - Apricot Moorpark,Fruit - Peach,Fruit - Apple Red Delicious,Fruit - Apple Golden Delicious Yellow,Fruit - Apple Shimla,Fruit - Muskmelon Honey Dew,Fruit - Muskmelon Casaba,Fruit - Muskmelon Cantaloupe,Fruit - Pears Kashmiri,Fruit - Pears Bagu Gosha,Fruit - Watermelon Arka Jyoti,Fruit - Watermelon Durgapur Kesar,Fruit - Mussambies or Sweet Lime,Fruit - Papaya Coorg Honey Dew,Fruit - Papaya Pusa Delicious,Fruit - Papaya Washington,Fruit - Guavas Allahabad Safeda,Fruit - Guavas Surkha,Fruit - Pomegranate Ganesh,Fruit "
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7994135"
+      ],
+      "b_id_parent": [
+        9844145
+      ],
+      "is_high_value": [
+        true
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "hqgna.lap.socontract"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138608",
+      "b_id": [
+        10138608
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766355"
+      ],
+      "b_category_name": [
+        "ELECTRICAL AND ELECTRONICS ENGINEERING LAB EQUIPMENT"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-11T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "ELECTRICAL AND ELECTRONICS ENGINEERING LAB EQUIPMENT"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8001845"
+      ],
+      "b_id_parent": [
+        9852961
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "Buyerjehanabad@2025"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Science & Technology Department Bihar"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138598",
+      "b_id": [
+        10138598
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766354"
+      ],
+      "b_category_name": [
+        "Custom Bid for Services - SCHEDULE 1 - GRASS CUTTING-ATP VRMP - VR,Custom Bid for Services - SCHEDU"
+      ],
+      "b_total_quantity": [
+        3
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        3
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        1
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8025902"
+      ],
+      "b_id_parent": [
+        9880555
+      ],
+      "is_high_value": [
+        true
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_cust"
+      ],
+      "b.b_created_by": [
+        "buyer243.hpcl.ap"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Petroleum and Natural Gas"
+      ],
+      "ba_official_details_deptName": [
+        "NA"
+      ],
+      "bid_schedule": [
+        {
+          "bs_id": "6639056",
+          "bs_bid_id": "10138598",
+          "bs_title": "Schedule 3",
+          "bs_status": "0"
+        }
+      ],
+      "parent_bid_schedule": [
+        {
+          "bs_id": "6369278",
+          "bs_bid_id": "9880555",
+          "bs_title": "Schedule 1",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6369279",
+          "bs_bid_id": "9880555",
+          "bs_title": "Schedule 2",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6369280",
+          "bs_bid_id": "9880555",
+          "bs_title": "Schedule 3",
+          "bs_status": "0"
+        }
+      ]
+    },
+    {
+      "id": "10138574",
+      "b_id": [
+        10138574
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766353"
+      ],
+      "b_category_name": [
+        "Tower Ladder (V2)"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "Tower Ladder (V2)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7953890"
+      ],
+      "b_id_parent": [
+        9797710
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_stru_cons_ladd_to23453710"
+      ],
+      "b.b_created_by": [
+        "buycon2.mmsme.hr"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Micro Small and Medium Enterprises"
+      ],
+      "ba_official_details_deptName": [
+        "Ministry of Micro Small and Medium Enterprises"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138572",
+      "b_id": [
+        10138572
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766352"
+      ],
+      "b_category_name": [
+        "SUPPLY OF GENERATOR SET 30 KVA (3 PHASE)"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "SUPPLY OF GENERATOR SET 30 KVA (3 PHASE)"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8070494"
+      ],
+      "b_id_parent": [
+        9931814
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "epo@123"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138567",
+      "b_id": [
+        10138567
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766350"
+      ],
+      "b_category_name": [
+        "Handling and Transport on Lumpsum Basis - Handling & Transport Service, STANDING ORDER FOR R and D "
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "Handling and Transport on Lumpsum Basis - Handling & Transport Service, STANDING ORDER FOR R and D SMALL QTY TRANSPORTATION"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7966357"
+      ],
+      "b_id_parent": [
+        9812172
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_good_ha10251015"
+      ],
+      "b.b_created_by": [
+        "shijin.pc"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Petroleum and Natural Gas"
+      ],
+      "ba_official_details_deptName": [
+        "NA"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10138560",
+      "b_id": [
+        10138560
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/766348"
+      ],
+      "b_category_name": [
+        "PROCUREMENT OF JET SKI WITH TROLLEY"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "PROCUREMENT OF JET SKI WITH TROLLEY"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7930204"
+      ],
+      "b_id_parent": [
+        9770712
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "sports17fbsu"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    }
+  ],
+  "numFound": 46893,
+  "start": 0
+}
