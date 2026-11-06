@@ -1,0 +1,90 @@
+[
+  {
+    "bidNumber": "GEM/2026/R/765947",
+    "file": "docs/GEM_2026_R_765947.pdf",
+    "pages": 2,
+    "chars": 3008,
+    "requirementKeys": [
+      "bid_published_at",
+      "ministry",
+      "department",
+      "organisation",
+      "office",
+      "total_quantity",
+      "mse_exemption",
+      "startup_exemption"
+    ],
+    "missed": 0
+  },
+  {
+    "bidNumber": "GEM/2026/R/765950",
+    "file": "docs/GEM_2026_R_765950.pdf",
+    "pages": 2,
+    "chars": 3078,
+    "requirementKeys": [
+      "bid_published_at",
+      "ministry",
+      "department",
+      "organisation",
+      "office",
+      "contract_period",
+      "turnover_min",
+      "mse_exemption",
+      "startup_exemption"
+    ],
+    "missed": 0
+  },
+  {
+    "bidNumber": "GEM/2026/R/765949",
+    "file": "docs/GEM_2026_R_765949.pdf",
+    "pages": 2,
+    "chars": 3038,
+    "requirementKeys": [
+      "bid_published_at",
+      "ministry",
+      "department",
+      "organisation",
+      "office",
+      "total_quantity",
+      "turnover_min",
+      "mse_exemption",
+      "startup_exemption"
+    ],
+    "missed": 0
+  },
+  {
+    "bidNumber": "GEM/2026/R/765948",
+    "file": "docs/GEM_2026_R_765948.pdf",
+    "pages": 2,
+    "chars": 2856,
+    "requirementKeys": [
+      "bid_published_at",
+      "ministry",
+      "department",
+      "organisation",
+      "office",
+      "total_quantity",
+      "mse_exemption",
+      "startup_exemption"
+    ],
+    "missed": 0
+  },
+  {
+    "bidNumber": "GEM/2026/R/765946",
+    "file": "docs/GEM_2026_R_765946.pdf",
+    "pages": 2,
+    "chars": 2373,
+    "requirementKeys": [
+      "bid_published_at",
+      "ministry",
+      "department",
+      "organisation",
+      "office",
+      "total_quantity",
+      "turnover_min",
+      "mse_exemption",
+      "startup_exemption"
+    ],
+    "missed": 0
+  }
+]

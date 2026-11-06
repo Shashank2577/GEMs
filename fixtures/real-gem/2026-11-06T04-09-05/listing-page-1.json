@@ -1,0 +1,1189 @@
+{
+  "docs": [
+    {
+      "id": "10135367",
+      "b_id": [
+        10135367
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765947"
+      ],
+      "b_category_name": [
+        "Hydraluic Press machine 80 TON with sensor as per specifications,Embossing die, Medal size 3\" , Alu"
+      ],
+      "b_total_quantity": [
+        3
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        3
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "Hydraluic Press machine 80 TON with sensor as per specifications,Embossing die, Medal size 3\" , Aluminium material, 3 mm Sheet Thickness,Embossing die, Medal size 4\" , Aluminium material, 3 m"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7958327"
+      ],
+      "b_id_parent": [
+        9802953
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "teomeg_gem"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135375",
+      "b_id": [
+        10135375
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765950"
+      ],
+      "b_category_name": [
+        "Stitching and Tailoring Service - Cutting + Stitching + Tailoring; Polyster; Navy"
+      ],
+      "b_total_quantity": [
+        300
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "Stitching and Tailoring Service - Cutting + Stitching + Tailoring; Polyster; Navy"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8130968"
+      ],
+      "b_id_parent": [
+        10001004
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_stit"
+      ],
+      "b.b_created_by": [
+        "biju.philip@icg.gov.in"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Defence"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135371",
+      "b_id": [
+        10135371
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765949"
+      ],
+      "b_category_name": [
+        "Chocolate,Custard Powder 100 gms pkt,Cornflour 100 gms pkt,Dog Biscuit,Ground Nut,Protinex Sugar Fr"
+      ],
+      "b_total_quantity": [
+        1381
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        10
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "Chocolate,Custard Powder 100 gms pkt,Cornflour 100 gms pkt,Dog Biscuit,Ground Nut,Protinex Sugar Free,Semiya,Sago,Vinegar,Sausages"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8196153"
+      ],
+      "b_id_parent": [
+        10075849
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "ankitk29"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135370",
+      "b_id": [
+        10135370
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765948"
+      ],
+      "b_category_name": [
+        "N4220 000002 GENERAL SERVICE LIFE JACKET ORALLY INFLATED"
+      ],
+      "b_total_quantity": [
+        2095
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "N4220 000002 GENERAL SERVICE LIFE JACKET ORALLY INFLATED"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7866897"
+      ],
+      "b_id_parent": [
+        9697945
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "jcprons1@123"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135364",
+      "b_id": [
+        10135364
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765946"
+      ],
+      "b_category_name": [
+        "Fabrication and installation of Scaled Model of INS Vikrant"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "Fabrication and installation of Scaled Model of INS Vikrant"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8034266"
+      ],
+      "b_id_parent": [
+        9890288
+      ],
+      "is_high_value": [
+        true
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "ADLOG"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135360",
+      "b_id": [
+        10135360
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765945"
+      ],
+      "b_category_name": [
+        "Cap Crizotinib 250 mg,Rituximab 100mg Inj,InjLeucovorin Calcium 50mg,5-Fluorouracil 500mg, 10 ml In"
+      ],
+      "b_total_quantity": [
+        86546
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        20
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        1
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7849390"
+      ],
+      "b_id_parent": [
+        9678223
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Buyer2CHEC"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [
+        {
+          "bs_id": "6635965",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 20",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635966",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 18",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635967",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 17",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635968",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 16",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635969",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 15",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635970",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 14",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635971",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 12",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635972",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 11",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635973",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 10",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635974",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 9",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635975",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 8",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635976",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 7",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635977",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 6",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635978",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 5",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635979",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 4",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635980",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 3",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6635981",
+          "bs_bid_id": "10135360",
+          "bs_title": "Schedule 1",
+          "bs_status": "0"
+        }
+      ],
+      "parent_bid_schedule": [
+        {
+          "bs_id": "6142221",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 1",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142222",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 2",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6142223",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 3",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142224",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 4",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142225",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 5",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142226",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 6",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142227",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 7",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142228",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 8",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142229",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 9",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142230",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 10",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142231",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 11",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142232",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 12",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142233",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 13",
+          "bs_status": "1"
+        },
+        {
+          "bs_id": "6142234",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 14",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142235",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 15",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142236",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 16",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142237",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 17",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142238",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 18",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142239",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 19",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6142240",
+          "bs_bid_id": "9678223",
+          "bs_title": "Schedule 20",
+          "bs_status": "0"
+        }
+      ]
+    },
+    {
+      "id": "10135359",
+      "b_id": [
+        10135359
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765944"
+      ],
+      "b_category_name": [
+        "0.09X20 POLYESTER GLASS SILK TAPE TO 4TMS. 096.088 REV-02. MATERIAL TO BE SUPPLIED IN ROLLS OF 50 M"
+      ],
+      "b_total_quantity": [
+        350000
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-10T15:00:00Z"
+      ],
+      "bd_category_name": [
+        "0.09X20 POLYESTER GLASS SILK TAPE TO 4TMS. 096.088 REV-02. MATERIAL TO BE SUPPLIED IN ROLLS OF 50 MR"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8168894"
+      ],
+      "b_id_parent": [
+        10044261
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "ashoksahni"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Heavy Industries and Public Enterprises"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Heavy Industry"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135358",
+      "b_id": [
+        10135358
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765943"
+      ],
+      "b_category_name": [
+        "TB, SDSS, SA789GRS32750/327, 6096MM, 19.05MM"
+      ],
+      "b_total_quantity": [
+        8500
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "TB, SDSS, SA789GRS32750/327, 6096MM, 19.05MM"
+      ],
+      "b_is_custom_item": [
+        1
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7898683"
+      ],
+      "b_id_parent": [
+        9734571
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_univ_univ_univ_univ"
+      ],
+      "b.b_created_by": [
+        "buyer243.hpcl.ap"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Petroleum and Natural Gas"
+      ],
+      "ba_official_details_deptName": [
+        "NA"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135352",
+      "b_id": [
+        10135352
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765942"
+      ],
+      "b_category_name": [
+        "PRESSUR PLATE,CLUTCH RELEASE BRG,FLY WHEEL ASSY,WATER PUMP COOLANT,CLUTCH REPAIR KIT,SLEEVE REPAIR "
+      ],
+      "b_total_quantity": [
+        7
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        6
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "PRESSUR PLATE,CLUTCH RELEASE BRG,FLY WHEEL ASSY,WATER PUMP COOLANT,CLUTCH REPAIR KIT,SLEEVE REPAIR KIT"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8197069"
+      ],
+      "b_id_parent": [
+        10076920
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "FINANCECLERK@948"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10135347",
+      "b_id": [
+        10135347
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/765941"
+      ],
+      "b_category_name": [
+        "Custom Bid for Services - Outside Refinery disposal of Canteen Gar - MR"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        1
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        1
+      ],
+      "b_buyer_status": [
+        0
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-07T10:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-09T10:00:00Z"
+      ],
+      "bd_category_name": [
+        "Custom Bid for Services - Outside Refinery disposal of Canteen Gar - MR"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8095207"
+      ],
+      "b_id_parent": [
+        9960234
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_cust"
+      ],
+      "b.b_created_by": [
+        "buyer243.hpcl.ap"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Petroleum and Natural Gas"
+      ],
+      "ba_official_details_deptName": [
+        "NA"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    }
+  ],
+  "numFound": 46464,
+  "start": 0
+}

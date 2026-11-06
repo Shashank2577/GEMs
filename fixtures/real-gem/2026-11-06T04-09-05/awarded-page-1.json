@@ -1,0 +1,990 @@
+{
+  "docs": [
+    {
+      "id": "10122631",
+      "b_id": [
+        10122631
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764536"
+      ],
+      "b_category_name": [
+        "Goods Transport Service – Per KM Based Service - Valuable goods requiring High Security; Open Bod"
+      ],
+      "b_total_quantity": [
+        10500
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        3
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T21:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T21:00:00Z"
+      ],
+      "bd_category_name": [
+        "Goods Transport Service – Per KM Based Service - Valuable goods requiring High Security; Open Body Taurus; 16 FT Truck,Goods Transport Service – Per KM Based Service - Valuable goods requiring High Security; Flatbed Truck; 40 to 80 FT Double Excel,Goods Transport Service – Per KM Based Service - Valuable goods requiring High Security; Flatbed Truck; 40 to 80 FT Double Crown (Depression)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8213332"
+      ],
+      "b_id_parent": [
+        10095866
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_good_go61253067"
+      ],
+      "b.b_created_by": [
+        "divyansh84890"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10122174",
+      "b_id": [
+        10122174
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764485"
+      ],
+      "b_category_name": [
+        "15 AMP SOCKET AND SWITCH WITH BOARD,2 AND HALF SQ MM SINGLE CORE COPPER WIRE RED,2 AND HALF SQ MM S"
+      ],
+      "b_total_quantity": [
+        436
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        6
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T19:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T19:00:00Z"
+      ],
+      "bd_category_name": [
+        "15 AMP SOCKET AND SWITCH WITH BOARD,2 AND HALF SQ MM SINGLE CORE COPPER WIRE RED,2 AND HALF SQ MM SINGLE CORE COPPER WIRE BLACK,1 SQ MM SINGLE CORE COPPER WIRE,4 SQ MM COPPER WIRE,10 SQ MM 2 CORE ALUMINIUM WIRE"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8178804"
+      ],
+      "b_id_parent": [
+        10055669
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_boq_boql_boql_boq"
+      ],
+      "b.b_created_by": [
+        "Shaikh302@buyer"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bd_details_is_boq": [
+        true
+      ],
+      "bd_details_new_boq": [
+        true
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": [
+        {
+          "bs_id": "6549156",
+          "bs_bid_id": "10055669",
+          "bs_title": "Schedule 1",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6549157",
+          "bs_bid_id": "10055669",
+          "bs_title": "Schedule 2",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6549158",
+          "bs_bid_id": "10055669",
+          "bs_title": "Schedule 3",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6549159",
+          "bs_bid_id": "10055669",
+          "bs_title": "Schedule 4",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6549160",
+          "bs_bid_id": "10055669",
+          "bs_title": "Schedule 5",
+          "bs_status": "0"
+        },
+        {
+          "bs_id": "6549161",
+          "bs_bid_id": "10055669",
+          "bs_title": "Schedule 6",
+          "bs_status": "0"
+        }
+      ]
+    },
+    {
+      "id": "10122211",
+      "b_id": [
+        10122211
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764491"
+      ],
+      "b_category_name": [
+        "Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conform"
+      ],
+      "b_total_quantity": [
+        1321
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        28
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T19:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T19:00:00Z"
+      ],
+      "bd_category_name": [
+        "Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper Alloy Gate Valve For Waterworks Purpose (V2) Conforming to IS 778,Copper Alloy Gate Valve For Waterworks Purpose (V2) Conforming to IS 778,PLASTIC BIB TAPS, PILLAR TAPS, ANGLE VALVES & STOP VALVES FOR HOT & COLD WATER SERVICES Conforming to IS 9763,PLASTIC BIB TAPS, PILLAR TAPS, ANGLE VALVES & STOP VALVES FOR HOT & COLD WATER SERVICES Conforming to IS 9763,Rotational Moulded Polyethylene"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8182450"
+      ],
+      "b_id_parent": [
+        10060170
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_stru_plum_fauc_co26775645,home_dist_flui_valv_co28615303,home_stru_plum_fauc_pl63113354,home_mate_cont_tank_ro87540757,home_dome_do65723251_bath_ba41273766,home_stru_plum_fa18486036_heal,home_stru_plum_nons_to55807567,home_stru_plum_nons_to45544432,home_stru_plum_sani_ba28166822"
+      ],
+      "b.b_created_by": [
+        "cweprakash"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10120372",
+      "b_id": [
+        10120372
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764337"
+      ],
+      "b_category_name": [
+        "Tractors (V3)"
+      ],
+      "b_total_quantity": [
+        131
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T15:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T16:27:59Z"
+      ],
+      "bd_category_name": [
+        "Tractors (V3)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8164379"
+      ],
+      "b_id_parent": [
+        10039129
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_ve66014551_moto_spec_tr17117346"
+      ],
+      "b.b_created_by": [
+        "gaurav2051"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Development and Panchayats Department Haryana"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10120638",
+      "b_id": [
+        10120638
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764362"
+      ],
+      "b_category_name": [
+        "Garden Bench"
+      ],
+      "b_total_quantity": [
+        24
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T16:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T16:00:00Z"
+      ],
+      "bd_category_name": [
+        "Garden Bench"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8186322"
+      ],
+      "b_id_parent": [
+        10064720
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_furn_ac74548875_outd_ga26462203"
+      ],
+      "b.b_created_by": [
+        "shhkrpsh7@gmail.com"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Panchayats and Rural Housing Department Gujarat"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10119728",
+      "b_id": [
+        10119728
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764265"
+      ],
+      "b_category_name": [
+        "XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for"
+      ],
+      "b_total_quantity": [
+        13243
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        156
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T14:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T15:50:29Z"
+      ],
+      "bd_category_name": [
+        "XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE Cable for Working Voltage up to and Including 1.1 KV Marked To IS 7098 (Part 1),XLPE"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8170742"
+      ],
+      "b_id_parent": [
+        10046388
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_powe_elec_elec_xl32325872,home_el05420327_ligh_exte_le13704051,home_el05420327_ligh_exte_le66054140,home_el05420327_lamp_lamp_le24155786,home_el63626345_ligh_exte_le31181000,home_el34134111_elec_el56655605_pi60435532,home_el34134111_lamp_lamp_ledb,home_el05420327_lamp_lamp_se47014418,home_el05420327_ligh_inte_le83742270,home_el34134111_elec_el80413628_ca78873062,home_dist_heat_heat_heat,home_powe_elec_elec_pv30826510,home_el34134111_elec_el80413628_comp,home_powe_elec_elec_pvcf,home_el47672617_pass_cap"
+      ],
+      "b.b_created_by": [
+        "cweprakash"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10087292",
+      "b_id": [
+        10087292
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/759829"
+      ],
+      "b_category_name": [
+        "Toner Cartridges / Ink Cartridges / Consumables for Printers"
+      ],
+      "b_total_quantity": [
+        35
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-10-28T15:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T15:34:03Z"
+      ],
+      "bd_category_name": [
+        "Toner Cartridges / Ink Cartridges / Consumables for Printers"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/7975723"
+      ],
+      "b_id_parent": [
+        9823053
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_offi_offi_prin_tone"
+      ],
+      "b.b_created_by": [
+        "AMMGENERAL"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Railways"
+      ],
+      "ba_official_details_deptName": [
+        "Indian Railways"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10119809",
+      "b_id": [
+        10119809
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764272"
+      ],
+      "b_category_name": [
+        "XLPE Cable, Working Voltage from 3.3 kV up to and including 33 kV (V2) ISI Marked to IS 7098 (Part "
+      ],
+      "b_total_quantity": [
+        1838
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        13
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T14:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T15:00:00Z"
+      ],
+      "bd_category_name": [
+        "XLPE Cable, Working Voltage from 3.3 kV up to and including 33 kV (V2) ISI Marked to IS 7098 (Part 2),XLPE Cable, Working Voltage from 3.3 kV up to and including 33 kV (V2) ISI Marked to IS 7098 (Part 2),Moulded Case Circuit Breakers (MCCB) Conforming To IS/IEC 60947 (Part 2),Moulded Case Circuit Breakers (MCCB) Conforming To IS/IEC 60947 (Part 2),Moulded Case Circuit Breakers (MCCB) Conforming To IS/IEC 60947 (Part 2),Moulded Case Circuit Breakers (MCCB) Conforming To IS/IEC 60947 (Part 2),Miniature Circuit Breakers (MCB) for AC Operation Marked To IS/IEC 60898 (Part 1),Miniature Circuit Breakers (MCB) for AC Operation Marked To IS/IEC 60898 (Part 1),Miniature Circuit Breakers (MCB) for AC Operation Marked To IS/IEC 60898 (Part 1),LED Luminaire for High Bay Lighting,PVC Insulated Copper Cable Single Core and Multi Core Circular Sheathed with Flexible Conductor (V2) ISI Marked To IS 694,PVC Insulated Copper Cable Single Core and Multi Core Circular Sheathed with Flexible Conductor (V2) ISI Marked To IS 694,PV"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8171197"
+      ],
+      "b_id_parent": [
+        10046913
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_powe_el15882444_elec_xl74530704,home_elec_elec_circ_mold,home_el34134111_elec_circ_mcbm,home_el05420327_ligh_inte_ledl,home_powe_elec_elec_pv42074413"
+      ],
+      "b.b_created_by": [
+        "cweprakash"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10119396",
+      "b_id": [
+        10119396
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764228"
+      ],
+      "b_category_name": [
+        "Plastic Seats and Covers for Water - Closets as per IS 2548,Ceramic ( Vitreous China ) Flushing Cis"
+      ],
+      "b_total_quantity": [
+        4949
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        19
+      ],
+      "b_type": [
+        0
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T14:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T14:00:00Z"
+      ],
+      "bd_category_name": [
+        "Plastic Seats and Covers for Water - Closets as per IS 2548,Ceramic ( Vitreous China ) Flushing Cisterns for Water Closets and Urinals conforming to IS 774,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Bathroom Water Shower (V2),Copper Alloy Gate Valve For Waterworks Purpose (V2) Conforming to IS 778,Stainless Steel Shelf Rack,Bathroom or Toilet Mirror (V3),Towel Ring,Waste Fittings for Washbasin and Sinks as per IS 2963,Bathroom Water Shower (V2),Copper alloy Taps/Stop Valves (V2) Conforming to IS 8931,Health Faucet,Waste Fittings for Washbasin and Sinks as per IS 2963,Bathroom or Toilet Mirror (V3),Flexible Drain Hoses for Wash Basins/ Sinks,Metal Alloy Casting Water Tap with Aerator (V2),Metal Alloy Casting Water Tap with Aerator (V2),Bathroom Water Shower (V2)"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8087988"
+      ],
+      "b_id_parent": [
+        9951729
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "home_stru_plum_sani_plas,home_stru_plum_sani_cera,home_stru_plum_fauc_co26775645,home_stru_plum_sani_ba28166822,home_dist_flui_valv_co28615303,home_furn_ac74548875_offi_st41251771,home_dome_do65723251_bath_ba41273766,home_stru_plum_nons_to55807567,home_dist_flui_hard_wast,home_stru_plum_fa18486036_heal,home_dist_flui_hose_flex,home_stru_plum_fauc_meta"
+      ],
+      "b.b_created_by": [
+        "buyerbtd"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_minName": [
+        "Ministry of Defence"
+      ],
+      "ba_official_details_deptName": [
+        "Department of Military Affairs"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    },
+    {
+      "id": "10119450",
+      "b_id": [
+        10119450
+      ],
+      "b_bid_number": [
+        "GEM/2026/R/764234"
+      ],
+      "b_category_name": [
+        "Repair, Maintenance, and Installation of Plant/ Systems/Equipments (Version 2) - MUNICIPAL CORPORAT"
+      ],
+      "b_total_quantity": [
+        1
+      ],
+      "b_status": [
+        2
+      ],
+      "b_bid_type": [
+        2
+      ],
+      "b_is_bunch": [
+        1
+      ],
+      "b_type": [
+        1
+      ],
+      "b_bid_to_ra": [
+        2
+      ],
+      "b_buyer_status": [
+        3
+      ],
+      "b_eval_type": [
+        0
+      ],
+      "final_start_date_sort": [
+        "2026-11-04T14:00:00Z"
+      ],
+      "final_end_date_sort": [
+        "2026-11-05T14:00:00Z"
+      ],
+      "bd_category_name": [
+        "Repair, Maintenance, and Installation of Plant/ Systems/Equipments (Version 2) - MUNICIPAL CORPORATION AMBALA; Supply of Brush Cutter 20nos and chain saw 2 nos; Service Provider"
+      ],
+      "b_is_custom_item": [
+        0
+      ],
+      "b_bid_number_parent": [
+        "GEM/2026/B/8159372"
+      ],
+      "b_id_parent": [
+        10033487
+      ],
+      "is_high_value": [
+        false
+      ],
+      "b_ra_to_bid": [
+        1
+      ],
+      "ra_b_status": [
+        1
+      ],
+      "b_is_inactive": [
+        0
+      ],
+      "ra_b_buyer_status": [
+        2
+      ],
+      "b_cat_id": [
+        "services_home_repa_re22373363"
+      ],
+      "b.b_created_by": [
+        "secymc.ambala"
+      ],
+      "ba_is_single_packet": [
+        0
+      ],
+      "ba_is_global_tendering": [
+        0
+      ],
+      "ba_is_limited_tendering": [
+        0
+      ],
+      "is_rc_bid": [
+        0
+      ],
+      "ba_official_details_deptName": [
+        "Urban Local Bodies"
+      ],
+      "bid_schedule": [],
+      "parent_bid_schedule": []
+    }
+  ],
+  "numFound": 3433123,
+  "start": 0
+}
