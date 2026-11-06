@@ -220,6 +220,13 @@ const pctP = (v: string): Parsed => {
   const n = Number.parseFloat(m[1]);
   return { value: `${n}%`, numeric: n };
 };
+// "Past Performance" is also a list item inside "Documents required from seller" (real GeM, 2026-11): only a leading "<n> %" is the criterion.
+const pastP = (v: string): Parsed => {
+  const m = v.match(/^[\s:]*(\d+(?:\.\d+)?)\s*%/);
+  if (!m) return null;
+  const n = Number.parseFloat(m[1]);
+  return { value: `${n}%`, numeric: n };
+};
 const intP = (v: string): Parsed => {
   const m = v.match(/(\d[\d,]*)/);
   if (!m) return null;
@@ -255,7 +262,7 @@ const LABELS: LabelDef[] = [
   { key: 'turnover_min', label: 'Minimum average annual turnover (bidder)', re: L('Minimum Average'), tail: 'Annual Turnover of the bidder (For 3 Years)', minTail: 14, parse: amount, mandatory: true },
   { key: 'oem_turnover', label: 'OEM average annual turnover', re: L('OEM Average'), tail: 'Turnover (Last 3 Years)', minTail: 8, parse: amount, mandatory: true },
   { key: 'experience_years', label: 'Years of past experience', re: L('Years of Past'), tail: 'Experience Required for same/similar service', minTail: 18, parse: yearsP, mandatory: true },
-  { key: 'past_performance', label: 'Past performance', re: L('Past Performance'), parse: pctP, mandatory: true },
+  { key: 'past_performance', label: 'Past performance', re: L('Past Performance'), parse: pastP, mandatory: true },
   { key: 'mse_exemption', label: 'MSE exemption (experience & turnover)', re: L('MSE (Exemption|Relaxation)'), tail: 'for Years Of Experience and Turnover', minTail: 8, parse: yesNo, mandatory: false },
   { key: 'startup_exemption', label: 'Startup exemption (experience & turnover)', re: L('Startup (Exemption|Relaxation)'), tail: 'for Years Of Experience and Turnover', minTail: 8, parse: yesNo, mandatory: false },
   { key: 'documents_required', label: 'Documents required from seller', re: L('Document(s)? required from seller'), parse: textP, mandatory: true },
@@ -497,6 +504,20 @@ export function extractRequirementsRules(pages: string[], meta: RuleMeta = {}): 
       });
     });
   });
+
+  // Real GeM (2026-11): a bid with no deposit prints "EMD Detail … Required No" / "ePBG Detail … Required No" instead of an
+  // amount. Record it explicitly so "no EMD" is a known fact (numeric 0) rather than a missing one.
+  for (const [key, label, name] of [['emd', 'EMD amount', 'EMD'], ['epbg', 'ePBG percentage', 'ePBG']] as const) {
+    if (have.has(key)) continue;
+    const re = new RegExp(`${name}\\s*Detail[^]{0,30}?Required\\s+(No|Yes)\\b`, 'i');
+    for (let i = 0; i < flats.length; i++) {
+      const m = re.exec(flats[i]);
+      if (!m || m[1].toLowerCase() !== 'no') continue;
+      have.add(key);
+      out.push({ key, label, value: 'Not required', numeric: 0, mandatory: false, source: src(i + 1, flats[i].slice(m.index, m.index + m[0].length)), method: 'RULE', confidence: 0.9 });
+      break;
+    }
+  }
 
   // Documents required → one requirement per document.
   const dl = docList as { items: string[]; page: number; quote: string } | null;

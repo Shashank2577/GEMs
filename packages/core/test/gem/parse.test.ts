@@ -168,3 +168,17 @@ describe('format-drift guard (FR-014)', () => {
     expect(isFormatDriftError(new Error('GeM listing failed: HTTP 503'))).toBe(false);
   });
 });
+
+describe('parentBidRef (real GeM reverse-auction listing, 2026-11)', () => {
+  it('reads the parent bid from an RA listing doc and builds its /showbidDocument URL', async () => {
+    const { parentBidRef } = await import('../../src/gem/parse');
+    expect(parentBidRef({ b_id_parent: [9802953], b_bid_number_parent: ['GEM/2026/B/7958327'] })).toEqual({
+      bidNumber: 'GEM/2026/B/7958327', gemBidId: '9802953', documentUrl: 'https://bidplus.gem.gov.in/showbidDocument/9802953',
+    });
+  });
+  it('is null when there is no parent', async () => {
+    const { parentBidRef } = await import('../../src/gem/parse');
+    expect(parentBidRef({})).toBeNull();
+    expect(parentBidRef(null)).toBeNull();
+  });
+});
