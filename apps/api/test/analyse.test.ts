@@ -25,7 +25,7 @@ const gemFetch: typeof fetch = async (input) => {
   const url = String(input instanceof Request ? input.url : input);
   gemCalls.push(url);
   if (onGemFetch) await onGemFetch(url);
-  const m = url.match(/\/showbidDocument\/(.+)$/);
+  const m = url.match(/\/(?:showbidDocument|showradocumentPdf)\/(.+)$/);
   if (m?.[1] === 'oversize') {
     // Advertises 26 MB; the client must refuse it without buffering the body (FR-008).
     return new Response(new TextEncoder().encode('%PDF-1.7 big') as BodyInit, { status: 200, headers: { 'content-type': 'application/pdf', 'content-length': String(26 * 1024 * 1024) } });
@@ -300,6 +300,19 @@ describe('corrigendum re-fetch of the GeM document (004/FR-046)', () => {
   const analyse = (t: { id: string }) => request(ctx.app, 'POST', `/tenders/${t.id}/analyse`, { cookie: roles.analyst.cookie });
   const fetchFailures = (t: { id: string }) => ctx.db.select().from(activityLog)
     .where(and(eq(activityLog.entityId, t.id), eq(activityLog.action, 'tender.document_fetch_failed')));
+
+  it('a reverse auction downloads its PARENT bid (the RA PDF is a 2-page summary; real GeM 2026-11), falling back to its own document', async () => {
+    const t = await insertTender('go-it-services', {
+      bidNumber: 'GEM/2026/R/9460020', contentHash: 'c46-ra', gemBidId: '9460020', bidType: 'ra',
+      documentUrl: 'http://127.0.0.1:4010/showradocumentPdf/go-it-services',
+      raw: { b_id_parent: [9460019], b_bid_number_parent: ['GEM/2026/B/9460019'] },
+    });
+    gemCalls.length = 0;
+    const r = await fetchDocs(t);
+    expect(r.status).toBe(201);
+    // Parent first (the fixture server has no such id → not a PDF), then the RA's own document via its own route.
+    expect(gemCalls).toEqual(['http://127.0.0.1:4010/showbidDocument/9460019', 'http://127.0.0.1:4010/showradocumentPdf/go-it-services']);
+  });
 
   it('S3: a failed re-fetch (404) falls back to the stored copy, is recorded, and is retried only after a newer corrigendum', async () => {
     const t = await insertTender('go-it-services', { bidNumber: 'GEM/2026/B/9460010', contentHash: 'c46-10', gemBidId: 'go-it-services' });

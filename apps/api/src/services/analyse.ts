@@ -38,6 +38,7 @@ import {
   type TenderDocumentWarning,
 } from '@tp/core/contracts/analyse';
 import { GemClient, GemError } from '@tp/core/gem/client';
+import { parentBidRef } from '@tp/core/gem/parse';
 import type { AppDeps, LlmRequest } from '../deps';
 import { logActivity } from '../lib/activity';
 import { HttpError, conflict, forbidden, notFound, serviceUnavailable, unprocessable } from '../lib/errors';
@@ -603,6 +604,17 @@ async function textHash(text: string | null): Promise<string> {
 const gemDocsIn = (db: DbOrTx, tenderId: string) =>
   db.select().from(tenderDocuments).where(and(eq(tenderDocuments.tenderId, tenderId), isNull(tenderDocuments.orgId))).orderBy(asc(tenderDocuments.createdAt));
 
+async function fetchFirstAvailable(client: GemClient, refs: string[]): Promise<Awaited<ReturnType<GemClient['fetchBidDocument']>>> {
+  let last: unknown;
+  for (const r of refs) {
+    try { return await client.fetchBidDocument(r); } catch (e) {
+      if (e instanceof HttpError) throw e; // gem_busy: stop, do not burn the other candidates
+      last = e;
+    }
+  }
+  throw last;
+}
+
 /**
  * Download the tender's GeM bid document (public, shared by every org) once. A later call returns the stored copy,
  * unless a corrigendum changed `documentUrl` after that copy was fetched (FR-046) or `refresh` is set: then the
@@ -620,7 +632,13 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
   const outdated = await gemCopyOutdated(deps.db, tender.id, existing);
   if (existing.length && !outdated && !input.refresh) return { documents: existing, fetched: 0, tender };
   // The URL a corrigendum published wins over the bid id; the first copy keeps the bid id first.
-  const ref = existing.length ? (tender.documentUrl ?? tender.gemBidId) : (tender.gemBidId ?? tender.documentUrl);
+  // `documentUrl` carries the right GeM route per bid type (a reverse auction is not under /showbidDocument), so it comes first.
+  // A reverse auction's own PDF is a 2-page summary: its full terms are in the parent bid, which is tried first (real GeM, 2026-11).
+  const parent = tender.bidType === 'ra' && !existing.length ? parentBidRef(tender.raw, deps.gem.baseUrl) : null;
+  // A re-fetch after a corrigendum tries exactly the current URL (a failure is recorded, not papered over by another document).
+  const candidates = (existing.length ? [tender.documentUrl ?? tender.gemBidId] : [parent?.documentUrl, tender.documentUrl, tender.gemBidId])
+    .filter((x, i, a): x is string => !!x && a.indexOf(x) === i);
+  const ref = candidates[0];
   if (!ref) throw new HttpError(422, 'no_gem_document', 'This tender has no GeM document link. Download the bid PDF from GeM and upload it here.');
   const client = new GemClient(deps.fetch, {
     baseUrl: deps.gem.baseUrl, userAgent: deps.gem.userAgent, minIntervalMs: deps.gem.minIntervalMs,
@@ -635,7 +653,7 @@ export async function fetchGemDocuments(deps: AppDeps, input: { orgId: string; u
   let totalPages: number;
   try {
     try {
-      got = await client.fetchBidDocument(ref);
+      got = await fetchFirstAvailable(client, candidates);
     } catch (e) {
       if (e instanceof HttpError) throw e; // 503 gem_busy from the lease
       deps.logger.warn('analyse: GeM document fetch failed', { tenderId: tender.id, error: (e as Error).message });

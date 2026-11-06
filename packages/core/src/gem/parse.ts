@@ -125,6 +125,19 @@ function bidTypeOf(doc: BidPlusDoc, category: string | null): GemBidType {
 }
 
 /** Document route used by GeM's public all-bids page (from the Apache-2.0 reference scraper). */
+/**
+ * A reverse auction (RA) document is a 2-page summary that says "refer to Bid document of GEM/…/B/… for technical
+ * specification, terms & conditions" (seen on real GeM, 2026-11). The full eligibility terms live in the parent bid,
+ * named by `b_id_parent` / `b_bid_number_parent` on the listing doc. Returns null for bids with no parent.
+ */
+export function parentBidRef(raw: Record<string, unknown> | null | undefined, baseUrl = 'https://bidplus.gem.gov.in'): { bidNumber: string | null; gemBidId: string; documentUrl: string } | null {
+  if (!raw) return null;
+  const idNum = firstNumber(raw, ['b_id_parent']);
+  if (idNum === null || !(idNum > 0)) return null;
+  const gemBidId = idNum.toFixed(0);
+  return { bidNumber: firstText(raw, ['b_bid_number_parent']), gemBidId, documentUrl: `${baseUrl.replace(/\/+$/, '')}/showbidDocument/${gemBidId}` };
+}
+
 function documentRoute(doc: BidPlusDoc): string {
   const code = firstNumber(doc, ['b_bid_type']);
   if (code === 5) return 'showdirectradocumentPdf';

@@ -18,7 +18,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { GemClient, GemError, DEFAULT_USER_AGENT } from '../packages/core/src/gem/client';
-import { parseBidPlusDoc, type NormalizedTender } from '../packages/core/src/gem/parse';
+import { parseBidPlusDoc, parentBidRef, type NormalizedTender } from '../packages/core/src/gem/parse';
 import { extractPdf, joinPages } from '../packages/core/src/analyse/pdf-text';
 import { extractRequirementsRules, flattenText } from '../packages/core/src/analyse/rules';
 
@@ -32,6 +32,8 @@ const PAGES = Math.max(1, Math.min(5, Number(arg('pages', '3'))));
 const DOCS = Math.max(0, Math.min(8, Number(arg('docs', '5'))));
 const BASE = arg('base', 'https://bidplus.gem.gov.in');
 const UA = arg('ua', DEFAULT_USER_AGENT);
+const SEARCH = arg('search', '');   // e.g. --search "GEM/2026/B/" to see direct bids, not just reverse auctions
+const SORT = arg('sort', '');       // Bid-End-Date-Latest | Bid-End-Date-Oldest | Bid-Start-Date-Latest
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const OUT = arg('out', join('fixtures', 'real-gem', stamp));
 
@@ -83,7 +85,7 @@ async function main() {
   let reachable = true;
   for (let page = 1; page <= PAGES; page++) {
     try {
-      const res = await gem.fetchPage({ page });
+      const res = await gem.fetchPage({ page, search: SEARCH || undefined, sort: (SORT || undefined) as never });
       numFound = res.numFound;
       save(`listing-page-${page}.json`, JSON.stringify(res, null, 2));
       for (const d of res.docs) {
@@ -156,9 +158,11 @@ async function main() {
   const docSummaries: unknown[] = [];
   const allMissed: string[] = [];
   for (const t of candidates) {
-    const id = t.documentUrl ?? t.gemBidId!;
+    const parent = t.bidType === 'ra' ? parentBidRef(t.raw, BASE) : null;
+    const id = parent?.documentUrl ?? t.documentUrl ?? t.gemBidId!;
     say();
     say(`### ${t.bidNumber} — ${t.title.slice(0, 80)}`);
+    if (parent) say(`- reverse auction → following parent bid ${parent.bidNumber ?? parent.gemBidId} (${id})`);
     try {
       const doc = await gem.fetchBidDocument(id);
       const file = `docs/${sanitize(t.bidNumber)}.pdf`;
